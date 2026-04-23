@@ -7,10 +7,11 @@ import { CHAINS, getAllowedChains, getChainById } from "@/lib/chains";
 import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
 import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress } from "@/lib/validation";
-import { getEip1193Provider } from "@/lib/wallet";
+import type { Eip1193Provider } from "@/lib/wallet";
 import { ERC20_ABI } from "@/lib/erc20";
 import { buildQuoteUrl } from "@/lib/quoteClient";
 import { swapLog } from "@/lib/swapLog";
+import { connectWallet, getActiveProvider, hasInjectedProvider } from "@/lib/walletConnector";
 
 type TxStatus = "idle" | "pending" | "confirmed" | "failed";
 
@@ -18,6 +19,7 @@ export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
 
+  const [provider, setProvider] = useState<Eip1193Provider | null>(null);
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [walletChainId, setWalletChainId] = useState<number | null>(null);
 
@@ -42,9 +44,10 @@ export default function Page() {
     if (!buyToken && tokens.length > 1) setBuyToken(tokens[1]!.address);
   }, [tokens, sellToken, buyToken]);
 
+  // Attach listeners to the active provider (injected or WalletConnect)
   useEffect(() => {
-    const eth = getEip1193Provider();
-    if (!eth) return;
+    const p = provider ?? getActiveProvider();
+    if (!p) return;
 
     const onAccountsChanged = (accounts: string[]) => {
       setWalletAddress(accounts?.[0] ?? "");
@@ -55,14 +58,21 @@ export default function Page() {
       setWalletChainId(Number.isFinite(cid) ? cid : null);
     };
 
-    eth.on?.("accountsChanged", onAccountsChanged);
-    eth.on?.("chainChanged", onChainChanged);
+    const onDisconnect = () => {
+      setWalletAddress("");
+      setWalletChainId(null);
+      setProvider(null);
+    };
+
+    p.on?.("accountsChanged", onAccountsChanged);
+    p.on?.("chainChanged", onChainChanged);
+    p.on?.("disconnect", onDisconnect);
 
     (async () => {
       try {
-        const accounts = (await eth.request({ method: "eth_accounts" })) as string[];
+        const accounts = (await p.request({ method: "eth_accounts" })) as string[];
         setWalletAddress(accounts?.[0] ?? "");
-        const hex = (await eth.request({ method: "eth_chainId" })) as string;
+        const hex = (await p.request({ method: "eth_chainId" })) as string;
         onChainChanged(hex);
       } catch {
         // ignore
@@ -70,10 +80,11 @@ export default function Page() {
     })();
 
     return () => {
-      eth.removeListener?.("accountsChanged", onAccountsChanged);
-      eth.removeListener?.("chainChanged", onChainChanged);
+      p.removeListener?.("accountsChanged", onAccountsChanged);
+      p.removeListener?.("chainChanged", onChainChanged);
+      p.removeListener?.("disconnect", onDisconnect);
     };
-  }, []);
+  }, [provider]);
 
   const sellTokenInfo = useMemo(() => tokens.find((t) => t.address === sellToken), [tokens, sellToken]);
   const buyTokenInfo = useMemo(() => tokens.find((t) => t.address === buyToken), [tokens, buyToken]);
@@ -86,26 +97,24 @@ export default function Page() {
     sellTokenInfo.address !== buyTokenInfo.address &&
     amountHuman.trim().length > 0;
 
-  async function connectWallet() {
+  async function onConnectWallet() {
     setActionError("");
-    const eth = getEip1193Provider();
-    if (!eth) {
-      setActionError("MetaMask not detected. Please install MetaMask.");
-      return;
-    }
     try {
-      const accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
-      setWalletAddress(accounts?.[0] ?? "");
-      const hex = (await eth.request({ method: "eth_chainId" })) as string;
-      setWalletChainId(Number.parseInt(hex, 16));
+      const res = await connectWallet({ allowedChainIds: allowedChains.map((c) => c.chainId) });
+      setProvider(res.provider);
     } catch (e: any) {
       setActionError(normalizeWalletError(e));
     }
   }
 
+  function getProviderOrThrow(): Eip1193Provider {
+    const p = provider ?? getActiveProvider();
+    if (!p) throw new Error("No wallet connected. Click “Connect Wallet” first.");
+    return p;
+  }
+
   async function ensureCorrectNetwork() {
-    const eth = getEip1193Provider();
-    if (!eth) throw new Error("MetaMask not detected.");
+    const p = getProviderOrThrow();
 
     const desired = selectedChainId;
     const current = walletChainId;
@@ -114,15 +123,16 @@ export default function Page() {
 
     const hexDesired = "0x" + desired.toString(16);
     try {
-      await eth.request({
+      await p.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: hexDesired }]
       });
     } catch (e: any) {
+      // If chain not added, try to add it (best-effort)
       if (e?.code === 4902) {
         const c = CHAINS[desired];
         if (!c?.rpcUrls?.length || !c.nativeCurrency) throw new Error("Chain not available to add in this app.");
-        await eth.request({
+        await p.request({
           method: "wallet_addEthereumChain",
           params: [
             {
@@ -187,10 +197,8 @@ export default function Page() {
 
     if (sellTokenInfo.isNative) return;
 
-    const eth = getEip1193Provider();
-    if (!eth) throw new Error("MetaMask not detected.");
-
-    const provider = new ethers.BrowserProvider(eth);
+    const p = getProviderOrThrow();
+    const provider = new ethers.BrowserProvider(p);
     const signer = await provider.getSigner();
 
     const token = new ethers.Contract(sellTokenInfo.address, ERC20_ABI, signer);
@@ -219,10 +227,8 @@ export default function Page() {
       await ensureCorrectNetwork();
       await ensureAllowanceAndApproveIfNeeded();
 
-      const eth = getEip1193Provider();
-      if (!eth) throw new Error("MetaMask not detected.");
-
-      const provider = new ethers.BrowserProvider(eth);
+      const p = getProviderOrThrow();
+      const provider = new ethers.BrowserProvider(p);
       const signer = await provider.getSigner();
 
       setSwapStatus("pending");
@@ -283,22 +289,30 @@ export default function Page() {
     };
   }, [quote, sellTokenInfo, buyTokenInfo]);
 
+  const connectHint = useMemo(() => {
+    if (walletAddress) return "";
+    if (hasInjectedProvider()) return "Detected an injected wallet in your browser.";
+    return "No injected wallet detected. We’ll open WalletConnect so you can connect a mobile wallet.";
+  }, [walletAddress]);
+
   return (
     <div className="container">
       <div className="header">
         <div>
           <h1 className="h1">Swap Aggregator MVP</h1>
-          <div className="subtle">Non-custodial swaps via 0x + MetaMask. Backend only builds quotes.</div>
+          <div className="subtle">Non-custodial swaps via 0x + your wallet. Backend only builds quotes.</div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
           <span className="badge">
             Network: <span className="mono">{chain?.name ?? `Chain ${selectedChainId}`}</span>
           </span>
-          <button className="btn btnPrimary" onClick={connectWallet} disabled={!!walletAddress}>
-            {walletAddress ? `Connected: ${shortAddr(walletAddress)}` : "Connect MetaMask"}
+          <button className="btn btnPrimary" onClick={onConnectWallet} disabled={!!walletAddress}>
+            {walletAddress ? `Connected: ${shortAddr(walletAddress)}` : "Connect Wallet"}
           </button>
         </div>
       </div>
+
+      {!walletAddress ? <div className="small" style={{ marginBottom: 12 }}>{connectHint}</div> : null}
 
       <div className="grid">
         <div className="panel">
@@ -451,7 +465,7 @@ function shortAddr(a: string) {
 }
 
 function normalizeWalletError(e: any): string {
-  if (e?.code === 4001) return "User rejected the request in MetaMask.";
+  if (e?.code === 4001) return "User rejected the request in their wallet.";
 
   const msg =
     e?.shortMessage ||
@@ -460,7 +474,10 @@ function normalizeWalletError(e: any): string {
     (typeof e === "string" ? e : "") ||
     "Unknown error";
 
-  // Common patterns from RPC / 0x
+  if (/project id/i.test(msg) && /walletconnect/i.test(msg)) {
+    return "WalletConnect is not configured. Set WALLETCONNECT_PROJECT_ID in your environment.";
+  }
+
   if (/insufficient funds/i.test(msg)) return "Insufficient funds for gas or swap amount.";
   if (/insufficient liquidity/i.test(msg)) return "Insufficient liquidity for this trade.";
   if (/slippage/i.test(msg)) return "Swap failed due to slippage. Try again with a smaller amount.";
