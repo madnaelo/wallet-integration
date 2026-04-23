@@ -65,7 +65,10 @@ Behavior:
 
 Auth:
 - No user auth required for MVP.
-- Add basic abuse protection (rate limiting / caching) if feasible.
+
+Protection:
+- Add basic rate limiting (e.g. per IP)
+- Add lightweight caching for identical quote requests (short TTL)
 
 Config:
 - Use `0x API key` from environment variable.
@@ -84,26 +87,44 @@ UI:
 
 Flow:
 1) User connects MetaMask.
-2) User selects tokens and amount.
-3) Frontend calls backend `GET /api/quote` with:
-   - chainId (from wallet)
-   - sellToken (address or symbol)
-   - buyToken (address or symbol)
-   - sellAmount (in base units or human units; be explicit and consistent)
-   - takerAddress (user wallet address)
-4) Frontend displays quote.
-5) On "Swap":
-   - Use `ethers.js` signer to send the transaction:
-     - `to` = quote.to
-     - `data` = quote.data
-     - `value` = quote.value
-     - `gasLimit` = quote.gas (or estimateGas with a safety buffer)
+2) Ensure wallet chainId is supported.
+3) User selects tokens and amount.
+4) Convert human-readable amount → base units using token decimals.
+5) Frontend calls backend `GET /api/quote` with:
+   - chainId
+   - sellToken
+   - buyToken
+   - sellAmount (base units)
+   - takerAddress (user wallet)
+6) Display quote (convert values back to human-readable).
+7) Before swap:
+   - Check ERC20 allowance for sellToken
+   - If insufficient:
+     - Prompt user to approve token spending
+     - Wait for approval confirmation
+8) On "Swap":
+   - Ensure wallet is on correct network (prompt switch if needed)
+   - Estimate gas using ethers.js
+   - Add safety buffer (~20%)
+   - Fallback to quote.gas if estimation fails
+   - Send transaction using signer.sendTransaction():
+     - to = quote.to
+     - data = quote.data
+     - value = quote.value
+     - gasLimit = computed gas
    - Let user sign in MetaMask
    - Show transaction hash after submission
-   - Optionally show confirmation status (pending/confirmed/failed)
+   - Show status: pending → confirmed / failed
+
+Error handling:
+- Display clear user-friendly errors:
+  - insufficient funds
+  - insufficient liquidity
+  - slippage issues
+  - user rejected transaction
+  - network mismatch
 
 Important:
-- Ensure chain/network in MetaMask matches the quote chainId.
 - Never send transactions from backend.
 
 ---
@@ -111,107 +132,110 @@ Important:
 ## 5) Dev/QA Testing Without Real Funds
 
 Support safe testing via testnets:
-- Use testnet chain IDs for dev/qa (configurable).
-- Use faucet funds for gas and test tokens where available.
-- Provide environment guardrails to prevent accidental mainnet usage in dev/qa.
+- Use testnet chain IDs for dev/qa (configurable)
+- Use faucet funds
+- Provide environment guardrails to prevent accidental mainnet usage
 
-Add optional preflight checks:
-- Simulate transaction with `eth_call` before prompting swap (optional but recommended).
-- Estimate gas and show errors early.
+Optional (recommended):
+- Simulate transaction via eth_call before execution
+- Estimate gas before showing swap
 
 ---
 
 ## 6) “All Chains” and “All Tokens” Strategy (Design for Future)
 
-The MVP should be designed so it can expand to:
-- Multiple chains
-- Multiple aggregators (0x, 1inch, Paraswap, etc.)
-- “All tokens” via discovery/import, not a massive static DB
-
-Key design principles:
-
 ### Chains
-Maintain an internal **enabled chain registry** (policy), not “every chain in existence.”
-- Per environment, define `ALLOWED_CHAIN_IDS`.
-- For each enabled chain, store required metadata:
-  - chainId, name
-  - aggregator base URL(s)
-  - RPC URL(s)
-  - feature flags (quotes enabled, swaps enabled)
-
-Frontend should fetch enabled chains from backend (future endpoint), or use a shared config for MVP.
+Maintain an internal **enabled chain registry**:
+- Controlled via `ALLOWED_CHAIN_IDS`
+- Each chain includes:
+  - chainId
+  - name
+  - aggregator base URL
+  - RPC URL
+  - feature flags
 
 ### Tokens
-Do NOT attempt to store all tokens globally.
-Use a layered approach:
-1) Curated default token list per chain (for UX)
-2) Token import by address (user pastes address)
-3) Denylist/blocklist for known bad tokens
-4) Optional risk checks (liquidity thresholds, honeypot/tax detection) later
+Use layered token approach:
+1) Curated default list
+2) Token import by address
+3) Blocklist for malicious tokens
+4) Optional risk checks later
 
 For MVP:
-- Provide a small curated token list for at least one chain.
-- Optionally allow token import by address (recommended if time permits).
+- Provide small curated token list
+- Support token import by address if feasible
 
 ---
 
 ## 7) Production Readiness Requirements (MVP)
 
 Implement:
-- Strong typing (TypeScript) for request/response DTOs
-- Input validation (chainId, addresses, amounts)
-- Clear error handling and user-friendly messages
-- Environment-based configuration:
-  - `ZEROX_API_KEY`
-  - `AFFILIATE_ADDRESS`
-  - `ALLOWED_CHAIN_IDS` (dev/qa/prod)
-  - RPC URLs if needed
+- Strong typing (TypeScript)
+- Input validation (addresses, chainId, amounts)
+- Clean error handling
+- Environment config:
+  - ZEROX_API_KEY
+  - AFFILIATE_ADDRESS
+  - ALLOWED_CHAIN_IDS
 - Security basics:
-  - CORS configured appropriately
-  - Rate limiting (at least minimal)
-  - Do not log sensitive user data unnecessarily
-- Code organization that supports future expansion:
-  - Aggregator client interface (e.g., `DexAggregatorClient`)
-  - `ZeroXClient` implementation
-  - Quote normalization layer (optional)
-  - Chain registry module
+  - CORS restrictions
+  - Rate limiting
+  - Avoid sensitive logging
+
+Architecture:
+- Aggregator abstraction layer:
+  - DexAggregatorClient interface
+  - ZeroXClient implementation
+- Chain registry module
+- Clear modular structure for future expansion
 
 ---
 
-## 8) Deliverables
+## 8) Swap Tracking (Lightweight)
 
-Produce a working MVP with:
-- Next.js frontend (TypeScript) + ethers.js + MetaMask connect
-- Backend `GET /api/quote` calling 0x with affiliate fee injection
-- Swap execution via MetaMask using returned tx payload
-- Dev/QA environment support via testnets and guardrails
+After transaction submission:
+- Capture and log:
+  - tx hash
+  - wallet address
+  - timestamp
+- Store in memory or simple log (no DB required for MVP)
 
 ---
 
-## 9) Notes / Business Context
+## 9) Deliverables
+
+- Next.js frontend (TypeScript)
+- MetaMask wallet integration
+- Backend `/api/quote`
+- Swap execution via wallet
+- ERC20 approval flow
+- Dev/testnet support
+- Fee collection via affiliateAddress
+
+---
+
+## 10) Notes / Business Context
 
 Business model:
-- Earn fee via aggregator affiliate/integrator parameters:
-  - `affiliateAddress` + `buyTokenPercentageFee=0.002`
+- Affiliate fee via 0x:
+  - affiliateAddress
+  - buyTokenPercentageFee = 0.002
 
-Legal positioning:
-- Non-custodial software interface
-- Users sign their own transactions
-- Platform never holds funds
+Legal:
+- Non-custodial
+- User-signed transactions
+- No fund handling
 
 ---
 
-## 10) Implementation Guidance
+## 11) Implementation Guidance
 
-When implementing:
-- Prefer simplicity but keep modular boundaries for future features:
+- Keep MVP minimal but clean
+- Design for future:
+  - multi-aggregator
   - user accounts
-  - analytics/reporting
-  - charts
-  - favorites
-  - swap history
-  - price alerts/notifications
-
-Do not implement those future features now, but design the code so they can be added without rewriting the MVP.
+  - analytics
+  - alerts
+- Do NOT implement those now
 
 END OF PROMPT
