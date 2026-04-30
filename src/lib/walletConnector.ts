@@ -29,6 +29,12 @@ export async function connectWallet(params: {
     throw new Error("Wallet connection must be initiated in the browser.");
   }
 
+  const [primaryChainId, ...additionalChainIds] = params.allowedChainIds;
+  if (primaryChainId === undefined) {
+    throw new Error("At least one allowed chain is required to connect a wallet.");
+  }
+  const walletConnectChains = [primaryChainId, ...additionalChainIds] as [number, ...number[]];
+
   // Prefer injected provider (MetaMask or any injected wallet)
   if (window.ethereum) {
     const injected = window.ethereum as Eip1193Provider;
@@ -50,10 +56,10 @@ export async function connectWallet(params: {
     );
   }
 
-  const wc = (await EthereumProvider.init({
+  const wc = await EthereumProvider.init({
     projectId,
-    chains: params.allowedChainIds,
-    optionalChains: params.allowedChainIds,
+    chains: walletConnectChains,
+    optionalChains: walletConnectChains,
     showQrModal: true,
     methods: [
       "eth_accounts",
@@ -68,13 +74,13 @@ export async function connectWallet(params: {
       "eth_signTypedData_v4"
     ],
     events: ["accountsChanged", "chainChanged", "disconnect"]
-  })) as unknown as Eip1193Provider;
+  });
 
-  await wc.request({ method: "eth_requestAccounts" });
+  await wc.enable();
 
-  activeProvider = wc;
+  activeProvider = wc as unknown as Eip1193Provider;
   activeKind = "walletconnect";
-  return { provider: wc, kind: "walletconnect" };
+  return { provider: activeProvider, kind: "walletconnect" };
 }
 
 export async function disconnectWallet(): Promise<void> {
