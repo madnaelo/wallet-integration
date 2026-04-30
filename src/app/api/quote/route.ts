@@ -6,7 +6,7 @@ import { getAllowedChainIds, getChainById, isChainAllowed } from "@/lib/chains";
 import { isAddress, isPositiveIntegerString } from "@/lib/validation";
 import { env } from "@/lib/server/env";
 import type { QuoteResponse } from "@/lib/types";
-import { ZeroXClient } from "@/lib/server/zeroxClient";
+import { createQuoteClient } from "@/lib/server/quoteProvider";
 
 export const runtime = "nodejs";
 
@@ -89,12 +89,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const client = new ZeroXClient({
-      apiKey: env.ZEROX_API_KEY,
-      baseUrl: chain.zeroXBaseUrl,
-      affiliateAddress: env.AFFILIATE_ADDRESS,
-      buyTokenPercentageFee: 0.002
-    });
+    const client = createQuoteClient(chain);
 
     const quote = await client.getQuote({
       sellToken,
