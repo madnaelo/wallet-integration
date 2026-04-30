@@ -16,20 +16,28 @@ export class ZeroXClient implements DexAggregatorClient {
   }
 
   async getQuote(params: QuoteParams): Promise<QuoteResponse> {
-    const url = new URL("/swap/v1/quote", this.cfg.baseUrl);
+    const url = new URL("/swap/allowance-holder/quote", this.cfg.baseUrl);
 
-    url.searchParams.set("sellToken", params.sellToken);
-    url.searchParams.set("buyToken", params.buyToken);
+    url.searchParams.set("chainId", String(params.chainId));
+    const sellToken = normalizeTokenAddress(params.sellToken);
+    const buyToken = normalizeTokenAddress(params.buyToken);
+
+    url.searchParams.set("sellToken", sellToken);
+    url.searchParams.set("buyToken", buyToken);
     url.searchParams.set("sellAmount", params.sellAmount);
-    url.searchParams.set("takerAddress", params.takerAddress);
+    url.searchParams.set("taker", params.takerAddress);
 
-    url.searchParams.set("affiliateAddress", this.cfg.affiliateAddress);
-    url.searchParams.set("buyTokenPercentageFee", String(this.cfg.buyTokenPercentageFee));
+    if (this.cfg.affiliateAddress !== "0x0000000000000000000000000000000000000000") {
+      url.searchParams.set("swapFeeRecipient", this.cfg.affiliateAddress);
+      url.searchParams.set("swapFeeBps", String(Math.round(this.cfg.buyTokenPercentageFee * 10_000)));
+      url.searchParams.set("swapFeeToken", buyToken);
+    }
 
     const res = await fetch(url.toString(), {
       method: "GET",
       headers: {
-        "0x-api-key": this.cfg.apiKey
+        "0x-api-key": this.cfg.apiKey,
+        "0x-version": "v2"
       },
       cache: "no-store"
     });
@@ -43,12 +51,34 @@ export class ZeroXClient implements DexAggregatorClient {
     }
 
     if (!res.ok) {
-      const msg = body?.reason || body?.validationErrors?.[0]?.reason || body?.error || `0x error (${res.status})`;
+      const detail = body?.data?.details?.[0];
+      const detailMessage = detail?.field && detail?.reason ? `${detail.field}: ${detail.reason}` : undefined;
+      const msg =
+        detailMessage ||
+        body?.reason ||
+        body?.validationErrors?.[0]?.reason ||
+        body?.message ||
+        body?.error ||
+        `0x error (${res.status})`;
       const err: any = new Error(msg);
       err.status = res.status;
       throw err;
     }
 
-    return body as QuoteResponse;
+    return normalizeQuote(body);
   }
+}
+
+function normalizeTokenAddress(token: string): string {
+  return token === "ETH" ? "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE" : token;
+}
+
+function normalizeQuote(body: any): QuoteResponse {
+  return {
+    ...body,
+    to: body?.transaction?.to ?? body?.to,
+    data: body?.transaction?.data ?? body?.data,
+    value: body?.transaction?.value ?? body?.value ?? "0",
+    allowanceTarget: body?.issues?.allowance?.spender ?? body?.allowanceTarget
+  } as QuoteResponse;
 }
