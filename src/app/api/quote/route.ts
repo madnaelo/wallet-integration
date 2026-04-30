@@ -119,7 +119,7 @@ function isOriginAllowed(origin: string | null): boolean {
   if (!allow || allow.trim().length === 0) return true;
   const parts = allow.split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.includes("*")) return true;
-  if (!origin) return false;
+  if (!origin) return true;
   return parts.includes(origin);
 }
 
