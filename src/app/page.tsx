@@ -9,6 +9,7 @@ import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
 import { ERC20_ABI } from "@/lib/erc20";
+import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
 import { swapLog } from "@/lib/swapLog";
 import { connectWallet, getActiveProvider, hasInjectedProvider } from "@/lib/walletConnector";
@@ -17,6 +18,7 @@ type TxStatus = "idle" | "pending" | "confirmed" | "failed";
 
 export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
+  const isDryRun = envPublic.DISALLOW_MAINNET;
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
 
   const [provider, setProvider] = useState<Eip1193Provider | null>(null);
@@ -225,6 +227,13 @@ export default function Page() {
 
     try {
       await ensureCorrectNetwork();
+
+      if (isDryRun) {
+        setSwapStatus("confirmed");
+        setSwapTxHash("Dry run: no transaction submitted.");
+        return;
+      }
+
       await ensureAllowanceAndApproveIfNeeded();
 
       const p = getProviderOrThrow();
@@ -384,7 +393,7 @@ export default function Page() {
               {quoteLoading ? "Fetching quote..." : "Get Quote"}
             </button>
             <button className="btn btnPrimary" onClick={executeSwap} disabled={!quote || !walletAddress}>
-              Swap
+              {isDryRun ? "Dry Run" : "Swap"}
             </button>
           </div>
 

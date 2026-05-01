@@ -29,7 +29,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   137: {
     chainId: 137,
     name: "Polygon",
-    zeroXBaseUrl: "https://polygon.api.0x.org",
+    zeroXBaseUrl: "https://api.0x.org",
     rpcUrls: ["https://polygon-rpc.com"],
     blockExplorerUrls: ["https://polygonscan.com"],
     nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 }
@@ -37,7 +37,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   8453: {
     chainId: 8453,
     name: "Base",
-    zeroXBaseUrl: "https://base.api.0x.org",
+    zeroXBaseUrl: "https://api.0x.org",
     rpcUrls: ["https://mainnet.base.org"],
     blockExplorerUrls: ["https://basescan.org"],
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }
