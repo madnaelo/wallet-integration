@@ -58,7 +58,6 @@ export function getAllowedChainIds(): number[] {
 
 export function isChainAllowed(chainId: number): boolean {
   const allowed = getAllowedChainIds();
-  if (envPublic.DISALLOW_MAINNET && chainId === 1) return false;
   return allowed.includes(chainId);
 }
 
