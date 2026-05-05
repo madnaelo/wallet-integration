@@ -92,13 +92,24 @@ body {
 
 .input,
 .select {
+  color-scheme: dark;
   width: 100%;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.25);
+  background-color: rgba(6, 12, 24, 0.92);
   color: var(--text);
   outline: none;
+}
+
+.select option {
+  background-color: #0b1220;
+  color: var(--text);
+}
+
+.select option:checked {
+  background-color: #1f5fbf;
+  color: #ffffff;
 }
 
 .input:focus,
