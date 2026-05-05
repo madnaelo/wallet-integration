@@ -220,6 +220,29 @@ body {
   font-weight: 700;
 }
 
+.quoteHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.quoteTimer,
+.quoteExpired {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.quoteTimer {
+  color: var(--muted);
+}
+
+.quoteExpired {
+  color: var(--warn);
+  font-weight: 700;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

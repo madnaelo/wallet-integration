@@ -15,6 +15,8 @@ import { swapLog } from "@/lib/swapLog";
 import { connectWallet, getActiveProvider, hasInjectedProvider } from "@/lib/walletConnector";
 
 type TxStatus = "idle" | "pending" | "confirmed" | "failed";
+const QUOTE_TTL_SECONDS = 20;
+
 type DisplayToken = { address: string; symbol: string; decimals: number };
 type QuoteValidationErrors = {
   amount?: string;
@@ -47,6 +49,8 @@ export default function Page() {
   const [customSlippagePct, setCustomSlippagePct] = useState<string>("1");
 
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
+  const [quoteFetchedAtMs, setQuoteFetchedAtMs] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [quoteError, setQuoteError] = useState<string>("");
   const [quoteLoading, setQuoteLoading] = useState<boolean>(false);
 
@@ -64,6 +68,11 @@ export default function Page() {
     if (!sellToken && tokens.length > 0) setSellToken(tokens[0]!.address);
     if (!buyToken && tokens.length > 1) setBuyToken(tokens[1]!.address);
   }, [tokens, sellToken, buyToken]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Attach listeners to the active provider (injected or WalletConnect)
   useEffect(() => {
@@ -133,6 +142,9 @@ export default function Page() {
     !!walletAddress &&
     isAddress(walletAddress) &&
     !hasQuoteValidationErrors;
+  const quoteAgeSeconds = quoteFetchedAtMs ? Math.floor((nowMs - quoteFetchedAtMs) / 1000) : 0;
+  const quoteSecondsRemaining = quote ? Math.max(0, QUOTE_TTL_SECONDS - quoteAgeSeconds) : 0;
+  const isQuoteExpired = !!quote && quoteSecondsRemaining <= 0;
 
   function requireWalletForForm() {
     if (walletAddress) return true;
@@ -149,6 +161,7 @@ export default function Page() {
 
   function clearQuoteState() {
     setQuote(null);
+    setQuoteFetchedAtMs(null);
     setQuoteError("");
     setApprovalTxHash("");
     setSwapTxHash("");
@@ -249,6 +262,7 @@ export default function Page() {
         throw new Error(msg);
       }
       setQuote(body as QuoteResponse);
+      setQuoteFetchedAtMs(Date.now());
     } catch (e: any) {
       setQuoteError(normalizeWalletError(e));
     } finally {
@@ -286,6 +300,10 @@ export default function Page() {
     setActionError("");
     if (!quote) {
       setActionError("Fetch a quote first.");
+      return;
+    }
+    if (isQuoteExpired) {
+      setActionError("Quote expired. Refresh the quote before continuing.");
       return;
     }
 
@@ -576,10 +594,10 @@ export default function Page() {
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
             <span className="quoteButtonWrap" onMouseEnter={revealQuoteValidation} onClick={revealQuoteValidation}>
               <button className="btn" onClick={fetchQuote} disabled={(!!walletAddress && !canQuote) || quoteLoading}>
-                {quoteLoading ? "Fetching quote..." : "Get Quote"}
+                {quoteLoading ? "Fetching quote..." : quote ? "Refresh Quote" : "Get Quote"}
               </button>
             </span>
-            <button className="btn btnPrimary" onClick={executeSwap} disabled={!quote || !walletAddress}>
+            <button className="btn btnPrimary" onClick={executeSwap} disabled={!quote || !walletAddress || isQuoteExpired}>
               {isDryRun ? "Dry Run" : "Swap"}
             </button>
           </div>
@@ -610,7 +628,14 @@ export default function Page() {
         </div>
 
         <div className="panel">
-          <div className="label">Trade Summary</div>
+          <div className="quoteHeader">
+            <div className="label">Trade Summary</div>
+            {quote ? (
+              <span className={isQuoteExpired ? "quoteExpired" : "quoteTimer"}>
+                {isQuoteExpired ? "Quote expired" : `Refreshes in ${quoteSecondsRemaining}s`}
+              </span>
+            ) : null}
+          </div>
           {!quote ? (
             <div className="small">No quote loaded.</div>
           ) : (
