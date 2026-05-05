@@ -147,6 +147,14 @@ export default function Page() {
     if (hasQuoteValidationErrors) setQuoteValidationVisible(true);
   }
 
+  function clearQuoteState() {
+    setQuote(null);
+    setQuoteError("");
+    setApprovalTxHash("");
+    setSwapTxHash("");
+    setSwapStatus("idle");
+  }
+
   async function onConnectWallet() {
     setActionError("");
     try {
@@ -425,8 +433,7 @@ export default function Page() {
                 onChange={(e) => {
                   requireWalletForForm();
                   setSelectedChainId(Number(e.target.value));
-                  setQuote(null);
-                  setQuoteError("");
+                  clearQuoteState();
                   setActionError("");
                 }}
               >
@@ -449,6 +456,7 @@ export default function Page() {
                 onChange={(e) => {
                   requireWalletForForm();
                   setAmountHuman(e.target.value);
+                  clearQuoteState();
                 }}
                 aria-invalid={quoteValidationVisible && !!quoteValidationErrors.amount}
                 aria-describedby="amount-error"
@@ -475,6 +483,7 @@ export default function Page() {
                 onChange={(e) => {
                   requireWalletForForm();
                   setSellToken(e.target.value);
+                  clearQuoteState();
                 }}
                 aria-invalid={quoteValidationVisible && !!quoteValidationErrors.sellToken}
                 aria-describedby="sell-token-error"
@@ -500,6 +509,7 @@ export default function Page() {
                 onChange={(e) => {
                   requireWalletForForm();
                   setBuyToken(e.target.value);
+                  clearQuoteState();
                 }}
                 aria-invalid={quoteValidationVisible && !!quoteValidationErrors.buyToken}
                 aria-describedby="buy-token-error"
@@ -528,6 +538,7 @@ export default function Page() {
                 onChange={(e) => {
                   requireWalletForForm();
                   setSlippageChoice(e.target.value);
+                  clearQuoteState();
                 }}
                 aria-invalid={quoteValidationVisible && !!quoteValidationErrors.slippage}
                 aria-describedby="slippage-error"
@@ -546,6 +557,7 @@ export default function Page() {
                   onChange={(e) => {
                     requireWalletForForm();
                     setCustomSlippagePct(e.target.value);
+                    clearQuoteState();
                   }}
                   aria-invalid={quoteValidationVisible && !!quoteValidationErrors.slippage}
                   aria-describedby="slippage-error"
