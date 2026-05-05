@@ -29,3 +29,4 @@ pnpm-debug.log*
 .aider*
 .env.development
 .env.production
+tsconfig.tsbuildinfo

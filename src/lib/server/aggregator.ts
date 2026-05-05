@@ -6,6 +6,7 @@ export type QuoteParams = {
   buyToken: string;
   sellAmount: string;
   takerAddress: string;
+  slippageBps?: number;
 };
 
 export interface DexAggregatorClient {

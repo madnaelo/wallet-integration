@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
   const buyToken = searchParams.get("buyToken") ?? "";
   const sellAmount = searchParams.get("sellAmount") ?? "";
   const takerAddress = searchParams.get("takerAddress") ?? "";
+  const slippageBpsStr = searchParams.get("slippageBps") ?? "";
 
   if (!chainIdStr || !/^\d+$/.test(chainIdStr)) {
     return withCors(NextResponse.json({ error: "Invalid chainId." }, { status: 400 }), corsOrigin);
@@ -77,12 +78,23 @@ export async function GET(req: NextRequest) {
     return withCors(NextResponse.json({ error: "Invalid takerAddress." }, { status: 400 }), corsOrigin);
   }
 
+  let slippageBps: number | undefined;
+  if (slippageBpsStr) {
+    if (!/^\d+$/.test(slippageBpsStr)) {
+      return withCors(NextResponse.json({ error: "Invalid slippageBps." }, { status: 400 }), corsOrigin);
+    }
+    slippageBps = Number(slippageBpsStr);
+    if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps > 10_000) {
+      return withCors(NextResponse.json({ error: "slippageBps must be between 0 and 10000." }, { status: 400 }), corsOrigin);
+    }
+  }
+
   const chain = getChainById(chainId);
   if (!chain) {
     return withCors(NextResponse.json({ error: "Chain registry missing configuration." }, { status: 500 }), corsOrigin);
   }
 
-  const cacheKey = `quote:${chainId}:${sellToken}:${buyToken}:${sellAmount}:${takerAddress}`;
+  const cacheKey = `quote:${chainId}:${sellToken}:${buyToken}:${sellAmount}:${takerAddress}:${slippageBps ?? "default"}`;
   const cached = quoteCache.get(cacheKey);
   if (cached) {
     return withCors(NextResponse.json(cached, { status: 200 }), corsOrigin);
@@ -96,7 +108,8 @@ export async function GET(req: NextRequest) {
       buyToken,
       sellAmount,
       takerAddress,
-      chainId
+      chainId,
+      slippageBps
     });
 
     quoteCache.set(cacheKey, quote);

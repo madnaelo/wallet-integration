@@ -26,6 +26,9 @@ export class ZeroXClient implements DexAggregatorClient {
     url.searchParams.set("buyToken", buyToken);
     url.searchParams.set("sellAmount", params.sellAmount);
     url.searchParams.set("taker", params.takerAddress);
+    if (typeof params.slippageBps === "number") {
+      url.searchParams.set("slippageBps", String(params.slippageBps));
+    }
 
     if (this.cfg.affiliateAddress !== "0x0000000000000000000000000000000000000000") {
       url.searchParams.set("swapFeeRecipient", this.cfg.affiliateAddress);
@@ -79,6 +82,7 @@ function normalizeQuote(body: any): QuoteResponse {
     to: body?.transaction?.to ?? body?.to,
     data: body?.transaction?.data ?? body?.data,
     value: body?.transaction?.value ?? body?.value ?? "0",
+    gas: body?.transaction?.gas ?? body?.gas,
     allowanceTarget: body?.issues?.allowance?.spender ?? body?.allowanceTarget
   } as QuoteResponse;
 }

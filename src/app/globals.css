@@ -128,14 +128,39 @@ body {
 
 .kv {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
   gap: 10px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
 
+.kv > .mono {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 .kv:last-child {
   border-bottom: none;
+}
+
+.feeDetails {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.feeDetails summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.feeDetails .kv {
+  padding-left: 12px;
+}
+
+.receiveRow .mono {
+  color: var(--ok);
+  font-weight: 700;
 }
 
 .badge {

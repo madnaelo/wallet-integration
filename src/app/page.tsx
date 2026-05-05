@@ -15,6 +15,15 @@ import { swapLog } from "@/lib/swapLog";
 import { connectWallet, getActiveProvider, hasInjectedProvider } from "@/lib/walletConnector";
 
 type TxStatus = "idle" | "pending" | "confirmed" | "failed";
+type DisplayToken = { address: string; symbol: string; decimals: number };
+type FeeLine = {
+  label: string;
+  amount: string;
+  token: DisplayToken;
+  display: string;
+  buyTokenAmount?: string;
+  buyTokenDisplay?: string;
+};
 
 export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
@@ -28,6 +37,8 @@ export default function Page() {
   const [sellToken, setSellToken] = useState<string>("");
   const [buyToken, setBuyToken] = useState<string>("");
   const [amountHuman, setAmountHuman] = useState<string>("");
+  const [slippageChoice, setSlippageChoice] = useState<string>("100");
+  const [customSlippagePct, setCustomSlippagePct] = useState<string>("1");
 
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [quoteError, setQuoteError] = useState<string>("");
@@ -90,6 +101,10 @@ export default function Page() {
 
   const sellTokenInfo = useMemo(() => tokens.find((t) => t.address === sellToken), [tokens, sellToken]);
   const buyTokenInfo = useMemo(() => tokens.find((t) => t.address === buyToken), [tokens, buyToken]);
+  const slippageBps = useMemo(
+    () => parseSlippageBps(slippageChoice, customSlippagePct),
+    [slippageChoice, customSlippagePct]
+  );
 
   const canQuote =
     !!walletAddress &&
@@ -97,7 +112,8 @@ export default function Page() {
     !!sellTokenInfo &&
     !!buyTokenInfo &&
     sellTokenInfo.address !== buyTokenInfo.address &&
-    amountHuman.trim().length > 0;
+    amountHuman.trim().length > 0 &&
+    slippageBps !== null;
 
   async function onConnectWallet() {
     setActionError("");
@@ -161,6 +177,10 @@ export default function Page() {
     setSwapStatus("idle");
 
     if (!canQuote || !sellTokenInfo || !buyTokenInfo) return;
+    if (slippageBps === null) {
+      setQuoteError("Invalid slippage tolerance.");
+      return;
+    }
 
     const sellAmount = parseUnitsSafe(amountHuman, sellTokenInfo.decimals);
     if (!sellAmount) {
@@ -175,7 +195,8 @@ export default function Page() {
         sellToken: sellTokenInfo.address,
         buyToken: buyTokenInfo.address,
         sellAmount,
-        takerAddress: walletAddress
+        takerAddress: walletAddress,
+        slippageBps
       });
 
       const res = await fetch(url, { method: "GET" });
@@ -285,18 +306,47 @@ export default function Page() {
   }
 
   const quoteSummary = useMemo(() => {
-    if (!quote || !sellTokenInfo || !buyTokenInfo) return null;
+    if (!quote || !sellTokenInfo || !buyTokenInfo || !chain?.nativeCurrency) return null;
 
-    const sellHuman = formatUnitsSafe(quote.sellAmount, sellTokenInfo.decimals);
-    const buyHuman = formatUnitsSafe(quote.buyAmount, buyTokenInfo.decimals);
+    const nativeToken: DisplayToken = {
+      address: "ETH",
+      symbol: chain.nativeCurrency.symbol,
+      decimals: chain.nativeCurrency.decimals
+    };
+    const sellDisplayToken = tokenInfoToDisplay(sellTokenInfo);
+    const buyDisplayToken = tokenInfoToDisplay(buyTokenInfo);
+    const tokenForAddress = (address: string): DisplayToken => resolveDisplayToken(address, tokens, nativeToken);
+
+    const sellHuman = formatTokenAmount(quote.sellAmount, sellDisplayToken);
+    const minBuyAmount = stringValue(quote.minBuyAmount);
+    const gasUnits = (quote.gas as string | undefined) ?? nestedString(quote, ["transaction", "gas"]);
+    const gasPriceWei = nestedString(quote, ["transaction", "gasPrice"]);
+    const networkFeeWei = stringValue(quote.totalNetworkFee) || multiplyIntegerStrings(gasUnits, gasPriceWei);
+    const networkFeeLine = networkFeeWei
+      ? {
+          label: "Network fee",
+          amount: networkFeeWei,
+          token: nativeToken,
+          display: formatTokenAmount(networkFeeWei, nativeToken)
+        }
+      : null;
+    const rawFeeLines = [...(networkFeeLine ? [networkFeeLine] : []), ...collectFeeLines(quote, tokenForAddress)];
+    const feeLines = rawFeeLines.map((fee) =>
+      withBuyTokenEquivalent(fee, sellDisplayToken, buyDisplayToken, quote.sellAmount, quote.buyAmount)
+    );
+    const buyTokenFees = sumBuyTokenFees(feeLines);
+    const netBuyAmount = subtractIntegerStrings(quote.buyAmount, buyTokenFees);
+    const netMinBuyAmount = minBuyAmount ? subtractIntegerStrings(minBuyAmount, buyTokenFees) : "";
 
     return {
       sellHuman,
-      buyHuman,
-      price: (quote.price as string | undefined) ?? "",
-      gas: (quote.gas as string | undefined) ?? ""
+      buyHuman: formatTokenAmount(netBuyAmount, buyDisplayToken),
+      minBuyHuman: netMinBuyAmount ? formatTokenAmount(netMinBuyAmount, buyDisplayToken) : "",
+      price: formatDerivedPrice(quote.sellAmount, sellDisplayToken, netBuyAmount, buyDisplayToken),
+      feeLines,
+      totalFees: formatConvertedFeeTotal(feeLines, buyDisplayToken)
     };
-  }, [quote, sellTokenInfo, buyTokenInfo]);
+  }, [quote, sellTokenInfo, buyTokenInfo, chain, tokens]);
 
   const connectHint = useMemo(() => {
     if (walletAddress) return "";
@@ -388,6 +438,35 @@ export default function Page() {
             </div>
           </div>
 
+          <div style={{ marginTop: 12 }}>
+            <div className="label">Slippage tolerance</div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <select
+                className="select"
+                style={{ maxWidth: 180 }}
+                value={slippageChoice}
+                onChange={(e) => setSlippageChoice(e.target.value)}
+              >
+                <option value="0">0%</option>
+                <option value="50">0.5%</option>
+                <option value="100">1%</option>
+                <option value="200">2%</option>
+                <option value="custom">Custom</option>
+              </select>
+              {slippageChoice === "custom" ? (
+                <input
+                  className="input"
+                  style={{ maxWidth: 160 }}
+                  value={customSlippagePct}
+                  onChange={(e) => setCustomSlippagePct(e.target.value)}
+                  placeholder="1"
+                  inputMode="decimal"
+                />
+              ) : null}
+            </div>
+            {slippageBps === null ? <div className="error" style={{ marginTop: 6 }}>Enter 0 to 10%.</div> : null}
+          </div>
+
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
             <button className="btn" onClick={fetchQuote} disabled={!canQuote || quoteLoading}>
               {quoteLoading ? "Fetching quote..." : "Get Quote"}
@@ -423,29 +502,44 @@ export default function Page() {
         </div>
 
         <div className="panel">
-          <div className="label">Quote</div>
+          <div className="label">Trade Summary</div>
           {!quote ? (
             <div className="small">No quote loaded.</div>
           ) : (
             <>
               <div className="kv">
-                <div className="subtle">Sell amount</div>
+                <div className="subtle">You pay</div>
                 <div className="mono">{quoteSummary?.sellHuman ?? ""}</div>
               </div>
               <div className="kv">
-                <div className="subtle">Buy amount</div>
-                <div className="mono">{quoteSummary?.buyHuman ?? ""}</div>
-              </div>
-              <div className="kv">
-                <div className="subtle">Price</div>
+                <div className="subtle">Rate</div>
                 <div className="mono">{quoteSummary?.price ?? ""}</div>
               </div>
               <div className="kv">
-                <div className="subtle">Estimated gas (from quote)</div>
-                <div className="mono">{quoteSummary?.gas ?? ""}</div>
+                <div className="subtle">Total fees</div>
+                <div className="mono">{quoteSummary?.totalFees || "Not provided"}</div>
+              </div>
+              {quoteSummary?.feeLines.length ? (
+                <details className="feeDetails">
+                  <summary>Fee breakdown</summary>
+                  {quoteSummary.feeLines.map((fee, index) => (
+                    <div className="kv" key={`${fee.label}-${fee.token.address}-${index}`}>
+                      <div className="subtle">{fee.label}</div>
+                      <div className="mono">{formatFeeDetail(fee)}</div>
+                    </div>
+                  ))}
+                </details>
+              ) : null}
+              <div className="kv receiveRow">
+                <div className="subtle">You receive</div>
+                <div className="mono">{quoteSummary?.buyHuman ?? ""}</div>
+              </div>
+              <div className="kv">
+                <div className="subtle">Minimum received</div>
+                <div className="mono">{quoteSummary?.minBuyHuman || "Not provided"}</div>
               </div>
               <div className="small" style={{ marginTop: 10 }}>
-                The backend returns the full 0x quote response. The swap transaction is sent directly from your wallet.
+                Final received amount can change before confirmation, but it should not be below the minimum received amount.
               </div>
             </>
           )}
@@ -471,6 +565,213 @@ export default function Page() {
 function shortAddr(a: string) {
   if (!a) return "";
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function tokenInfoToDisplay(token: TokenInfo): DisplayToken {
+  return {
+    address: token.address,
+    symbol: token.symbol,
+    decimals: token.decimals
+  };
+}
+
+function resolveDisplayToken(address: string, tokens: TokenInfo[], nativeToken: DisplayToken): DisplayToken {
+  if (isNativeTokenAddress(address)) return nativeToken;
+
+  const found = tokens.find((token) => normalizeTokenKey(token.address) === normalizeTokenKey(address));
+  if (found) return tokenInfoToDisplay(found);
+
+  return {
+    address,
+    symbol: isAddress(address) ? shortAddr(address) : address,
+    decimals: 18
+  };
+}
+
+function isNativeTokenAddress(address: string): boolean {
+  const normalized = normalizeTokenKey(address);
+  return normalized === "eth" || normalized === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+}
+
+function normalizeTokenKey(address: string): string {
+  return address.trim().toLowerCase();
+}
+
+function formatTokenAmount(amountBaseUnits: string, token: DisplayToken): string {
+  return `${formatDecimal(formatUnitsSafe(amountBaseUnits, token.decimals), 8)} ${token.symbol}`;
+}
+
+function formatDerivedPrice(
+  sellAmount: string,
+  sellToken: DisplayToken,
+  buyAmount: string,
+  buyToken: DisplayToken
+): string {
+  const sell = Number(formatUnitsSafe(sellAmount, sellToken.decimals));
+  const buy = Number(formatUnitsSafe(buyAmount, buyToken.decimals));
+  if (!Number.isFinite(sell) || !Number.isFinite(buy) || sell <= 0) return "";
+  return `${formatDecimal(String(buy / sell), 8)} ${buyToken.symbol} per ${sellToken.symbol}`;
+}
+
+function formatDecimal(value: string, maximumFractionDigits: number): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  if (n === 0) return "0";
+  const threshold = 1 / 10 ** maximumFractionDigits;
+  if (Math.abs(n) < threshold) return `< ${threshold.toLocaleString(undefined, { maximumFractionDigits })}`;
+  return n.toLocaleString(undefined, {
+    maximumFractionDigits,
+    maximumSignificantDigits: 10
+  });
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function parseSlippageBps(choice: string, customPct: string): number | null {
+  if (choice !== "custom") return Number(choice);
+
+  const pct = Number(customPct.trim());
+  if (!Number.isFinite(pct) || pct < 0 || pct > 10) return null;
+  return Math.round(pct * 100);
+}
+
+function multiplyIntegerStrings(a: string, b: string): string {
+  if (!/^\d+$/.test(a) || !/^\d+$/.test(b)) return "";
+  return (BigInt(a) * BigInt(b)).toString();
+}
+
+function subtractIntegerStrings(value: string, deduction: string): string {
+  if (!/^\d+$/.test(value)) return value;
+  if (!/^\d+$/.test(deduction)) return value;
+  const result = BigInt(value) - BigInt(deduction);
+  return result > 0n ? result.toString() : "0";
+}
+
+function collectFeeLines(quote: QuoteResponse, tokenForAddress: (address: string) => DisplayToken): FeeLine[] {
+  const fees: any = quote.fees;
+  if (!fees || typeof fees !== "object") return [];
+
+  const lines: FeeLine[] = [];
+  pushFeeLine(lines, "0x provider fee", fees.zeroExFee, tokenForAddress);
+  pushFeeLine(lines, "Platform fee", fees.integratorFee, tokenForAddress);
+  if (Array.isArray(fees.integratorFees)) {
+    fees.integratorFees.forEach((fee: unknown, index: number) => {
+      pushFeeLine(lines, `Platform fee ${index + 1}`, fee, tokenForAddress);
+    });
+  }
+  pushFeeLine(lines, "Additional gas fee", fees.gasFee, tokenForAddress);
+  return lines;
+}
+
+function withBuyTokenEquivalent(
+  fee: FeeLine,
+  sellToken: DisplayToken,
+  buyToken: DisplayToken,
+  sellAmount: string,
+  buyAmount: string
+): FeeLine {
+  const buyTokenAmount = convertFeeToBuyToken(fee, sellToken, buyToken, sellAmount, buyAmount);
+  return {
+    ...fee,
+    buyTokenAmount,
+    buyTokenDisplay: buyTokenAmount ? formatTokenAmount(buyTokenAmount, buyToken) : undefined
+  };
+}
+
+function convertFeeToBuyToken(
+  fee: FeeLine,
+  sellToken: DisplayToken,
+  buyToken: DisplayToken,
+  sellAmount: string,
+  buyAmount: string
+): string {
+  if (isSameToken(fee.token, buyToken)) return fee.amount;
+  if (isSameToken(fee.token, sellToken)) return multiplyDivideIntegerStrings(fee.amount, buyAmount, sellAmount);
+  return "";
+}
+
+function multiplyDivideIntegerStrings(value: string, multiplier: string, divisor: string): string {
+  if (!/^\d+$/.test(value) || !/^\d+$/.test(multiplier) || !/^\d+$/.test(divisor)) return "";
+  const divisorBigInt = BigInt(divisor);
+  if (divisorBigInt === 0n) return "";
+  return ((BigInt(value) * BigInt(multiplier)) / divisorBigInt).toString();
+}
+
+function sumBuyTokenFees(lines: FeeLine[]): string {
+  return lines
+    .reduce((sum, line) => (/^\d+$/.test(line.buyTokenAmount ?? "") ? sum + BigInt(line.buyTokenAmount!) : sum), 0n)
+    .toString();
+}
+
+function isSameToken(a: DisplayToken, b: DisplayToken): boolean {
+  if (isNativeTokenAddress(a.address) && isNativeTokenAddress(b.address)) return true;
+  return normalizeTokenKey(a.address) === normalizeTokenKey(b.address);
+}
+
+function pushFeeLine(
+  lines: FeeLine[],
+  label: string,
+  fee: unknown,
+  tokenForAddress: (address: string) => DisplayToken
+) {
+  if (!fee || typeof fee !== "object") return;
+  const amount = stringValue((fee as any).amount);
+  const tokenAddress = stringValue((fee as any).token);
+  if (!amount || !tokenAddress) return;
+
+  const token = tokenForAddress(tokenAddress);
+  lines.push({
+    label,
+    amount,
+    token,
+    display: formatTokenAmount(amount, token)
+  });
+}
+
+function formatConvertedFeeTotal(lines: FeeLine[], buyToken: DisplayToken): string {
+  const buyTokenTotal = sumBuyTokenFees(lines);
+  const unconvertedFees = lines.filter((line) => !line.buyTokenAmount);
+  const convertedDisplay = formatTokenAmount(buyTokenTotal, buyToken);
+
+  if (!unconvertedFees.length) return convertedDisplay;
+  return `${convertedDisplay} + ${formatOriginalFeeTotal(unconvertedFees)}`;
+}
+
+function formatFeeDetail(fee: FeeLine): string {
+  if (!fee.buyTokenDisplay) return fee.display;
+  if (fee.buyTokenDisplay === fee.display) return fee.display;
+  return `${fee.buyTokenDisplay} (${fee.display})`;
+}
+
+function formatOriginalFeeTotal(lines: FeeLine[]): string {
+  if (!lines.length) return "0";
+
+  const totals = new Map<string, { amount: bigint; token: DisplayToken }>();
+  for (const line of lines) {
+    if (!/^\d+$/.test(line.amount)) continue;
+    const key = `${normalizeTokenKey(line.token.address)}:${line.token.symbol}:${line.token.decimals}`;
+    const current = totals.get(key);
+    const amount = BigInt(line.amount);
+    totals.set(key, {
+      amount: (current?.amount ?? 0n) + amount,
+      token: line.token
+    });
+  }
+
+  if (!totals.size) return lines.map((line) => line.display).join(" + ");
+  return Array.from(totals.values())
+    .map((total) => formatTokenAmount(total.amount.toString(), total.token))
+    .join(" + ");
+}
+
+function nestedString(obj: unknown, path: string[]): string {
+  let current: any = obj;
+  for (const key of path) {
+    current = current?.[key];
+  }
+  return typeof current === "string" ? current : "";
 }
 
 function normalizeWalletError(e: any): string {
