@@ -48,6 +48,7 @@ export default function Page() {
   const [swapTxHash, setSwapTxHash] = useState<string>("");
   const [swapStatus, setSwapStatus] = useState<TxStatus>("idle");
   const [actionError, setActionError] = useState<string>("");
+  const [connectPromptVisible, setConnectPromptVisible] = useState<boolean>(false);
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
   const tokens: TokenInfo[] = useMemo(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [], [selectedChainId]);
@@ -64,6 +65,7 @@ export default function Page() {
 
     const onAccountsChanged = (accounts: string[]) => {
       setWalletAddress(accounts?.[0] ?? "");
+      if (accounts?.[0]) setConnectPromptVisible(false);
     };
 
     const onChainChanged = (hexChainId: string) => {
@@ -115,11 +117,20 @@ export default function Page() {
     amountHuman.trim().length > 0 &&
     slippageBps !== null;
 
+  function requireWalletForForm() {
+    if (walletAddress) return true;
+    setConnectPromptVisible(true);
+    setQuoteError("");
+    setActionError("");
+    return false;
+  }
+
   async function onConnectWallet() {
     setActionError("");
     try {
       const res = await connectWallet({ allowedChainIds: allowedChains.map((c) => c.chainId) });
       setProvider(res.provider);
+      setConnectPromptVisible(false);
     } catch (e: any) {
       setActionError(normalizeWalletError(e));
     }
@@ -176,6 +187,7 @@ export default function Page() {
     setSwapTxHash("");
     setSwapStatus("idle");
 
+    if (!requireWalletForForm()) return;
     if (!canQuote || !sellTokenInfo || !buyTokenInfo) return;
     if (slippageBps === null) {
       setQuoteError("Invalid slippage tolerance.");
@@ -361,13 +373,19 @@ export default function Page() {
           <h1 className="h1">Swap Aggregator MVP</h1>
           <div className="subtle">Non-custodial swaps via 0x + your wallet. Backend only builds quotes.</div>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="walletActions">
           <span className="badge">
             Network: <span className="mono">{chain?.name ?? `Chain ${selectedChainId}`}</span>
           </span>
           <button className="btn btnPrimary" onClick={onConnectWallet} disabled={!!walletAddress}>
             {walletAddress ? `Connected: ${shortAddr(walletAddress)}` : "Connect Wallet"}
           </button>
+          {connectPromptVisible && !walletAddress ? (
+            <div className="connectNudge">
+              <strong>Connect wallet first</strong>
+              <span>Connect your wallet to get a quote or change swap details.</span>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -382,6 +400,7 @@ export default function Page() {
                 className="select"
                 value={selectedChainId}
                 onChange={(e) => {
+                  requireWalletForForm();
                   setSelectedChainId(Number(e.target.value));
                   setQuote(null);
                   setQuoteError("");
@@ -404,7 +423,10 @@ export default function Page() {
               <input
                 className="input"
                 value={amountHuman}
-                onChange={(e) => setAmountHuman(e.target.value)}
+                onChange={(e) => {
+                  requireWalletForForm();
+                  setAmountHuman(e.target.value);
+                }}
                 placeholder="0.01"
                 inputMode="decimal"
               />
@@ -417,7 +439,14 @@ export default function Page() {
           <div className="row" style={{ marginTop: 12 }}>
             <div>
               <div className="label">Sell token</div>
-              <select className="select" value={sellToken} onChange={(e) => setSellToken(e.target.value)}>
+              <select
+                className="select"
+                value={sellToken}
+                onChange={(e) => {
+                  requireWalletForForm();
+                  setSellToken(e.target.value);
+                }}
+              >
                 {tokens.map((t) => (
                   <option key={t.address} value={t.address}>
                     {t.symbol} {t.isNative ? "(native)" : ""}
@@ -428,7 +457,14 @@ export default function Page() {
 
             <div>
               <div className="label">Buy token</div>
-              <select className="select" value={buyToken} onChange={(e) => setBuyToken(e.target.value)}>
+              <select
+                className="select"
+                value={buyToken}
+                onChange={(e) => {
+                  requireWalletForForm();
+                  setBuyToken(e.target.value);
+                }}
+              >
                 {tokens.map((t) => (
                   <option key={t.address} value={t.address}>
                     {t.symbol} {t.isNative ? "(native)" : ""}
@@ -445,7 +481,10 @@ export default function Page() {
                 className="select"
                 style={{ maxWidth: 180 }}
                 value={slippageChoice}
-                onChange={(e) => setSlippageChoice(e.target.value)}
+                onChange={(e) => {
+                  requireWalletForForm();
+                  setSlippageChoice(e.target.value);
+                }}
               >
                 <option value="0">0%</option>
                 <option value="50">0.5%</option>
@@ -458,7 +497,10 @@ export default function Page() {
                   className="input"
                   style={{ maxWidth: 160 }}
                   value={customSlippagePct}
-                  onChange={(e) => setCustomSlippagePct(e.target.value)}
+                  onChange={(e) => {
+                    requireWalletForForm();
+                    setCustomSlippagePct(e.target.value);
+                  }}
                   placeholder="1"
                   inputMode="decimal"
                 />
@@ -468,7 +510,7 @@ export default function Page() {
           </div>
 
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-            <button className="btn" onClick={fetchQuote} disabled={!canQuote || quoteLoading}>
+            <button className="btn" onClick={fetchQuote} disabled={(!!walletAddress && !canQuote) || quoteLoading}>
               {quoteLoading ? "Fetching quote..." : "Get Quote"}
             </button>
             <button className="btn btnPrimary" onClick={executeSwap} disabled={!quote || !walletAddress}>

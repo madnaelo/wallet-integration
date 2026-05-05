@@ -126,6 +126,44 @@ body {
   border-color: rgba(110, 168, 254, 0.55);
 }
 
+.walletActions {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.connectNudge {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 5;
+  width: min(280px, calc(100vw - 36px));
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 212, 59, 0.4);
+  border-radius: 10px;
+  background: rgba(38, 31, 12, 0.98);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.connectNudge strong,
+.connectNudge span {
+  display: block;
+}
+
+.connectNudge strong {
+  margin-bottom: 3px;
+  color: var(--warn);
+}
+
+.connectNudge span {
+  color: var(--muted);
+}
+
 .kv {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, auto);
