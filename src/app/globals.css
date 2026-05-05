@@ -106,6 +106,17 @@ body {
   border-color: rgba(110, 168, 254, 0.7);
 }
 
+.input[aria-invalid="true"],
+.select[aria-invalid="true"] {
+  border-color: rgba(255, 107, 107, 0.85);
+}
+
+.fieldError {
+  margin-top: 6px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
 .btn {
   padding: 10px 12px;
   border-radius: 10px;
@@ -124,6 +135,14 @@ body {
 .btnPrimary {
   background: rgba(110, 168, 254, 0.35);
   border-color: rgba(110, 168, 254, 0.55);
+}
+
+.quoteButtonWrap {
+  display: inline-flex;
+}
+
+.quoteButtonWrap .btn:disabled {
+  pointer-events: none;
 }
 
 .walletActions {

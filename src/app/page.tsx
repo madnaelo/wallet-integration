@@ -16,6 +16,12 @@ import { connectWallet, getActiveProvider, hasInjectedProvider } from "@/lib/wal
 
 type TxStatus = "idle" | "pending" | "confirmed" | "failed";
 type DisplayToken = { address: string; symbol: string; decimals: number };
+type QuoteValidationErrors = {
+  amount?: string;
+  sellToken?: string;
+  buyToken?: string;
+  slippage?: string;
+};
 type FeeLine = {
   label: string;
   amount: string;
@@ -49,6 +55,7 @@ export default function Page() {
   const [swapStatus, setSwapStatus] = useState<TxStatus>("idle");
   const [actionError, setActionError] = useState<string>("");
   const [connectPromptVisible, setConnectPromptVisible] = useState<boolean>(false);
+  const [quoteValidationVisible, setQuoteValidationVisible] = useState<boolean>(false);
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
   const tokens: TokenInfo[] = useMemo(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [], [selectedChainId]);
@@ -107,15 +114,25 @@ export default function Page() {
     () => parseSlippageBps(slippageChoice, customSlippagePct),
     [slippageChoice, customSlippagePct]
   );
+  const quoteValidationErrors = useMemo(
+    () =>
+      getQuoteValidationErrors({
+        amountHuman,
+        sellTokenInfo,
+        buyTokenInfo,
+        slippageBps
+      }),
+    [amountHuman, sellTokenInfo, buyTokenInfo, slippageBps]
+  );
+  const hasQuoteValidationErrors = useMemo(
+    () => Object.values(quoteValidationErrors).some(Boolean),
+    [quoteValidationErrors]
+  );
 
   const canQuote =
     !!walletAddress &&
     isAddress(walletAddress) &&
-    !!sellTokenInfo &&
-    !!buyTokenInfo &&
-    sellTokenInfo.address !== buyTokenInfo.address &&
-    amountHuman.trim().length > 0 &&
-    slippageBps !== null;
+    !hasQuoteValidationErrors;
 
   function requireWalletForForm() {
     if (walletAddress) return true;
@@ -123,6 +140,11 @@ export default function Page() {
     setQuoteError("");
     setActionError("");
     return false;
+  }
+
+  function revealQuoteValidation() {
+    if (!walletAddress) requireWalletForForm();
+    if (hasQuoteValidationErrors) setQuoteValidationVisible(true);
   }
 
   async function onConnectWallet() {
@@ -187,6 +209,7 @@ export default function Page() {
     setSwapTxHash("");
     setSwapStatus("idle");
 
+    revealQuoteValidation();
     if (!requireWalletForForm()) return;
     if (!canQuote || !sellTokenInfo || !buyTokenInfo) return;
     if (slippageBps === null) {
@@ -427,9 +450,16 @@ export default function Page() {
                   requireWalletForForm();
                   setAmountHuman(e.target.value);
                 }}
+                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.amount}
+                aria-describedby="amount-error"
                 placeholder="0.01"
                 inputMode="decimal"
               />
+              {quoteValidationVisible && quoteValidationErrors.amount ? (
+                <div className="fieldError" id="amount-error">
+                  {quoteValidationErrors.amount}
+                </div>
+              ) : null}
               <div className="small" style={{ marginTop: 6 }}>
                 Amount is converted to base units using token decimals before requesting a quote.
               </div>
@@ -446,6 +476,8 @@ export default function Page() {
                   requireWalletForForm();
                   setSellToken(e.target.value);
                 }}
+                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.sellToken}
+                aria-describedby="sell-token-error"
               >
                 {tokens.map((t) => (
                   <option key={t.address} value={t.address}>
@@ -453,6 +485,11 @@ export default function Page() {
                   </option>
                 ))}
               </select>
+              {quoteValidationVisible && quoteValidationErrors.sellToken ? (
+                <div className="fieldError" id="sell-token-error">
+                  {quoteValidationErrors.sellToken}
+                </div>
+              ) : null}
             </div>
 
             <div>
@@ -464,6 +501,8 @@ export default function Page() {
                   requireWalletForForm();
                   setBuyToken(e.target.value);
                 }}
+                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.buyToken}
+                aria-describedby="buy-token-error"
               >
                 {tokens.map((t) => (
                   <option key={t.address} value={t.address}>
@@ -471,6 +510,11 @@ export default function Page() {
                   </option>
                 ))}
               </select>
+              {quoteValidationVisible && quoteValidationErrors.buyToken ? (
+                <div className="fieldError" id="buy-token-error">
+                  {quoteValidationErrors.buyToken}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -485,6 +529,8 @@ export default function Page() {
                   requireWalletForForm();
                   setSlippageChoice(e.target.value);
                 }}
+                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.slippage}
+                aria-describedby="slippage-error"
               >
                 <option value="0">0%</option>
                 <option value="50">0.5%</option>
@@ -501,18 +547,26 @@ export default function Page() {
                     requireWalletForForm();
                     setCustomSlippagePct(e.target.value);
                   }}
+                  aria-invalid={quoteValidationVisible && !!quoteValidationErrors.slippage}
+                  aria-describedby="slippage-error"
                   placeholder="1"
                   inputMode="decimal"
                 />
               ) : null}
             </div>
-            {slippageBps === null ? <div className="error" style={{ marginTop: 6 }}>Enter 0 to 10%.</div> : null}
+            {quoteValidationVisible && quoteValidationErrors.slippage ? (
+              <div className="fieldError" id="slippage-error">
+                {quoteValidationErrors.slippage}
+              </div>
+            ) : null}
           </div>
 
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-            <button className="btn" onClick={fetchQuote} disabled={(!!walletAddress && !canQuote) || quoteLoading}>
-              {quoteLoading ? "Fetching quote..." : "Get Quote"}
-            </button>
+            <span className="quoteButtonWrap" onMouseEnter={revealQuoteValidation} onClick={revealQuoteValidation}>
+              <button className="btn" onClick={fetchQuote} disabled={(!!walletAddress && !canQuote) || quoteLoading}>
+                {quoteLoading ? "Fetching quote..." : "Get Quote"}
+              </button>
+            </span>
             <button className="btn btnPrimary" onClick={executeSwap} disabled={!quote || !walletAddress}>
               {isDryRun ? "Dry Run" : "Swap"}
             </button>
@@ -607,6 +661,39 @@ export default function Page() {
 function shortAddr(a: string) {
   if (!a) return "";
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function getQuoteValidationErrors(params: {
+  amountHuman: string;
+  sellTokenInfo: TokenInfo | undefined;
+  buyTokenInfo: TokenInfo | undefined;
+  slippageBps: number | null;
+}): QuoteValidationErrors {
+  const errors: QuoteValidationErrors = {};
+
+  if (!params.sellTokenInfo) {
+    errors.sellToken = "Select a token to sell.";
+  }
+
+  if (!params.buyTokenInfo) {
+    errors.buyToken = "Select a token to buy.";
+  }
+
+  if (params.sellTokenInfo && params.buyTokenInfo && params.sellTokenInfo.address === params.buyTokenInfo.address) {
+    errors.buyToken = "Choose a different token to buy.";
+  }
+
+  if (!params.amountHuman.trim()) {
+    errors.amount = "Enter an amount.";
+  } else if (params.sellTokenInfo && !parseUnitsSafe(params.amountHuman, params.sellTokenInfo.decimals)) {
+    errors.amount = "Enter a valid amount greater than 0.";
+  }
+
+  if (params.slippageBps === null) {
+    errors.slippage = "Enter a slippage tolerance from 0% to 10%.";
+  }
+
+  return errors;
 }
 
 function tokenInfoToDisplay(token: TokenInfo): DisplayToken {
