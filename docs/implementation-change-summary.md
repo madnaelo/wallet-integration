@@ -189,6 +189,99 @@ Changes:
 - Added wrapping for long quote/fee values.
 - Added styles for the expandable fee breakdown.
 - Highlighted the final `You receive` row.
+- Added dark select/dropdown option styling to avoid white text on light gray browser dropdowns.
+
+## Slippage Control
+
+Updated:
+
+- `src/app/page.tsx`
+- `src/lib/quoteClient.ts`
+- `src/app/api/quote/route.ts`
+- `src/lib/server/aggregator.ts`
+- `src/lib/server/zeroxClient.ts`
+- `src/lib/server/mockAggregatorClient.ts`
+
+Changes:
+
+- Added slippage controls to the UI.
+- Presets: `0%`, `0.5%`, `1%`, `2%`, `Custom`.
+- Default: `1%`.
+- Custom slippage is validated from `0%` to `10%`.
+- The frontend sends `slippageBps`.
+- The backend validates `slippageBps`.
+- The 0x client forwards `slippageBps` to the 0x quote endpoint.
+- Mock quotes calculate `minBuyAmount` using the selected slippage.
+
+## Wallet Connection Prompt
+
+Updated:
+
+- `src/app/page.tsx`
+- `src/app/globals.css`
+
+Changes:
+
+- Added a non-modal prompt near the `Connect Wallet` button.
+- It appears when a disconnected user interacts with quote-affecting form fields or clicks `Get Quote`.
+- It disappears once a wallet is connected.
+
+## Field Validation
+
+Updated:
+
+- `src/app/page.tsx`
+- `src/app/globals.css`
+
+Changes:
+
+- Added field-level validation messages.
+- Invalid fields get `aria-invalid` and red outline styling.
+- The disabled `Get Quote` button is wrapped so hover/click can reveal validation messages.
+
+Validation currently covers:
+
+- Missing amount.
+- Invalid amount.
+- Missing sell token.
+- Missing buy token.
+- Same sell and buy token.
+- Invalid custom slippage.
+
+## Quote Invalidation
+
+Updated `src/app/page.tsx`.
+
+Changes:
+
+- Added `clearQuoteState()`.
+- Quote and swap state are cleared when chain, amount, sell token, buy token, or slippage changes.
+
+Cleared state includes:
+
+- Current quote.
+- Quote timestamp.
+- Quote errors.
+- Approval transaction hash.
+- Swap transaction hash.
+- Swap status.
+
+## Quote Freshness Timer
+
+Updated:
+
+- `src/app/page.tsx`
+- `src/app/globals.css`
+
+Changes:
+
+- Added `QUOTE_TTL_SECONDS = 20`.
+- New quotes store `quoteFetchedAtMs`.
+- UI countdown shows `Refreshes in Ns`.
+- After expiry, UI shows `Quote expired`.
+- Expired quotes stay visible.
+- Swap/dry-run is disabled for expired quotes.
+- The quote button label becomes `Refresh Quote` when a quote exists.
 
 ## Verification Performed
 

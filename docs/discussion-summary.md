@@ -221,3 +221,75 @@ The features that align best with the original business model are:
 - Profit threshold alerts.
 - Optional notification channels such as email, Telegram, push, or in-app alerts.
 
+## UX Decisions Added Later
+
+### Minimum Received And Slippage
+
+Minimum received is controlled by slippage tolerance.
+
+Example:
+
+```text
+Expected receive: 2,320 USDT
+Slippage: 1%
+Minimum received: about 2,296.8 USDT
+```
+
+The user should be able to control slippage. Current UX direction:
+
+- Presets include `0%`, `0.5%`, `1%`, `2%`.
+- `1%` is the sensible default.
+- Custom slippage is allowed from `0%` to `10%`.
+
+The selected value is passed as `slippageBps` to the quote API and then to 0x.
+
+### Quote Freshness Timer
+
+The countdown timer seen in wallet/exchange apps is mostly a UX freshness feature, not a blockchain guarantee.
+
+Important distinction:
+
+- Slippage/minimum received protects execution.
+- Quote freshness protects user understanding and prevents stale display.
+
+Current recommendation implemented:
+
+```text
+Quote TTL: 20 seconds
+```
+
+After expiry:
+
+- Keep the old quote visible.
+- Label it expired.
+- Disable swap/dry-run.
+- Change the quote action to refresh the quote.
+
+### Validation And Wallet Gating
+
+When the user interacts with the form while disconnected, the app should show a non-modal prompt near the connect wallet button.
+
+When form fields are invalid, the app should show field-level messages near the relevant input, similar to HTML5 validation:
+
+- Missing amount.
+- Invalid or zero amount.
+- Missing token.
+- Same sell and buy token.
+- Invalid slippage.
+
+### Quote Invalidation
+
+Any form change that can affect the quote should clear the old quote:
+
+- Chain.
+- Amount.
+- Sell token.
+- Buy token.
+- Slippage.
+
+This prevents stale quote data from remaining visible after the user changes trade inputs.
+
+### Select Styling
+
+Native browser dropdowns can render with a light popup on Windows. The selects should use the app's dark theme for both the closed control and opened option list where browser styling allows it.
+
