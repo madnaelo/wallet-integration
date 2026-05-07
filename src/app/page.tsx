@@ -12,10 +12,31 @@ import { ERC20_ABI } from "@/lib/erc20";
 import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
 import { swapLog } from "@/lib/swapLog";
-import { connectWallet, getActiveProvider, hasInjectedProvider } from "@/lib/walletConnector";
+import {
+  connectWallet,
+  disconnectWallet,
+  getActiveProvider,
+  getActiveProviderKind,
+  hasInjectedProvider,
+  walletSessionSupportsMethod
+} from "@/lib/walletConnector";
+import {
+  BackendClientError,
+  type BackendSession,
+  type SaveSwapHistoryRequest,
+  type SwapHistoryRecord,
+  listSwapHistory,
+  requestAuthNonce,
+  saveSwapHistory,
+  verifyAuthSignature
+} from "@/lib/backendClient";
 
 type TxStatus = "idle" | "pending" | "confirmed" | "failed";
 const QUOTE_TTL_SECONDS = 20;
+const BACKEND_SESSION_STORAGE_KEY = "wallet.swapAssistant.backendSession.v1";
+const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
+const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
+const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
 
 type DisplayToken = { address: string; symbol: string; decimals: number };
 type QuoteValidationErrors = {
@@ -41,6 +62,7 @@ export default function Page() {
   const [provider, setProvider] = useState<Eip1193Provider | null>(null);
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [walletChainId, setWalletChainId] = useState<number | null>(null);
+  const [walletKind, setWalletKind] = useState<"injected" | "walletconnect" | null>(null);
 
   const [sellToken, setSellToken] = useState<string>("");
   const [buyToken, setBuyToken] = useState<string>("");
@@ -60,6 +82,11 @@ export default function Page() {
   const [actionError, setActionError] = useState<string>("");
   const [connectPromptVisible, setConnectPromptVisible] = useState<boolean>(false);
   const [quoteValidationVisible, setQuoteValidationVisible] = useState<boolean>(false);
+  const [backendSession, setBackendSession] = useState<BackendSession | null>(null);
+  const [dbSwapHistory, setDbSwapHistory] = useState<SwapHistoryRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+  const [historyError, setHistoryError] = useState<string>("");
+  const [historyNotice, setHistoryNotice] = useState<string>("");
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
   const tokens: TokenInfo[] = useMemo(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [], [selectedChainId]);
@@ -93,6 +120,7 @@ export default function Page() {
       setWalletAddress("");
       setWalletChainId(null);
       setProvider(null);
+      setWalletKind(null);
     };
 
     p.on?.("accountsChanged", onAccountsChanged);
@@ -116,6 +144,41 @@ export default function Page() {
       p.removeListener?.("disconnect", onDisconnect);
     };
   }, [provider]);
+
+  useEffect(() => {
+    if (!walletAddress) {
+      setBackendSession(null);
+      setDbSwapHistory([]);
+      setHistoryError("");
+      setHistoryNotice("");
+      setHistoryLoading(false);
+      return;
+    }
+
+    const stored = readStoredBackendSession();
+    if (!stored || !isSessionForWallet(stored, walletAddress)) {
+      setBackendSession(null);
+      setDbSwapHistory([]);
+      setHistoryError("");
+      setHistoryNotice("");
+      setHistoryLoading(false);
+      return;
+    }
+
+    setBackendSession(stored);
+    setHistoryLoading(true);
+    setHistoryError("");
+    setHistoryNotice("");
+    loadBackendHistory(stored)
+      .catch((e: any) => {
+        setDbSwapHistory([]);
+        setBackendSession(null);
+        if (isExpiredBackendSessionError(e)) clearStoredBackendSession();
+        setHistoryError(normalizeWalletError(e));
+      })
+      .finally(() => setHistoryLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletAddress, provider]);
 
   const sellTokenInfo = useMemo(() => tokens.find((t) => t.address === sellToken), [tokens, sellToken]);
   const buyTokenInfo = useMemo(() => tokens.find((t) => t.address === buyToken), [tokens, buyToken]);
@@ -173,9 +236,29 @@ export default function Page() {
     try {
       const res = await connectWallet({ allowedChainIds: allowedChains.map((c) => c.chainId) });
       setProvider(res.provider);
+      setWalletKind(res.kind);
       setConnectPromptVisible(false);
     } catch (e: any) {
       setActionError(normalizeWalletError(e));
+    }
+  }
+
+  async function onDisconnectWallet() {
+    setActionError("");
+    setHistoryError("");
+    setHistoryNotice("");
+    try {
+      await disconnectWallet();
+    } catch {
+      // Best-effort local cleanup still happens below.
+    } finally {
+      setWalletAddress("");
+      setWalletChainId(null);
+      setProvider(null);
+      setWalletKind(null);
+      setBackendSession(null);
+      setDbSwapHistory([]);
+      clearQuoteState();
     }
   }
 
@@ -183,6 +266,92 @@ export default function Page() {
     const p = provider ?? getActiveProvider();
     if (!p) throw new Error("No wallet connected. Click “Connect Wallet” first.");
     return p;
+  }
+
+  async function ensureBackendSession(): Promise<BackendSession> {
+    if (!walletAddress) throw new Error("Connect your wallet before saving swap history.");
+
+    const stored = readStoredBackendSession();
+    if (stored && isSessionForWallet(stored, walletAddress)) {
+      setBackendSession(stored);
+      return stored;
+    }
+
+    const p = getProviderOrThrow();
+    setHistoryNotice("Requesting a one-time sign-in message from the backend...");
+    const nonce = await requestAuthNonce(envPublic.BACKEND_BASE_URL, walletAddress);
+    const signature = await signMessageWithProvider(
+      p,
+      walletAddress,
+      nonce.message,
+      walletKind ?? getActiveProviderKind(),
+      setHistoryNotice
+    );
+    setHistoryNotice("Signature received. Verifying wallet ownership...");
+    const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, walletAddress, signature);
+    writeStoredBackendSession(session);
+    setBackendSession(session);
+    setHistoryNotice("");
+    return session;
+  }
+
+  async function refreshBackendHistory() {
+    setHistoryLoading(true);
+    setHistoryError("");
+    setHistoryNotice("");
+    try {
+      const session = await ensureBackendSession();
+      await loadBackendHistory(session);
+    } catch (e: any) {
+      setDbSwapHistory([]);
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setHistoryError(normalizeWalletError(e));
+    } finally {
+      setHistoryNotice("");
+      setHistoryLoading(false);
+    }
+  }
+
+  async function loadBackendHistory(session: BackendSession) {
+    const history = await listSwapHistory(envPublic.BACKEND_BASE_URL, session, 25);
+    setDbSwapHistory(history);
+  }
+
+  async function persistCurrentSwap(status: SaveSwapHistoryRequest["status"], txHash?: string) {
+    if (!quote || !sellTokenInfo || !buyTokenInfo) return;
+
+    let session = await ensureBackendSession();
+    const request: SaveSwapHistoryRequest = {
+      chainId: selectedChainId,
+      txHash,
+      status,
+      sellTokenAddress: sellTokenInfo.address,
+      sellTokenSymbol: sellTokenInfo.symbol,
+      sellTokenDecimals: sellTokenInfo.decimals,
+      buyTokenAddress: buyTokenInfo.address,
+      buyTokenSymbol: buyTokenInfo.symbol,
+      buyTokenDecimals: buyTokenInfo.decimals,
+      sellAmountRaw: quote.sellAmount,
+      buyAmountRaw: quote.buyAmount,
+      minBuyAmountRaw: stringValue(quote.minBuyAmount),
+      aggregator: "0x",
+      quote
+    };
+
+    let saved: SwapHistoryRecord;
+    try {
+      saved = await saveSwapHistory(envPublic.BACKEND_BASE_URL, session, request);
+    } catch (e: any) {
+      if (!isExpiredBackendSessionError(e)) throw e;
+      clearStoredBackendSession();
+      setBackendSession(null);
+      session = await ensureBackendSession();
+      saved = await saveSwapHistory(envPublic.BACKEND_BASE_URL, session, request);
+    }
+    setDbSwapHistory((history) => [saved, ...history.filter((item) => item.id !== saved.id)].slice(0, 25));
   }
 
   async function ensureCorrectNetwork() {
@@ -313,6 +482,11 @@ export default function Page() {
       if (isDryRun) {
         setSwapStatus("confirmed");
         setSwapTxHash("Dry run: no transaction submitted.");
+        try {
+          await persistCurrentSwap("dry_run", "dry-run");
+        } catch (historySaveError: any) {
+          setHistoryError(normalizeWalletError(historySaveError));
+        }
         return;
       }
 
@@ -358,8 +532,14 @@ export default function Page() {
       swapLog.add({ txHash: tx.hash, walletAddress, timestampMs: Date.now() });
 
       const receipt = await tx.wait();
-      if (receipt?.status === 1) setSwapStatus("confirmed");
-      else setSwapStatus("failed");
+      if (receipt?.status === 1) {
+        setSwapStatus("confirmed");
+        try {
+          await persistCurrentSwap("confirmed", tx.hash);
+        } catch (historySaveError: any) {
+          setHistoryError(normalizeWalletError(historySaveError));
+        }
+      } else setSwapStatus("failed");
     } catch (e: any) {
       setSwapStatus("failed");
       setActionError(normalizeWalletError(e));
@@ -429,6 +609,11 @@ export default function Page() {
           <button className="btn btnPrimary" onClick={onConnectWallet} disabled={!!walletAddress}>
             {walletAddress ? `Connected: ${shortAddr(walletAddress)}` : "Connect Wallet"}
           </button>
+          {walletAddress ? (
+            <button className="btn" onClick={onDisconnectWallet}>
+              Disconnect
+            </button>
+          ) : null}
           {connectPromptVisible && !walletAddress ? (
             <div className="connectNudge">
               <strong>Connect wallet first</strong>
@@ -680,15 +865,34 @@ export default function Page() {
       </div>
 
       <div className="panel" style={{ marginTop: 14 }}>
-        <div className="label">Swap Tracking (in-memory)</div>
+        <div className="quoteHeader">
+          <div>
+            <div className="label">Swap History (database)</div>
+            <div className="subtle">
+              {backendSession ? `Signed in as ${shortAddr(backendSession.walletAddress)}` : "Wallet signature required to save history."}
+            </div>
+          </div>
+          <button className="btn" onClick={refreshBackendHistory} disabled={!walletAddress || historyLoading}>
+            {historyLoading ? (backendSession ? "Syncing..." : "Open Wallet To Sign") : backendSession ? "Refresh History" : "Sign In To Sync"}
+          </button>
+        </div>
+        {historyNotice ? <div className="small" style={{ marginTop: 8 }}>{historyNotice}</div> : null}
+        {historyError ? <div className="error" style={{ marginTop: 8 }}>{historyError}</div> : null}
         <div className="small">
-          {swapLog.list().length === 0
-            ? "No swaps logged yet."
-            : swapLog
-                .list()
+          {dbSwapHistory.length === 0
+            ? "No database-backed swaps saved yet."
+            : dbSwapHistory
                 .slice(0, 5)
-                .map((s) => `${new Date(s.timestampMs).toISOString()}  ${s.walletAddress}  ${s.txHash}`)
+                .map(
+                  (s) =>
+                    `${new Date(s.createdAt).toISOString()}  ${s.status}  ${s.sellTokenSymbol}->${s.buyTokenSymbol}  ${
+                      s.txHash ?? "no tx"
+                    }`
+                )
                 .join("\n")}
+        </div>
+        <div className="small" style={{ marginTop: 10 }}>
+          Local execution log entries: {swapLog.list().length}
         </div>
       </div>
     </div>
@@ -698,6 +902,137 @@ export default function Page() {
 function shortAddr(a: string) {
   if (!a) return "";
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function readStoredBackendSession(): BackendSession | null {
+  try {
+    const raw = window.localStorage.getItem(BACKEND_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as BackendSession;
+    if (!parsed.walletAddress || !parsed.accessToken || !parsed.expiresAt) return null;
+    if (new Date(parsed.expiresAt).getTime() <= Date.now() + 60_000) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredBackendSession(session: BackendSession) {
+  window.localStorage.setItem(BACKEND_SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+function clearStoredBackendSession() {
+  window.localStorage.removeItem(BACKEND_SESSION_STORAGE_KEY);
+}
+
+function isSessionForWallet(session: BackendSession, walletAddress: string): boolean {
+  return session.walletAddress.toLowerCase() === walletAddress.toLowerCase();
+}
+
+function isExpiredBackendSessionError(e: any): boolean {
+  return e instanceof BackendClientError && e.status === 401;
+}
+
+async function signMessageWithProvider(
+  provider: Eip1193Provider,
+  walletAddress: string,
+  message: string,
+  providerKind: "injected" | "walletconnect" | null,
+  setNotice: (message: string) => void
+): Promise<string> {
+  const hexMessage = utf8ToHex(message);
+  const supportsPersonalSign = walletSessionSupportsMethod(provider, "personal_sign");
+  if (providerKind === "walletconnect" && supportsPersonalSign === false) {
+    throw new Error(
+      "The connected WalletConnect session did not approve personal_sign. Disconnect, reconnect, and approve message signing."
+    );
+  }
+
+  const attempts =
+    providerKind === "walletconnect"
+      ? [
+          { label: "wallet text signature", params: [message, walletAddress] },
+          { label: "wallet hex signature", params: [hexMessage, walletAddress] }
+        ]
+      : [
+          { label: "wallet hex signature", params: [hexMessage, walletAddress] },
+          { label: "wallet text signature", params: [message, walletAddress] }
+        ];
+
+  let lastError: unknown = null;
+  for (const [index, attempt] of attempts.entries()) {
+    try {
+      setNotice(
+        `Open your connected wallet and approve the sign-in message. This proves wallet ownership and cannot move funds.`
+      );
+      const signature = await requestWithTimeout(
+        requestWalletSignature(provider, attempt.params, providerKind),
+        providerKind === "walletconnect" ? WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS : SIGNING_ATTEMPT_TIMEOUT_MS,
+        `${attempt.label} did not return a signature.`
+      );
+
+      if (typeof signature !== "string" || !signature.startsWith("0x")) {
+        throw new Error("Wallet did not return a valid signature.");
+      }
+
+      return signature;
+    } catch (e: any) {
+      if (isUserRejectedWalletRequest(e)) throw e;
+      if (isWalletRequestTimeout(e)) {
+        throw new Error(
+          "The connected wallet did not return a signature. Reopen the wallet request, or disconnect/reconnect WalletConnect and try again."
+        );
+      }
+      lastError = e;
+      if (index === 0) {
+        setNotice("The wallet did not accept the first signing format. Trying the alternate signing format...");
+      }
+    }
+  }
+
+  throw new Error(normalizeWalletError(lastError) || "Wallet did not return a signature.");
+}
+
+function requestWalletSignature(
+  provider: Eip1193Provider,
+  params: string[],
+  providerKind: "injected" | "walletconnect" | null
+): Promise<unknown> {
+  const args = {
+    method: "personal_sign",
+    params
+  };
+  if (providerKind === "walletconnect") {
+    return provider.request(args, SIGNING_ATTEMPT_EXPIRY_SECONDS);
+  }
+  return provider.request(args);
+}
+
+function requestWithTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      const error = new Error(message);
+      error.name = "WalletRequestTimeout";
+      reject(error);
+    }, timeoutMs);
+    promise.then(resolve, reject).finally(() => window.clearTimeout(timeoutId));
+  });
+}
+
+function isWalletRequestTimeout(e: any): boolean {
+  return e?.name === "WalletRequestTimeout";
+}
+
+function isUserRejectedWalletRequest(e: any): boolean {
+  const message = String(e?.message ?? e ?? "");
+  return e?.code === 4001 || /reject|denied|cancel/i.test(message);
+}
+
+function utf8ToHex(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  return `0x${Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")}`;
 }
 
 function getQuoteValidationErrors(params: {

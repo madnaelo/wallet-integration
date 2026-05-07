@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wallet
+      POSTGRES_USER: wallet
+      POSTGRES_PASSWORD: wallet
+    ports:
+      - "55432:5432"
+    volumes:
+      - wallet_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wallet -d wallet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    profiles: ["full"]
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/wallet
+      DATABASE_USERNAME: wallet
+      DATABASE_PASSWORD: wallet
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      SESSION_TTL_HOURS: 168
+      NONCE_TTL_MINUTES: 10
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
+        NEXT_PUBLIC_ALLOWED_CHAIN_IDS: ${NEXT_PUBLIC_ALLOWED_CHAIN_IDS:-1}
+        NEXT_PUBLIC_DISALLOW_MAINNET: ${NEXT_PUBLIC_DISALLOW_MAINNET:-true}
+        NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-http://localhost:8080}
+    environment:
+      ZEROX_API_KEY: ${ZEROX_API_KEY:-}
+      AFFILIATE_ADDRESS: ${AFFILIATE_ADDRESS:-0x0000000000000000000000000000000000000000}
+      CORS_ALLOW_ORIGINS: http://localhost:3000
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX: 30
+      QUOTE_CACHE_TTL_MS: 8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  wallet_postgres_data:

@@ -116,7 +116,7 @@ This has been passing after recent implementation changes.
 Paste this into a new session:
 
 ```text
-We are continuing work on the wallet swap MVP in f:\assignments\wallet.
+We are continuing work on the wallet swap MVP in E:\assignments\wallet.
 Please first read docs/context-handoff.md, docs/BRD.md, docs/prompt*.md,
 docs/discussion-summary.md, and docs/implementation-change-summary.md.
 Then inspect git status/diff before making changes.

@@ -1,0 +1,19 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: swap-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:55432/wallet}
+    username: ${DATABASE_USERNAME:wallet}
+    password: ${DATABASE_PASSWORD:wallet}
+  flyway:
+    enabled: true
+
+wallet:
+  api:
+    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  auth:
+    nonce-ttl-minutes: ${NONCE_TTL_MINUTES:10}
+    session-ttl-hours: ${SESSION_TTL_HOURS:168}
