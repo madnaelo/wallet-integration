@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ethers } from "ethers";
 import type { QuoteResponse } from "@/lib/types";
 import { CHAINS, getAllowedChains, getChainById } from "@/lib/chains";
@@ -9,17 +9,11 @@ import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
 import { ERC20_ABI } from "@/lib/erc20";
+import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect } from "@reown/appkit/react";
+import { isAppKitConfigured } from "@/context/appkit";
 import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
 import { swapLog } from "@/lib/swapLog";
-import {
-  connectWallet,
-  disconnectWallet,
-  getActiveProvider,
-  getActiveProviderKind,
-  hasInjectedProvider,
-  walletSessionSupportsMethod
-} from "@/lib/walletConnector";
 import {
   BackendClientError,
   type BackendSession,
@@ -53,9 +47,17 @@ type FeeLine = {
   buyTokenAmount?: string;
   buyTokenDisplay?: string;
 };
+type RouteLine = {
+  source: string;
+  share: string;
+};
 
 export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
+  const { open: openAppKit } = useAppKit();
+  const { address: appKitAddress, isConnected: appKitConnected } = useAppKitAccount({ namespace: "eip155" });
+  const { walletProvider: appKitProvider, walletProviderType } = useAppKitProvider<Eip1193Provider>("eip155");
+  const { disconnect: disconnectAppKit } = useDisconnect();
   const isDryRun = envPublic.DISALLOW_MAINNET;
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
 
@@ -75,6 +77,8 @@ export default function Page() {
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [quoteError, setQuoteError] = useState<string>("");
   const [quoteLoading, setQuoteLoading] = useState<boolean>(false);
+  const [rateInverted, setRateInverted] = useState<boolean>(false);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string>("");
 
   const [approvalTxHash, setApprovalTxHash] = useState<string>("");
   const [swapTxHash, setSwapTxHash] = useState<string>("");
@@ -84,9 +88,12 @@ export default function Page() {
   const [quoteValidationVisible, setQuoteValidationVisible] = useState<boolean>(false);
   const [backendSession, setBackendSession] = useState<BackendSession | null>(null);
   const [dbSwapHistory, setDbSwapHistory] = useState<SwapHistoryRecord[]>([]);
+  const [historyExpanded, setHistoryExpanded] = useState<boolean>(false);
+  const [historyLoaded, setHistoryLoaded] = useState<boolean>(false);
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [historyError, setHistoryError] = useState<string>("");
   const [historyNotice, setHistoryNotice] = useState<string>("");
+  const historyRequestInFlightRef = useRef<boolean>(false);
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
   const tokens: TokenInfo[] = useMemo(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [], [selectedChainId]);
@@ -101,9 +108,26 @@ export default function Page() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Attach listeners to the active provider (injected or WalletConnect)
   useEffect(() => {
-    const p = provider ?? getActiveProvider();
+    if (appKitConnected && appKitAddress && appKitProvider) {
+      setProvider(appKitProvider);
+      setWalletAddress(appKitAddress);
+      setWalletKind(walletProviderType === "WALLET_CONNECT" ? "walletconnect" : "injected");
+      setConnectPromptVisible(false);
+      return;
+    }
+
+    if (!appKitConnected) {
+      setWalletAddress("");
+      setWalletChainId(null);
+      setProvider(null);
+      setWalletKind(null);
+    }
+  }, [appKitAddress, appKitConnected, appKitProvider, walletProviderType]);
+
+  // Attach listeners to the connected wallet provider.
+  useEffect(() => {
+    const p = provider;
     if (!p) return;
 
     const onAccountsChanged = (accounts: string[]) => {
@@ -149,6 +173,8 @@ export default function Page() {
     if (!walletAddress) {
       setBackendSession(null);
       setDbSwapHistory([]);
+      setHistoryExpanded(false);
+      setHistoryLoaded(false);
       setHistoryError("");
       setHistoryNotice("");
       setHistoryLoading(false);
@@ -159,6 +185,7 @@ export default function Page() {
     if (!stored || !isSessionForWallet(stored, walletAddress)) {
       setBackendSession(null);
       setDbSwapHistory([]);
+      setHistoryLoaded(false);
       setHistoryError("");
       setHistoryNotice("");
       setHistoryLoading(false);
@@ -166,18 +193,10 @@ export default function Page() {
     }
 
     setBackendSession(stored);
-    setHistoryLoading(true);
+    setDbSwapHistory([]);
+    setHistoryLoaded(false);
     setHistoryError("");
     setHistoryNotice("");
-    loadBackendHistory(stored)
-      .catch((e: any) => {
-        setDbSwapHistory([]);
-        setBackendSession(null);
-        if (isExpiredBackendSessionError(e)) clearStoredBackendSession();
-        setHistoryError(normalizeWalletError(e));
-      })
-      .finally(() => setHistoryLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress, provider]);
 
   const sellTokenInfo = useMemo(() => tokens.find((t) => t.address === sellToken), [tokens, sellToken]);
@@ -208,6 +227,7 @@ export default function Page() {
   const quoteAgeSeconds = quoteFetchedAtMs ? Math.floor((nowMs - quoteFetchedAtMs) / 1000) : 0;
   const quoteSecondsRemaining = quote ? Math.max(0, QUOTE_TTL_SECONDS - quoteAgeSeconds) : 0;
   const isQuoteExpired = !!quote && quoteSecondsRemaining <= 0;
+  const availableQuotes = useMemo(() => quote?.availableQuotes ?? (quote ? [quote] : []), [quote]);
 
   function requireWalletForForm() {
     if (walletAddress) return true;
@@ -224,6 +244,7 @@ export default function Page() {
 
   function clearQuoteState() {
     setQuote(null);
+    setSelectedQuoteId("");
     setQuoteFetchedAtMs(null);
     setQuoteError("");
     setApprovalTxHash("");
@@ -231,16 +252,13 @@ export default function Page() {
     setSwapStatus("idle");
   }
 
-  async function onConnectWallet() {
+  async function openWalletChooser() {
     setActionError("");
-    try {
-      const res = await connectWallet({ allowedChainIds: allowedChains.map((c) => c.chainId) });
-      setProvider(res.provider);
-      setWalletKind(res.kind);
-      setConnectPromptVisible(false);
-    } catch (e: any) {
-      setActionError(normalizeWalletError(e));
+    if (!isAppKitConfigured) {
+      setActionError("Wallet connection is unavailable right now. Please try again later.");
+      return;
     }
+    await openAppKit({ view: "Connect" });
   }
 
   async function onDisconnectWallet() {
@@ -248,7 +266,7 @@ export default function Page() {
     setHistoryError("");
     setHistoryNotice("");
     try {
-      await disconnectWallet();
+      await disconnectAppKit({ namespace: "eip155" });
     } catch {
       // Best-effort local cleanup still happens below.
     } finally {
@@ -263,8 +281,8 @@ export default function Page() {
   }
 
   function getProviderOrThrow(): Eip1193Provider {
-    const p = provider ?? getActiveProvider();
-    if (!p) throw new Error("No wallet connected. Click “Connect Wallet” first.");
+    const p = provider;
+    if (!p) throw new Error("Connect your wallet first.");
     return p;
   }
 
@@ -284,7 +302,7 @@ export default function Page() {
       p,
       walletAddress,
       nonce.message,
-      walletKind ?? getActiveProviderKind(),
+      walletKind,
       setHistoryNotice
     );
     setHistoryNotice("Signature received. Verifying wallet ownership...");
@@ -296,6 +314,8 @@ export default function Page() {
   }
 
   async function refreshBackendHistory() {
+    if (historyRequestInFlightRef.current) return;
+    historyRequestInFlightRef.current = true;
     setHistoryLoading(true);
     setHistoryError("");
     setHistoryNotice("");
@@ -312,12 +332,26 @@ export default function Page() {
     } finally {
       setHistoryNotice("");
       setHistoryLoading(false);
+      historyRequestInFlightRef.current = false;
     }
   }
 
   async function loadBackendHistory(session: BackendSession) {
     const history = await listSwapHistory(envPublic.BACKEND_BASE_URL, session, 25);
     setDbSwapHistory(history);
+    setHistoryLoaded(true);
+  }
+
+  function onHistoryToggle(event: { currentTarget: HTMLDetailsElement }) {
+    const expanded = event.currentTarget.open;
+    setHistoryExpanded(expanded);
+
+    if (!expanded || !walletAddress || historyLoaded || historyRequestInFlightRef.current) return;
+
+    const stored = backendSession ?? readStoredBackendSession();
+    if (stored && isSessionForWallet(stored, walletAddress)) {
+      void refreshBackendHistory();
+    }
   }
 
   async function persistCurrentSwap(status: SaveSwapHistoryRequest["status"], txHash?: string) {
@@ -337,8 +371,8 @@ export default function Page() {
       sellAmountRaw: quote.sellAmount,
       buyAmountRaw: quote.buyAmount,
       minBuyAmountRaw: stringValue(quote.minBuyAmount),
-      aggregator: "0x",
-      quote
+      aggregator: stringValue(quote.providerId) || "swap-provider",
+      quote: quoteForHistory(quote)
     };
 
     let saved: SwapHistoryRecord;
@@ -430,13 +464,27 @@ export default function Page() {
         const msg = body?.error ?? body?.message ?? `Quote failed with status ${res.status}`;
         throw new Error(msg);
       }
-      setQuote(body as QuoteResponse);
+      const fetchedQuote = body as QuoteResponse;
+      setQuote(fetchedQuote);
+      setSelectedQuoteId(fetchedQuote.quoteId ?? "");
       setQuoteFetchedAtMs(Date.now());
     } catch (e: any) {
       setQuoteError(normalizeWalletError(e));
     } finally {
       setQuoteLoading(false);
     }
+  }
+
+  function onSelectedQuoteChange(quoteId: string) {
+    const next = availableQuotes.find((item) => item.quoteId === quoteId);
+    if (!next || !quote) return;
+
+    setSelectedQuoteId(quoteId);
+    setQuote({
+      ...next,
+      availableQuotes,
+      quoteErrors: quote.quoteErrors
+    });
   }
 
   async function ensureAllowanceAndApproveIfNeeded() {
@@ -559,7 +607,9 @@ export default function Page() {
     const tokenForAddress = (address: string): DisplayToken => resolveDisplayToken(address, tokens, nativeToken);
 
     const sellHuman = formatTokenAmount(quote.sellAmount, sellDisplayToken);
+    const grossBuyAmount = stringValue(quote.grossBuyAmount) || quote.buyAmount;
     const minBuyAmount = stringValue(quote.minBuyAmount);
+    const routeLines = collectRouteLines(quote, tokenForAddress);
     const gasUnits = (quote.gas as string | undefined) ?? nestedString(quote, ["transaction", "gas"]);
     const gasPriceWei = nestedString(quote, ["transaction", "gasPrice"]);
     const networkFeeWei = stringValue(quote.totalNetworkFee) || multiplyIntegerStrings(gasUnits, gasPriceWei);
@@ -571,42 +621,47 @@ export default function Page() {
           display: formatTokenAmount(networkFeeWei, nativeToken)
         }
       : null;
-    const rawFeeLines = [...(networkFeeLine ? [networkFeeLine] : []), ...collectFeeLines(quote, tokenForAddress)];
-    const feeLines = rawFeeLines.map((fee) =>
-      withBuyTokenEquivalent(fee, sellDisplayToken, buyDisplayToken, quote.sellAmount, quote.buyAmount)
+    const swapFeeLines = collectFeeLines(quote, tokenForAddress).map((fee) =>
+      withBuyTokenEquivalent(fee, sellDisplayToken, buyDisplayToken, quote.sellAmount, grossBuyAmount)
     );
-    const buyTokenFees = sumBuyTokenFees(feeLines);
-    const netBuyAmount = subtractIntegerStrings(quote.buyAmount, buyTokenFees);
-    const netMinBuyAmount = minBuyAmount ? subtractIntegerStrings(minBuyAmount, buyTokenFees) : "";
+    const buyTokenFeesDeducted = sumFeesChargedInToken(swapFeeLines, buyDisplayToken);
+    const netBuyAmount = stringValue(quote.netBuyAmount) || subtractIntegerStrings(grossBuyAmount, buyTokenFeesDeducted);
+    const netMinBuyAmount = minBuyAmount ? subtractIntegerStrings(minBuyAmount, buyTokenFeesDeducted) : "";
+    const networkCost = networkFeeLine?.display ?? "Not provided";
+    const swapFeeTotal = swapFeeLines.length ? formatConvertedFeeTotal(swapFeeLines, buyDisplayToken) : "None";
 
     return {
+      providerName: stringValue(quote.providerName) || "Best route",
       sellHuman,
+      grossBuyHuman: formatTokenAmount(grossBuyAmount, buyDisplayToken),
       buyHuman: formatTokenAmount(netBuyAmount, buyDisplayToken),
       minBuyHuman: netMinBuyAmount ? formatTokenAmount(netMinBuyAmount, buyDisplayToken) : "",
-      price: formatDerivedPrice(quote.sellAmount, sellDisplayToken, netBuyAmount, buyDisplayToken),
-      feeLines,
-      totalFees: formatConvertedFeeTotal(feeLines, buyDisplayToken)
+      rate: formatPairRate(quote.sellAmount, sellDisplayToken, grossBuyAmount, buyDisplayToken, rateInverted),
+      networkCost,
+      routeLines,
+      routeSummary: formatRouteSummary(routeLines, stringValue(quote.providerName)),
+      swapFeeLines,
+      swapFeeTotal
     };
-  }, [quote, sellTokenInfo, buyTokenInfo, chain, tokens]);
+  }, [quote, sellTokenInfo, buyTokenInfo, chain, tokens, rateInverted]);
 
   const connectHint = useMemo(() => {
     if (walletAddress) return "";
-    if (hasInjectedProvider()) return "Detected an injected wallet in your browser.";
-    return "No injected wallet detected. We’ll open WalletConnect so you can connect a mobile wallet.";
+    return "Choose a browser wallet or connect from your phone.";
   }, [walletAddress]);
 
   return (
     <div className="container">
       <div className="header">
         <div>
-          <h1 className="h1">Swap Aggregator MVP</h1>
-          <div className="subtle">Non-custodial swaps via 0x + your wallet. Backend only builds quotes.</div>
+          <h1 className="h1">The Wallet</h1>
+          <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
         </div>
         <div className="walletActions">
           <span className="badge">
             Network: <span className="mono">{chain?.name ?? `Chain ${selectedChainId}`}</span>
           </span>
-          <button className="btn btnPrimary" onClick={onConnectWallet} disabled={!!walletAddress}>
+          <button className="btn btnPrimary" onClick={openWalletChooser} disabled={!!walletAddress}>
             {walletAddress ? `Connected: ${shortAddr(walletAddress)}` : "Connect Wallet"}
           </button>
           {walletAddress ? (
@@ -642,12 +697,12 @@ export default function Page() {
               >
                 {allowedChains.map((c) => (
                   <option key={c.chainId} value={c.chainId}>
-                    {c.name} (chainId {c.chainId})
+                    {c.name}
                   </option>
                 ))}
               </select>
               <div className="small" style={{ marginTop: 6 }}>
-                Wallet chainId: <span className="mono">{walletChainId ?? "unknown"}</span>
+                Wallet network: <span className="mono">{formatWalletNetwork(walletChainId)}</span>
               </div>
             </div>
 
@@ -671,9 +726,6 @@ export default function Page() {
                   {quoteValidationErrors.amount}
                 </div>
               ) : null}
-              <div className="small" style={{ marginTop: 6 }}>
-                Amount is converted to base units using token decimals before requesting a quote.
-              </div>
             </div>
           </div>
 
@@ -783,7 +835,7 @@ export default function Page() {
               </button>
             </span>
             <button className="btn btnPrimary" onClick={executeSwap} disabled={!quote || !walletAddress || isQuoteExpired}>
-              {isDryRun ? "Dry Run" : "Swap"}
+              {isDryRun ? "Preview Swap" : "Swap"}
             </button>
           </div>
 
@@ -822,79 +874,157 @@ export default function Page() {
             ) : null}
           </div>
           {!quote ? (
-            <div className="small">No quote loaded.</div>
+            <div className="small">Enter swap details to see your quote.</div>
           ) : (
             <>
               <div className="kv">
                 <div className="subtle">You pay</div>
                 <div className="mono">{quoteSummary?.sellHuman ?? ""}</div>
               </div>
-              <div className="kv">
-                <div className="subtle">Rate</div>
-                <div className="mono">{quoteSummary?.price ?? ""}</div>
-              </div>
-              <div className="kv">
-                <div className="subtle">Total fees</div>
-                <div className="mono">{quoteSummary?.totalFees || "Not provided"}</div>
-              </div>
-              {quoteSummary?.feeLines.length ? (
-                <details className="feeDetails">
-                  <summary>Fee breakdown</summary>
-                  {quoteSummary.feeLines.map((fee, index) => (
-                    <div className="kv" key={`${fee.label}-${fee.token.address}-${index}`}>
-                      <div className="subtle">{fee.label}</div>
-                      <div className="mono">{formatFeeDetail(fee)}</div>
-                    </div>
-                  ))}
-                </details>
-              ) : null}
               <div className="kv receiveRow">
                 <div className="subtle">You receive</div>
                 <div className="mono">{quoteSummary?.buyHuman ?? ""}</div>
               </div>
               <div className="kv">
-                <div className="subtle">Minimum received</div>
-                <div className="mono">{quoteSummary?.minBuyHuman || "Not provided"}</div>
+                <div className="subtle">Rate</div>
+                <button className="rateButton mono" type="button" onClick={() => setRateInverted((value) => !value)}>
+                  {quoteSummary?.rate ?? ""}
+                </button>
               </div>
+              <div className="kv">
+                <div className="subtle">Route</div>
+                <div className="routeChoice">
+                  {availableQuotes.length > 1 && buyTokenInfo ? (
+                    <select
+                      className="select routeSelect"
+                      value={selectedQuoteId || quote.quoteId || ""}
+                      onChange={(e) => onSelectedQuoteChange(e.target.value)}
+                    >
+                      {availableQuotes.map((item) => (
+                        <option key={item.quoteId ?? item.providerId} value={item.quoteId ?? ""}>
+                          {formatQuoteOption(item, tokenInfoToDisplay(buyTokenInfo))}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="mono">{quoteSummary?.providerName ?? ""}</span>
+                  )}
+                </div>
+              </div>
+              <div className="kv">
+                <div className="subtle">Service fee</div>
+                <div className="mono">{quoteSummary?.swapFeeTotal ?? ""}</div>
+              </div>
+              {quoteSummary ? (
+                <details className="feeDetails routeDetails">
+                  <summary>
+                    <span className="subtle">Details</span>
+                    <span className="mono">Minimum, fees, network</span>
+                  </summary>
+                  {quoteSummary.swapFeeLines.map((fee, index) => (
+                    <div className="kv" key={`${fee.label}-${fee.token.address}-${index}`}>
+                      <div className="subtle">{fee.label}</div>
+                      <div className="mono feeAmount">{renderFeeDetail(fee)}</div>
+                    </div>
+                  ))}
+                  <div className="kv">
+                    <div className="subtle">Before fees</div>
+                    <div className="mono">{quoteSummary.grossBuyHuman}</div>
+                  </div>
+                  <div className="kv">
+                    <div className="subtle">Minimum received</div>
+                    <div className="mono">{quoteSummary.minBuyHuman || "Not provided"}</div>
+                  </div>
+                  <div className="kv">
+                    <div className="subtle">Network cost</div>
+                    <div className="mono">{quoteSummary.networkCost}</div>
+                  </div>
+                </details>
+              ) : null}
               <div className="small" style={{ marginTop: 10 }}>
-                Final received amount can change before confirmation, but it should not be below the minimum received amount.
+                Network fee is paid separately in the chain native token and confirmed in your wallet.
               </div>
             </>
           )}
         </div>
       </div>
 
-      <div className="panel" style={{ marginTop: 14 }}>
-        <div className="quoteHeader">
-          <div>
-            <div className="label">Swap History (database)</div>
+      <details className="panel historyPanel" open={historyExpanded} onToggle={onHistoryToggle}>
+        <summary className="historySummary">
+          <span className="historyChevron" aria-hidden="true" />
+          <span className="historyTitleBlock">
+            <span className="label">Swap History</span>
+            <span className="subtle">
+              {backendSession ? `Connected as ${shortAddr(backendSession.walletAddress)}` : "Connect your wallet to see saved swaps."}
+            </span>
+          </span>
+          <span className="historyActions">
+            <span className="badge">
+              {historyLoading
+                ? "Loading history"
+                : historyExpanded
+                  ? historyLoaded
+                    ? `${dbSwapHistory.length} saved`
+                    : "Ready to load history"
+                  : "Expand to see history"}
+            </span>
+          </span>
+        </summary>
+        <div className="historyContent">
+          <div className="quoteHeader">
             <div className="subtle">
-              {backendSession ? `Signed in as ${shortAddr(backendSession.walletAddress)}` : "Wallet signature required to save history."}
+              {walletAddress
+                ? backendSession
+                  ? ""
+                  : "Sign once to view your saved swaps."
+                : "Connect your wallet to view your saved swaps."}
             </div>
+            <button className="btn" onClick={refreshBackendHistory} disabled={!walletAddress || historyLoading}>
+              {historyLoading
+                ? backendSession
+                  ? "Syncing..."
+                  : "Open Wallet To Sign"
+                : backendSession
+                  ? historyLoaded
+                    ? "Refresh History"
+                    : "Load History"
+                  : "Sign In To Sync"}
+            </button>
           </div>
-          <button className="btn" onClick={refreshBackendHistory} disabled={!walletAddress || historyLoading}>
-            {historyLoading ? (backendSession ? "Syncing..." : "Open Wallet To Sign") : backendSession ? "Refresh History" : "Sign In To Sync"}
-          </button>
+          {historyNotice ? <div className="small" style={{ marginTop: 8 }}>{historyNotice}</div> : null}
+          {historyError ? <div className="error" style={{ marginTop: 8 }}>{historyError}</div> : null}
+          {!historyLoaded && dbSwapHistory.length === 0 ? (
+            <div className="small">History has not been loaded yet.</div>
+          ) : dbSwapHistory.length === 0 ? (
+            <div className="small">No saved swaps yet.</div>
+          ) : (
+            <div className="historyTableWrap">
+              <table className="historyTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Swap</th>
+                    <th>Transaction</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dbSwapHistory.slice(0, 5).map((swap) => (
+                    <tr key={swap.id}>
+                      <td>{formatHistoryDate(swap.createdAt)}</td>
+                      <td>{formatHistoryStatus(swap.status)}</td>
+                      <td>
+                        {swap.sellTokenSymbol} to {swap.buyTokenSymbol}
+                      </td>
+                      <td className="mono">{formatHistoryTx(swap.txHash)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-        {historyNotice ? <div className="small" style={{ marginTop: 8 }}>{historyNotice}</div> : null}
-        {historyError ? <div className="error" style={{ marginTop: 8 }}>{historyError}</div> : null}
-        <div className="small">
-          {dbSwapHistory.length === 0
-            ? "No database-backed swaps saved yet."
-            : dbSwapHistory
-                .slice(0, 5)
-                .map(
-                  (s) =>
-                    `${new Date(s.createdAt).toISOString()}  ${s.status}  ${s.sellTokenSymbol}->${s.buyTokenSymbol}  ${
-                      s.txHash ?? "no tx"
-                    }`
-                )
-                .join("\n")}
-        </div>
-        <div className="small" style={{ marginTop: 10 }}>
-          Local execution log entries: {swapLog.list().length}
-        </div>
-      </div>
+      </details>
     </div>
   );
 }
@@ -902,6 +1032,55 @@ export default function Page() {
 function shortAddr(a: string) {
   if (!a) return "";
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function formatWalletNetwork(chainId: number | null): string {
+  if (!chainId) return "Not connected";
+  return getChainById(chainId)?.name ?? "Unsupported network";
+}
+
+function formatHistoryDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatHistoryStatus(status: SwapHistoryRecord["status"]): string {
+  switch (status) {
+    case "dry_run":
+      return "Preview";
+    case "submitted":
+      return "Submitted";
+    case "confirmed":
+      return "Confirmed";
+    case "failed":
+      return "Failed";
+    default:
+      return status;
+  }
+}
+
+function formatHistoryTx(txHash: string | undefined): string {
+  if (!txHash || txHash === "dry-run") return "-";
+  return shortAddr(txHash);
+}
+
+function quoteForHistory(quote: QuoteResponse): QuoteResponse {
+  const { availableQuotes: _availableQuotes, quoteErrors: _quoteErrors, ...rest } = quote;
+  return rest;
+}
+
+function formatQuoteOption(quote: QuoteResponse, buyToken: DisplayToken): string {
+  const providerName = stringValue(quote.providerName) || "Route";
+  const rankLabel = quote.isBest ? "Best - " : "";
+  const amount = stringValue(quote.netBuyAmount) || stringValue(quote.buyAmount);
+  const formattedAmount = amount ? formatTokenAmount(amount, buyToken) : "Quote";
+  return `${rankLabel}${providerName} - ${formattedAmount}`;
 }
 
 function readStoredBackendSession(): BackendSession | null {
@@ -991,6 +1170,13 @@ async function signMessageWithProvider(
   }
 
   throw new Error(normalizeWalletError(lastError) || "Wallet did not return a signature.");
+}
+
+function walletSessionSupportsMethod(provider: Eip1193Provider | null, method: string): boolean | null {
+  const p: any = provider;
+  const methods = p?.session?.namespaces?.eip155?.methods;
+  if (!Array.isArray(methods)) return null;
+  return methods.includes(method);
 }
 
 function requestWalletSignature(
@@ -1102,16 +1288,21 @@ function formatTokenAmount(amountBaseUnits: string, token: DisplayToken): string
   return `${formatDecimal(formatUnitsSafe(amountBaseUnits, token.decimals), 8)} ${token.symbol}`;
 }
 
-function formatDerivedPrice(
+function formatPairRate(
   sellAmount: string,
   sellToken: DisplayToken,
   buyAmount: string,
-  buyToken: DisplayToken
+  buyToken: DisplayToken,
+  inverted: boolean
 ): string {
   const sell = Number(formatUnitsSafe(sellAmount, sellToken.decimals));
   const buy = Number(formatUnitsSafe(buyAmount, buyToken.decimals));
-  if (!Number.isFinite(sell) || !Number.isFinite(buy) || sell <= 0) return "";
-  return `${formatDecimal(String(buy / sell), 8)} ${buyToken.symbol} per ${sellToken.symbol}`;
+  if (!Number.isFinite(sell) || !Number.isFinite(buy) || sell <= 0 || buy <= 0) return "";
+
+  if (inverted) {
+    return `1 ${buyToken.symbol} = ${formatDecimal(String(sell / buy), 8)} ${sellToken.symbol}`;
+  }
+  return `1 ${sellToken.symbol} = ${formatDecimal(String(buy / sell), 8)} ${buyToken.symbol}`;
 }
 
 function formatDecimal(value: string, maximumFractionDigits: number): string {
@@ -1150,12 +1341,85 @@ function subtractIntegerStrings(value: string, deduction: string): string {
   return result > 0n ? result.toString() : "0";
 }
 
+function collectRouteLines(quote: QuoteResponse, tokenForAddress: (address: string) => DisplayToken): RouteLine[] {
+  if (Array.isArray(quote.routeLines) && quote.routeLines.length) {
+    return quote.routeLines.map((line: any) => ({
+      source: stringValue(line?.source) || "Liquidity source",
+      share: stringValue(line?.share) || "Best route"
+    }));
+  }
+
+  const fills = (quote as any)?.route?.fills;
+  if (!Array.isArray(fills)) return [];
+
+  return fills
+    .map((fill: any) => {
+      const source =
+        stringValue(fill?.source) ||
+        stringValue(fill?.sourceName) ||
+        stringValue(fill?.name) ||
+        "Liquidity source";
+      const share = formatRouteShare(fill?.proportionBps ?? fill?.proportion ?? fill?.shareBps ?? fill?.percentage);
+      const from = stringValue(fill?.from);
+      const to = stringValue(fill?.to);
+      const pair =
+        from && to
+          ? `${tokenForAddress(from).symbol} -> ${tokenForAddress(to).symbol}`
+          : stringValue(fill?.input) && stringValue(fill?.output)
+            ? `${tokenForAddress(stringValue(fill.input)).symbol} -> ${tokenForAddress(stringValue(fill.output)).symbol}`
+            : "";
+
+      return {
+        source: pair ? `${source} (${pair})` : source,
+        share
+      };
+    })
+    .filter((line) => line.source.trim().length > 0);
+}
+
+function formatRouteShare(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value > 100 ? `${formatDecimal(String(value / 100), 2)}%` : `${formatDecimal(String(value), 2)}%`;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return numeric > 100 ? `${formatDecimal(String(numeric / 100), 2)}%` : `${formatDecimal(String(numeric), 2)}%`;
+    }
+  }
+  return "Best route";
+}
+
+function formatRouteSummary(lines: RouteLine[], providerName?: string): string {
+  const fallback = providerName ? `${providerName} route` : "Best route";
+  if (!lines.length) return fallback;
+  if (lines.length === 1) return lines[0]!.source;
+  return `${lines[0]!.source} + ${lines.length - 1} more`;
+}
+
 function collectFeeLines(quote: QuoteResponse, tokenForAddress: (address: string) => DisplayToken): FeeLine[] {
+  if (Array.isArray(quote.serviceFees) && quote.serviceFees.length) {
+    return quote.serviceFees
+      .map((fee: any) => {
+        const amount = stringValue(fee?.amount);
+        const tokenAddress = stringValue(fee?.token);
+        if (!amount || !tokenAddress) return null;
+        const token = tokenForAddress(tokenAddress);
+        return {
+          label: stringValue(fee?.label) || "Service fee",
+          amount,
+          token,
+          display: formatTokenAmount(amount, token)
+        };
+      })
+      .filter((fee): fee is FeeLine => !!fee);
+  }
+
   const fees: any = quote.fees;
   if (!fees || typeof fees !== "object") return [];
 
   const lines: FeeLine[] = [];
-  pushFeeLine(lines, "0x provider fee", fees.zeroExFee, tokenForAddress);
+  pushFeeLine(lines, "Service fee", fees.zeroExFee, tokenForAddress);
   pushFeeLine(lines, "Platform fee", fees.integratorFee, tokenForAddress);
   if (Array.isArray(fees.integratorFees)) {
     fees.integratorFees.forEach((fee: unknown, index: number) => {
@@ -1206,6 +1470,12 @@ function sumBuyTokenFees(lines: FeeLine[]): string {
     .toString();
 }
 
+function sumFeesChargedInToken(lines: FeeLine[], token: DisplayToken): string {
+  return lines
+    .reduce((sum, line) => (isSameToken(line.token, token) && /^\d+$/.test(line.amount) ? sum + BigInt(line.amount) : sum), 0n)
+    .toString();
+}
+
 function isSameToken(a: DisplayToken, b: DisplayToken): boolean {
   if (isNativeTokenAddress(a.address) && isNativeTokenAddress(b.address)) return true;
   return normalizeTokenKey(a.address) === normalizeTokenKey(b.address);
@@ -1240,10 +1510,14 @@ function formatConvertedFeeTotal(lines: FeeLine[], buyToken: DisplayToken): stri
   return `${convertedDisplay} + ${formatOriginalFeeTotal(unconvertedFees)}`;
 }
 
-function formatFeeDetail(fee: FeeLine): string {
-  if (!fee.buyTokenDisplay) return fee.display;
-  if (fee.buyTokenDisplay === fee.display) return fee.display;
-  return `${fee.buyTokenDisplay} (${fee.display})`;
+function renderFeeDetail(fee: FeeLine) {
+  if (!fee.buyTokenDisplay || fee.buyTokenDisplay === fee.display) return fee.display;
+  return (
+    <>
+      <span>{fee.display}</span>
+      <span className="feeEquivalent">{fee.buyTokenDisplay}</span>
+    </>
+  );
 }
 
 function formatOriginalFeeTotal(lines: FeeLine[]): string {
@@ -1286,7 +1560,7 @@ function normalizeWalletError(e: any): string {
     "Unknown error";
 
   if (/project id/i.test(msg) && /walletconnect/i.test(msg)) {
-    return "WalletConnect is not configured. Set WALLETCONNECT_PROJECT_ID in your environment.";
+    return "Mobile wallet connection is unavailable right now. Try a browser wallet.";
   }
 
   if (/insufficient funds/i.test(msg)) return "Insufficient funds for gas or swap amount.";

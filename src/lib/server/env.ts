@@ -13,6 +13,11 @@ function optionalNumber(name: string, fallback: number): number {
 
 export const env = {
   ZEROX_API_KEY: optional("ZEROX_API_KEY", ""),
+  ONEINCH_API_KEY: optional("ONEINCH_API_KEY", ""),
+  SWAP_PROVIDERS: optional("SWAP_PROVIDERS", "0x,1inch,paraswap,odos"),
+  PARASWAP_BASE_URL: optional("PARASWAP_BASE_URL", "https://api.paraswap.io"),
+  ODOS_BASE_URL: optional("ODOS_BASE_URL", "https://api.odos.xyz"),
+  ODOS_API_KEY: optional("ODOS_API_KEY", ""),
   AFFILIATE_ADDRESS: optional("AFFILIATE_ADDRESS", "0x0000000000000000000000000000000000000000"),
   CORS_ALLOW_ORIGINS: optional("CORS_ALLOW_ORIGINS", "http://localhost:3000"),
   RATE_LIMIT_WINDOW_MS: optionalNumber("RATE_LIMIT_WINDOW_MS", 60_000),

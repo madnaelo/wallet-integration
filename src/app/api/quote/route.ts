@@ -7,6 +7,7 @@ import { isAddress, isPositiveIntegerString } from "@/lib/validation";
 import { env } from "@/lib/server/env";
 import type { QuoteResponse } from "@/lib/types";
 import { createQuoteClient } from "@/lib/server/quoteProvider";
+import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
 
 export const runtime = "nodejs";
 
@@ -94,6 +95,12 @@ export async function GET(req: NextRequest) {
     return withCors(NextResponse.json({ error: "Chain registry missing configuration." }, { status: 500 }), corsOrigin);
   }
 
+  const sellTokenInfo = resolveTokenInfo(chainId, sellToken);
+  const buyTokenInfo = resolveTokenInfo(chainId, buyToken);
+  if (!sellTokenInfo || !buyTokenInfo) {
+    return withCors(NextResponse.json({ error: "Token is not available on this network." }, { status: 400 }), corsOrigin);
+  }
+
   const cacheKey = `quote:${chainId}:${sellToken}:${buyToken}:${sellAmount}:${takerAddress}:${slippageBps ?? "default"}`;
   const cached = quoteCache.get(cacheKey);
   if (cached) {
@@ -105,7 +112,11 @@ export async function GET(req: NextRequest) {
 
     const quote = await client.getQuote({
       sellToken,
+      sellTokenSymbol: sellTokenInfo.symbol,
+      sellTokenDecimals: sellTokenInfo.decimals,
       buyToken,
+      buyTokenSymbol: buyTokenInfo.symbol,
+      buyTokenDecimals: buyTokenInfo.decimals,
       sellAmount,
       takerAddress,
       chainId,
@@ -129,6 +140,16 @@ function isOriginAllowed(origin: string | null): boolean {
   if (parts.includes("*")) return true;
   if (!origin) return true;
   return parts.includes(origin);
+}
+
+function resolveTokenInfo(chainId: number, address: string): TokenInfo | null {
+  const tokens = DEFAULT_TOKENS_BY_CHAIN[chainId] ?? [];
+  const normalized = normalizeTokenKey(address);
+  return tokens.find((token) => normalizeTokenKey(token.address) === normalized) ?? null;
+}
+
+function normalizeTokenKey(address: string): string {
+  return address.trim().toLowerCase();
 }
 
 function withCors(res: NextResponse, origin: string | null) {

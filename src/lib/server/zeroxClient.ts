@@ -1,5 +1,12 @@
 import type { QuoteResponse } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
+import {
+  assertExecutableQuote,
+  normalizeNativeToken,
+  normalizeQuote,
+  readProviderResponse,
+  stringValue
+} from "@/lib/server/quoteNormalization";
 
 export type ZeroXClientConfig = {
   apiKey: string;
@@ -9,6 +16,9 @@ export type ZeroXClientConfig = {
 };
 
 export class ZeroXClient implements DexAggregatorClient {
+  providerId = "0x";
+  providerName = "0x";
+
   private cfg: ZeroXClientConfig;
 
   constructor(cfg: ZeroXClientConfig) {
@@ -19,8 +29,8 @@ export class ZeroXClient implements DexAggregatorClient {
     const url = new URL("/swap/allowance-holder/quote", this.cfg.baseUrl);
 
     url.searchParams.set("chainId", String(params.chainId));
-    const sellToken = normalizeTokenAddress(params.sellToken);
-    const buyToken = normalizeTokenAddress(params.buyToken);
+    const sellToken = normalizeNativeToken(params.sellToken);
+    const buyToken = normalizeNativeToken(params.buyToken);
 
     url.searchParams.set("sellToken", sellToken);
     url.searchParams.set("buyToken", buyToken);
@@ -45,44 +55,48 @@ export class ZeroXClient implements DexAggregatorClient {
       cache: "no-store"
     });
 
-    const bodyText = await res.text();
-    let body: any = {};
-    try {
-      body = bodyText ? JSON.parse(bodyText) : {};
-    } catch {
-      body = { raw: bodyText };
-    }
+    const body = await readZeroXResponse(res);
 
-    if (!res.ok) {
-      const detail = body?.data?.details?.[0];
-      const detailMessage = detail?.field && detail?.reason ? `${detail.field}: ${detail.reason}` : undefined;
-      const msg =
-        detailMessage ||
-        body?.reason ||
-        body?.validationErrors?.[0]?.reason ||
-        body?.message ||
-        body?.error ||
-        `0x error (${res.status})`;
-      const err: any = new Error(msg);
-      err.status = res.status;
-      throw err;
-    }
+    return this.normalizeZeroXQuote(body, params);
+  }
 
-    return normalizeQuote(body);
+  private normalizeZeroXQuote(body: Record<string, unknown>, params: QuoteParams): QuoteResponse {
+    const raw: any = body;
+    const fields = {
+      buyAmount: stringValue(raw.buyAmount),
+      minBuyAmount: stringValue(raw.minBuyAmount),
+      to: stringValue(raw?.transaction?.to) || stringValue(raw.to),
+      data: stringValue(raw?.transaction?.data) || stringValue(raw.data),
+      value: stringValue(raw?.transaction?.value) || stringValue(raw.value) || "0",
+      gas: stringValue(raw?.transaction?.gas) || stringValue(raw.gas),
+      gasPrice: stringValue(raw?.transaction?.gasPrice),
+      allowanceTarget: stringValue(raw?.issues?.allowance?.spender) || stringValue(raw.allowanceTarget),
+      serviceFees: collectZeroXFees(raw)
+    };
+
+    assertExecutableQuote(fields);
+
+    return normalizeQuote(body, params, this, fields);
   }
 }
 
-function normalizeTokenAddress(token: string): string {
-  return token === "ETH" ? "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE" : token;
+async function readZeroXResponse(res: Response): Promise<Record<string, unknown>> {
+  const body = await readProviderResponse(res, "0x");
+  if (res.ok) return body;
+  return body;
 }
 
-function normalizeQuote(body: any): QuoteResponse {
-  return {
-    ...body,
-    to: body?.transaction?.to ?? body?.to,
-    data: body?.transaction?.data ?? body?.data,
-    value: body?.transaction?.value ?? body?.value ?? "0",
-    gas: body?.transaction?.gas ?? body?.gas,
-    allowanceTarget: body?.issues?.allowance?.spender ?? body?.allowanceTarget
-  } as QuoteResponse;
+function collectZeroXFees(body: any) {
+  const fees = body?.fees;
+  if (!fees || typeof fees !== "object") return [];
+
+  const lines = [];
+  for (const fee of [fees.zeroExFee, fees.integratorFee, ...(Array.isArray(fees.integratorFees) ? fees.integratorFees : [])]) {
+    const amount = stringValue(fee?.amount);
+    const token = stringValue(fee?.token);
+    if (amount && token) {
+      lines.push({ label: "Service fee", amount, token });
+    }
+  }
+  return lines;
 }

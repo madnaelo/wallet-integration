@@ -4,13 +4,7 @@ export type Eip1193Provider = {
   removeListener?: (event: string, listener: (...args: any[]) => void) => void;
 };
 
-declare global {
-  interface Window {
-    ethereum?: Eip1193Provider;
-  }
-}
-
 export function getEip1193Provider(): Eip1193Provider | null {
   if (typeof window === "undefined") return null;
-  return window.ethereum ?? null;
+  return ((window as any).ethereum as Eip1193Provider | undefined) ?? null;
 }

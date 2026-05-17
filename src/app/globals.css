@@ -207,23 +207,108 @@ body {
   overflow-wrap: anywhere;
 }
 
+.kv > .rateButton {
+  justify-self: end;
+}
+
+.routeChoice {
+  min-width: min(260px, 100%);
+  text-align: right;
+}
+
+.routeSelect {
+  max-width: 320px;
+  width: 100%;
+}
+
 .kv:last-child {
   border-bottom: none;
 }
 
 .feeDetails {
   border-bottom: 1px solid var(--border);
-  padding: 10px 0;
 }
 
 .feeDetails summary {
   color: var(--muted);
   cursor: pointer;
   font-size: 13px;
+  list-style: none;
+  padding: 10px 0;
+}
+
+.feeDetails summary::-webkit-details-marker {
+  display: none;
 }
 
 .feeDetails .kv {
   padding-left: 12px;
+}
+
+.routeDetails summary {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 0.9fr) minmax(0, 1.2fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.routeDetails summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid var(--muted);
+  border-top: 4px solid transparent;
+  transform-origin: 45% 50%;
+  transition: transform 120ms ease;
+}
+
+.routeDetails[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.routeDetails summary > .mono {
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rateButton {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.rateButton:focus-visible {
+  outline: 1px solid rgba(110, 168, 254, 0.75);
+  outline-offset: 3px;
+}
+
+.routeAmount {
+  color: var(--muted);
+}
+
+.detailsNote {
+  padding: 8px 0 10px 12px;
+}
+
+.feeAmount {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.feeEquivalent {
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .receiveRow .mono {
@@ -237,6 +322,90 @@ body {
   gap: 10px;
   align-items: center;
   margin-bottom: 6px;
+}
+
+.historyPanel {
+  margin-top: 14px;
+}
+
+.historyPanel > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.historyPanel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.historySummary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.historyChevron {
+  width: 0;
+  height: 0;
+  flex: 0 0 auto;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid var(--muted);
+  border-top: 5px solid transparent;
+  transform-origin: 45% 50%;
+  transition: transform 120ms ease;
+}
+
+.historyPanel[open] .historyChevron {
+  transform: rotate(90deg);
+}
+
+.historyTitleBlock {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.historyActions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.historyContent {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.historyTableWrap {
+  overflow-x: auto;
+}
+
+.historyTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.historyTable th,
+.historyTable td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.historyTable th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.historyTable td:last-child,
+.historyTable th:last-child {
+  text-align: right;
 }
 
 .quoteTimer,

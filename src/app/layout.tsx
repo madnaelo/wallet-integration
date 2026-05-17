@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AppKitProvider } from "@/context/appkit";
 
 export const metadata: Metadata = {
-  title: "Swap Aggregator MVP",
-  description: "Non-custodial swap aggregator MVP using 0x + MetaMask"
+  title: "The Wallet",
+  description: "Your Personal Swap Aggregator. Get the best price for your swaps."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-US">
-      <body>{children}</body>
+      <body>
+        <AppKitProvider>{children}</AppKitProvider>
+      </body>
     </html>
   );
 }
