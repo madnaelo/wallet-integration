@@ -10,10 +10,12 @@ import {
   toSlippagePercent,
   ZERO_ADDRESS
 } from "@/lib/server/quoteNormalization";
+import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 
 export type OdosClientConfig = {
   baseUrl: string;
   apiKey?: string;
+  platformFee: PlatformFeeConfig;
 };
 
 export class OdosClient implements DexAggregatorClient {
@@ -49,7 +51,8 @@ export class OdosClient implements DexAggregatorClient {
       value: stringValue(tx.value) || "0",
       gas: String(tx.gas ?? assembleRaw.gasEstimate ?? ""),
       allowanceTarget: stringValue(tx.to),
-      routeLines
+      routeLines,
+      platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
     assertExecutableQuote(fields);
@@ -79,6 +82,12 @@ export class OdosClient implements DexAggregatorClient {
         ],
         slippageLimitPercent: Number(toSlippagePercent(params.slippageBps)),
         userAddr: params.takerAddress,
+        ...(this.cfg.platformFee.enabled
+          ? {
+              partnerFeePercent: this.cfg.platformFee.feeFraction,
+              feeRecipient: this.cfg.platformFee.recipient
+            }
+          : {}),
         compact: true
       })
     });

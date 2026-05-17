@@ -39,6 +39,7 @@ export function normalizeQuote(
     allowanceTarget?: string;
     routeLines?: QuoteRouteLine[];
     serviceFees?: QuoteFee[];
+    platformFeeBps?: number;
   }
 ): QuoteResponse {
   const grossBuyAmount = fields.buyAmount;
@@ -48,6 +49,7 @@ export function normalizeQuote(
     quoteId: buildQuoteId(meta.providerId, params, fields.to, grossBuyAmount),
     providerId: meta.providerId,
     providerName: meta.providerName,
+    platformFeeBps: fields.platformFeeBps,
     sellAmount: params.sellAmount,
     buyAmount: grossBuyAmount,
     grossBuyAmount,

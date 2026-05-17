@@ -628,7 +628,9 @@ export default function Page() {
     const netBuyAmount = stringValue(quote.netBuyAmount) || subtractIntegerStrings(grossBuyAmount, buyTokenFeesDeducted);
     const netMinBuyAmount = minBuyAmount ? subtractIntegerStrings(minBuyAmount, buyTokenFeesDeducted) : "";
     const networkCost = networkFeeLine?.display ?? "Not provided";
-    const swapFeeTotal = swapFeeLines.length ? formatConvertedFeeTotal(swapFeeLines, buyDisplayToken) : "None";
+    const platformFeeBps = numberValue(quote.platformFeeBps);
+    const platformFeeLabel = platformFeeBps > 0 ? formatFeeBps(platformFeeBps) : "";
+    const swapFeeTotal = swapFeeLines.length ? formatConvertedFeeTotal(swapFeeLines, buyDisplayToken) : platformFeeLabel || "None";
 
     return {
       providerName: stringValue(quote.providerName) || "Best route",
@@ -641,7 +643,8 @@ export default function Page() {
       routeLines,
       routeSummary: formatRouteSummary(routeLines, stringValue(quote.providerName)),
       swapFeeLines,
-      swapFeeTotal
+      swapFeeTotal,
+      platformFeeLabel
     };
   }, [quote, sellTokenInfo, buyTokenInfo, chain, tokens, rateInverted]);
 
@@ -927,6 +930,12 @@ export default function Page() {
                       <div className="mono feeAmount">{renderFeeDetail(fee)}</div>
                     </div>
                   ))}
+                  {!quoteSummary.swapFeeLines.length && quoteSummary.platformFeeLabel ? (
+                    <div className="kv">
+                      <div className="subtle">Service fee</div>
+                      <div className="mono">{quoteSummary.platformFeeLabel}</div>
+                    </div>
+                  ) : null}
                   <div className="kv">
                     <div className="subtle">Before fees</div>
                     <div className="mono">{quoteSummary.grossBuyHuman}</div>
@@ -1321,6 +1330,10 @@ function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+function numberValue(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 function parseSlippageBps(choice: string, customPct: string): number | null {
   if (choice !== "custom") return Number(choice);
 
@@ -1518,6 +1531,10 @@ function renderFeeDetail(fee: FeeLine) {
       <span className="feeEquivalent">{fee.buyTokenDisplay}</span>
     </>
   );
+}
+
+function formatFeeBps(feeBps: number): string {
+  return `${formatDecimal(String(feeBps / 100), 4)}%`;
 }
 
 function formatOriginalFeeTotal(lines: FeeLine[]): string {

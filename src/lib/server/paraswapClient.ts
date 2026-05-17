@@ -10,9 +10,11 @@ import {
   stringValue,
   toMinAmount
 } from "@/lib/server/quoteNormalization";
+import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 
 export type ParaswapClientConfig = {
   baseUrl: string;
+  platformFee: PlatformFeeConfig;
 };
 
 export class ParaswapClient implements DexAggregatorClient {
@@ -38,8 +40,13 @@ export class ParaswapClient implements DexAggregatorClient {
     url.searchParams.set("userAddress", params.takerAddress);
     url.searchParams.set("receiver", params.takerAddress);
     url.searchParams.set("slippage", String(params.slippageBps ?? 100));
-    url.searchParams.set("partner", "thewallet");
+    url.searchParams.set("partner", this.cfg.platformFee.paraswapPartner);
     url.searchParams.set("version", "6.2");
+    if (this.cfg.platformFee.enabled) {
+      url.searchParams.set("partnerFeeBps", String(this.cfg.platformFee.feeBps));
+      url.searchParams.set("partnerAddress", this.cfg.platformFee.recipient);
+      url.searchParams.set("isDirectFeeTransfer", "true");
+    }
 
     const res = await fetch(url.toString(), {
       method: "GET",
@@ -60,7 +67,8 @@ export class ParaswapClient implements DexAggregatorClient {
       gas: stringValue(tx.gas) || String(raw.gas ?? ""),
       gasPrice: stringValue(tx.gasPrice),
       allowanceTarget: stringValue(priceRoute.tokenTransferProxy) || stringValue(raw.tokenTransferProxy) || stringValue(tx.to),
-      routeLines: collectNestedProtocolLines(priceRoute.bestRoute ?? priceRoute.route ?? priceRoute)
+      routeLines: collectNestedProtocolLines(priceRoute.bestRoute ?? priceRoute.route ?? priceRoute),
+      platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
     assertExecutableQuote(fields);

@@ -8,6 +8,7 @@ import { OneInchClient } from "@/lib/server/oneInchClient";
 import { ParaswapClient } from "@/lib/server/paraswapClient";
 import { OdosClient } from "@/lib/server/odosClient";
 import { MultiQuoteProvider } from "@/lib/server/multiQuoteProvider";
+import { createPlatformFeeConfig } from "@/lib/server/platformFees";
 
 export function createQuoteClient(chain: ChainConfig): DexAggregatorClient {
   const clients = createEnabledClients(chain);
@@ -33,28 +34,28 @@ function hasApiKey(value: string, placeholder: string): boolean {
 function createEnabledClients(chain: ChainConfig): DexAggregatorClient[] {
   const providers = env.SWAP_PROVIDERS.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
   const clients: DexAggregatorClient[] = [];
+  const platformFee = createPlatformFeeConfig();
 
   if (providers.includes("0x") && hasZeroXApiKey(env.ZEROX_API_KEY)) {
     clients.push(
       new ZeroXClient({
         apiKey: env.ZEROX_API_KEY,
         baseUrl: chain.zeroXBaseUrl,
-        affiliateAddress: env.AFFILIATE_ADDRESS,
-        buyTokenPercentageFee: 0.002
+        platformFee
       })
     );
   }
 
   if (providers.includes("1inch") && hasApiKey(env.ONEINCH_API_KEY, "your_1inch_api_key_here")) {
-    clients.push(new OneInchClient({ apiKey: env.ONEINCH_API_KEY }));
+    clients.push(new OneInchClient({ apiKey: env.ONEINCH_API_KEY, platformFee }));
   }
 
   if (providers.includes("paraswap")) {
-    clients.push(new ParaswapClient({ baseUrl: env.PARASWAP_BASE_URL }));
+    clients.push(new ParaswapClient({ baseUrl: env.PARASWAP_BASE_URL, platformFee }));
   }
 
   if (providers.includes("odos")) {
-    clients.push(new OdosClient({ baseUrl: env.ODOS_BASE_URL, apiKey: env.ODOS_API_KEY }));
+    clients.push(new OdosClient({ baseUrl: env.ODOS_BASE_URL, apiKey: env.ODOS_API_KEY, platformFee }));
   }
 
   return clients;

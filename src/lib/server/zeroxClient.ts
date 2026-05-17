@@ -7,12 +7,12 @@ import {
   readProviderResponse,
   stringValue
 } from "@/lib/server/quoteNormalization";
+import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 
 export type ZeroXClientConfig = {
   apiKey: string;
   baseUrl: string;
-  affiliateAddress: string;
-  buyTokenPercentageFee: number;
+  platformFee: PlatformFeeConfig;
 };
 
 export class ZeroXClient implements DexAggregatorClient {
@@ -40,9 +40,9 @@ export class ZeroXClient implements DexAggregatorClient {
       url.searchParams.set("slippageBps", String(params.slippageBps));
     }
 
-    if (this.cfg.affiliateAddress !== "0x0000000000000000000000000000000000000000") {
-      url.searchParams.set("swapFeeRecipient", this.cfg.affiliateAddress);
-      url.searchParams.set("swapFeeBps", String(Math.round(this.cfg.buyTokenPercentageFee * 10_000)));
+    if (this.cfg.platformFee.enabled) {
+      url.searchParams.set("swapFeeRecipient", this.cfg.platformFee.recipient);
+      url.searchParams.set("swapFeeBps", String(this.cfg.platformFee.feeBps));
       url.searchParams.set("swapFeeToken", buyToken);
     }
 
@@ -71,7 +71,8 @@ export class ZeroXClient implements DexAggregatorClient {
       gas: stringValue(raw?.transaction?.gas) || stringValue(raw.gas),
       gasPrice: stringValue(raw?.transaction?.gasPrice),
       allowanceTarget: stringValue(raw?.issues?.allowance?.spender) || stringValue(raw.allowanceTarget),
-      serviceFees: collectZeroXFees(raw)
+      serviceFees: collectZeroXFees(raw),
+      platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
     assertExecutableQuote(fields);

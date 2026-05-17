@@ -9,11 +9,13 @@ import {
   stringValue,
   toSlippagePercent
 } from "@/lib/server/quoteNormalization";
+import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 
 const ONEINCH_NATIVE_TOKEN = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
 export type OneInchClientConfig = {
   apiKey: string;
+  platformFee: PlatformFeeConfig;
   baseUrl?: string;
 };
 
@@ -27,6 +29,7 @@ export class OneInchClient implements DexAggregatorClient {
   constructor(cfg: OneInchClientConfig) {
     this.cfg = {
       apiKey: cfg.apiKey,
+      platformFee: cfg.platformFee,
       baseUrl: cfg.baseUrl ?? "https://api.1inch.dev"
     };
   }
@@ -43,6 +46,10 @@ export class OneInchClient implements DexAggregatorClient {
     url.searchParams.set("includeProtocols", "true");
     url.searchParams.set("includeGas", "true");
     url.searchParams.set("disableEstimate", "true");
+    if (this.cfg.platformFee.enabled) {
+      url.searchParams.set("fee", this.cfg.platformFee.feePercent);
+      url.searchParams.set("referrer", this.cfg.platformFee.recipient);
+    }
 
     const res = await fetch(url.toString(), {
       method: "GET",
@@ -62,7 +69,8 @@ export class OneInchClient implements DexAggregatorClient {
       gas: String(tx.gas ?? raw.gas ?? ""),
       gasPrice: stringValue(tx.gasPrice),
       allowanceTarget: (await spenderPromise) || stringValue(tx.to),
-      routeLines: collectNestedProtocolLines(raw.protocols)
+      routeLines: collectNestedProtocolLines(raw.protocols),
+      platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
     assertExecutableQuote(fields);

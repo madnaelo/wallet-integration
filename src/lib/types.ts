@@ -22,6 +22,7 @@ export type QuoteResponse = {
   providerName?: string;
   providerRank?: number;
   isBest?: boolean;
+  platformFeeBps?: number;
   price?: string;
   buyAmount: string;
   sellAmount: string;
