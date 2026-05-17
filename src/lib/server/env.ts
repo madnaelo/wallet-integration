@@ -17,7 +17,7 @@ export const env = {
   SWAP_PROVIDERS: optional("SWAP_PROVIDERS", "0x,1inch,paraswap,odos"),
   PARASWAP_BASE_URL: optional("PARASWAP_BASE_URL", "https://api.paraswap.io"),
   PARASWAP_API_KEY: optional("PARASWAP_API_KEY", ""),
-  PARASWAP_API_KEY_HEADER: optional("PARASWAP_API_KEY_HEADER", "x-api-key"),
+  PARASWAP_API_KEY_HEADER: optional("PARASWAP_API_KEY_HEADER", "X-API-Key"),
   PARASWAP_PARTNER: optional("PARASWAP_PARTNER", "thewallet"),
   ODOS_BASE_URL: optional("ODOS_BASE_URL", "https://api.odos.xyz"),
   ODOS_API_KEY: optional("ODOS_API_KEY", ""),
