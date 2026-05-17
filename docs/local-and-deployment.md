@@ -18,34 +18,34 @@ Current local notes:
 
 ## Local Native Workflow
 
-Start local Postgres:
+Run these from Windows PowerShell. Each block is copy-paste ready.
+
+Terminal 1: start local Postgres:
 
 ```powershell
-.\scripts\dev-db.ps1
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\dev-db.ps1'
 ```
 
-If PowerShell blocks local scripts, run them with:
+Terminal 2: start Spring Boot backend:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev-db.ps1
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\backend-dev.ps1'
 ```
 
-Start Spring Boot backend:
+Terminal 3: start Next.js frontend:
 
 ```powershell
-.\scripts\backend-dev.ps1
-```
-
-Start Next.js frontend:
-
-```powershell
-.\scripts\frontend-dev.ps1
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\frontend-dev.ps1'
 ```
 
 Stop local services started by the scripts:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\stop-dev.ps1
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\stop-dev.ps1'
 ```
 
 Default local URLs:
@@ -59,12 +59,14 @@ Default local URLs:
 Once Docker Desktop is running, the full stack can also be started with:
 
 ```powershell
+Set-Location 'E:\assignments\wallet'
 docker compose --profile full up -d --build
 ```
 
 The default Compose command without the profile starts only Postgres:
 
 ```powershell
+Set-Location 'E:\assignments\wallet'
 docker compose up -d postgres
 ```
 
@@ -73,13 +75,8 @@ docker compose up -d postgres
 Run:
 
 ```powershell
-.\scripts\verify.ps1
-```
-
-On this machine the verified command was:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify.ps1
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\verify.ps1'
 ```
 
 This runs:
@@ -103,15 +100,19 @@ Public routes:
 
 Prepare production env:
 
-```bash
-cp infra/prod.env.example infra/prod.env
+```powershell
+Set-Location 'E:\assignments\wallet'
+Copy-Item '.\infra\prod.env.example' '.\infra\prod.env' -Force
+notepad '.\infra\prod.env'
 ```
 
-Then edit `infra/prod.env` on the server with real values.
+Then edit `infra/prod.env` with real production values. Do not commit that file.
 
-Deploy/update:
+Deploy/update on the OCI Linux VM after the repo is copied or pulled there:
 
 ```bash
+cd /opt/wallet
+chmod +x scripts/prod-deploy.sh
 ./scripts/prod-deploy.sh
 ```
 
