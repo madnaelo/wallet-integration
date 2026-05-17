@@ -14,6 +14,8 @@ import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 
 export type ParaswapClientConfig = {
   baseUrl: string;
+  apiKey?: string;
+  apiKeyHeader: string;
   platformFee: PlatformFeeConfig;
 };
 
@@ -50,7 +52,7 @@ export class ParaswapClient implements DexAggregatorClient {
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: this.headers(),
       cache: "no-store"
     });
     const body = await readProviderResponse(res, this.providerName);
@@ -76,4 +78,20 @@ export class ParaswapClient implements DexAggregatorClient {
 
     return normalizeQuote(body, params, this, fields);
   }
+
+  private headers(): Record<string, string> {
+    const apiKey = this.cfg.apiKey?.trim();
+    const apiKeyHeader = normalizeHeaderName(this.cfg.apiKeyHeader);
+
+    return {
+      Accept: "application/json",
+      ...(apiKey && apiKeyHeader ? { [apiKeyHeader]: apiKey } : {})
+    };
+  }
+}
+
+function normalizeHeaderName(value: string): string {
+  const header = value.trim();
+  if (!/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(header)) return "";
+  return header;
 }

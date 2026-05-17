@@ -51,7 +51,14 @@ function createEnabledClients(chain: ChainConfig): DexAggregatorClient[] {
   }
 
   if (providers.includes("paraswap")) {
-    clients.push(new ParaswapClient({ baseUrl: env.PARASWAP_BASE_URL, platformFee }));
+    clients.push(
+      new ParaswapClient({
+        baseUrl: env.PARASWAP_BASE_URL,
+        apiKey: env.PARASWAP_API_KEY,
+        apiKeyHeader: env.PARASWAP_API_KEY_HEADER,
+        platformFee
+      })
+    );
   }
 
   if (providers.includes("odos")) {
