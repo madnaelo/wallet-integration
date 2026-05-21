@@ -694,6 +694,8 @@ export default function Page() {
                 onChange={(e) => {
                   requireWalletForForm();
                   setSelectedChainId(Number(e.target.value));
+                  setSellToken("");
+                  setBuyToken("");
                   clearQuoteState();
                   setActionError("");
                 }}
@@ -732,7 +734,7 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="row" style={{ marginTop: 12 }}>
+          <div className="tokenPairRow" style={{ marginTop: 12 }}>
             <div>
               <div className="label">Sell token</div>
               <select
@@ -758,6 +760,22 @@ export default function Page() {
                 </div>
               ) : null}
             </div>
+
+            <button
+              className="tokenFlipButton"
+              type="button"
+              title="Swap tokens"
+              aria-label="Swap sell and buy tokens"
+              onClick={() => {
+                if (!requireWalletForForm()) return;
+                setSellToken(buyToken);
+                setBuyToken(sellToken);
+                clearQuoteState();
+              }}
+              disabled={!sellToken || !buyToken}
+            >
+              <span aria-hidden="true">&#8645;</span>
+            </button>
 
             <div>
               <div className="label">Buy token</div>
