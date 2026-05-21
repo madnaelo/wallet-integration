@@ -104,6 +104,22 @@ export default function Page() {
   }, [tokens, sellToken, buyToken]);
 
   useEffect(() => {
+    if (!walletChainId || !allowedChains.some((allowedChain) => allowedChain.chainId === walletChainId)) return;
+
+    setSelectedChainId(walletChainId);
+    setSellToken("");
+    setBuyToken("");
+    setQuote(null);
+    setSelectedQuoteId("");
+    setQuoteFetchedAtMs(null);
+    setQuoteError("");
+    setApprovalTxHash("");
+    setSwapTxHash("");
+    setSwapStatus("idle");
+    setActionError("");
+  }, [allowedChains, walletChainId]);
+
+  useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
@@ -774,7 +790,7 @@ export default function Page() {
               }}
               disabled={!sellToken || !buyToken}
             >
-              <span aria-hidden="true">&#8645;</span>
+              <span aria-hidden="true">&#8644;</span>
             </button>
 
             <div>
