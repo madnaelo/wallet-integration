@@ -1198,7 +1198,7 @@ function requestWalletSignature(
     params
   };
   if (providerKind === "walletconnect") {
-    return provider.request(args, SIGNING_ATTEMPT_EXPIRY_SECONDS);
+    return provider.request(args, undefined, SIGNING_ATTEMPT_EXPIRY_SECONDS);
   }
   return provider.request(args);
 }
