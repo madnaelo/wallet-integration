@@ -17,11 +17,13 @@ Implemented:
   QR/mobile flows.
 - Same-chain swap selection for configured Ethereum, Polygon, and Base
   networks. The connected wallet chain is selected when it is allowed.
-- Searchable same-chain token pickers backed by cached token-list/provider
-  metadata, native/popular-token fallbacks, and a sell/buy reversal control.
+- Searchable token pickers backed by cached token-list/provider metadata,
+  native/popular-token fallbacks, native BTC receive selection, and a sell/buy
+  reversal control.
 - `GET /api/quote` with validation, per-IP rate limiting, and short quote cache.
-- Multi-provider quote clients for 0x, 1inch, ParaSwap, and Odos. Successful
-  quotes are normalized, ranked, and shown through one provider/route UI.
+- Multi-provider same-chain quote clients for 0x, 1inch, ParaSwap, and Odos.
+  LI.FI builds EVM-to-native-BTC receive quotes. Successful quotes are
+  normalized and shown through one provider/route UI.
 - Provider failure isolation: one timed-out or rejected provider does not hide
   successful quotes from other configured providers.
 - User-facing trade summary with slippage, quote expiry, provider selection,
@@ -30,7 +32,7 @@ Implemented:
 - Spring Boot and PostgreSQL backend for signed wallet sessions and swap
   history.
 - Collapsed swap history panel that loads authenticated history on demand and
-  stores dry-run or confirmed swaps.
+  stores dry-run, submitted cross-chain, or confirmed swaps.
 
 Not implemented yet:
 
@@ -39,6 +41,7 @@ Not implemented yet:
 - Price alert thresholds.
 - Email, Telegram, push, or in-app notification delivery.
 - Guarded import-by-address flow and token risk signals.
+- Native BTC sell execution and cross-chain destination status tracking.
 
 ## Architecture
 
@@ -57,9 +60,10 @@ High-level flow:
 
 1. User connects a wallet through AppKit.
 2. Frontend requests quotes from the Next.js quote route with the selected
-   same-chain pair and wallet taker address.
-3. The quote route asks enabled providers in parallel and returns the best
-   normalized executable quote plus alternatives.
+   pair, wallet taker address, and a Bitcoin receive address only when native
+   BTC is the output.
+3. The quote route asks enabled same-chain providers in parallel or LI.FI for
+   an EVM-to-BTC quote, then returns normalized executable quote data.
 4. The frontend checks approvals when needed and asks the user's wallet to sign
    and submit the selected transaction.
 5. Swap history uses a signed wallet message to create a backend session before
@@ -111,6 +115,7 @@ Important quote and wallet variables:
 - `ONEINCH_API_KEY`
 - `PARASWAP_BASE_URL`, `PARASWAP_API_KEY`, `PARASWAP_API_KEY_HEADER`
 - `ODOS_BASE_URL`, `ODOS_API_KEY`
+- `LIFI_BASE_URL`, `LIFI_API_KEY`, `LIFI_INTEGRATOR`
 
 Important fee variables:
 
@@ -177,4 +182,6 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 10](docs/prompt10_f.md): chain and token selector ergonomics.
 - [Prompt 11](docs/prompt11_f.md): searchable same-chain tokens and simpler
   network UX.
+- [Prompt 12](docs/prompt12_f.md): native BTC receive quotes without confusing
+  BTC with wrapped EVM tokens.
 

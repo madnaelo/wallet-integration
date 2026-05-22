@@ -6,8 +6,8 @@ import { getAllowedChainIds, getChainById, isChainAllowed } from "@/lib/chains";
 import { isAddress, isPositiveIntegerString } from "@/lib/validation";
 import { env } from "@/lib/server/env";
 import type { QuoteResponse } from "@/lib/types";
-import { createQuoteClient } from "@/lib/server/quoteProvider";
-import { type TokenInfo } from "@/lib/tokens";
+import { createNativeBitcoinQuoteClient, createQuoteClient } from "@/lib/server/quoteProvider";
+import { isNativeBitcoinToken, type TokenInfo } from "@/lib/tokens";
 import { getTokensForChain } from "@/lib/server/tokenRegistry";
 
 export const runtime = "nodejs";
@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
   const buyToken = searchParams.get("buyToken") ?? "";
   const sellAmount = searchParams.get("sellAmount") ?? "";
   const takerAddress = searchParams.get("takerAddress") ?? "";
+  const toAddress = (searchParams.get("toAddress") ?? "").trim();
   const slippageBpsStr = searchParams.get("slippageBps") ?? "";
 
   if (!chainIdStr || !/^\d+$/.test(chainIdStr)) {
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
   }
 
   const isSellTokenOk = sellToken === "ETH" || isAddress(sellToken);
-  const isBuyTokenOk = buyToken === "ETH" || isAddress(buyToken);
+  const isBuyTokenOk = buyToken === "ETH" || isAddress(buyToken) || isNativeBitcoinToken(buyToken);
 
   if (!isSellTokenOk || !isBuyTokenOk) {
     return withCors(
@@ -78,6 +79,10 @@ export async function GET(req: NextRequest) {
 
   if (!isAddress(takerAddress)) {
     return withCors(NextResponse.json({ error: "Invalid takerAddress." }, { status: 400 }), corsOrigin);
+  }
+
+  if (isNativeBitcoinToken(buyToken) && !isBitcoinReceiveAddressInput(toAddress)) {
+    return withCors(NextResponse.json({ error: "Enter a Bitcoin receive address." }, { status: 400 }), corsOrigin);
   }
 
   let slippageBps: number | undefined;
@@ -101,15 +106,21 @@ export async function GET(req: NextRequest) {
   if (!sellTokenInfo || !buyTokenInfo) {
     return withCors(NextResponse.json({ error: "Token is not available on this network." }, { status: 400 }), corsOrigin);
   }
+  if (isNativeBitcoinToken(sellTokenInfo)) {
+    return withCors(
+      NextResponse.json({ error: "Selling native Bitcoin is not available in this flow yet." }, { status: 400 }),
+      corsOrigin
+    );
+  }
 
-  const cacheKey = `quote:${chainId}:${sellToken}:${buyToken}:${sellAmount}:${takerAddress}:${slippageBps ?? "default"}`;
+  const cacheKey = `quote:${chainId}:${sellToken}:${buyToken}:${sellAmount}:${takerAddress}:${toAddress}:${slippageBps ?? "default"}`;
   const cached = quoteCache.get(cacheKey);
   if (cached) {
     return withCors(NextResponse.json(cached, { status: 200 }), corsOrigin);
   }
 
   try {
-    const client = createQuoteClient(chain);
+    const client = isNativeBitcoinToken(buyTokenInfo) ? createNativeBitcoinQuoteClient() : createQuoteClient(chain);
 
     const quote = await client.getQuote({
       sellToken,
@@ -120,6 +131,7 @@ export async function GET(req: NextRequest) {
       buyTokenDecimals: buyTokenInfo.decimals,
       sellAmount,
       takerAddress,
+      toAddress: isNativeBitcoinToken(buyTokenInfo) ? toAddress : undefined,
       chainId,
       slippageBps
     });
@@ -151,6 +163,11 @@ async function resolveTokenInfo(chainId: number, address: string): Promise<Token
 
 function normalizeTokenKey(address: string): string {
   return address.trim().toLowerCase();
+}
+
+function isBitcoinReceiveAddressInput(value: string): boolean {
+  const address = value.trim();
+  return address.length >= 14 && address.length <= 128 && /^[A-Za-z0-9]+$/.test(address);
 }
 
 function withCors(res: NextResponse, origin: string | null) {

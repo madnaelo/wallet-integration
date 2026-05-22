@@ -65,7 +65,7 @@ export function TokenPicker({
       >
         <span className="tokenPickerSymbol">{selectedToken?.symbol ?? "Select token"}</span>
         <span className="tokenPickerName">
-          {selectedToken?.isNative ? "Native" : selectedToken?.name ?? selectedToken?.symbol ?? ""}
+          {selectedToken ? selectedTokenCaption(selectedToken) : ""}
         </span>
         <span className="tokenPickerChevron" aria-hidden="true" />
       </button>
@@ -92,7 +92,7 @@ export function TokenPicker({
               >
                 <span className="tokenPickerOptionSymbol">{token.symbol}</span>
                 <span className="tokenPickerOptionMeta">
-                  <span>{token.isNative ? "Native token" : token.name ?? token.symbol}</span>
+                  <span>{tokenCaption(token)}</span>
                   <span className="mono">{token.isNative ? "" : shortAddress(token.address)}</span>
                 </span>
               </button>
@@ -145,6 +145,16 @@ function findToken(tokens: TokenInfo[], address: string): TokenInfo | undefined 
 
 function sameToken(first: string, second: string): boolean {
   return first.trim().toLowerCase() === second.trim().toLowerCase();
+}
+
+function selectedTokenCaption(token: TokenInfo): string {
+  if (token.assetKind === "bitcoin") return token.networkName ?? "Bitcoin";
+  return token.isNative ? "Native" : token.name ?? token.symbol;
+}
+
+function tokenCaption(token: TokenInfo): string {
+  if (token.assetKind === "bitcoin") return token.networkName ?? token.name ?? token.symbol;
+  return token.isNative ? "Native token" : token.name ?? token.symbol;
 }
 
 function shortAddress(value: string): string {

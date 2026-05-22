@@ -27,7 +27,7 @@ import {
   verifyAuthSignature
 } from "@/lib/backendClient";
 
-type TxStatus = "idle" | "pending" | "confirmed" | "failed";
+type TxStatus = "idle" | "pending" | "submitted" | "confirmed" | "failed";
 const QUOTE_TTL_SECONDS = 20;
 const BACKEND_SESSION_STORAGE_KEY = "wallet.swapAssistant.backendSession.v1";
 const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
@@ -39,6 +39,7 @@ type QuoteValidationErrors = {
   amount?: string;
   sellToken?: string;
   buyToken?: string;
+  receiveAddress?: string;
   slippage?: string;
 };
 type FeeLine = {
@@ -70,6 +71,7 @@ export default function Page() {
 
   const [sellToken, setSellToken] = useState<string>("");
   const [buyToken, setBuyToken] = useState<string>("");
+  const [bitcoinReceiveAddress, setBitcoinReceiveAddress] = useState<string>("");
   const [amountHuman, setAmountHuman] = useState<string>("");
   const [slippageChoice, setSlippageChoice] = useState<string>("100");
   const [customSlippagePct, setCustomSlippagePct] = useState<string>("1");
@@ -102,6 +104,7 @@ export default function Page() {
   const [tokens, setTokens] = useState<TokenInfo[]>(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? []);
   const [tokensLoading, setTokensLoading] = useState<boolean>(false);
   const [tokenListNotice, setTokenListNotice] = useState<string>("");
+  const sellTokens = useMemo(() => tokens.filter((token) => !token.buyOnly), [tokens]);
 
   useEffect(() => {
     const fallbackTokens = DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [];
@@ -130,12 +133,12 @@ export default function Page() {
   }, [selectedChainId]);
 
   useEffect(() => {
-    const sellTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(sellToken));
+    const sellTokenAvailable = sellTokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(sellToken));
     const buyTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken));
 
-    if (!sellTokenAvailable && tokens.length > 0) setSellToken(tokens[0]!.address);
+    if (!sellTokenAvailable && sellTokens.length > 0) setSellToken(sellTokens[0]!.address);
     if (!buyTokenAvailable && tokens.length > 1) setBuyToken(tokens[1]!.address);
-  }, [tokens, sellToken, buyToken]);
+  }, [tokens, sellTokens, sellToken, buyToken]);
 
   useEffect(() => {
     if (!walletChainId || !allowedChains.some((allowedChain) => allowedChain.chainId === walletChainId)) return;
@@ -251,6 +254,7 @@ export default function Page() {
 
   const sellTokenInfo = useMemo(() => tokens.find((t) => t.address === sellToken), [tokens, sellToken]);
   const buyTokenInfo = useMemo(() => tokens.find((t) => t.address === buyToken), [tokens, buyToken]);
+  const isBitcoinReceiveSwap = buyTokenInfo?.assetKind === "bitcoin";
   const slippageBps = useMemo(
     () => parseSlippageBps(slippageChoice, customSlippagePct),
     [slippageChoice, customSlippagePct]
@@ -261,9 +265,10 @@ export default function Page() {
         amountHuman,
         sellTokenInfo,
         buyTokenInfo,
+        bitcoinReceiveAddress,
         slippageBps
       }),
-    [amountHuman, sellTokenInfo, buyTokenInfo, slippageBps]
+    [amountHuman, sellTokenInfo, buyTokenInfo, bitcoinReceiveAddress, slippageBps]
   );
   const hasQuoteValidationErrors = useMemo(
     () => Object.values(quoteValidationErrors).some(Boolean),
@@ -516,6 +521,7 @@ export default function Page() {
         buyToken: buyTokenInfo.address,
         sellAmount,
         takerAddress: walletAddress,
+        toAddress: isBitcoinReceiveSwap ? bitcoinReceiveAddress.trim() : undefined,
         slippageBps
       });
 
@@ -642,9 +648,10 @@ export default function Page() {
 
       const receipt = await tx.wait();
       if (receipt?.status === 1) {
-        setSwapStatus("confirmed");
+        const historyStatus = quote.executionKind === "evm-to-bitcoin" ? "submitted" : "confirmed";
+        setSwapStatus(historyStatus);
         try {
-          await persistCurrentSwap("confirmed", tx.hash);
+          await persistCurrentSwap(historyStatus, tx.hash);
         } catch (historySaveError: any) {
           setHistoryError(normalizeWalletError(historySaveError));
         }
@@ -790,7 +797,7 @@ export default function Page() {
               <TokenPicker
                 label="Sell token"
                 value={sellToken}
-                tokens={tokens}
+                tokens={sellTokens}
                 loading={tokensLoading}
                 onChange={(value) => {
                   requireWalletForForm();
@@ -818,7 +825,7 @@ export default function Page() {
                 setBuyToken(sellToken);
                 clearQuoteState();
               }}
-              disabled={!sellToken || !buyToken}
+              disabled={!sellToken || !buyToken || !!buyTokenInfo?.buyOnly}
             >
               <span aria-hidden="true">&#8644;</span>
             </button>
@@ -844,6 +851,32 @@ export default function Page() {
               ) : null}
             </div>
           </div>
+          {isBitcoinReceiveSwap ? (
+            <div style={{ marginTop: 12 }}>
+              <div className="label">Bitcoin receive address</div>
+              <input
+                className="input"
+                value={bitcoinReceiveAddress}
+                onChange={(e) => {
+                  requireWalletForForm();
+                  setBitcoinReceiveAddress(e.target.value);
+                  clearQuoteState();
+                }}
+                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.receiveAddress}
+                aria-describedby="bitcoin-address-error"
+                placeholder="bc1..."
+                spellCheck={false}
+                autoComplete="off"
+              />
+              {quoteValidationVisible && quoteValidationErrors.receiveAddress ? (
+                <div className="fieldError" id="bitcoin-address-error">
+                  {quoteValidationErrors.receiveAddress}
+                </div>
+              ) : (
+                <div className="small" style={{ marginTop: 8 }}>Bitcoin will be sent to this address.</div>
+              )}
+            </div>
+          ) : null}
           {tokenListNotice ? <div className="small" style={{ marginTop: 8 }}>{tokenListNotice}</div> : null}
 
           <div style={{ marginTop: 12 }}>
@@ -919,10 +952,10 @@ export default function Page() {
 
           {swapStatus !== "idle" ? (
             <div
-              className={swapStatus === "confirmed" ? "ok" : swapStatus === "pending" ? "warn" : "error"}
+              className={swapStatus === "confirmed" ? "ok" : swapStatus === "pending" || swapStatus === "submitted" ? "warn" : "error"}
               style={{ marginTop: 8 }}
             >
-              Status: {swapStatus}
+              Status: {formatSwapStatus(swapStatus)}
             </div>
           ) : null}
         </div>
@@ -1013,6 +1046,11 @@ export default function Page() {
               <div className="small" style={{ marginTop: 10 }}>
                 Network fee is paid separately in the chain native token and confirmed in your wallet.
               </div>
+              {quote.executionKind === "evm-to-bitcoin" ? (
+                <div className="small" style={{ marginTop: 8 }}>
+                  Bitcoin delivery can continue after your wallet confirms the source transaction.
+                </div>
+              ) : null}
             </>
           )}
         </div>
@@ -1137,6 +1175,11 @@ function formatHistoryStatus(status: SwapHistoryRecord["status"]): string {
 function formatHistoryTx(txHash: string | undefined): string {
   if (!txHash || txHash === "dry-run") return "-";
   return shortAddr(txHash);
+}
+
+function formatSwapStatus(status: TxStatus): string {
+  if (status === "idle") return "";
+  return `${status[0]!.toUpperCase()}${status.slice(1)}`;
 }
 
 function quoteForHistory(quote: QuoteResponse): QuoteResponse {
@@ -1294,6 +1337,7 @@ function getQuoteValidationErrors(params: {
   amountHuman: string;
   sellTokenInfo: TokenInfo | undefined;
   buyTokenInfo: TokenInfo | undefined;
+  bitcoinReceiveAddress: string;
   slippageBps: number | null;
 }): QuoteValidationErrors {
   const errors: QuoteValidationErrors = {};
@@ -1308,6 +1352,14 @@ function getQuoteValidationErrors(params: {
 
   if (params.sellTokenInfo && params.buyTokenInfo && params.sellTokenInfo.address === params.buyTokenInfo.address) {
     errors.buyToken = "Choose a different token to buy.";
+  }
+
+  if (params.sellTokenInfo?.buyOnly) {
+    errors.sellToken = "Choose a token available from your connected wallet.";
+  }
+
+  if (params.buyTokenInfo?.assetKind === "bitcoin" && !isBitcoinReceiveAddressInput(params.bitcoinReceiveAddress)) {
+    errors.receiveAddress = "Enter the Bitcoin address that should receive this swap.";
   }
 
   if (!params.amountHuman.trim()) {
@@ -1346,11 +1398,18 @@ function resolveDisplayToken(address: string, tokens: TokenInfo[], nativeToken: 
 
 function isNativeTokenAddress(address: string): boolean {
   const normalized = normalizeTokenKey(address);
-  return normalized === "eth" || normalized === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+  return normalized === "eth"
+    || normalized === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    || normalized === "0x0000000000000000000000000000000000000000";
 }
 
 function normalizeTokenKey(address: string): string {
   return address.trim().toLowerCase();
+}
+
+function isBitcoinReceiveAddressInput(value: string): boolean {
+  const address = value.trim();
+  return address.length >= 14 && address.length <= 128 && /^[A-Za-z0-9]+$/.test(address);
 }
 
 function formatTokenAmount(amountBaseUnits: string, token: DisplayToken): string {

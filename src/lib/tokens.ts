@@ -1,12 +1,34 @@
 export type TokenInfo = {
   symbol: string;
-  address: string; // ERC20 address or "ETH"
+  address: string; // ERC20 address, "ETH", or a provider-native asset id.
   decimals: number;
   isNative?: boolean;
   name?: string;
   logoURI?: string;
   searchAliases?: string[];
+  assetKind?: "evm" | "bitcoin";
+  networkName?: string;
+  buyOnly?: boolean;
 };
+
+export const NATIVE_BITCOIN_TOKEN_ADDRESS = "bitcoin";
+
+export const NATIVE_BITCOIN_TOKEN: TokenInfo = {
+  symbol: "BTC",
+  address: NATIVE_BITCOIN_TOKEN_ADDRESS,
+  decimals: 8,
+  isNative: true,
+  name: "Bitcoin",
+  searchAliases: ["BTC", "Bitcoin", "Native Bitcoin"],
+  assetKind: "bitcoin",
+  networkName: "Bitcoin network",
+  buyOnly: true
+};
+
+export function isNativeBitcoinToken(token: Pick<TokenInfo, "address" | "assetKind"> | string): boolean {
+  if (typeof token === "string") return token.trim().toLowerCase() === NATIVE_BITCOIN_TOKEN_ADDRESS;
+  return token.assetKind === "bitcoin" || isNativeBitcoinToken(token.address);
+}
 
 export const DEFAULT_TOKENS_BY_CHAIN: Record<number, TokenInfo[]> = {
   11155111: [
@@ -18,6 +40,7 @@ export const DEFAULT_TOKENS_BY_CHAIN: Record<number, TokenInfo[]> = {
     { symbol: "ETH", address: "ETH", decimals: 18, isNative: true, name: "Ether", searchAliases: ["Ethereum"] },
     { symbol: "USDT", address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6, name: "Tether USD" },
     { symbol: "USDC", address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals: 6, name: "USD Coin" },
+    NATIVE_BITCOIN_TOKEN,
     {
       symbol: "WBTC",
       address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
@@ -41,6 +64,7 @@ export const DEFAULT_TOKENS_BY_CHAIN: Record<number, TokenInfo[]> = {
     { symbol: "MATIC", address: "ETH", decimals: 18, isNative: true, name: "Polygon native token", searchAliases: ["POL", "Polygon"] },
     { symbol: "USDT", address: "0xc2132D05D31c914a87C6611C10748AaCBa0CbFfC", decimals: 6, name: "Tether USD" },
     { symbol: "USDC", address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", decimals: 6, name: "USD Coin" },
+    NATIVE_BITCOIN_TOKEN,
     { symbol: "USDC.e", address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", decimals: 6, name: "Bridged USD Coin" },
     {
       symbol: "WBTC",
@@ -56,6 +80,7 @@ export const DEFAULT_TOKENS_BY_CHAIN: Record<number, TokenInfo[]> = {
   8453: [
     { symbol: "ETH", address: "ETH", decimals: 18, isNative: true, name: "Ether", searchAliases: ["Ethereum"] },
     { symbol: "USDC", address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals: 6, name: "USD Coin" },
+    NATIVE_BITCOIN_TOKEN,
     {
       symbol: "cbBTC",
       address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",

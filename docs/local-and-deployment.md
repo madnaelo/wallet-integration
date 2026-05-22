@@ -122,8 +122,10 @@ Implemented now:
 
 - Wallet-owned backend session via signed wallet message.
 - Postgres-backed swap history.
-- Frontend saves dry-run and confirmed swaps to the backend.
+- Frontend saves dry-run, submitted cross-chain, and confirmed swaps to the
+  backend.
 - Frontend reads authenticated swap history from the backend.
+- Native BTC receive quotes from supported EVM source assets through LI.FI.
 
 Not implemented yet:
 
@@ -131,3 +133,4 @@ Not implemented yet:
 - Alert thresholds.
 - Scheduled reverse-swap scanner.
 - Email, Telegram, or push notification delivery.
+- Native BTC sell execution and cross-chain destination status tracking.

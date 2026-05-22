@@ -7,6 +7,7 @@ import { ZeroXClient } from "@/lib/server/zeroxClient";
 import { OneInchClient } from "@/lib/server/oneInchClient";
 import { ParaswapClient } from "@/lib/server/paraswapClient";
 import { OdosClient } from "@/lib/server/odosClient";
+import { LifiBitcoinClient } from "@/lib/server/lifiBitcoinClient";
 import { MultiQuoteProvider } from "@/lib/server/multiQuoteProvider";
 import { createPlatformFeeConfig } from "@/lib/server/platformFees";
 
@@ -21,6 +22,19 @@ export function createQuoteClient(chain: ChainConfig): DexAggregatorClient {
   return new MockAggregatorClient();
 }
 
+export function createNativeBitcoinQuoteClient(): DexAggregatorClient {
+  if (!enabledProviders().includes("lifi")) {
+    throw new Error("Native Bitcoin quotes are unavailable right now.");
+  }
+
+  return new LifiBitcoinClient({
+    baseUrl: env.LIFI_BASE_URL,
+    apiKey: env.LIFI_API_KEY,
+    integrator: env.LIFI_INTEGRATOR,
+    platformFee: createPlatformFeeConfig()
+  });
+}
+
 function hasZeroXApiKey(value: string): boolean {
   const normalized = value.trim();
   return normalized.length > 0 && normalized !== "your_0x_api_key_here";
@@ -32,7 +46,7 @@ function hasApiKey(value: string, placeholder: string): boolean {
 }
 
 function createEnabledClients(chain: ChainConfig): DexAggregatorClient[] {
-  const providers = env.SWAP_PROVIDERS.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+  const providers = enabledProviders();
   const clients: DexAggregatorClient[] = [];
   const platformFee = createPlatformFeeConfig();
 
@@ -66,4 +80,8 @@ function createEnabledClients(chain: ChainConfig): DexAggregatorClient[] {
   }
 
   return clients;
+}
+
+function enabledProviders(): string[] {
+  return env.SWAP_PROVIDERS.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
 }

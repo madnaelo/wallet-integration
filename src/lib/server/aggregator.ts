@@ -10,6 +10,7 @@ export type QuoteParams = {
   buyTokenDecimals: number;
   sellAmount: string;
   takerAddress: string;
+  toAddress?: string;
   slippageBps?: number;
 };
 

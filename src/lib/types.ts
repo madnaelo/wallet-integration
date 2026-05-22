@@ -20,6 +20,7 @@ export type QuoteResponse = {
   quoteId?: string;
   providerId?: string;
   providerName?: string;
+  executionKind?: "evm-same-chain" | "evm-to-bitcoin";
   providerRank?: number;
   isBest?: boolean;
   platformFeeBps?: number;
