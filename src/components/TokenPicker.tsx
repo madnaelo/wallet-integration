@@ -28,7 +28,7 @@ export function TokenPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const selectedToken = useMemo(() => findToken(tokens, value), [tokens, value]);
-  const matchingTokens = useMemo(() => filterTokens(tokens, query), [tokens, query]);
+  const matchingTokens = useMemo(() => searchTokens(tokens, query), [tokens, query]);
   const visibleTokens = matchingTokens.slice(0, MAX_VISIBLE_TOKENS);
 
   useEffect(() => {
@@ -108,13 +108,35 @@ export function TokenPicker({
   );
 }
 
-function filterTokens(tokens: TokenInfo[], query: string): TokenInfo[] {
+function searchTokens(tokens: TokenInfo[], query: string): TokenInfo[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return tokens;
 
-  return tokens.filter((token) =>
-    [token.symbol, token.name ?? "", token.address].some((value) => value.toLowerCase().includes(normalized))
-  );
+  return tokens
+    .map((token, order) => ({ token, order, score: scoreTokenMatch(token, normalized) }))
+    .filter((match) => match.score < Number.POSITIVE_INFINITY)
+    .sort((first, second) => first.score - second.score || first.order - second.order)
+    .map((match) => match.token);
+}
+
+function scoreTokenMatch(token: TokenInfo, query: string): number {
+  const symbol = token.symbol.toLowerCase();
+  const name = (token.name ?? "").toLowerCase();
+  const address = token.address.toLowerCase();
+  const aliases = (token.searchAliases ?? []).map((alias) => alias.toLowerCase());
+
+  if (address === query) return 0;
+  if (symbol === query) return 1;
+  if (aliases.some((alias) => alias === query)) return 2;
+  if (name === query) return 3;
+  if (symbol.startsWith(query)) return 4;
+  if (aliases.some((alias) => alias.startsWith(query))) return 5;
+  if (name.startsWith(query)) return 6;
+  if (symbol.includes(query)) return 7;
+  if (aliases.some((alias) => alias.includes(query))) return 8;
+  if (name.includes(query)) return 9;
+  if (address.includes(query)) return 10;
+  return Number.POSITIVE_INFINITY;
 }
 
 function findToken(tokens: TokenInfo[], address: string): TokenInfo | undefined {

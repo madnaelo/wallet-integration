@@ -18,7 +18,8 @@ Implement these two related slices:
 ## Token Discovery Requirements
 
 - Replace small native token dropdowns with a searchable token picker.
-- Keep native tokens and carefully curated popular tokens available immediately.
+- Keep native tokens and carefully curated popular tokens available immediately
+  and pinned above the long tail.
 - Load a much larger chain-filtered token registry for supported mainnets.
 - Prefer standard Token List metadata where suitable and merge additional
   configured provider token metadata when it safely increases coverage.
@@ -30,6 +31,13 @@ Implement these two related slices:
   - Ethereum tokens while Ethereum is selected,
   - Polygon tokens while Polygon is selected,
   - Base tokens while Base is selected.
+- Search by user language and precise identifiers:
+  - symbol/ticker,
+  - display name,
+  - aliases for familiar assets whose on-chain symbol differs,
+  - contract address.
+- Rank exact symbol, alias, name, and address matches before loose substring
+  matches.
 - Fall back to popular tokens with a user-facing notice if the larger list is
   temporarily unavailable.
 
