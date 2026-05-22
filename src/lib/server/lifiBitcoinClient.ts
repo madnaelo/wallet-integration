@@ -1,4 +1,4 @@
-import type { QuoteResponse, QuoteFee } from "@/lib/types";
+import type { QuoteResponse, QuoteFee, QuoteToken } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 import {
@@ -31,13 +31,16 @@ export class LifiBitcoinClient implements DexAggregatorClient {
     if (!this.supportedChainIds.includes(params.chainId)) {
       throw new Error("Native Bitcoin quotes are not available from this network yet.");
     }
-    if (!params.toAddress) throw new Error("Enter the Bitcoin address that should receive this swap.");
+    if (!isBitcoinToken(params.sellToken) && !isBitcoinToken(params.buyToken)) {
+      throw new Error("LI.FI Bitcoin quotes require native Bitcoin on one side.");
+    }
+    if (!params.toAddress) throw new Error("Choose where this swap should be received.");
 
     const url = new URL("/v1/quote", this.cfg.baseUrl);
-    url.searchParams.set("fromChain", String(params.chainId));
-    url.searchParams.set("toChain", BITCOIN_CHAIN_ID);
+    url.searchParams.set("fromChain", isBitcoinToken(params.sellToken) ? BITCOIN_CHAIN_ID : String(params.chainId));
+    url.searchParams.set("toChain", isBitcoinToken(params.buyToken) ? BITCOIN_CHAIN_ID : String(params.chainId));
     url.searchParams.set("fromToken", toLifiToken(params.sellToken));
-    url.searchParams.set("toToken", BITCOIN_TOKEN_ID);
+    url.searchParams.set("toToken", toLifiToken(params.buyToken));
     url.searchParams.set("fromAddress", params.takerAddress);
     url.searchParams.set("toAddress", params.toAddress);
     url.searchParams.set("fromAmount", params.sellAmount);
@@ -94,8 +97,9 @@ export class LifiBitcoinClient implements DexAggregatorClient {
 
     return normalizeQuote(
       {
-        executionKind: "evm-to-bitcoin",
+        executionKind: isBitcoinToken(params.sellToken) ? "bitcoin-to-evm" : "evm-to-bitcoin",
         totalNetworkFee: sumCostAmounts(gasCosts),
+        networkFeeToken: firstCostToken(gasCosts),
         tool: stringValue(raw.tool)
       },
       params,
@@ -142,5 +146,23 @@ function sumCostAmounts(costs: unknown[]): string {
 }
 
 function toLifiToken(token: string): string {
+  if (isBitcoinToken(token)) return BITCOIN_TOKEN_ID;
   return token === "ETH" ? ZERO_ADDRESS : token;
+}
+
+function isBitcoinToken(token: string): boolean {
+  return token.trim().toLowerCase() === BITCOIN_TOKEN_ID;
+}
+
+function firstCostToken(costs: unknown[]): QuoteToken | undefined {
+  for (const cost of costs) {
+    const token = (cost as any)?.token;
+    const address = stringValue(token?.address);
+    const symbol = stringValue(token?.symbol);
+    const decimals = Number(token?.decimals);
+    if (address && symbol && Number.isInteger(decimals) && decimals >= 0) {
+      return { address, symbol, decimals };
+    }
+  }
+  return undefined;
 }

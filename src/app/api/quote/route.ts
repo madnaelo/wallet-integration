@@ -60,12 +60,12 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const isSellTokenOk = sellToken === "ETH" || isAddress(sellToken);
+  const isSellTokenOk = sellToken === "ETH" || isAddress(sellToken) || isNativeBitcoinToken(sellToken);
   const isBuyTokenOk = buyToken === "ETH" || isAddress(buyToken) || isNativeBitcoinToken(buyToken);
 
   if (!isSellTokenOk || !isBuyTokenOk) {
     return withCors(
-      NextResponse.json({ error: "Invalid token address (or use ETH)." }, { status: 400 }),
+      NextResponse.json({ error: "Invalid token address." }, { status: 400 }),
       corsOrigin
     );
   }
@@ -77,12 +77,22 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (!isAddress(takerAddress)) {
-    return withCors(NextResponse.json({ error: "Invalid takerAddress." }, { status: 400 }), corsOrigin);
+  if (isNativeBitcoinToken(sellToken)) {
+    if (!isBitcoinAddressInput(takerAddress)) {
+      return withCors(NextResponse.json({ error: "Invalid Bitcoin source address." }, { status: 400 }), corsOrigin);
+    }
+  } else if (!isAddress(takerAddress)) {
+    return withCors(NextResponse.json({ error: "Invalid source wallet address." }, { status: 400 }), corsOrigin);
   }
 
-  if (isNativeBitcoinToken(buyToken) && !isBitcoinReceiveAddressInput(toAddress)) {
-    return withCors(NextResponse.json({ error: "Enter a Bitcoin receive address." }, { status: 400 }), corsOrigin);
+  if (isNativeBitcoinToken(buyToken)) {
+    if (!isBitcoinAddressInput(toAddress)) {
+      return withCors(NextResponse.json({ error: "Choose a Bitcoin receive address." }, { status: 400 }), corsOrigin);
+    }
+  } else if (toAddress && !isAddress(toAddress)) {
+    return withCors(NextResponse.json({ error: "Invalid receive address." }, { status: 400 }), corsOrigin);
+  } else if (isNativeBitcoinToken(sellToken) && !toAddress) {
+    return withCors(NextResponse.json({ error: "Choose a receive address." }, { status: 400 }), corsOrigin);
   }
 
   let slippageBps: number | undefined;
@@ -106,13 +116,6 @@ export async function GET(req: NextRequest) {
   if (!sellTokenInfo || !buyTokenInfo) {
     return withCors(NextResponse.json({ error: "Token is not available on this network." }, { status: 400 }), corsOrigin);
   }
-  if (isNativeBitcoinToken(sellTokenInfo)) {
-    return withCors(
-      NextResponse.json({ error: "Selling native Bitcoin is not available in this flow yet." }, { status: 400 }),
-      corsOrigin
-    );
-  }
-
   const cacheKey = `quote:${chainId}:${sellToken}:${buyToken}:${sellAmount}:${takerAddress}:${toAddress}:${slippageBps ?? "default"}`;
   const cached = quoteCache.get(cacheKey);
   if (cached) {
@@ -120,7 +123,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const client = isNativeBitcoinToken(buyTokenInfo) ? createNativeBitcoinQuoteClient() : createQuoteClient(chain);
+    const isBitcoinSwap = isNativeBitcoinToken(sellTokenInfo) || isNativeBitcoinToken(buyTokenInfo);
+    const client = isBitcoinSwap ? createNativeBitcoinQuoteClient() : createQuoteClient(chain);
 
     const quote = await client.getQuote({
       sellToken,
@@ -131,7 +135,7 @@ export async function GET(req: NextRequest) {
       buyTokenDecimals: buyTokenInfo.decimals,
       sellAmount,
       takerAddress,
-      toAddress: isNativeBitcoinToken(buyTokenInfo) ? toAddress : undefined,
+      toAddress: toAddress || undefined,
       chainId,
       slippageBps
     });
@@ -165,7 +169,7 @@ function normalizeTokenKey(address: string): string {
   return address.trim().toLowerCase();
 }
 
-function isBitcoinReceiveAddressInput(value: string): boolean {
+function isBitcoinAddressInput(value: string): boolean {
   const address = value.trim();
   return address.length >= 14 && address.length <= 128 && /^[A-Za-z0-9]+$/.test(address);
 }

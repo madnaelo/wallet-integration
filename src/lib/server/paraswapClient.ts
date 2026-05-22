@@ -40,7 +40,7 @@ export class ParaswapClient implements DexAggregatorClient {
     url.searchParams.set("amount", params.sellAmount);
     url.searchParams.set("side", "SELL");
     url.searchParams.set("userAddress", params.takerAddress);
-    url.searchParams.set("receiver", params.takerAddress);
+    url.searchParams.set("receiver", params.toAddress || params.takerAddress);
     url.searchParams.set("slippage", String(params.slippageBps ?? 100));
     url.searchParams.set("partner", this.cfg.platformFee.paraswapPartner);
     url.searchParams.set("version", "6.2");

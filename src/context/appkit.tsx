@@ -2,8 +2,9 @@
 
 import type { ReactNode } from "react";
 import { createAppKit } from "@reown/appkit/react";
+import { BitcoinAdapter } from "@reown/appkit-adapter-bitcoin";
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
-import { base, mainnet, polygon, sepolia, type AppKitNetwork } from "@reown/appkit/networks";
+import { base, bitcoin, mainnet, polygon, sepolia, type AppKitNetwork } from "@reown/appkit/networks";
 import { getAllowedChainIds } from "@/lib/chains";
 
 const rawProjectId = (
@@ -27,13 +28,18 @@ const configuredNetworks = getAllowedChainIds()
   .map((chainId) => networkByChainId[chainId])
   .filter((network): network is AppKitNetwork => Boolean(network));
 
-const networks = (configuredNetworks.length ? configuredNetworks : [sepolia]) as [AppKitNetwork, ...AppKitNetwork[]];
+const evmNetworks = configuredNetworks.length ? configuredNetworks : [sepolia];
+const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
+  evmNetworks[0]!,
+  ...evmNetworks.slice(1),
+  bitcoin
+];
 
 createAppKit({
-  adapters: [new EthersAdapter()],
+  adapters: [new EthersAdapter(), new BitcoinAdapter({ projectId })],
   projectId,
   networks,
-  defaultNetwork: networks[0],
+  defaultNetwork: evmNetworks[0],
   metadata: {
     name: "The Wallet",
     description: "Your Personal Swap Aggregator",

@@ -8,7 +8,6 @@ export type TokenInfo = {
   searchAliases?: string[];
   assetKind?: "evm" | "bitcoin";
   networkName?: string;
-  buyOnly?: boolean;
 };
 
 export const NATIVE_BITCOIN_TOKEN_ADDRESS = "bitcoin";
@@ -21,8 +20,7 @@ export const NATIVE_BITCOIN_TOKEN: TokenInfo = {
   name: "Bitcoin",
   searchAliases: ["BTC", "Bitcoin", "Native Bitcoin"],
   assetKind: "bitcoin",
-  networkName: "Bitcoin network",
-  buyOnly: true
+  networkName: "Bitcoin network"
 };
 
 export function isNativeBitcoinToken(token: Pick<TokenInfo, "address" | "assetKind"> | string): boolean {

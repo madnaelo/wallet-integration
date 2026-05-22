@@ -39,9 +39,10 @@ type QuoteValidationErrors = {
   amount?: string;
   sellToken?: string;
   buyToken?: string;
-  receiveAddress?: string;
+  recipientAddress?: string;
   slippage?: string;
 };
+type RecipientMode = "wallet" | "custom";
 type FeeLine = {
   label: string;
   amount: string;
@@ -59,6 +60,7 @@ export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
   const { open: openAppKit } = useAppKit();
   const { address: appKitAddress, isConnected: appKitConnected } = useAppKitAccount({ namespace: "eip155" });
+  const { address: bitcoinAccountAddress } = useAppKitAccount({ namespace: "bip122" });
   const { walletProvider: appKitProvider, walletProviderType } = useAppKitProvider<Eip1193Provider>("eip155");
   const { disconnect: disconnectAppKit } = useDisconnect();
   const isDryRun = envPublic.DISALLOW_MAINNET;
@@ -71,7 +73,8 @@ export default function Page() {
 
   const [sellToken, setSellToken] = useState<string>("");
   const [buyToken, setBuyToken] = useState<string>("");
-  const [bitcoinReceiveAddress, setBitcoinReceiveAddress] = useState<string>("");
+  const [recipientAddress, setRecipientAddress] = useState<string>("");
+  const [recipientMode, setRecipientMode] = useState<RecipientMode>("wallet");
   const [amountHuman, setAmountHuman] = useState<string>("");
   const [slippageChoice, setSlippageChoice] = useState<string>("100");
   const [customSlippagePct, setCustomSlippagePct] = useState<string>("1");
@@ -104,7 +107,6 @@ export default function Page() {
   const [tokens, setTokens] = useState<TokenInfo[]>(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? []);
   const [tokensLoading, setTokensLoading] = useState<boolean>(false);
   const [tokenListNotice, setTokenListNotice] = useState<string>("");
-  const sellTokens = useMemo(() => tokens.filter((token) => !token.buyOnly), [tokens]);
 
   useEffect(() => {
     const fallbackTokens = DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [];
@@ -133,12 +135,12 @@ export default function Page() {
   }, [selectedChainId]);
 
   useEffect(() => {
-    const sellTokenAvailable = sellTokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(sellToken));
+    const sellTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(sellToken));
     const buyTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken));
 
-    if (!sellTokenAvailable && sellTokens.length > 0) setSellToken(sellTokens[0]!.address);
+    if (!sellTokenAvailable && tokens.length > 0) setSellToken(tokens[0]!.address);
     if (!buyTokenAvailable && tokens.length > 1) setBuyToken(tokens[1]!.address);
-  }, [tokens, sellTokens, sellToken, buyToken]);
+  }, [tokens, sellToken, buyToken]);
 
   useEffect(() => {
     if (!walletChainId || !allowedChains.some((allowedChain) => allowedChain.chainId === walletChainId)) return;
@@ -254,7 +256,11 @@ export default function Page() {
 
   const sellTokenInfo = useMemo(() => tokens.find((t) => t.address === sellToken), [tokens, sellToken]);
   const buyTokenInfo = useMemo(() => tokens.find((t) => t.address === buyToken), [tokens, buyToken]);
+  const isBitcoinSourceSwap = sellTokenInfo?.assetKind === "bitcoin";
   const isBitcoinReceiveSwap = buyTokenInfo?.assetKind === "bitcoin";
+  const sourceWalletAddress = isBitcoinSourceSwap ? bitcoinAccountAddress ?? "" : walletAddress;
+  const destinationWalletAddress = isBitcoinReceiveSwap ? bitcoinAccountAddress ?? "" : walletAddress;
+  const destinationWalletLabel = isBitcoinReceiveSwap ? "Bitcoin wallet" : "connected wallet";
   const slippageBps = useMemo(
     () => parseSlippageBps(slippageChoice, customSlippagePct),
     [slippageChoice, customSlippagePct]
@@ -265,26 +271,37 @@ export default function Page() {
         amountHuman,
         sellTokenInfo,
         buyTokenInfo,
-        bitcoinReceiveAddress,
+        sourceWalletAddress,
+        recipientAddress,
         slippageBps
       }),
-    [amountHuman, sellTokenInfo, buyTokenInfo, bitcoinReceiveAddress, slippageBps]
+    [amountHuman, sellTokenInfo, buyTokenInfo, sourceWalletAddress, recipientAddress, slippageBps]
   );
   const hasQuoteValidationErrors = useMemo(
     () => Object.values(quoteValidationErrors).some(Boolean),
     [quoteValidationErrors]
   );
 
-  const canQuote =
-    !!walletAddress &&
-    isAddress(walletAddress) &&
-    !hasQuoteValidationErrors;
+  const canQuote = !!sourceWalletAddress && !hasQuoteValidationErrors;
   const quoteAgeSeconds = quoteFetchedAtMs ? Math.floor((nowMs - quoteFetchedAtMs) / 1000) : 0;
   const quoteSecondsRemaining = quote ? Math.max(0, QUOTE_TTL_SECONDS - quoteAgeSeconds) : 0;
   const isQuoteExpired = !!quote && quoteSecondsRemaining <= 0;
   const availableQuotes = useMemo(() => quote?.availableQuotes ?? (quote ? [quote] : []), [quote]);
 
+  useEffect(() => {
+    if (recipientMode !== "wallet") return;
+    setRecipientAddress(destinationWalletAddress);
+  }, [destinationWalletAddress, recipientMode]);
+
   function requireWalletForForm() {
+    if (isBitcoinSourceSwap) {
+      if (bitcoinAccountAddress) return true;
+      setQuoteValidationVisible(true);
+      setQuoteError("");
+      setActionError("");
+      return false;
+    }
+
     if (walletAddress) return true;
     setConnectPromptVisible(true);
     setQuoteError("");
@@ -307,6 +324,13 @@ export default function Page() {
     setSwapStatus("idle");
   }
 
+  function useConnectedDestinationWallet() {
+    if (!destinationWalletAddress) return;
+    setRecipientMode("wallet");
+    setRecipientAddress(destinationWalletAddress);
+    clearQuoteState();
+  }
+
   function selectSwapChain(chainId: number) {
     if (networkMenuRef.current) networkMenuRef.current.open = false;
     if (chainId === selectedChainId) return;
@@ -324,7 +348,16 @@ export default function Page() {
       setActionError("Wallet connection is unavailable right now. Please try again later.");
       return;
     }
-    await openAppKit({ view: "Connect" });
+    await openAppKit({ view: "Connect", namespace: "eip155" });
+  }
+
+  async function openBitcoinWalletChooser() {
+    setActionError("");
+    if (!isAppKitConfigured) {
+      setActionError("Bitcoin wallet connection is unavailable right now. Please try again later.");
+      return;
+    }
+    await openAppKit({ view: "Connect", namespace: "bip122" });
   }
 
   async function onDisconnectWallet() {
@@ -520,8 +553,8 @@ export default function Page() {
         sellToken: sellTokenInfo.address,
         buyToken: buyTokenInfo.address,
         sellAmount,
-        takerAddress: walletAddress,
-        toAddress: isBitcoinReceiveSwap ? bitcoinReceiveAddress.trim() : undefined,
+        takerAddress: sourceWalletAddress,
+        toAddress: recipientAddress.trim(),
         slippageBps
       });
 
@@ -588,6 +621,10 @@ export default function Page() {
     }
     if (isQuoteExpired) {
       setActionError("Quote expired. Refresh the quote before continuing.");
+      return;
+    }
+    if (quote.executionKind === "bitcoin-to-evm") {
+      setActionError("BTC sell quotes are available now. Sending from Bitcoin is not available yet.");
       return;
     }
 
@@ -670,6 +707,7 @@ export default function Page() {
       symbol: chain.nativeCurrency.symbol,
       decimals: chain.nativeCurrency.decimals
     };
+    const networkFeeToken = quote.networkFeeToken ? tokenMetadataToDisplay(quote.networkFeeToken) : nativeToken;
     const sellDisplayToken = tokenInfoToDisplay(sellTokenInfo);
     const buyDisplayToken = tokenInfoToDisplay(buyTokenInfo);
     const tokenForAddress = (address: string): DisplayToken => resolveDisplayToken(address, tokens, nativeToken);
@@ -685,8 +723,8 @@ export default function Page() {
       ? {
           label: "Network fee",
           amount: networkFeeWei,
-          token: nativeToken,
-          display: formatTokenAmount(networkFeeWei, nativeToken)
+          token: networkFeeToken,
+          display: formatTokenAmount(networkFeeWei, networkFeeToken)
         }
       : null;
     const swapFeeLines = collectFeeLines(quote, tokenForAddress).map((fee) =>
@@ -797,7 +835,7 @@ export default function Page() {
               <TokenPicker
                 label="Sell token"
                 value={sellToken}
-                tokens={sellTokens}
+                tokens={tokens}
                 loading={tokensLoading}
                 onChange={(value) => {
                   requireWalletForForm();
@@ -812,6 +850,11 @@ export default function Page() {
                   {quoteValidationErrors.sellToken}
                 </div>
               ) : null}
+              {isBitcoinSourceSwap && !bitcoinAccountAddress ? (
+                <button className="btn walletPromptButton" type="button" onClick={openBitcoinWalletChooser}>
+                  Connect Bitcoin Wallet
+                </button>
+              ) : null}
             </div>
 
             <button
@@ -825,7 +868,7 @@ export default function Page() {
                 setBuyToken(sellToken);
                 clearQuoteState();
               }}
-              disabled={!sellToken || !buyToken || !!buyTokenInfo?.buyOnly}
+              disabled={!sellToken || !buyToken}
             >
               <span aria-hidden="true">&#8644;</span>
             </button>
@@ -851,32 +894,55 @@ export default function Page() {
               ) : null}
             </div>
           </div>
-          {isBitcoinReceiveSwap ? (
-            <div style={{ marginTop: 12 }}>
-              <div className="label">Bitcoin receive address</div>
+          <div className="recipientPanel">
+            <div className="recipientHeader">
+              <div className="label">Receive at</div>
+              {recipientMode === "wallet" && destinationWalletAddress ? (
+                <span className="badge recipientBadge">{destinationWalletLabel}</span>
+              ) : null}
+            </div>
+            <div className="recipientRow">
               <input
                 className="input"
-                value={bitcoinReceiveAddress}
+                value={recipientAddress}
                 onChange={(e) => {
                   requireWalletForForm();
-                  setBitcoinReceiveAddress(e.target.value);
+                  setRecipientMode("custom");
+                  setRecipientAddress(e.target.value);
                   clearQuoteState();
                 }}
-                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.receiveAddress}
-                aria-describedby="bitcoin-address-error"
-                placeholder="bc1..."
+                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.recipientAddress}
+                aria-describedby="recipient-address-error"
+                placeholder={isBitcoinReceiveSwap ? "bc1..." : "0x..."}
                 spellCheck={false}
                 autoComplete="off"
               />
-              {quoteValidationVisible && quoteValidationErrors.receiveAddress ? (
-                <div className="fieldError" id="bitcoin-address-error">
-                  {quoteValidationErrors.receiveAddress}
-                </div>
+              {destinationWalletAddress ? (
+                <button className="btn" type="button" onClick={useConnectedDestinationWallet}>
+                  Use Wallet
+                </button>
               ) : (
-                <div className="small" style={{ marginTop: 8 }}>Bitcoin will be sent to this address.</div>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={isBitcoinReceiveSwap ? openBitcoinWalletChooser : openWalletChooser}
+                >
+                  {isBitcoinReceiveSwap ? "Connect Bitcoin Wallet" : "Connect Wallet"}
+                </button>
               )}
             </div>
-          ) : null}
+            {quoteValidationVisible && quoteValidationErrors.recipientAddress ? (
+              <div className="fieldError" id="recipient-address-error">
+                {quoteValidationErrors.recipientAddress}
+              </div>
+            ) : (
+              <div className="small recipientHint">
+                {destinationWalletAddress
+                  ? "You can receive in the connected wallet or enter another address."
+                  : `Connect a ${isBitcoinReceiveSwap ? "Bitcoin " : ""}wallet or enter the address that should receive this swap.`}
+              </div>
+            )}
+          </div>
           {tokenListNotice ? <div className="small" style={{ marginTop: 8 }}>{tokenListNotice}</div> : null}
 
           <div style={{ marginTop: 12 }}>
@@ -930,9 +996,18 @@ export default function Page() {
                 {quoteLoading ? "Fetching quote..." : quote ? "Refresh Quote" : "Get Quote"}
               </button>
             </span>
-            <button className="btn btnPrimary" onClick={executeSwap} disabled={!quote || !walletAddress || isQuoteExpired}>
-              {isDryRun ? "Preview Swap" : "Swap"}
+            <button
+              className="btn btnPrimary"
+              onClick={executeSwap}
+              disabled={!quote || !walletAddress || isQuoteExpired || quote.executionKind === "bitcoin-to-evm"}
+            >
+              {quote?.executionKind === "bitcoin-to-evm" ? "BTC Sell Quote Only" : isDryRun ? "Preview Swap" : "Swap"}
             </button>
+            {quote?.executionKind === "bitcoin-to-evm" ? (
+              <div className="small" style={{ marginTop: 8 }}>
+                BTC sell quotes are available now. Sending from Bitcoin is not available yet.
+              </div>
+            ) : null}
           </div>
 
           {quoteError ? <div className="error" style={{ marginTop: 12 }}>{quoteError}</div> : null}
@@ -1337,7 +1412,8 @@ function getQuoteValidationErrors(params: {
   amountHuman: string;
   sellTokenInfo: TokenInfo | undefined;
   buyTokenInfo: TokenInfo | undefined;
-  bitcoinReceiveAddress: string;
+  sourceWalletAddress: string;
+  recipientAddress: string;
   slippageBps: number | null;
 }): QuoteValidationErrors {
   const errors: QuoteValidationErrors = {};
@@ -1354,12 +1430,16 @@ function getQuoteValidationErrors(params: {
     errors.buyToken = "Choose a different token to buy.";
   }
 
-  if (params.sellTokenInfo?.buyOnly) {
-    errors.sellToken = "Choose a token available from your connected wallet.";
+  if (params.sellTokenInfo?.assetKind === "bitcoin" && !isBitcoinAddressInput(params.sourceWalletAddress)) {
+    errors.sellToken = "Connect a Bitcoin wallet to sell BTC.";
   }
 
-  if (params.buyTokenInfo?.assetKind === "bitcoin" && !isBitcoinReceiveAddressInput(params.bitcoinReceiveAddress)) {
-    errors.receiveAddress = "Enter the Bitcoin address that should receive this swap.";
+  if (params.buyTokenInfo?.assetKind === "bitcoin") {
+    if (!isBitcoinAddressInput(params.recipientAddress)) {
+      errors.recipientAddress = "Connect a Bitcoin wallet or enter a Bitcoin receive address.";
+    }
+  } else if (params.buyTokenInfo && !isAddress(params.recipientAddress)) {
+    errors.recipientAddress = "Connect a wallet or enter an address for this swap.";
   }
 
   if (!params.amountHuman.trim()) {
@@ -1403,11 +1483,19 @@ function isNativeTokenAddress(address: string): boolean {
     || normalized === "0x0000000000000000000000000000000000000000";
 }
 
+function tokenMetadataToDisplay(token: DisplayToken): DisplayToken {
+  return {
+    address: token.address,
+    symbol: token.symbol,
+    decimals: token.decimals
+  };
+}
+
 function normalizeTokenKey(address: string): string {
   return address.trim().toLowerCase();
 }
 
-function isBitcoinReceiveAddressInput(value: string): boolean {
+function isBitcoinAddressInput(value: string): boolean {
   const address = value.trim();
   return address.length >= 14 && address.length <= 128 && /^[A-Za-z0-9]+$/.test(address);
 }

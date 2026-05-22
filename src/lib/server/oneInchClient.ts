@@ -42,6 +42,9 @@ export class OneInchClient implements DexAggregatorClient {
     url.searchParams.set("amount", params.sellAmount);
     url.searchParams.set("from", params.takerAddress);
     url.searchParams.set("origin", params.takerAddress);
+    if (params.toAddress) {
+      url.searchParams.set("receiver", params.toAddress);
+    }
     url.searchParams.set("slippage", toSlippagePercent(params.slippageBps));
     url.searchParams.set("includeProtocols", "true");
     url.searchParams.set("includeGas", "true");

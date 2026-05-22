@@ -9,6 +9,12 @@ export type QuoteFee = {
   token: string;
 };
 
+export type QuoteToken = {
+  address: string;
+  symbol: string;
+  decimals: number;
+};
+
 export type QuoteProviderError = {
   providerId: string;
   providerName: string;
@@ -20,7 +26,7 @@ export type QuoteResponse = {
   quoteId?: string;
   providerId?: string;
   providerName?: string;
-  executionKind?: "evm-same-chain" | "evm-to-bitcoin";
+  executionKind?: "evm-same-chain" | "evm-to-bitcoin" | "bitcoin-to-evm";
   providerRank?: number;
   isBest?: boolean;
   platformFeeBps?: number;
@@ -37,6 +43,7 @@ export type QuoteResponse = {
   gas?: string;
 
   allowanceTarget?: string;
+  networkFeeToken?: QuoteToken;
   routeLines?: QuoteRouteLine[];
   serviceFees?: QuoteFee[];
   availableQuotes?: QuoteResponse[];

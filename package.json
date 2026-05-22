@@ -12,6 +12,7 @@
   "dependencies": {
     "@base-org/account": "^2.5.5",
     "@reown/appkit": "^1.8.19",
+    "@reown/appkit-adapter-bitcoin": "^1.8.19",
     "@reown/appkit-adapter-ethers": "^1.8.19",
     "ethers": "^6.13.2",
     "next": "14.2.5",

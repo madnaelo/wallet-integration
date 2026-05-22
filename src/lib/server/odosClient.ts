@@ -30,6 +30,10 @@ export class OdosClient implements DexAggregatorClient {
   }
 
   async getQuote(params: QuoteParams): Promise<QuoteResponse> {
+    if (params.toAddress && normalizeAddress(params.toAddress) !== normalizeAddress(params.takerAddress)) {
+      throw new Error("Odos is unavailable for a different receive address.");
+    }
+
     const quote = await this.fetchQuote(params);
     const assemble = await this.assembleTransaction(quote, params);
     const quoteRaw: any = quote;
@@ -118,4 +122,8 @@ export class OdosClient implements DexAggregatorClient {
       ...(this.cfg.apiKey ? { "x-api-key": this.cfg.apiKey } : {})
     };
   }
+}
+
+function normalizeAddress(value: string): string {
+  return value.trim().toLowerCase();
 }

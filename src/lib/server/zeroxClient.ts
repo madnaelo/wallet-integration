@@ -36,6 +36,9 @@ export class ZeroXClient implements DexAggregatorClient {
     url.searchParams.set("buyToken", buyToken);
     url.searchParams.set("sellAmount", params.sellAmount);
     url.searchParams.set("taker", params.takerAddress);
+    if (params.toAddress) {
+      url.searchParams.set("recipient", params.toAddress);
+    }
     if (typeof params.slippageBps === "number") {
       url.searchParams.set("slippageBps", String(params.slippageBps));
     }

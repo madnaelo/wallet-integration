@@ -125,7 +125,8 @@ Implemented now:
 - Frontend saves dry-run, submitted cross-chain, and confirmed swaps to the
   backend.
 - Frontend reads authenticated swap history from the backend.
-- Native BTC receive quotes from supported EVM source assets through LI.FI.
+- Native BTC quote paths through LI.FI with separate source and receive wallet
+  modeling in the frontend.
 
 Not implemented yet:
 

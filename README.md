@@ -18,12 +18,12 @@ Implemented:
 - Same-chain swap selection for configured Ethereum, Polygon, and Base
   networks. The connected wallet chain is selected when it is allowed.
 - Searchable token pickers backed by cached token-list/provider metadata,
-  native/popular-token fallbacks, native BTC receive selection, and a sell/buy
-  reversal control.
+  native/popular-token fallbacks, native BTC selection, and a sell/buy reversal
+  control.
 - `GET /api/quote` with validation, per-IP rate limiting, and short quote cache.
 - Multi-provider same-chain quote clients for 0x, 1inch, ParaSwap, and Odos.
-  LI.FI builds EVM-to-native-BTC receive quotes. Successful quotes are
-  normalized and shown through one provider/route UI.
+  LI.FI builds native-BTC quote paths while successful quotes are normalized
+  and shown through one provider/route UI.
 - Provider failure isolation: one timed-out or rejected provider does not hide
   successful quotes from other configured providers.
 - User-facing trade summary with slippage, quote expiry, provider selection,
@@ -58,16 +58,21 @@ The repository keeps quote execution and persisted user data separate:
 
 High-level flow:
 
-1. User connects a wallet through AppKit.
+1. User connects a source wallet through AppKit.
 2. Frontend requests quotes from the Next.js quote route with the selected
-   pair, wallet taker address, and a Bitcoin receive address only when native
-   BTC is the output.
+   pair, source-wallet address, and the selected receive wallet/address.
 3. The quote route asks enabled same-chain providers in parallel or LI.FI for
-   an EVM-to-BTC quote, then returns normalized executable quote data.
+   native-BTC quote paths, then returns normalized quote data.
 4. The frontend checks approvals when needed and asks the user's wallet to sign
    and submit the selected transaction.
 5. Swap history uses a signed wallet message to create a backend session before
    PostgreSQL history is saved or read.
+
+Native BTC swaps use the same form model: the source wallet pays, the receive
+wallet/address receives, and the connected destination wallet pre-fills the
+receive field when it matches the destination network. BTC-source quotes are
+kept visible while Bitcoin-side PSBT signing and submission remain a dedicated
+follow-up.
 
 ## Local Setup
 
@@ -184,4 +189,6 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
   network UX.
 - [Prompt 12](docs/prompt12_f.md): native BTC receive quotes without confusing
   BTC with wrapped EVM tokens.
+- [Prompt 13](docs/prompt13_f.md): source and receive wallet modeling for
+  native BTC quote paths.
 

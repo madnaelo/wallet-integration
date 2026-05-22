@@ -260,6 +260,41 @@ body {
   outline-offset: 3px;
 }
 
+.walletPromptButton {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.recipientPanel {
+  margin-top: 12px;
+}
+
+.recipientHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.recipientBadge {
+  padding: 4px 8px;
+}
+
+.recipientRow {
+  align-items: stretch;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.recipientRow .btn {
+  white-space: nowrap;
+}
+
+.recipientHint {
+  margin-top: 8px;
+}
+
 @media (min-width: 560px) {
   .tokenPairRow {
     align-items: start;
@@ -268,6 +303,10 @@ body {
 
   .tokenFlipButton {
     margin-top: 24px;
+  }
+
+  .recipientRow {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 
