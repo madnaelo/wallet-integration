@@ -17,7 +17,8 @@ Implemented:
   QR/mobile flows.
 - Same-chain swap selection for configured Ethereum, Polygon, and Base
   networks. The connected wallet chain is selected when it is allowed.
-- Curated per-chain token lists and a sell/buy pair reversal control.
+- Searchable same-chain token pickers backed by cached token-list/provider
+  metadata, native/popular-token fallbacks, and a sell/buy reversal control.
 - `GET /api/quote` with validation, per-IP rate limiting, and short quote cache.
 - Multi-provider quote clients for 0x, 1inch, ParaSwap, and Odos. Successful
   quotes are normalized, ranked, and shown through one provider/route UI.
@@ -37,7 +38,7 @@ Not implemented yet:
 - Scheduled reverse-swap profit scanning.
 - Price alert thresholds.
 - Email, Telegram, push, or in-app notification delivery.
-- Searchable large token registry or guarded import-by-address flow.
+- Guarded import-by-address flow and token risk signals.
 
 ## Architecture
 
@@ -174,4 +175,6 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 8](docs/prompt8_f.md): multi-provider quote aggregation.
 - [Prompt 9](docs/prompt9_f.md): platform fee and provider operations config.
 - [Prompt 10](docs/prompt10_f.md): chain and token selector ergonomics.
+- [Prompt 11](docs/prompt11_f.md): searchable same-chain tokens and simpler
+  network UX.
 

@@ -3,6 +3,8 @@ export type TokenInfo = {
   address: string; // ERC20 address or "ETH"
   decimals: number;
   isNative?: boolean;
+  name?: string;
+  logoURI?: string;
 };
 
 export const DEFAULT_TOKENS_BY_CHAIN: Record<number, TokenInfo[]> = {

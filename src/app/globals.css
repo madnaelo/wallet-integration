@@ -64,6 +64,8 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
+  position: relative;
+  z-index: 2;
 }
 
 @media (min-width: 860px) {
@@ -88,6 +90,144 @@ body {
   display: grid;
   gap: 10px;
   grid-template-columns: minmax(0, 1fr);
+}
+
+.tokenPicker {
+  min-width: 0;
+  position: relative;
+}
+
+.tokenPickerButton {
+  align-items: center;
+  background-color: rgba(6, 12, 24, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 3px 10px;
+  grid-template-columns: minmax(0, 1fr) 12px;
+  min-height: 44px;
+  padding: 8px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.tokenPickerButton:focus,
+.tokenPickerButton[aria-expanded="true"] {
+  border-color: rgba(110, 168, 254, 0.7);
+  outline: none;
+}
+
+.tokenPickerButton[data-invalid="true"] {
+  border-color: rgba(255, 107, 107, 0.85);
+}
+
+.tokenPickerSymbol {
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.tokenPickerName {
+  color: var(--muted);
+  font-size: 12px;
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tokenPickerChevron {
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--muted);
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  transition: transform 120ms ease;
+}
+
+.tokenPickerButton[aria-expanded="true"] .tokenPickerChevron {
+  transform: rotate(180deg);
+}
+
+.tokenPickerPanel {
+  background: rgba(8, 14, 28, 0.99);
+  border: 1px solid rgba(110, 168, 254, 0.32);
+  border-radius: 10px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+  left: 0;
+  min-width: min(360px, calc(100vw - 36px));
+  padding: 10px;
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 8;
+}
+
+.tokenSearch {
+  margin-bottom: 8px;
+}
+
+.tokenPickerList {
+  max-height: min(360px, 45vh);
+  overflow-y: auto;
+}
+
+.tokenPickerOption {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(48px, auto) minmax(0, 1fr);
+  min-height: 44px;
+  padding: 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.tokenPickerOption:hover,
+.tokenPickerOption:focus-visible,
+.tokenPickerOptionSelected {
+  background: rgba(110, 168, 254, 0.16);
+  outline: none;
+}
+
+.tokenPickerOptionSymbol {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tokenPickerOptionMeta {
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.tokenPickerOptionMeta > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tokenPickerEmpty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 14px 8px;
+}
+
+.tokenPickerHint {
+  padding: 8px 8px 0;
 }
 
 .tokenFlipButton {
@@ -210,6 +350,73 @@ body {
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.networkMenu {
+  position: relative;
+}
+
+.networkMenu > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.networkMenu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.networkSummary {
+  color: var(--text);
+  min-height: 36px;
+}
+
+.networkSummary strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.networkChevron {
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--muted);
+  transition: transform 120ms ease;
+}
+
+.networkMenu[open] .networkChevron {
+  transform: rotate(180deg);
+}
+
+.networkPanel {
+  background: rgba(8, 14, 28, 0.99);
+  border: 1px solid rgba(110, 168, 254, 0.32);
+  border-radius: 10px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(260px, calc(100vw - 36px));
+  z-index: 7;
+}
+
+.networkOption {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.networkOption:hover,
+.networkOption:focus-visible,
+.networkOptionSelected {
+  background: rgba(110, 168, 254, 0.16);
+  outline: none;
 }
 
 .connectNudge {

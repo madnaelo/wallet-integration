@@ -7,7 +7,8 @@ import { isAddress, isPositiveIntegerString } from "@/lib/validation";
 import { env } from "@/lib/server/env";
 import type { QuoteResponse } from "@/lib/types";
 import { createQuoteClient } from "@/lib/server/quoteProvider";
-import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
+import { type TokenInfo } from "@/lib/tokens";
+import { getTokensForChain } from "@/lib/server/tokenRegistry";
 
 export const runtime = "nodejs";
 
@@ -95,8 +96,8 @@ export async function GET(req: NextRequest) {
     return withCors(NextResponse.json({ error: "Chain registry missing configuration." }, { status: 500 }), corsOrigin);
   }
 
-  const sellTokenInfo = resolveTokenInfo(chainId, sellToken);
-  const buyTokenInfo = resolveTokenInfo(chainId, buyToken);
+  const sellTokenInfo = await resolveTokenInfo(chainId, sellToken);
+  const buyTokenInfo = await resolveTokenInfo(chainId, buyToken);
   if (!sellTokenInfo || !buyTokenInfo) {
     return withCors(NextResponse.json({ error: "Token is not available on this network." }, { status: 400 }), corsOrigin);
   }
@@ -142,8 +143,8 @@ function isOriginAllowed(origin: string | null): boolean {
   return parts.includes(origin);
 }
 
-function resolveTokenInfo(chainId: number, address: string): TokenInfo | null {
-  const tokens = DEFAULT_TOKENS_BY_CHAIN[chainId] ?? [];
+async function resolveTokenInfo(chainId: number, address: string): Promise<TokenInfo | null> {
+  const tokens = await getTokensForChain(chainId);
   const normalized = normalizeTokenKey(address);
   return tokens.find((token) => normalizeTokenKey(token.address) === normalized) ?? null;
 }

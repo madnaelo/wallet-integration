@@ -14,6 +14,8 @@ import { isAppKitConfigured } from "@/context/appkit";
 import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
 import { swapLog } from "@/lib/swapLog";
+import { listTokens } from "@/lib/tokenClient";
+import { TokenPicker } from "@/components/TokenPicker";
 import {
   BackendClientError,
   type BackendSession,
@@ -94,13 +96,45 @@ export default function Page() {
   const [historyError, setHistoryError] = useState<string>("");
   const [historyNotice, setHistoryNotice] = useState<string>("");
   const historyRequestInFlightRef = useRef<boolean>(false);
+  const networkMenuRef = useRef<HTMLDetailsElement>(null);
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
-  const tokens: TokenInfo[] = useMemo(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [], [selectedChainId]);
+  const [tokens, setTokens] = useState<TokenInfo[]>(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? []);
+  const [tokensLoading, setTokensLoading] = useState<boolean>(false);
+  const [tokenListNotice, setTokenListNotice] = useState<string>("");
 
   useEffect(() => {
-    if (!sellToken && tokens.length > 0) setSellToken(tokens[0]!.address);
-    if (!buyToken && tokens.length > 1) setBuyToken(tokens[1]!.address);
+    const fallbackTokens = DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [];
+    const controller = new AbortController();
+    setTokens(fallbackTokens);
+    setTokensLoading(true);
+    setTokenListNotice("");
+
+    listTokens(selectedChainId, controller.signal)
+      .then((availableTokens) => {
+        if (!availableTokens.length) {
+          setTokenListNotice("Showing popular tokens for this network.");
+          return;
+        }
+        setTokens(availableTokens);
+      })
+      .catch((error: any) => {
+        if (error?.name === "AbortError") return;
+        setTokenListNotice("Showing popular tokens while the full token list is unavailable.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTokensLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [selectedChainId]);
+
+  useEffect(() => {
+    const sellTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(sellToken));
+    const buyTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken));
+
+    if (!sellTokenAvailable && tokens.length > 0) setSellToken(tokens[0]!.address);
+    if (!buyTokenAvailable && tokens.length > 1) setBuyToken(tokens[1]!.address);
   }, [tokens, sellToken, buyToken]);
 
   useEffect(() => {
@@ -266,6 +300,17 @@ export default function Page() {
     setApprovalTxHash("");
     setSwapTxHash("");
     setSwapStatus("idle");
+  }
+
+  function selectSwapChain(chainId: number) {
+    if (networkMenuRef.current) networkMenuRef.current.open = false;
+    if (chainId === selectedChainId) return;
+
+    setSelectedChainId(chainId);
+    setSellToken("");
+    setBuyToken("");
+    clearQuoteState();
+    setActionError("");
   }
 
   async function openWalletChooser() {
@@ -677,9 +722,26 @@ export default function Page() {
           <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
         </div>
         <div className="walletActions">
-          <span className="badge">
-            Network: <span className="mono">{chain?.name ?? `Chain ${selectedChainId}`}</span>
-          </span>
+          <details className="networkMenu" ref={networkMenuRef}>
+            <summary className="badge networkSummary" aria-label={`Network: ${chain?.name ?? "Network"}`}>
+              <span>Network</span>
+              <strong>{chain?.name ?? "Choose"}</strong>
+              <span className="networkChevron" aria-hidden="true" />
+            </summary>
+            <div className="networkPanel">
+              {allowedChains.map((allowedChain) => (
+                <button
+                  className={`networkOption${allowedChain.chainId === selectedChainId ? " networkOptionSelected" : ""}`}
+                  type="button"
+                  key={allowedChain.chainId}
+                  onClick={() => selectSwapChain(allowedChain.chainId)}
+                >
+                  {allowedChain.name}
+                </button>
+              ))}
+              <div className="small">Wallet: {formatWalletNetwork(walletChainId)}</div>
+            </div>
+          </details>
           <button className="btn btnPrimary" onClick={openWalletChooser} disabled={!!walletAddress}>
             {walletAddress ? `Connected: ${shortAddr(walletAddress)}` : "Connect Wallet"}
           </button>
@@ -701,75 +763,43 @@ export default function Page() {
 
       <div className="grid">
         <div className="panel">
-          <div className="row">
-            <div>
-              <div className="label">Chain</div>
-              <select
-                className="select"
-                value={selectedChainId}
-                onChange={(e) => {
-                  requireWalletForForm();
-                  setSelectedChainId(Number(e.target.value));
-                  setSellToken("");
-                  setBuyToken("");
-                  clearQuoteState();
-                  setActionError("");
-                }}
-              >
-                {allowedChains.map((c) => (
-                  <option key={c.chainId} value={c.chainId}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <div className="small" style={{ marginTop: 6 }}>
-                Wallet network: <span className="mono">{formatWalletNetwork(walletChainId)}</span>
+          <div>
+            <div className="label">Amount (sell)</div>
+            <input
+              className="input"
+              value={amountHuman}
+              onChange={(e) => {
+                requireWalletForForm();
+                setAmountHuman(e.target.value);
+                clearQuoteState();
+              }}
+              aria-invalid={quoteValidationVisible && !!quoteValidationErrors.amount}
+              aria-describedby="amount-error"
+              placeholder="0.01"
+              inputMode="decimal"
+            />
+            {quoteValidationVisible && quoteValidationErrors.amount ? (
+              <div className="fieldError" id="amount-error">
+                {quoteValidationErrors.amount}
               </div>
-            </div>
-
-            <div>
-              <div className="label">Amount (sell)</div>
-              <input
-                className="input"
-                value={amountHuman}
-                onChange={(e) => {
-                  requireWalletForForm();
-                  setAmountHuman(e.target.value);
-                  clearQuoteState();
-                }}
-                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.amount}
-                aria-describedby="amount-error"
-                placeholder="0.01"
-                inputMode="decimal"
-              />
-              {quoteValidationVisible && quoteValidationErrors.amount ? (
-                <div className="fieldError" id="amount-error">
-                  {quoteValidationErrors.amount}
-                </div>
-              ) : null}
-            </div>
+            ) : null}
           </div>
 
           <div className="tokenPairRow" style={{ marginTop: 12 }}>
             <div>
-              <div className="label">Sell token</div>
-              <select
-                className="select"
+              <TokenPicker
+                label="Sell token"
                 value={sellToken}
-                onChange={(e) => {
+                tokens={tokens}
+                loading={tokensLoading}
+                onChange={(value) => {
                   requireWalletForForm();
-                  setSellToken(e.target.value);
+                  setSellToken(value);
                   clearQuoteState();
                 }}
-                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.sellToken}
-                aria-describedby="sell-token-error"
-              >
-                {tokens.map((t) => (
-                  <option key={t.address} value={t.address}>
-                    {t.symbol} {t.isNative ? "(native)" : ""}
-                  </option>
-                ))}
-              </select>
+                invalid={quoteValidationVisible && !!quoteValidationErrors.sellToken}
+                describedBy="sell-token-error"
+              />
               {quoteValidationVisible && quoteValidationErrors.sellToken ? (
                 <div className="fieldError" id="sell-token-error">
                   {quoteValidationErrors.sellToken}
@@ -794,24 +824,19 @@ export default function Page() {
             </button>
 
             <div>
-              <div className="label">Buy token</div>
-              <select
-                className="select"
+              <TokenPicker
+                label="Buy token"
                 value={buyToken}
-                onChange={(e) => {
+                tokens={tokens}
+                loading={tokensLoading}
+                onChange={(value) => {
                   requireWalletForForm();
-                  setBuyToken(e.target.value);
+                  setBuyToken(value);
                   clearQuoteState();
                 }}
-                aria-invalid={quoteValidationVisible && !!quoteValidationErrors.buyToken}
-                aria-describedby="buy-token-error"
-              >
-                {tokens.map((t) => (
-                  <option key={t.address} value={t.address}>
-                    {t.symbol} {t.isNative ? "(native)" : ""}
-                  </option>
-                ))}
-              </select>
+                invalid={quoteValidationVisible && !!quoteValidationErrors.buyToken}
+                describedBy="buy-token-error"
+              />
               {quoteValidationVisible && quoteValidationErrors.buyToken ? (
                 <div className="fieldError" id="buy-token-error">
                   {quoteValidationErrors.buyToken}
@@ -819,6 +844,7 @@ export default function Page() {
               ) : null}
             </div>
           </div>
+          {tokenListNotice ? <div className="small" style={{ marginTop: 8 }}>{tokenListNotice}</div> : null}
 
           <div style={{ marginTop: 12 }}>
             <div className="label">Slippage tolerance</div>
