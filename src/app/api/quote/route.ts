@@ -171,7 +171,10 @@ function normalizeTokenKey(address: string): string {
 
 function isBitcoinAddressInput(value: string): boolean {
   const address = value.trim();
-  return address.length >= 14 && address.length <= 128 && /^[A-Za-z0-9]+$/.test(address);
+  return (
+    /^(bc1)[ac-hj-np-z02-9]{11,87}$/i.test(address) ||
+    /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(address)
+  );
 }
 
 function withCors(res: NextResponse, origin: string | null) {

@@ -260,11 +260,6 @@ body {
   outline-offset: 3px;
 }
 
-.walletPromptButton {
-  margin-top: 8px;
-  width: 100%;
-}
-
 .recipientPanel {
   margin-top: 12px;
 }
@@ -293,6 +288,40 @@ body {
 
 .recipientHint {
   margin-top: 8px;
+}
+
+.walletSupportNotice {
+  align-items: flex-start;
+  background: rgba(255, 195, 80, 0.1);
+  border: 1px solid rgba(255, 195, 80, 0.32);
+  border-radius: 8px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  gap: 5px;
+  line-height: 1.35;
+  margin-top: 8px;
+  padding: 9px 10px;
+}
+
+.noticeLink {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.noticeLink:focus-visible {
+  outline: 1px solid rgba(110, 168, 254, 0.75);
+  outline-offset: 3px;
 }
 
 @media (min-width: 560px) {
