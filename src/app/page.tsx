@@ -55,12 +55,12 @@ type RouteLine = {
   share: string;
 };
 type WalletNamespace = "eip155" | "bip122";
-type WalletSelectionPurpose = "source" | "recipient";
-type RecipientSelection = {
-  address: string;
-  tokenAddress: string;
-  assetKind: TokenInfo["assetKind"];
+type RecipientAddressMode = "connected" | "custom";
+type RecipientDialogMode = "paste" | "scan";
+type QrDetector = {
+  detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
 };
+type QrDetectorConstructor = new (options?: { formats?: string[] }) => QrDetector;
 
 export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
@@ -80,9 +80,12 @@ export default function Page() {
   const [sellToken, setSellToken] = useState<string>("");
   const [buyToken, setBuyToken] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
-  const [recipientSelection, setRecipientSelection] = useState<RecipientSelection | null>(null);
-  const [pendingRecipientNamespace, setPendingRecipientNamespace] = useState<WalletNamespace | null>(null);
-  const [walletSwitchNotice, setWalletSwitchNotice] = useState<string>("");
+  const [recipientAddressMode, setRecipientAddressMode] = useState<RecipientAddressMode>("connected");
+  const [recipientDialogOpen, setRecipientDialogOpen] = useState<boolean>(false);
+  const [recipientDialogMode, setRecipientDialogMode] = useState<RecipientDialogMode>("paste");
+  const [recipientAddressDraft, setRecipientAddressDraft] = useState<string>("");
+  const [recipientDialogError, setRecipientDialogError] = useState<string>("");
+  const [recipientQrStatus, setRecipientQrStatus] = useState<string>("");
   const [amountHuman, setAmountHuman] = useState<string>("");
   const [slippageChoice, setSlippageChoice] = useState<string>("100");
   const [customSlippagePct, setCustomSlippagePct] = useState<string>("1");
@@ -110,6 +113,11 @@ export default function Page() {
   const [historyNotice, setHistoryNotice] = useState<string>("");
   const historyRequestInFlightRef = useRef<boolean>(false);
   const networkMenuRef = useRef<HTMLDetailsElement>(null);
+  const previousBuyTokenAddressRef = useRef<string>("");
+  const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
+  const recipientQrStreamRef = useRef<MediaStream | null>(null);
+  const recipientQrTimerRef = useRef<number | null>(null);
+  const applyRecipientAddressRef = useRef<(rawValue: string, sourceLabel?: string) => void>(() => undefined);
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
   const [tokens, setTokens] = useState<TokenInfo[]>(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? []);
@@ -268,16 +276,11 @@ export default function Page() {
   const isBitcoinReceiveSwap = buyTokenInfo?.assetKind === "bitcoin";
   const sourceWalletAddress = isBitcoinSourceSwap ? bitcoinAccountAddress ?? "" : walletAddress;
   const destinationWalletAddress = isBitcoinReceiveSwap ? bitcoinAccountAddress ?? "" : walletAddress;
-  const selectedRecipientAddress =
-    recipientSelection && buyTokenInfo && normalizeTokenKey(recipientSelection.tokenAddress) === normalizeTokenKey(buyTokenInfo.address)
-      ? recipientSelection.address
-      : "";
-  const resolvedRecipientAddress = destinationWalletAddress || selectedRecipientAddress;
-  const recipientTooltip = destinationWalletAddress
+  const recipientTooltip = recipientAddressMode === "custom" && recipientAddress
+    ? "Custom Recipient Address"
+    : destinationWalletAddress
     ? "Currently Connected Wallet"
-    : selectedRecipientAddress
-      ? "Selected Recipient Wallet"
-      : "No recipient wallet connected";
+    : "No recipient address selected";
   const hasAnyWalletAddress = Boolean(walletAddress || bitcoinAccountAddress);
   const sourceWalletNotice = getWalletSupportNotice({
     token: sellTokenInfo,
@@ -286,14 +289,6 @@ export default function Page() {
     hasAnyWalletAddress,
     hasEvmWallet: Boolean(walletAddress),
     hasBitcoinWallet: Boolean(bitcoinAccountAddress),
-  });
-  const destinationWalletNotice = getWalletSupportNotice({
-    token: buyTokenInfo,
-    side: "buy",
-    chainName: chain?.name,
-    hasAnyWalletAddress,
-    hasEvmWallet: Boolean(walletAddress),
-    hasBitcoinWallet: Boolean(bitcoinAccountAddress)
   });
   const slippageBps = useMemo(
     () => parseSlippageBps(slippageChoice, customSlippagePct),
@@ -323,31 +318,98 @@ export default function Page() {
   const availableQuotes = useMemo(() => quote?.availableQuotes ?? (quote ? [quote] : []), [quote]);
 
   useEffect(() => {
-    setRecipientAddress(resolvedRecipientAddress);
-  }, [resolvedRecipientAddress]);
+    applyRecipientAddressRef.current = applyRecipientAddress;
+  });
 
   useEffect(() => {
-    if (!recipientSelection || !buyTokenInfo) return;
-    if (normalizeTokenKey(recipientSelection.tokenAddress) !== normalizeTokenKey(buyTokenInfo.address)) {
-      setRecipientSelection(null);
+    if (recipientAddressMode === "connected") {
+      setRecipientAddress(destinationWalletAddress);
     }
-  }, [buyTokenInfo, recipientSelection]);
+  }, [destinationWalletAddress, recipientAddressMode]);
 
   useEffect(() => {
-    if (!pendingRecipientNamespace || !buyTokenInfo) return;
+    const buyTokenAddress = buyTokenInfo?.address ?? "";
+    if (previousBuyTokenAddressRef.current === buyTokenAddress) return;
 
-    const address = pendingRecipientNamespace === "bip122" ? bitcoinAccountAddress : walletAddress;
-    if (!address) return;
+    previousBuyTokenAddressRef.current = buyTokenAddress;
+    setRecipientAddressMode("connected");
+    setRecipientAddress(destinationWalletAddress);
+    setRecipientDialogOpen(false);
+    setRecipientDialogError("");
+  }, [buyTokenInfo?.address, destinationWalletAddress]);
 
-    setRecipientSelection({
-      address,
-      tokenAddress: buyTokenInfo.address,
-      assetKind: buyTokenInfo.assetKind
-    });
-    setPendingRecipientNamespace(null);
-    setWalletSwitchNotice("Recipient wallet selected. Reconnect the wallet you want to swap from when you are ready.");
-    clearQuoteState();
-  }, [pendingRecipientNamespace, bitcoinAccountAddress, walletAddress, buyTokenInfo]);
+  useEffect(() => {
+    if (!recipientDialogOpen || recipientDialogMode !== "scan") {
+      stopRecipientQrScanner();
+      return;
+    }
+
+    let cancelled = false;
+    const barcodeDetector = getQrDetectorConstructor();
+
+    if (!barcodeDetector) {
+      setRecipientQrStatus("QR scanning is not available in this browser. Paste the address instead.");
+      return () => {
+        cancelled = true;
+        stopRecipientQrScanner();
+      };
+    }
+    const BarcodeDetector = barcodeDetector;
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setRecipientQrStatus("Camera scanning is not available in this browser. Paste the address instead.");
+      return () => {
+        cancelled = true;
+        stopRecipientQrScanner();
+      };
+    }
+
+    async function startRecipientQrScanner() {
+      try {
+        setRecipientQrStatus("Starting camera...");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        recipientQrStreamRef.current = stream;
+        if (recipientQrVideoRef.current) {
+          recipientQrVideoRef.current.srcObject = stream;
+          await recipientQrVideoRef.current.play();
+        }
+
+        const detector = new BarcodeDetector({ formats: ["qr_code"] });
+        setRecipientQrStatus("Point your camera at the recipient QR code.");
+        recipientQrTimerRef.current = window.setInterval(async () => {
+          const video = recipientQrVideoRef.current;
+          if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+
+          try {
+            const codes = await detector.detect(video);
+            const rawValue = codes[0]?.rawValue?.trim();
+            if (!rawValue) return;
+
+            applyRecipientAddressRef.current(rawValue, "QR code");
+          } catch {
+            setRecipientQrStatus("Could not read that QR code yet.");
+          }
+        }, 600);
+      } catch {
+        setRecipientQrStatus("Camera permission was not granted. Paste the address instead.");
+      }
+    }
+
+    startRecipientQrScanner();
+    return () => {
+      cancelled = true;
+      stopRecipientQrScanner();
+    };
+  }, [recipientDialogOpen, recipientDialogMode, buyTokenInfo]);
 
   function requireWalletForForm() {
     if (isBitcoinSourceSwap) {
@@ -380,15 +442,6 @@ export default function Page() {
     setSwapStatus("idle");
   }
 
-  function rememberCurrentRecipientWallet() {
-    if (!buyTokenInfo || !destinationWalletAddress) return;
-    setRecipientSelection({
-      address: destinationWalletAddress,
-      tokenAddress: buyTokenInfo.address,
-      assetKind: buyTokenInfo.assetKind
-    });
-  }
-
   function selectSwapChain(chainId: number) {
     if (networkMenuRef.current) networkMenuRef.current.open = false;
     if (chainId === selectedChainId) return;
@@ -396,13 +449,13 @@ export default function Page() {
     setSelectedChainId(chainId);
     setSellToken("");
     setBuyToken("");
+    setRecipientAddressMode("connected");
     clearQuoteState();
     setActionError("");
   }
 
-  async function openWalletForNamespace(namespace: WalletNamespace, purpose: WalletSelectionPurpose) {
+  async function openWalletForNamespace(namespace: WalletNamespace) {
     setActionError("");
-    setWalletSwitchNotice("");
     if (!isAppKitConfigured) {
       setActionError("Wallet connection is unavailable right now. Please try again later.");
       return;
@@ -414,8 +467,6 @@ export default function Page() {
     ];
 
     if (connectedNamespaces.length > 0) {
-      rememberCurrentRecipientWallet();
-      setWalletSwitchNotice("Switching wallet connection so you can choose another wallet.");
       for (const connectedNamespace of connectedNamespaces) {
         try {
           await disconnectAppKit({ namespace: connectedNamespace });
@@ -435,20 +486,75 @@ export default function Page() {
       await waitMs(250);
     }
 
-    setPendingRecipientNamespace(purpose === "recipient" ? namespace : null);
     await openAppKit({ view: "Connect", namespace });
   }
 
   async function openWalletChooser() {
-    await openWalletForNamespace("eip155", "source");
+    await openWalletForNamespace("eip155");
   }
 
   async function openBitcoinWalletChooser() {
-    await openWalletForNamespace("bip122", "source");
+    await openWalletForNamespace("bip122");
   }
 
-  async function openRecipientWalletChooser() {
-    await openWalletForNamespace(isBitcoinReceiveSwap ? "bip122" : "eip155", "recipient");
+  function openRecipientAddressDialog() {
+    setRecipientDialogMode("paste");
+    setRecipientAddressDraft(recipientAddress);
+    setRecipientDialogError("");
+    setRecipientQrStatus("");
+    setRecipientDialogOpen(true);
+  }
+
+  function closeRecipientAddressDialog() {
+    setRecipientDialogOpen(false);
+    setRecipientDialogError("");
+    setRecipientQrStatus("");
+    stopRecipientQrScanner();
+  }
+
+  function useConnectedRecipientAddress() {
+    if (!destinationWalletAddress) {
+      setRecipientDialogError("Connect a compatible wallet first, or paste a recipient address.");
+      return;
+    }
+
+    setRecipientAddress(destinationWalletAddress);
+    setRecipientAddressMode("connected");
+    setQuoteValidationVisible(false);
+    closeRecipientAddressDialog();
+    clearQuoteState();
+  }
+
+  function applyRecipientAddress(rawValue: string, sourceLabel = "address") {
+    const parsedAddress = parseRecipientAddressInput(rawValue, buyTokenInfo);
+    const validationError = validateRecipientAddress(parsedAddress, buyTokenInfo);
+    if (validationError) {
+      setRecipientDialogError(validationError);
+      if (sourceLabel === "QR code") setRecipientQrStatus("QR code did not contain a valid recipient address.");
+      return;
+    }
+
+    setRecipientAddress(parsedAddress);
+    setRecipientAddressMode("custom");
+    setQuoteValidationVisible(false);
+    closeRecipientAddressDialog();
+    clearQuoteState();
+  }
+
+  function stopRecipientQrScanner() {
+    if (recipientQrTimerRef.current) {
+      window.clearInterval(recipientQrTimerRef.current);
+      recipientQrTimerRef.current = null;
+    }
+
+    if (recipientQrStreamRef.current) {
+      recipientQrStreamRef.current.getTracks().forEach((track) => track.stop());
+      recipientQrStreamRef.current = null;
+    }
+
+    if (recipientQrVideoRef.current) {
+      recipientQrVideoRef.current.srcObject = null;
+    }
   }
 
   async function onDisconnectWallet() {
@@ -959,6 +1065,7 @@ export default function Page() {
                 if (!requireWalletForForm()) return;
                 setSellToken(buyToken);
                 setBuyToken(sellToken);
+                setRecipientAddressMode("connected");
                 clearQuoteState();
               }}
               disabled={!sellToken || !buyToken}
@@ -975,6 +1082,7 @@ export default function Page() {
                 onChange={(value) => {
                   requireWalletForForm();
                   setBuyToken(value);
+                  setRecipientAddressMode("connected");
                   clearQuoteState();
                 }}
                 invalid={quoteValidationVisible && !!quoteValidationErrors.buyToken}
@@ -985,16 +1093,8 @@ export default function Page() {
                   {quoteValidationErrors.buyToken}
                 </div>
               ) : null}
-              {destinationWalletNotice ? (
-                <WalletSupportNotice
-                  message={destinationWalletNotice.message}
-                  actionLabel={destinationWalletNotice.actionLabel}
-                  onAction={openRecipientWalletChooser}
-                />
-              ) : null}
             </div>
           </div>
-          {walletSwitchNotice ? <div className="small walletSwitchNotice">{walletSwitchNotice}</div> : null}
           <div className="recipientPanel">
             <div className="recipientHeader">
               <div className="label">Recipient address</div>
@@ -1013,9 +1113,9 @@ export default function Page() {
               <button
                 className="recipientEditButton"
                 type="button"
-                title={isBitcoinReceiveSwap ? "Choose Bitcoin recipient wallet" : "Choose recipient wallet"}
-                aria-label={isBitcoinReceiveSwap ? "Choose Bitcoin recipient wallet" : "Choose recipient wallet"}
-                onClick={openRecipientWalletChooser}
+                title="Edit recipient address"
+                aria-label="Edit recipient address"
+                onClick={openRecipientAddressDialog}
               >
                 <span aria-hidden="true">&#9998;</span>
               </button>
@@ -1026,6 +1126,103 @@ export default function Page() {
               </div>
             ) : null}
           </div>
+          {recipientDialogOpen ? (
+            <div className="recipientDialogOverlay" role="presentation">
+              <div
+                className="recipientDialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="recipient-dialog-title"
+              >
+                <div className="recipientDialogHeader">
+                  <h2 id="recipient-dialog-title">Recipient address</h2>
+                  <button
+                    className="recipientDialogClose"
+                    type="button"
+                    aria-label="Close recipient address options"
+                    onClick={closeRecipientAddressDialog}
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className="recipientMethodGrid" role="group" aria-label="Recipient address options">
+                  <button
+                    className={`recipientMethodButton${recipientDialogMode === "paste" ? " recipientMethodButtonActive" : ""}`}
+                    type="button"
+                    onClick={() => {
+                      setRecipientDialogMode("paste");
+                      setRecipientDialogError("");
+                    }}
+                  >
+                    Paste address
+                  </button>
+                  <button
+                    className={`recipientMethodButton${recipientDialogMode === "scan" ? " recipientMethodButtonActive" : ""}`}
+                    type="button"
+                    onClick={() => {
+                      setRecipientDialogMode("scan");
+                      setRecipientDialogError("");
+                    }}
+                  >
+                    Scan QR
+                  </button>
+                  <button
+                    className="recipientMethodButton"
+                    type="button"
+                    onClick={useConnectedRecipientAddress}
+                    disabled={!destinationWalletAddress}
+                  >
+                    Current wallet
+                  </button>
+                </div>
+
+                {recipientDialogMode === "paste" ? (
+                  <form
+                    className="recipientDialogBody"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      applyRecipientAddress(recipientAddressDraft);
+                    }}
+                  >
+                    <input
+                      className="input"
+                      value={recipientAddressDraft}
+                      onChange={(event) => {
+                        setRecipientAddressDraft(event.target.value);
+                        setRecipientDialogError("");
+                      }}
+                      placeholder={isBitcoinReceiveSwap ? "bc1..." : "0x..."}
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                    {recipientDialogError ? <div className="fieldError">{recipientDialogError}</div> : null}
+                    <div className="recipientDialogActions">
+                      <button className="btn" type="button" onClick={closeRecipientAddressDialog}>
+                        Cancel
+                      </button>
+                      <button className="btn btnPrimary" type="submit" disabled={!recipientAddressDraft.trim()}>
+                        Save
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="recipientDialogBody">
+                    <div className="qrScannerFrame">
+                      <video ref={recipientQrVideoRef} className="qrScannerVideo" muted playsInline />
+                    </div>
+                    {recipientQrStatus ? <div className="small">{recipientQrStatus}</div> : null}
+                    {recipientDialogError ? <div className="fieldError">{recipientDialogError}</div> : null}
+                    <div className="recipientDialogActions">
+                      <button className="btn" type="button" onClick={closeRecipientAddressDialog}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
           {tokenListNotice ? <div className="small" style={{ marginTop: 8 }}>{tokenListNotice}</div> : null}
 
           <div style={{ marginTop: 12 }}>
@@ -1571,10 +1768,10 @@ function getQuoteValidationErrors(params: {
 
   if (params.buyTokenInfo?.assetKind === "bitcoin") {
     if (!isBitcoinAddressInput(params.recipientAddress)) {
-      errors.recipientAddress = "Connect a Bitcoin wallet to receive BTC.";
+      errors.recipientAddress = "Enter a valid BTC recipient address.";
     }
   } else if (params.buyTokenInfo && !isAddress(params.recipientAddress)) {
-    errors.recipientAddress = "Connect a recipient wallet for this swap.";
+    errors.recipientAddress = "Enter a valid recipient address.";
   }
 
   if (!params.amountHuman.trim()) {
@@ -1588,6 +1785,46 @@ function getQuoteValidationErrors(params: {
   }
 
   return errors;
+}
+
+function parseRecipientAddressInput(value: string, token: TokenInfo | undefined): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  if (token?.assetKind === "bitcoin") {
+    return parseBitcoinAddressInput(trimmed);
+  }
+
+  return parseEvmAddressInput(trimmed);
+}
+
+function parseBitcoinAddressInput(value: string): string {
+  const bitcoinUri = value.match(/^bitcoin:([^?]+)/i);
+  if (!bitcoinUri) return value;
+
+  try {
+    return decodeURIComponent(bitcoinUri[1] ?? "").trim();
+  } catch {
+    return (bitcoinUri[1] ?? "").trim();
+  }
+}
+
+function parseEvmAddressInput(value: string): string {
+  const addressMatch = value.match(/0x[a-fA-F0-9]{40}/);
+  return addressMatch?.[0] ?? value;
+}
+
+function validateRecipientAddress(address: string, token: TokenInfo | undefined): string {
+  if (!address.trim()) return "Enter a recipient address.";
+  if (token?.assetKind === "bitcoin") {
+    return isBitcoinAddressInput(address) ? "" : "Enter a valid BTC recipient address.";
+  }
+  return isAddress(address) ? "" : "Enter a valid recipient address.";
+}
+
+function getQrDetectorConstructor(): QrDetectorConstructor | null {
+  const barcodeWindow = window as Window & { BarcodeDetector?: QrDetectorConstructor };
+  return barcodeWindow.BarcodeDetector ?? null;
 }
 
 function tokenInfoToDisplay(token: TokenInfo): DisplayToken {

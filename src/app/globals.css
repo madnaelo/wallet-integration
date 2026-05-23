@@ -336,10 +336,6 @@ body {
   outline-offset: 3px;
 }
 
-.walletSwitchNotice {
-  margin-top: 8px;
-}
-
 @media (min-width: 560px) {
   .tokenPairRow {
     align-items: start;
@@ -349,6 +345,126 @@ body {
   .tokenFlipButton {
     align-self: start;
     margin-top: 24px;
+  }
+}
+
+.recipientDialogOverlay {
+  align-items: center;
+  background: rgba(3, 7, 18, 0.72);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 30;
+}
+
+.recipientDialog {
+  background: #111827;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  max-width: 440px;
+  padding: 14px;
+  width: min(100%, 440px);
+}
+
+.recipientDialogHeader {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.recipientDialogHeader h2 {
+  font-size: 16px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.recipientDialogClose {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 22px;
+  height: 34px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 34px;
+}
+
+.recipientDialogClose:hover,
+.recipientDialogClose:focus-visible {
+  border-color: var(--border);
+  color: var(--text);
+  outline: none;
+}
+
+.recipientMethodGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+  margin-bottom: 12px;
+}
+
+.recipientMethodButton {
+  background: rgba(6, 12, 24, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+
+.recipientMethodButton:hover,
+.recipientMethodButton:focus-visible,
+.recipientMethodButtonActive {
+  border-color: rgba(110, 168, 254, 0.76);
+  outline: none;
+}
+
+.recipientMethodButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.recipientDialogBody {
+  display: grid;
+  gap: 10px;
+}
+
+.recipientDialogActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.qrScannerFrame {
+  aspect-ratio: 1;
+  background: rgba(6, 12, 24, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.qrScannerVideo {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+@media (min-width: 420px) {
+  .recipientMethodGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
