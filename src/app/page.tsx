@@ -54,6 +54,13 @@ type RouteLine = {
   source: string;
   share: string;
 };
+type WalletNamespace = "eip155" | "bip122";
+type WalletSelectionPurpose = "source" | "recipient";
+type RecipientSelection = {
+  address: string;
+  tokenAddress: string;
+  assetKind: TokenInfo["assetKind"];
+};
 
 export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
@@ -73,6 +80,9 @@ export default function Page() {
   const [sellToken, setSellToken] = useState<string>("");
   const [buyToken, setBuyToken] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
+  const [recipientSelection, setRecipientSelection] = useState<RecipientSelection | null>(null);
+  const [pendingRecipientNamespace, setPendingRecipientNamespace] = useState<WalletNamespace | null>(null);
+  const [walletSwitchNotice, setWalletSwitchNotice] = useState<string>("");
   const [amountHuman, setAmountHuman] = useState<string>("");
   const [slippageChoice, setSlippageChoice] = useState<string>("100");
   const [customSlippagePct, setCustomSlippagePct] = useState<string>("1");
@@ -258,7 +268,16 @@ export default function Page() {
   const isBitcoinReceiveSwap = buyTokenInfo?.assetKind === "bitcoin";
   const sourceWalletAddress = isBitcoinSourceSwap ? bitcoinAccountAddress ?? "" : walletAddress;
   const destinationWalletAddress = isBitcoinReceiveSwap ? bitcoinAccountAddress ?? "" : walletAddress;
-  const recipientTooltip = destinationWalletAddress ? "Currently Connected Wallet" : "No recipient wallet connected";
+  const selectedRecipientAddress =
+    recipientSelection && buyTokenInfo && normalizeTokenKey(recipientSelection.tokenAddress) === normalizeTokenKey(buyTokenInfo.address)
+      ? recipientSelection.address
+      : "";
+  const resolvedRecipientAddress = destinationWalletAddress || selectedRecipientAddress;
+  const recipientTooltip = destinationWalletAddress
+    ? "Currently Connected Wallet"
+    : selectedRecipientAddress
+      ? "Selected Recipient Wallet"
+      : "No recipient wallet connected";
   const hasAnyWalletAddress = Boolean(walletAddress || bitcoinAccountAddress);
   const sourceWalletNotice = getWalletSupportNotice({
     token: sellTokenInfo,
@@ -304,8 +323,31 @@ export default function Page() {
   const availableQuotes = useMemo(() => quote?.availableQuotes ?? (quote ? [quote] : []), [quote]);
 
   useEffect(() => {
-    setRecipientAddress(destinationWalletAddress);
-  }, [destinationWalletAddress]);
+    setRecipientAddress(resolvedRecipientAddress);
+  }, [resolvedRecipientAddress]);
+
+  useEffect(() => {
+    if (!recipientSelection || !buyTokenInfo) return;
+    if (normalizeTokenKey(recipientSelection.tokenAddress) !== normalizeTokenKey(buyTokenInfo.address)) {
+      setRecipientSelection(null);
+    }
+  }, [buyTokenInfo, recipientSelection]);
+
+  useEffect(() => {
+    if (!pendingRecipientNamespace || !buyTokenInfo) return;
+
+    const address = pendingRecipientNamespace === "bip122" ? bitcoinAccountAddress : walletAddress;
+    if (!address) return;
+
+    setRecipientSelection({
+      address,
+      tokenAddress: buyTokenInfo.address,
+      assetKind: buyTokenInfo.assetKind
+    });
+    setPendingRecipientNamespace(null);
+    setWalletSwitchNotice("Recipient wallet selected. Reconnect the wallet you want to swap from when you are ready.");
+    clearQuoteState();
+  }, [pendingRecipientNamespace, bitcoinAccountAddress, walletAddress, buyTokenInfo]);
 
   function requireWalletForForm() {
     if (isBitcoinSourceSwap) {
@@ -338,6 +380,15 @@ export default function Page() {
     setSwapStatus("idle");
   }
 
+  function rememberCurrentRecipientWallet() {
+    if (!buyTokenInfo || !destinationWalletAddress) return;
+    setRecipientSelection({
+      address: destinationWalletAddress,
+      tokenAddress: buyTokenInfo.address,
+      assetKind: buyTokenInfo.assetKind
+    });
+  }
+
   function selectSwapChain(chainId: number) {
     if (networkMenuRef.current) networkMenuRef.current.open = false;
     if (chainId === selectedChainId) return;
@@ -349,22 +400,55 @@ export default function Page() {
     setActionError("");
   }
 
-  async function openWalletChooser() {
+  async function openWalletForNamespace(namespace: WalletNamespace, purpose: WalletSelectionPurpose) {
     setActionError("");
+    setWalletSwitchNotice("");
     if (!isAppKitConfigured) {
       setActionError("Wallet connection is unavailable right now. Please try again later.");
       return;
     }
-    await openAppKit({ view: "Connect", namespace: "eip155" });
+
+    const connectedNamespaces: WalletNamespace[] = [
+      ...(walletAddress ? (["eip155"] as const) : []),
+      ...(bitcoinAccountAddress ? (["bip122"] as const) : [])
+    ];
+
+    if (connectedNamespaces.length > 0) {
+      rememberCurrentRecipientWallet();
+      setWalletSwitchNotice("Switching wallet connection so you can choose another wallet.");
+      for (const connectedNamespace of connectedNamespaces) {
+        try {
+          await disconnectAppKit({ namespace: connectedNamespace });
+        } catch {
+          // Continue to the chooser; Reown may already have dropped the session.
+        }
+      }
+
+      if (connectedNamespaces.includes("eip155")) {
+        setWalletAddress("");
+        setWalletChainId(null);
+        setProvider(null);
+        setWalletKind(null);
+        setBackendSession(null);
+        setDbSwapHistory([]);
+      }
+      await waitMs(250);
+    }
+
+    setPendingRecipientNamespace(purpose === "recipient" ? namespace : null);
+    await openAppKit({ view: "Connect", namespace });
+  }
+
+  async function openWalletChooser() {
+    await openWalletForNamespace("eip155", "source");
   }
 
   async function openBitcoinWalletChooser() {
-    setActionError("");
-    if (!isAppKitConfigured) {
-      setActionError("Bitcoin wallet connection is unavailable right now. Please try again later.");
-      return;
-    }
-    await openAppKit({ view: "Connect", namespace: "bip122" });
+    await openWalletForNamespace("bip122", "source");
+  }
+
+  async function openRecipientWalletChooser() {
+    await openWalletForNamespace(isBitcoinReceiveSwap ? "bip122" : "eip155", "recipient");
   }
 
   async function onDisconnectWallet() {
@@ -905,11 +989,12 @@ export default function Page() {
                 <WalletSupportNotice
                   message={destinationWalletNotice.message}
                   actionLabel={destinationWalletNotice.actionLabel}
-                  onAction={destinationWalletNotice.walletKind === "bitcoin" ? openBitcoinWalletChooser : openWalletChooser}
+                  onAction={openRecipientWalletChooser}
                 />
               ) : null}
             </div>
           </div>
+          {walletSwitchNotice ? <div className="small walletSwitchNotice">{walletSwitchNotice}</div> : null}
           <div className="recipientPanel">
             <div className="recipientHeader">
               <div className="label">Recipient address</div>
@@ -930,7 +1015,7 @@ export default function Page() {
                 type="button"
                 title={isBitcoinReceiveSwap ? "Choose Bitcoin recipient wallet" : "Choose recipient wallet"}
                 aria-label={isBitcoinReceiveSwap ? "Choose Bitcoin recipient wallet" : "Choose recipient wallet"}
-                onClick={isBitcoinReceiveSwap ? openBitcoinWalletChooser : openWalletChooser}
+                onClick={openRecipientWalletChooser}
               >
                 <span aria-hidden="true">&#9998;</span>
               </button>
@@ -1246,7 +1331,7 @@ function getWalletSupportNotice(params: {
 
   if (token.assetKind === "bitcoin") {
     if (hasBitcoinWallet) return null;
-    const actionLabel = "Connect Bitcoin wallet";
+    const actionLabel = hasAnyWalletAddress ? "Switch to Bitcoin wallet" : "Connect Bitcoin wallet";
     const message = hasAnyWalletAddress
       ? "Connected wallet does not support BTC on the Bitcoin network."
       : side === "sell"
@@ -1263,7 +1348,7 @@ function getWalletSupportNotice(params: {
     side === "sell"
       ? `Connected wallet does not support ${token.symbol} on ${network}.`
       : `Connected wallet does not support receiving ${token.symbol} on ${network}.`;
-  return { message, actionLabel: "Connect supported wallet", walletKind: "evm" };
+  return { message, actionLabel: "Switch to supported wallet", walletKind: "evm" };
 }
 
 function formatWalletNetwork(chainId: number | null): string {
@@ -1551,6 +1636,10 @@ function isBitcoinAddressInput(value: string): boolean {
     /^(bc1)[ac-hj-np-z02-9]{11,87}$/i.test(address) ||
     /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(address)
   );
+}
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function formatTokenAmount(amountBaseUnits: string, token: DisplayToken): string {

@@ -336,6 +336,10 @@ body {
   outline-offset: 3px;
 }
 
+.walletSwitchNotice {
+  margin-top: 8px;
+}
+
 @media (min-width: 560px) {
   .tokenPairRow {
     align-items: start;
