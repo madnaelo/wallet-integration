@@ -50,7 +50,7 @@ export function TokenPicker({
   }, [open]);
 
   return (
-    <div className="tokenPicker" ref={rootRef}>
+    <div className={`tokenPicker${open ? " tokenPickerOpen" : ""}`} ref={rootRef}>
       <div className="label">{label}</div>
       <button
         className="tokenPickerButton"

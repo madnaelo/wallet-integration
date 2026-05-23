@@ -68,6 +68,16 @@ body {
   z-index: 2;
 }
 
+.grid > .panel:first-child {
+  position: relative;
+  z-index: 3;
+}
+
+.grid > .panel:nth-child(2) {
+  position: relative;
+  z-index: 1;
+}
+
 @media (min-width: 860px) {
   .grid {
     grid-template-columns: 1.2fr 0.8fr;
@@ -95,6 +105,10 @@ body {
 .tokenPicker {
   min-width: 0;
   position: relative;
+}
+
+.tokenPickerOpen {
+  z-index: 20;
 }
 
 .tokenPickerButton {
@@ -163,7 +177,7 @@ body {
   padding: 10px;
   position: absolute;
   top: calc(100% + 8px);
-  z-index: 8;
+  z-index: 21;
 }
 
 .tokenSearch {
