@@ -42,7 +42,6 @@ type QuoteValidationErrors = {
   recipientAddress?: string;
   slippage?: string;
 };
-type RecipientMode = "wallet" | "custom";
 type FeeLine = {
   label: string;
   amount: string;
@@ -74,7 +73,6 @@ export default function Page() {
   const [sellToken, setSellToken] = useState<string>("");
   const [buyToken, setBuyToken] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
-  const [recipientMode, setRecipientMode] = useState<RecipientMode>("wallet");
   const [amountHuman, setAmountHuman] = useState<string>("");
   const [slippageChoice, setSlippageChoice] = useState<string>("100");
   const [customSlippagePct, setCustomSlippagePct] = useState<string>("1");
@@ -260,7 +258,7 @@ export default function Page() {
   const isBitcoinReceiveSwap = buyTokenInfo?.assetKind === "bitcoin";
   const sourceWalletAddress = isBitcoinSourceSwap ? bitcoinAccountAddress ?? "" : walletAddress;
   const destinationWalletAddress = isBitcoinReceiveSwap ? bitcoinAccountAddress ?? "" : walletAddress;
-  const destinationWalletLabel = isBitcoinReceiveSwap ? "Bitcoin wallet" : "connected wallet";
+  const recipientTooltip = destinationWalletAddress ? "Currently Connected Wallet" : "No recipient wallet connected";
   const hasAnyWalletAddress = Boolean(walletAddress || bitcoinAccountAddress);
   const sourceWalletNotice = getWalletSupportNotice({
     token: sellTokenInfo,
@@ -269,7 +267,6 @@ export default function Page() {
     hasAnyWalletAddress,
     hasEvmWallet: Boolean(walletAddress),
     hasBitcoinWallet: Boolean(bitcoinAccountAddress),
-    recipientAddress
   });
   const destinationWalletNotice = getWalletSupportNotice({
     token: buyTokenInfo,
@@ -277,8 +274,7 @@ export default function Page() {
     chainName: chain?.name,
     hasAnyWalletAddress,
     hasEvmWallet: Boolean(walletAddress),
-    hasBitcoinWallet: Boolean(bitcoinAccountAddress),
-    recipientAddress
+    hasBitcoinWallet: Boolean(bitcoinAccountAddress)
   });
   const slippageBps = useMemo(
     () => parseSlippageBps(slippageChoice, customSlippagePct),
@@ -308,9 +304,8 @@ export default function Page() {
   const availableQuotes = useMemo(() => quote?.availableQuotes ?? (quote ? [quote] : []), [quote]);
 
   useEffect(() => {
-    if (recipientMode !== "wallet") return;
     setRecipientAddress(destinationWalletAddress);
-  }, [destinationWalletAddress, recipientMode]);
+  }, [destinationWalletAddress]);
 
   function requireWalletForForm() {
     if (isBitcoinSourceSwap) {
@@ -341,13 +336,6 @@ export default function Page() {
     setApprovalTxHash("");
     setSwapTxHash("");
     setSwapStatus("idle");
-  }
-
-  function useConnectedDestinationWallet() {
-    if (!destinationWalletAddress) return;
-    setRecipientMode("wallet");
-    setRecipientAddress(destinationWalletAddress);
-    clearQuoteState();
   }
 
   function selectSwapChain(chainId: number) {
@@ -924,44 +912,34 @@ export default function Page() {
           </div>
           <div className="recipientPanel">
             <div className="recipientHeader">
-              <div className="label">Receive at</div>
-              {recipientMode === "wallet" && destinationWalletAddress ? (
-                <span className="badge recipientBadge">{destinationWalletLabel}</span>
-              ) : null}
+              <div className="label">Recipient address</div>
             </div>
-            <div className="recipientRow">
+            <div className="recipientRow" title={recipientTooltip} aria-label={recipientTooltip}>
               <input
-                className="input"
+                className="input recipientAddressInput"
                 value={recipientAddress}
-                onChange={(e) => {
-                  requireWalletForForm();
-                  setRecipientMode("custom");
-                  setRecipientAddress(e.target.value);
-                  clearQuoteState();
-                }}
+                readOnly
                 aria-invalid={quoteValidationVisible && !!quoteValidationErrors.recipientAddress}
                 aria-describedby="recipient-address-error"
                 placeholder={isBitcoinReceiveSwap ? "bc1..." : "0x..."}
                 spellCheck={false}
                 autoComplete="off"
               />
-              {destinationWalletAddress ? (
-                <button className="btn" type="button" onClick={useConnectedDestinationWallet}>
-                  Use Wallet
-                </button>
-              ) : null}
+              <button
+                className="recipientEditButton"
+                type="button"
+                title={isBitcoinReceiveSwap ? "Choose Bitcoin recipient wallet" : "Choose recipient wallet"}
+                aria-label={isBitcoinReceiveSwap ? "Choose Bitcoin recipient wallet" : "Choose recipient wallet"}
+                onClick={isBitcoinReceiveSwap ? openBitcoinWalletChooser : openWalletChooser}
+              >
+                <span aria-hidden="true">&#9998;</span>
+              </button>
             </div>
             {quoteValidationVisible && quoteValidationErrors.recipientAddress ? (
               <div className="fieldError" id="recipient-address-error">
                 {quoteValidationErrors.recipientAddress}
               </div>
-            ) : (
-              <div className="small recipientHint">
-                {destinationWalletAddress
-                  ? "You can receive in the connected wallet or enter another address."
-                  : `Connect a ${isBitcoinReceiveSwap ? "Bitcoin " : ""}wallet or enter the address that should receive this swap.`}
-              </div>
-            )}
+            ) : null}
           </div>
           {tokenListNotice ? <div className="small" style={{ marginTop: 8 }}>{tokenListNotice}</div> : null}
 
@@ -1262,25 +1240,22 @@ function getWalletSupportNotice(params: {
   hasAnyWalletAddress: boolean;
   hasEvmWallet: boolean;
   hasBitcoinWallet: boolean;
-  recipientAddress: string;
 }): { message: string; actionLabel: string; walletKind: "bitcoin" | "evm" } | null {
-  const { token, side, chainName, hasAnyWalletAddress, hasEvmWallet, hasBitcoinWallet, recipientAddress } = params;
+  const { token, side, chainName, hasAnyWalletAddress, hasEvmWallet, hasBitcoinWallet } = params;
   if (!token) return null;
 
   if (token.assetKind === "bitcoin") {
     if (hasBitcoinWallet) return null;
-    if (side === "buy" && isBitcoinAddressInput(recipientAddress)) return null;
     const actionLabel = "Connect Bitcoin wallet";
     const message = hasAnyWalletAddress
       ? "Connected wallet does not support BTC on the Bitcoin network."
       : side === "sell"
         ? "Connect a Bitcoin wallet to sell BTC."
-        : "Connect a Bitcoin wallet or enter a BTC receive address below.";
+        : "Connect a Bitcoin wallet to receive BTC.";
     return { message, actionLabel, walletKind: "bitcoin" };
   }
 
   if (hasEvmWallet) return null;
-  if (side === "buy" && isAddress(recipientAddress)) return null;
   if (!hasAnyWalletAddress) return null;
 
   const network = chainName ?? "this network";
@@ -1511,10 +1486,10 @@ function getQuoteValidationErrors(params: {
 
   if (params.buyTokenInfo?.assetKind === "bitcoin") {
     if (!isBitcoinAddressInput(params.recipientAddress)) {
-      errors.recipientAddress = "Connect a Bitcoin wallet or enter a Bitcoin receive address.";
+      errors.recipientAddress = "Connect a Bitcoin wallet to receive BTC.";
     }
   } else if (params.buyTokenInfo && !isAddress(params.recipientAddress)) {
-    errors.recipientAddress = "Connect a wallet or enter an address for this swap.";
+    errors.recipientAddress = "Connect a recipient wallet for this swap.";
   }
 
   if (!params.amountHuman.trim()) {
