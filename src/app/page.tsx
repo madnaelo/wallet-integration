@@ -20,13 +20,18 @@ import { listTokens } from "@/lib/tokenClient";
 import { TokenPicker, type TokenPickerNetwork, type TokenPickerOption } from "@/components/TokenPicker";
 import {
   BackendClientError,
+  type FavoritePair,
   type BackendSession,
   type NotificationPreference,
+  type SaveFavoritePairRequest,
   type SaveSwapHistoryRequest,
   type SwapHistoryRecord,
+  deleteFavoritePair,
   getNotificationPreferences,
+  listFavoritePairs,
   listSwapHistory,
   requestAuthNonce,
+  saveFavoritePair,
   saveNotificationPreferences,
   saveSwapHistory,
   verifyAuthSignature
@@ -163,6 +168,18 @@ export default function Page() {
   const [telegramEnabledDraft, setTelegramEnabledDraft] = useState<boolean>(false);
   const [telegramChatIdDraft, setTelegramChatIdDraft] = useState<string>("");
   const notificationPreferenceRequestInFlightRef = useRef<boolean>(false);
+  const [favoritesExpanded, setFavoritesExpanded] = useState<boolean>(false);
+  const [favoritePairs, setFavoritePairs] = useState<FavoritePair[]>([]);
+  const [favoritePairsLoaded, setFavoritePairsLoaded] = useState<boolean>(false);
+  const [favoritePairsLoading, setFavoritePairsLoading] = useState<boolean>(false);
+  const [favoritePairSaving, setFavoritePairSaving] = useState<boolean>(false);
+  const [favoritePairDeletingId, setFavoritePairDeletingId] = useState<string>("");
+  const [favoritePairError, setFavoritePairError] = useState<string>("");
+  const [favoritePairNotice, setFavoritePairNotice] = useState<string>("");
+  const [favoriteAlertEnabledDraft, setFavoriteAlertEnabledDraft] = useState<boolean>(false);
+  const [favoriteAlertDirectionDraft, setFavoriteAlertDirectionDraft] = useState<"above" | "below">("above");
+  const [favoriteTargetRateDraft, setFavoriteTargetRateDraft] = useState<string>("");
+  const favoritePairsRequestInFlightRef = useRef<boolean>(false);
   const previousBuyTokenAddressRef = useRef<string>("");
   const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
@@ -350,6 +367,7 @@ export default function Page() {
       setHistoryNotice("");
       setHistoryLoading(false);
       resetNotificationPreferenceState();
+      resetFavoritePairsState();
       return;
     }
 
@@ -362,6 +380,7 @@ export default function Page() {
       setHistoryNotice("");
       setHistoryLoading(false);
       resetNotificationPreferenceState();
+      resetFavoritePairsState();
       return;
     }
 
@@ -371,6 +390,7 @@ export default function Page() {
     setHistoryError("");
     setHistoryNotice("");
     resetNotificationPreferenceState();
+    resetFavoritePairsState();
   }, [walletAddress, provider]);
 
   const sellTokenInfo = useMemo(
@@ -815,6 +835,7 @@ export default function Page() {
       setBackendSession(null);
       setDbSwapHistory([]);
       resetNotificationPreferenceState();
+      resetFavoritePairsState();
       clearQuoteState();
     }
   }
@@ -906,6 +927,21 @@ export default function Page() {
     notificationPreferenceRequestInFlightRef.current = false;
   }
 
+  function resetFavoritePairsState() {
+    setFavoritesExpanded(false);
+    setFavoritePairs([]);
+    setFavoritePairsLoaded(false);
+    setFavoritePairsLoading(false);
+    setFavoritePairSaving(false);
+    setFavoritePairDeletingId("");
+    setFavoritePairError("");
+    setFavoritePairNotice("");
+    setFavoriteAlertEnabledDraft(false);
+    setFavoriteAlertDirectionDraft("above");
+    setFavoriteTargetRateDraft("");
+    favoritePairsRequestInFlightRef.current = false;
+  }
+
   async function refreshNotificationPreferences() {
     if (notificationPreferenceRequestInFlightRef.current) return;
     notificationPreferenceRequestInFlightRef.current = true;
@@ -972,6 +1008,108 @@ export default function Page() {
     } finally {
       setNotificationPreferenceSaving(false);
     }
+  }
+
+  async function refreshFavoritePairs() {
+    if (favoritePairsRequestInFlightRef.current) return;
+    favoritePairsRequestInFlightRef.current = true;
+    setFavoritePairsLoading(true);
+    setFavoritePairError("");
+    setFavoritePairNotice("");
+    try {
+      const session = await ensureBackendSession();
+      const pairs = await listFavoritePairs(envPublic.BACKEND_BASE_URL, session);
+      setFavoritePairs(pairs);
+      setFavoritePairsLoaded(true);
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setFavoritePairError(normalizeWalletError(e));
+    } finally {
+      setFavoritePairsLoading(false);
+      favoritePairsRequestInFlightRef.current = false;
+    }
+  }
+
+  function onFavoritesToggle(event: { currentTarget: HTMLDetailsElement }) {
+    const expanded = event.currentTarget.open;
+    setFavoritesExpanded(expanded);
+
+    if (!expanded || !walletAddress || favoritePairsLoaded || favoritePairsRequestInFlightRef.current) return;
+
+    const stored = backendSession ?? readStoredBackendSession();
+    if (stored && isSessionForWallet(stored, walletAddress)) {
+      void refreshFavoritePairs();
+    }
+  }
+
+  async function saveCurrentFavoritePair() {
+    setFavoritePairSaving(true);
+    setFavoritePairError("");
+    setFavoritePairNotice("");
+    try {
+      const request = buildFavoritePairRequest();
+      const session = await ensureBackendSession();
+      const saved = await saveFavoritePair(envPublic.BACKEND_BASE_URL, session, request);
+      setFavoritePairs((pairs) => [saved, ...pairs.filter((pair) => pair.id !== saved.id)]);
+      setFavoritePairsLoaded(true);
+      setFavoritePairNotice(`${saved.sellTokenSymbol} to ${saved.buyTokenSymbol} saved.`);
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setFavoritePairError(normalizeWalletError(e));
+    } finally {
+      setFavoritePairSaving(false);
+    }
+  }
+
+  async function removeFavoritePair(pair: FavoritePair) {
+    setFavoritePairDeletingId(pair.id);
+    setFavoritePairError("");
+    setFavoritePairNotice("");
+    try {
+      const session = await ensureBackendSession();
+      await deleteFavoritePair(envPublic.BACKEND_BASE_URL, session, pair.id);
+      setFavoritePairs((pairs) => pairs.filter((item) => item.id !== pair.id));
+      setFavoritePairNotice(`${pair.sellTokenSymbol} to ${pair.buyTokenSymbol} removed.`);
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setFavoritePairError(normalizeWalletError(e));
+    } finally {
+      setFavoritePairDeletingId("");
+    }
+  }
+
+  function buildFavoritePairRequest(): SaveFavoritePairRequest {
+    if (!sellTokenInfo || !buyTokenInfo) throw new Error("Select a pair before saving it.");
+    if (normalizeTokenKey(sellTokenInfo.address) === normalizeTokenKey(buyTokenInfo.address)) {
+      throw new Error("Choose two different tokens before saving a favorite pair.");
+    }
+
+    const targetRate = normalizePositiveDecimal(favoriteTargetRateDraft);
+    if (favoriteAlertEnabledDraft && !targetRate) {
+      throw new Error("Set a target rate before enabling favorite-pair alerts.");
+    }
+
+    return {
+      chainId: selectedChainId,
+      sellTokenAddress: sellTokenInfo.address,
+      sellTokenSymbol: sellTokenInfo.symbol,
+      sellTokenDecimals: sellTokenInfo.decimals,
+      buyTokenAddress: buyTokenInfo.address,
+      buyTokenSymbol: buyTokenInfo.symbol,
+      buyTokenDecimals: buyTokenInfo.decimals,
+      targetRate,
+      alertDirection: favoriteAlertDirectionDraft,
+      alertsEnabled: favoriteAlertEnabledDraft
+    };
   }
 
   async function persistCurrentSwap(status: SaveSwapHistoryRequest["status"], txHash?: string) {
@@ -1289,6 +1427,21 @@ export default function Page() {
         walletName: walletInfo?.name
       }),
     [chain?.name, evmAccount.embeddedWalletInfo?.user, walletAddress, walletChainId, walletInfo?.name, walletProviderType]
+  );
+  const currentFavoriteRate = useMemo(() => {
+    if (!quote || !sellTokenInfo || !buyTokenInfo) return "";
+    const buyAmount = stringValue(quote.netBuyAmount) || stringValue(quote.grossBuyAmount) || quote.buyAmount;
+    return calculatePairRate(quote.sellAmount, tokenInfoToDisplay(sellTokenInfo), buyAmount, tokenInfoToDisplay(buyTokenInfo));
+  }, [buyTokenInfo, quote, sellTokenInfo]);
+  const currentFavoritePair = useMemo(
+    () =>
+      favoritePairs.find(
+        (pair) =>
+          pair.chainId === selectedChainId &&
+          normalizeTokenKey(pair.sellTokenAddress) === normalizeTokenKey(sellToken) &&
+          normalizeTokenKey(pair.buyTokenAddress) === normalizeTokenKey(buyToken)
+      ),
+    [buyToken, favoritePairs, selectedChainId, sellToken]
   );
 
   return (
@@ -1943,6 +2096,146 @@ export default function Page() {
           </div>
         </div>
       </details>
+
+      <details className="panel historyPanel favoritesPanel" open={favoritesExpanded} onToggle={onFavoritesToggle}>
+        <summary className="historySummary">
+          <span className="historyChevron" aria-hidden="true" />
+          <span className="historyTitleBlock">
+            <span className="label">Favorite Pairs</span>
+            <span className="subtle">
+              {walletAddress
+                ? favoritePairsLoaded
+                  ? `${favoritePairs.length} saved`
+                  : "Save pairs and target-rate alerts for this wallet."
+                : "Connect your wallet to save favorite pairs."}
+            </span>
+          </span>
+          <span className="historyActions">
+            <span className="badge">
+              {favoritePairsLoading
+                ? "Loading favorites"
+                : favoritesExpanded
+                  ? favoritePairsLoaded
+                    ? "Ready"
+                    : "Sign in to load"
+                  : "Expand favorites"}
+            </span>
+          </span>
+        </summary>
+        <div className="historyContent settingsContent">
+          <div className="quoteHeader">
+            <div className="subtle">
+              {sellTokenInfo && buyTokenInfo
+                ? `Current pair: ${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}`
+                : "Select a pair in the swap form, then save it here."}
+            </div>
+            <button className="btn" type="button" onClick={refreshFavoritePairs} disabled={!walletAddress || favoritePairsLoading}>
+              {favoritePairsLoading ? "Loading..." : favoritePairsLoaded ? "Refresh" : "Load Favorites"}
+            </button>
+          </div>
+
+          <div className="favoriteComposer">
+            <div>
+              <label className="toggleRow">
+                <input
+                  type="checkbox"
+                  checked={favoriteAlertEnabledDraft}
+                  onChange={(event) => setFavoriteAlertEnabledDraft(event.target.checked)}
+                  disabled={!walletAddress}
+                />
+                <span>
+                  <strong>Alert on target rate</strong>
+                  <span className="subtle">Notify me when this pair reaches my target.</span>
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <div className="label">Target</div>
+              <div className="targetRateRow">
+                <select
+                  className="select"
+                  value={favoriteAlertDirectionDraft}
+                  onChange={(event) => setFavoriteAlertDirectionDraft(event.target.value as "above" | "below")}
+                  disabled={!walletAddress}
+                >
+                  <option value="above">At or above</option>
+                  <option value="below">At or below</option>
+                </select>
+                <input
+                  className="input"
+                  value={favoriteTargetRateDraft}
+                  onChange={(event) => setFavoriteTargetRateDraft(event.target.value)}
+                  placeholder={currentFavoriteRate || "2500"}
+                  inputMode="decimal"
+                  disabled={!walletAddress}
+                />
+              </div>
+              {sellTokenInfo && buyTokenInfo ? (
+                <div className="small" style={{ marginTop: 6 }}>
+                  1 {sellTokenInfo.symbol} in {buyTokenInfo.symbol}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="settingsActions">
+              <button
+                className="btn btnPrimary"
+                type="button"
+                onClick={saveCurrentFavoritePair}
+                disabled={!walletAddress || !sellTokenInfo || !buyTokenInfo || favoritePairSaving}
+              >
+                {favoritePairSaving ? "Saving..." : currentFavoritePair ? "Update Favorite" : "Save Favorite"}
+              </button>
+            </div>
+          </div>
+
+          {favoritePairNotice ? <div className="ok" style={{ marginTop: 10 }}>{favoritePairNotice}</div> : null}
+          {favoritePairError ? <div className="error" style={{ marginTop: 10 }}>{favoritePairError}</div> : null}
+
+          {!favoritePairsLoaded && favoritePairs.length === 0 ? (
+            <div className="small">Favorites have not been loaded yet.</div>
+          ) : favoritePairs.length === 0 ? (
+            <div className="small">No favorite pairs yet.</div>
+          ) : (
+            <div className="historyTableWrap">
+              <table className="historyTable">
+                <thead>
+                  <tr>
+                    <th>Pair</th>
+                    <th>Target</th>
+                    <th>Alerts</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {favoritePairs.map((pair) => (
+                    <tr key={pair.id}>
+                      <td>
+                        {pair.sellTokenSymbol} to {pair.buyTokenSymbol}
+                      </td>
+                      <td>{formatFavoriteTarget(pair)}</td>
+                      <td>{pair.alertsEnabled ? "On" : "Off"}</td>
+                      <td>
+                        <button
+                          className="tableActionButton"
+                          type="button"
+                          onClick={() => {
+                            void removeFavoritePair(pair);
+                          }}
+                          disabled={favoritePairDeletingId === pair.id}
+                        >
+                          {favoritePairDeletingId === pair.id ? "Removing..." : "Remove"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }
@@ -2227,6 +2520,12 @@ function formatHistoryStatus(status: SwapHistoryRecord["status"]): string {
 function formatHistoryTx(txHash: string | undefined): string {
   if (!txHash || txHash === "dry-run") return "-";
   return shortAddr(txHash);
+}
+
+function formatFavoriteTarget(pair: FavoritePair): string {
+  if (!pair.targetRate) return "-";
+  const direction = pair.alertDirection === "below" ? "At or below" : "At or above";
+  return `${direction} ${formatDecimal(String(pair.targetRate), 8)} ${pair.buyTokenSymbol} per ${pair.sellTokenSymbol}`;
 }
 
 function formatSwapStatus(status: TxStatus): string {
@@ -2540,6 +2839,26 @@ function formatPairRate(
     return `1 ${buyToken.symbol} = ${formatDecimal(String(sell / buy), 8)} ${sellToken.symbol}`;
   }
   return `1 ${sellToken.symbol} = ${formatDecimal(String(buy / sell), 8)} ${buyToken.symbol}`;
+}
+
+function calculatePairRate(
+  sellAmount: string,
+  sellToken: DisplayToken,
+  buyAmount: string,
+  buyToken: DisplayToken
+): string {
+  const sell = Number(formatUnitsSafe(sellAmount, sellToken.decimals));
+  const buy = Number(formatUnitsSafe(buyAmount, buyToken.decimals));
+  if (!Number.isFinite(sell) || !Number.isFinite(buy) || sell <= 0 || buy <= 0) return "";
+  return formatDecimal(String(buy / sell), 8);
+}
+
+function normalizePositiveDecimal(value: string): string | null {
+  const normalized = value.trim().replace(/,/g, "");
+  if (!normalized) return null;
+  if (!/^\d+(\.\d+)?$/.test(normalized)) throw new Error("Enter a valid target rate.");
+  if (Number(normalized) <= 0) throw new Error("Target rate must be greater than zero.");
+  return normalized;
 }
 
 function formatDecimal(value: string, maximumFractionDigits: number): string {

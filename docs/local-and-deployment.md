@@ -180,11 +180,11 @@ Implemented now:
   modeling in the frontend.
 - Backend notification preferences, scheduled reverse-swap profit scanning, and
   email/Telegram delivery adapters.
+- Favorite pairs with above/below target-rate alerts.
 
 Not implemented yet:
 
-- Favorite pairs table.
-- Frontend notification preferences UI.
-- General price alerts beyond reverse-swap profit alerts.
+- General price alerts beyond favorite-pair target rates and reverse-swap
+  profit alerts.
 - Push or in-app notification delivery.
 - Native BTC sell execution and cross-chain destination status tracking.

@@ -1,6 +1,7 @@
 package com.wallet.swap.notification;
 
 import com.wallet.swap.config.NotificationProperties;
+import com.wallet.swap.notification.FavoritePairModels.FavoritePairCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
 import java.math.BigDecimal;
@@ -20,21 +21,27 @@ public class ReverseProfitMonitor {
 
   private final NotificationProperties properties;
   private final ReverseProfitCandidateRepository candidateRepository;
+  private final FavoritePairCandidateRepository favoritePairCandidateRepository;
   private final CoinGeckoPriceClient priceClient;
   private final ReverseProfitCalculator calculator;
+  private final FavoritePairCalculator favoritePairCalculator;
   private final NotificationDeliveryService deliveryService;
   private final AtomicBoolean running = new AtomicBoolean(false);
 
   public ReverseProfitMonitor(
       NotificationProperties properties,
       ReverseProfitCandidateRepository candidateRepository,
+      FavoritePairCandidateRepository favoritePairCandidateRepository,
       CoinGeckoPriceClient priceClient,
       ReverseProfitCalculator calculator,
+      FavoritePairCalculator favoritePairCalculator,
       NotificationDeliveryService deliveryService) {
     this.properties = properties;
     this.candidateRepository = candidateRepository;
+    this.favoritePairCandidateRepository = favoritePairCandidateRepository;
     this.priceClient = priceClient;
     this.calculator = calculator;
+    this.favoritePairCalculator = favoritePairCalculator;
     this.deliveryService = deliveryService;
   }
 
@@ -48,26 +55,48 @@ public class ReverseProfitMonitor {
           properties.getEligibleStatuses(),
           properties.getLookbackDays(),
           properties.getCandidateLimit());
-      if (candidates.isEmpty()) return;
+      List<FavoritePairCandidate> favoritePairCandidates = favoritePairCandidateRepository.findCandidates(
+          properties.getCandidateLimit());
+      if (candidates.isEmpty() && favoritePairCandidates.isEmpty()) return;
 
       Set<TokenRef> tokenRefs = new HashSet<>();
       for (ReverseProfitCandidate candidate : candidates) {
         tokenRefs.add(candidate.sellToken());
         tokenRefs.add(candidate.buyToken());
       }
+      for (FavoritePairCandidate candidate : favoritePairCandidates) {
+        tokenRefs.add(candidate.sellToken());
+        tokenRefs.add(candidate.buyToken());
+      }
 
       Map<TokenRef, BigDecimal> prices = priceClient.fetchUsdPrices(tokenRefs);
-      int delivered = 0;
+      int reverseOpportunities = 0;
       for (ReverseProfitCandidate candidate : candidates) {
-        delivered += calculator.evaluate(candidate, prices)
+        reverseOpportunities += calculator.evaluate(candidate, prices)
             .map(opportunity -> {
               deliveryService.deliver(opportunity);
               return 1;
             })
             .orElse(0);
       }
-      if (delivered > 0) {
-        log.info("Reverse profit monitor processed {} candidates and found {} opportunities.", candidates.size(), delivered);
+
+      int favoritePairOpportunities = 0;
+      for (FavoritePairCandidate candidate : favoritePairCandidates) {
+        favoritePairOpportunities += favoritePairCalculator.evaluate(candidate, prices)
+            .map(opportunity -> {
+              deliveryService.deliver(opportunity);
+              return 1;
+            })
+            .orElse(0);
+      }
+
+      int totalOpportunities = reverseOpportunities + favoritePairOpportunities;
+      if (totalOpportunities > 0) {
+        log.info(
+            "Notification monitor processed {} reverse candidates and {} favorite pairs; found {} opportunities.",
+            candidates.size(),
+            favoritePairCandidates.size(),
+            totalOpportunities);
       }
     } catch (Exception exception) {
       log.warn("Reverse profit monitor failed.", exception);

@@ -1038,6 +1038,42 @@ body {
   justify-content: flex-end;
 }
 
+.favoriteComposer {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 820px) {
+  .favoriteComposer {
+    align-items: end;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 1fr) auto;
+  }
+}
+
+.targetRateRow {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(130px, 0.45fr) minmax(0, 1fr);
+}
+
+.tableActionButton {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tableActionButton:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .historyTableWrap {
   overflow-x: auto;
 }

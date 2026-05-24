@@ -36,12 +36,13 @@ Implemented:
 - Backend notification preferences, scheduled reverse-swap profit scanning, and
   email/Telegram delivery adapters. The scanner batches market price reads
   before evaluating historical swaps to reduce provider pressure.
+- Wallet-owned favorite pairs with optional target-rate Telegram/email alerts
+  using above/below thresholds.
 
 Not implemented yet:
 
-- Favorite token pairs.
-- Frontend notification preferences UI.
-- General price alert thresholds beyond reverse-swap profit alerts.
+- General price alert workflows beyond favorite-pair target rates and
+  reverse-swap profit alerts.
 - Push or in-app notification delivery.
 - Guarded import-by-address flow and token risk signals.
 - Native BTC sell execution and cross-chain destination status tracking.
@@ -54,7 +55,7 @@ The repository keeps quote execution and persisted user data separate:
 - `src/lib/server/`: server-only swap provider clients, quote normalization,
   fee configuration, rate limiting, and quote cache.
 - `backend/`: Spring Boot API for wallet-authenticated history and reverse
-  profit notifications.
+  profit notifications and favorite pairs.
 - `backend/src/main/resources/db/migration/`: Flyway database migrations.
 - `docker-compose.yml`: local PostgreSQL and optional full local stack.
 - `docker-compose.prod.yml`, `infra/`, and `scripts/`: OCI-oriented production
@@ -72,8 +73,8 @@ High-level flow:
 5. Swap history uses a signed wallet message to create a backend session before
    PostgreSQL history is saved or read.
 6. The backend scheduler batches token USD prices, evaluates eligible historical
-   swaps for reverse-profit opportunities, and sends enabled email/Telegram
-   alerts after cooldown checks.
+   swaps and favorite pairs for alert opportunities, and sends enabled
+   email/Telegram alerts after cooldown checks.
 
 Native BTC swaps use the same form model: the source wallet pays, the receive
 wallet/address receives, and the connected destination wallet pre-fills the
@@ -227,4 +228,5 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 20](docs/prompt20_f.md): connected wallet label.
 - [Prompt 21](docs/prompt21_f.md): recipient address source label.
 - [Prompt 22](docs/prompt22_f.md): reverse-swap profit notifications.
+- [Prompt 23](docs/prompt23_f.md): Telegram settings and favorite-pair alerts.
 

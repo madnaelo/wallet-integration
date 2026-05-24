@@ -57,6 +57,36 @@ export type SaveNotificationPreferenceRequest = {
   cooldownMinutes?: number;
 };
 
+export type FavoritePair = {
+  id: string;
+  walletAddress: string;
+  chainId: number;
+  sellTokenAddress: string;
+  sellTokenSymbol: string;
+  sellTokenDecimals: number;
+  buyTokenAddress: string;
+  buyTokenSymbol: string;
+  buyTokenDecimals: number;
+  targetRate?: string | null;
+  alertDirection: "above" | "below";
+  alertsEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SaveFavoritePairRequest = {
+  chainId: number;
+  sellTokenAddress: string;
+  sellTokenSymbol: string;
+  sellTokenDecimals: number;
+  buyTokenAddress: string;
+  buyTokenSymbol: string;
+  buyTokenDecimals: number;
+  targetRate?: string | null;
+  alertDirection?: "above" | "below";
+  alertsEnabled?: boolean;
+};
+
 export class BackendClientError extends Error {
   status: number;
   body: unknown;
@@ -137,6 +167,45 @@ export async function saveNotificationPreferences(
       Authorization: `Bearer ${session.accessToken}`
     },
     body: JSON.stringify(request)
+  });
+}
+
+export async function listFavoritePairs(
+  backendBaseUrl: string,
+  session: BackendSession
+): Promise<FavoritePair[]> {
+  return backendFetch<FavoritePair[]>(backendBaseUrl, "/api/favorite-pairs", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    }
+  });
+}
+
+export async function saveFavoritePair(
+  backendBaseUrl: string,
+  session: BackendSession,
+  request: SaveFavoritePairRequest
+): Promise<FavoritePair> {
+  return backendFetch<FavoritePair>(backendBaseUrl, "/api/favorite-pairs", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    },
+    body: JSON.stringify(request)
+  });
+}
+
+export async function deleteFavoritePair(
+  backendBaseUrl: string,
+  session: BackendSession,
+  id: string
+): Promise<void> {
+  await backendFetch<Record<string, never>>(backendBaseUrl, `/api/favorite-pairs/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    }
   });
 }
 

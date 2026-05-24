@@ -1,5 +1,6 @@
 package com.wallet.swap.notification;
 
+import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitOpportunity;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,16 +16,19 @@ public class NotificationDeliveryService {
   private final TelegramNotificationSender telegramSender;
   private final NotificationMessageFormatter messageFormatter;
   private final ReverseProfitAlertRepository alertRepository;
+  private final FavoritePairAlertRepository favoritePairAlertRepository;
 
   public NotificationDeliveryService(
       EmailNotificationSender emailSender,
       TelegramNotificationSender telegramSender,
       NotificationMessageFormatter messageFormatter,
-      ReverseProfitAlertRepository alertRepository) {
+      ReverseProfitAlertRepository alertRepository,
+      FavoritePairAlertRepository favoritePairAlertRepository) {
     this.emailSender = emailSender;
     this.telegramSender = telegramSender;
     this.messageFormatter = messageFormatter;
     this.alertRepository = alertRepository;
+    this.favoritePairAlertRepository = favoritePairAlertRepository;
   }
 
   public void deliver(ReverseProfitOpportunity opportunity) {
@@ -36,6 +40,18 @@ public class NotificationDeliveryService {
     if (opportunity.candidate().telegramEnabled() && telegramSender.isEnabled()
         && isCooldownElapsed(opportunity.candidate().lastTelegramAlertAt(), opportunity.candidate().cooldownMinutes())) {
       deliverTelegram(opportunity);
+    }
+  }
+
+  public void deliver(FavoritePairOpportunity opportunity) {
+    if (opportunity.candidate().emailEnabled() && emailSender.isEnabled()
+        && isCooldownElapsed(opportunity.candidate().lastEmailAlertAt(), opportunity.candidate().cooldownMinutes())) {
+      deliverFavoritePairEmail(opportunity);
+    }
+
+    if (opportunity.candidate().telegramEnabled() && telegramSender.isEnabled()
+        && isCooldownElapsed(opportunity.candidate().lastTelegramAlertAt(), opportunity.candidate().cooldownMinutes())) {
+      deliverFavoritePairTelegram(opportunity);
     }
   }
 
@@ -58,6 +74,28 @@ public class NotificationDeliveryService {
     } catch (Exception exception) {
       log.warn("Reverse profit Telegram delivery failed for swap {}", opportunity.candidate().swapHistoryId(), exception);
       alertRepository.saveDelivery(opportunity, "telegram", target, false, exception.getMessage());
+    }
+  }
+
+  private void deliverFavoritePairEmail(FavoritePairOpportunity opportunity) {
+    String target = opportunity.candidate().emailAddress();
+    try {
+      emailSender.send(target, messageFormatter.subject(opportunity), messageFormatter.body(opportunity));
+      favoritePairAlertRepository.saveDelivery(opportunity, "email", target, true, null);
+    } catch (Exception exception) {
+      log.warn("Favorite pair email delivery failed for pair {}", opportunity.candidate().id(), exception);
+      favoritePairAlertRepository.saveDelivery(opportunity, "email", target, false, exception.getMessage());
+    }
+  }
+
+  private void deliverFavoritePairTelegram(FavoritePairOpportunity opportunity) {
+    String target = opportunity.candidate().telegramChatId();
+    try {
+      telegramSender.send(target, messageFormatter.body(opportunity));
+      favoritePairAlertRepository.saveDelivery(opportunity, "telegram", target, true, null);
+    } catch (Exception exception) {
+      log.warn("Favorite pair Telegram delivery failed for pair {}", opportunity.candidate().id(), exception);
+      favoritePairAlertRepository.saveDelivery(opportunity, "telegram", target, false, exception.getMessage());
     }
   }
 

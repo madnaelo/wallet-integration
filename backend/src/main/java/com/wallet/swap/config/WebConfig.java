@@ -26,7 +26,7 @@ public class WebConfig implements WebMvcConfigurer {
     if (origins.contains("*")) {
       registry.addMapping("/api/**")
           .allowedOriginPatterns("*")
-          .allowedMethods("GET", "POST", "PUT", "OPTIONS")
+          .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
           .allowedHeaders("*")
           .maxAge(3600);
       return;
@@ -34,7 +34,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     registry.addMapping("/api/**")
         .allowedOrigins(origins.toArray(String[]::new))
-        .allowedMethods("GET", "POST", "PUT", "OPTIONS")
+        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
         .allowedHeaders("*")
         .maxAge(3600);
   }
