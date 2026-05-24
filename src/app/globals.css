@@ -1154,6 +1154,48 @@ body {
   gap: 8px;
 }
 
+.swapFavoritePanel {
+  align-items: end;
+  background: rgba(6, 12, 24, 0.36);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+}
+
+@media (min-width: 820px) {
+  .swapFavoritePanel {
+    grid-template-columns: minmax(150px, 0.9fr) auto minmax(250px, 1.2fr) auto;
+  }
+}
+
+.miniToggleRow {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+  min-height: 40px;
+}
+
+.miniToggleRow input {
+  accent-color: var(--accent);
+}
+
+.miniToggleRow span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.compactTargetRateRow {
+  min-width: 0;
+}
+
+.swapFavoriteHint {
+  grid-column: 1 / -1;
+}
+
 .favoriteComposer {
   display: grid;
   gap: 12px;

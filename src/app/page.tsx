@@ -182,7 +182,7 @@ export default function Page() {
   const [favoritePairDeletingId, setFavoritePairDeletingId] = useState<string>("");
   const [favoritePairError, setFavoritePairError] = useState<string>("");
   const [favoritePairNotice, setFavoritePairNotice] = useState<string>("");
-  const [favoriteAlertEnabledDraft, setFavoriteAlertEnabledDraft] = useState<boolean>(false);
+  const [favoriteAlertEnabledDraft, setFavoriteAlertEnabledDraft] = useState<boolean>(true);
   const [favoriteAlertDirectionDraft, setFavoriteAlertDirectionDraft] = useState<"above" | "below">("above");
   const [favoriteTargetRateDraft, setFavoriteTargetRateDraft] = useState<string>("");
   const favoritePairsRequestInFlightRef = useRef<boolean>(false);
@@ -973,7 +973,7 @@ export default function Page() {
     setFavoritePairDeletingId("");
     setFavoritePairError("");
     setFavoritePairNotice("");
-    setFavoriteAlertEnabledDraft(false);
+    setFavoriteAlertEnabledDraft(true);
     setFavoriteAlertDirectionDraft("above");
     setFavoriteTargetRateDraft("");
     favoritePairsRequestInFlightRef.current = false;
@@ -1112,7 +1112,7 @@ export default function Page() {
       const saved = await saveFavoritePair(envPublic.BACKEND_BASE_URL, session, request);
       setFavoritePairs((pairs) => [saved, ...pairs.filter((pair) => pair.id !== saved.id)]);
       setFavoritePairsLoaded(true);
-      setFavoritePairNotice(`${saved.sellTokenSymbol} to ${saved.buyTokenSymbol} saved.`);
+      setFavoritePairNotice(`${saved.sellTokenSymbol} to ${saved.buyTokenSymbol} favorite added.`);
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
@@ -1490,16 +1490,37 @@ export default function Page() {
     const buyAmount = stringValue(quote.netBuyAmount) || stringValue(quote.grossBuyAmount) || quote.buyAmount;
     return calculatePairRate(quote.sellAmount, tokenInfoToDisplay(sellTokenInfo), buyAmount, tokenInfoToDisplay(buyTokenInfo));
   }, [buyTokenInfo, quote, sellTokenInfo]);
-  const currentFavoritePair = useMemo(
+  const currentFavoritePairCount = useMemo(
     () =>
-      favoritePairs.find(
+      favoritePairs.filter(
         (pair) =>
           pair.chainId === selectedChainId &&
           normalizeTokenKey(pair.sellTokenAddress) === normalizeTokenKey(sellToken) &&
           normalizeTokenKey(pair.buyTokenAddress) === normalizeTokenKey(buyToken)
-      ),
+      ).length,
     [buyToken, favoritePairs, selectedChainId, sellToken]
   );
+  const favoriteTargetHelper = useMemo(() => {
+    if (!sellTokenInfo || !buyTokenInfo) return "";
+    if (currentFavoriteRate) {
+      return `Current quoted rate: ${formatDecimal(currentFavoriteRate, 8)} ${buyTokenInfo.symbol} per ${sellTokenInfo.symbol}`;
+    }
+    return `1 ${sellTokenInfo.symbol} in ${buyTokenInfo.symbol}`;
+  }, [buyTokenInfo, currentFavoriteRate, sellTokenInfo]);
+
+  useEffect(() => {
+    setFavoriteTargetRateDraft("");
+    setFavoriteAlertDirectionDraft("above");
+    setFavoriteAlertEnabledDraft(true);
+    setFavoritePairError("");
+    setFavoritePairNotice("");
+  }, [selectedChainId, sellToken, buyToken]);
+
+  useEffect(() => {
+    if (currentFavoriteRate && !favoriteTargetRateDraft.trim()) {
+      setFavoriteTargetRateDraft(currentFavoriteRate);
+    }
+  }, [currentFavoriteRate, favoriteTargetRateDraft]);
 
   return (
     <div className="container">
@@ -1905,8 +1926,59 @@ export default function Page() {
             ) : null}
           </div>
 
+          <div className="swapFavoritePanel">
+            <div>
+              <div className="label">Favorite pair</div>
+              <div className="subtle">
+                {sellTokenInfo && buyTokenInfo
+                  ? `${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}${currentFavoritePairCount ? ` - ${currentFavoritePairCount} saved` : ""}`
+                  : "Select tokens to save a favorite pair."}
+              </div>
+            </div>
+            <label className="miniToggleRow">
+              <input
+                type="checkbox"
+                checked={favoriteAlertEnabledDraft}
+                onChange={(event) => setFavoriteAlertEnabledDraft(event.target.checked)}
+                disabled={!walletAddress}
+              />
+              <span>Alert</span>
+            </label>
+            <div className="targetRateRow compactTargetRateRow">
+              <select
+                className="select"
+                value={favoriteAlertDirectionDraft}
+                onChange={(event) => setFavoriteAlertDirectionDraft(event.target.value as "above" | "below")}
+                disabled={!walletAddress}
+              >
+                <option value="above">At or above</option>
+                <option value="below">At or below</option>
+              </select>
+              <input
+                className="input"
+                value={favoriteTargetRateDraft}
+                onChange={(event) => setFavoriteTargetRateDraft(event.target.value)}
+                placeholder={currentFavoriteRate || "Target rate"}
+                inputMode="decimal"
+                disabled={!walletAddress}
+              />
+            </div>
+            <button
+              className="btn"
+              type="button"
+              onClick={saveCurrentFavoritePair}
+              disabled={!walletAddress || !sellTokenInfo || !buyTokenInfo || favoritePairSaving}
+            >
+              {favoritePairSaving ? "Saving..." : "Add Favorite"}
+            </button>
+            {favoriteTargetHelper ? <div className="small swapFavoriteHint">{favoriteTargetHelper}</div> : null}
+            <div className="small swapFavoriteHint">Same-pair targets must be at least 1% apart.</div>
+          </div>
+
           {quoteError ? <div className="error" style={{ marginTop: 12 }}>{quoteError}</div> : null}
           {actionError ? <div className="error" style={{ marginTop: 12 }}>{actionError}</div> : null}
+          {favoritePairNotice ? <div className="ok" style={{ marginTop: 12 }}>{favoritePairNotice}</div> : null}
+          {favoritePairError ? <div className="error" style={{ marginTop: 12 }}>{favoritePairError}</div> : null}
 
           {approvalTxHash ? (
             <div className="small" style={{ marginTop: 12 }}>
@@ -2225,7 +2297,7 @@ export default function Page() {
           <div className="quoteHeader">
             <div className="subtle">
               {sellTokenInfo && buyTokenInfo
-                ? `Current pair: ${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}`
+                ? `Add new favorite: ${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}`
                 : "Select a pair in the swap form, then save it here."}
             </div>
             <button className="btn" type="button" onClick={refreshFavoritePairs} disabled={!walletAddress || favoritePairsLoading}>
@@ -2244,7 +2316,7 @@ export default function Page() {
                 />
                 <span>
                   <strong>Alert on target rate</strong>
-                  <span className="subtle">Notify me when this pair reaches my target.</span>
+                  <span className="subtle">Notify me when this pair reaches my target. Same-pair targets must be at least 1% apart.</span>
                 </span>
               </label>
             </div>
@@ -2270,11 +2342,7 @@ export default function Page() {
                   disabled={!walletAddress}
                 />
               </div>
-              {sellTokenInfo && buyTokenInfo ? (
-                <div className="small" style={{ marginTop: 6 }}>
-                  1 {sellTokenInfo.symbol} in {buyTokenInfo.symbol}
-                </div>
-              ) : null}
+              {favoriteTargetHelper ? <div className="small" style={{ marginTop: 6 }}>{favoriteTargetHelper}</div> : null}
             </div>
 
             <div className="settingsActions">
@@ -2284,7 +2352,7 @@ export default function Page() {
                 onClick={saveCurrentFavoritePair}
                 disabled={!walletAddress || !sellTokenInfo || !buyTokenInfo || favoritePairSaving}
               >
-                {favoritePairSaving ? "Saving..." : currentFavoritePair ? "Update Favorite" : "Save Favorite"}
+                {favoritePairSaving ? "Saving..." : "Add Favorite"}
               </button>
             </div>
           </div>

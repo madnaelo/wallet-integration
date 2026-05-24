@@ -2,6 +2,7 @@ package com.wallet.swap.notification;
 
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairRequest;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairResponse;
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -31,7 +32,7 @@ public class FavoritePairRepository {
         walletAddress);
   }
 
-  public FavoritePairResponse upsert(String walletAddress, FavoritePairRequest request) {
+  public FavoritePairResponse insert(String walletAddress, FavoritePairRequest request) {
     UUID id = UUID.randomUUID();
     return jdbcTemplate.queryForObject(
         """
@@ -42,16 +43,6 @@ public class FavoritePairRepository {
           target_rate, alert_direction, alerts_enabled
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (wallet_address, chain_id, (lower(sell_token_address)), (lower(buy_token_address)))
-        DO UPDATE SET
-          sell_token_symbol = EXCLUDED.sell_token_symbol,
-          sell_token_decimals = EXCLUDED.sell_token_decimals,
-          buy_token_symbol = EXCLUDED.buy_token_symbol,
-          buy_token_decimals = EXCLUDED.buy_token_decimals,
-          target_rate = EXCLUDED.target_rate,
-          alert_direction = EXCLUDED.alert_direction,
-          alerts_enabled = EXCLUDED.alerts_enabled,
-          updated_at = now()
         RETURNING *
         """,
         (rs, rowNum) -> mapRow(rs),
@@ -67,6 +58,81 @@ public class FavoritePairRepository {
         request.targetRate(),
         normalizeDirection(request.alertDirection()),
         Boolean.TRUE.equals(request.alertsEnabled()));
+  }
+
+  public List<FavoritePairTarget> listTargetsForPair(String walletAddress, FavoritePairRequest request, UUID excludedId) {
+    if (excludedId == null) {
+      return jdbcTemplate.query(
+          """
+          SELECT id, target_rate
+          FROM favorite_pairs
+          WHERE wallet_address = ?
+            AND chain_id = ?
+            AND lower(sell_token_address) = lower(?)
+            AND lower(buy_token_address) = lower(?)
+            AND alert_direction = ?
+            AND target_rate IS NOT NULL
+          """,
+          (rs, rowNum) -> new FavoritePairTarget(rs.getObject("id", UUID.class), rs.getBigDecimal("target_rate")),
+          walletAddress,
+          request.chainId(),
+          request.sellTokenAddress().trim(),
+          request.buyTokenAddress().trim(),
+          normalizeDirection(request.alertDirection()));
+    }
+
+    return jdbcTemplate.query(
+        """
+        SELECT id, target_rate
+        FROM favorite_pairs
+        WHERE wallet_address = ?
+          AND chain_id = ?
+          AND lower(sell_token_address) = lower(?)
+          AND lower(buy_token_address) = lower(?)
+          AND alert_direction = ?
+          AND target_rate IS NOT NULL
+          AND id <> ?
+        """,
+        (rs, rowNum) -> new FavoritePairTarget(rs.getObject("id", UUID.class), rs.getBigDecimal("target_rate")),
+        walletAddress,
+        request.chainId(),
+        request.sellTokenAddress().trim(),
+        request.buyTokenAddress().trim(),
+        normalizeDirection(request.alertDirection()),
+        excludedId);
+  }
+
+  public boolean existsUntargetedForPair(String walletAddress, FavoritePairRequest request, UUID excludedId) {
+    String excludedClause = excludedId == null ? "" : "\n          AND id <> ?";
+    Object[] params = excludedId == null
+        ? new Object[] {
+            walletAddress,
+            request.chainId(),
+            request.sellTokenAddress().trim(),
+            request.buyTokenAddress().trim()
+        }
+        : new Object[] {
+            walletAddress,
+            request.chainId(),
+            request.sellTokenAddress().trim(),
+            request.buyTokenAddress().trim(),
+            excludedId
+        };
+
+    Integer count = jdbcTemplate.queryForObject(
+        """
+        SELECT count(*)
+        FROM favorite_pairs
+        WHERE wallet_address = ?
+          AND chain_id = ?
+          AND lower(sell_token_address) = lower(?)
+          AND lower(buy_token_address) = lower(?)
+          AND target_rate IS NULL
+        """
+            + excludedClause,
+        Integer.class,
+        params);
+    return count != null && count > 0;
   }
 
   public FavoritePairResponse update(String walletAddress, UUID id, FavoritePairRequest request) {
@@ -137,4 +203,6 @@ public class FavoritePairRepository {
   private Instant timestampToInstant(Timestamp timestamp) {
     return timestamp == null ? null : timestamp.toInstant();
   }
+
+  public record FavoritePairTarget(UUID id, BigDecimal targetRate) {}
 }

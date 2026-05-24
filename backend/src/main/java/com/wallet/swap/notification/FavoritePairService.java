@@ -4,6 +4,7 @@ import com.wallet.swap.common.ApiException;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairRequest;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairResponse;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class FavoritePairService {
   private static final Set<String> ALERT_DIRECTIONS = Set.of("above", "below");
+  private static final BigDecimal MIN_TARGET_GAP_RATIO = new BigDecimal("0.01");
+  private static final BigDecimal MIN_TARGET_GAP_FLOOR = new BigDecimal("0.000000000000000001");
 
   private final FavoritePairRepository repository;
 
@@ -26,12 +29,16 @@ public class FavoritePairService {
 
   public FavoritePairResponse save(String walletAddress, FavoritePairRequest request) {
     validate(request);
-    return repository.upsert(walletAddress, normalized(request));
+    FavoritePairRequest normalized = normalized(request);
+    validateTargetSpacing(walletAddress, normalized, null);
+    return repository.insert(walletAddress, normalized);
   }
 
   public FavoritePairResponse update(String walletAddress, UUID id, FavoritePairRequest request) {
     validate(request);
-    return repository.update(walletAddress, id, normalized(request));
+    FavoritePairRequest normalized = normalized(request);
+    validateTargetSpacing(walletAddress, normalized, id);
+    return repository.update(walletAddress, id, normalized);
   }
 
   public void delete(String walletAddress, UUID id) {
@@ -39,6 +46,12 @@ public class FavoritePairService {
   }
 
   private void validate(FavoritePairRequest request) {
+    if (request.chainId() == null) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Network is required.");
+    }
+    if (request.sellTokenAddress() == null || request.buyTokenAddress() == null) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Choose two different tokens.");
+    }
     if (request.sellTokenDecimals() == null || request.buyTokenDecimals() == null) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Token decimals are required.");
     }
@@ -57,6 +70,30 @@ public class FavoritePairService {
     }
     if (Boolean.TRUE.equals(request.alertsEnabled()) && targetRate == null) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Set a target rate before enabling alerts.");
+    }
+  }
+
+  private void validateTargetSpacing(String walletAddress, FavoritePairRequest request, UUID excludedId) {
+    BigDecimal targetRate = request.targetRate();
+    if (targetRate == null) {
+      if (repository.existsUntargetedForPair(walletAddress, request, excludedId)) {
+        throw new ApiException(HttpStatus.CONFLICT, "This favorite pair is already saved without a target.");
+      }
+      return;
+    }
+
+    for (FavoritePairRepository.FavoritePairTarget existing : repository.listTargetsForPair(walletAddress, request, excludedId)) {
+      BigDecimal existingTarget = existing.targetRate();
+      BigDecimal minimumGap = existingTarget.min(targetRate)
+          .multiply(MIN_TARGET_GAP_RATIO)
+          .setScale(18, RoundingMode.HALF_UP)
+          .max(MIN_TARGET_GAP_FLOOR);
+      BigDecimal actualGap = existingTarget.subtract(targetRate).abs();
+      if (actualGap.compareTo(minimumGap) < 0) {
+        throw new ApiException(
+            HttpStatus.CONFLICT,
+            "Use a target at least 1% away from another saved alert for this pair and direction.");
+      }
     }
   }
 

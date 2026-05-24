@@ -40,6 +40,8 @@ Implemented:
   using above/below thresholds.
 - Page-like navigation for Swap, Favorites, and Preferences. Telegram is linked
   through the bot flow instead of asking users for a chat ID.
+- Favorite pairs can be added from the Swap or Favorites pages, including
+  laddered target alerts for the same pair when prices are at least 1% apart.
 
 Not implemented yet:
 
@@ -234,4 +236,5 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 24](docs/prompt24_f.md): user-friendly Telegram linking and separate
   settings pages.
 - [Prompt 25](docs/prompt25_f.md): menu navigation and local Telegram config.
+- [Prompt 26](docs/prompt26_f.md): add favorites from swap and target ladders.
 

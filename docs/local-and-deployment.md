@@ -182,6 +182,8 @@ Implemented now:
 - Backend notification preferences, scheduled reverse-swap profit scanning, and
   email/Telegram delivery adapters.
 - Favorite pairs with above/below target-rate alerts.
+- Multiple target alerts for the same favorite pair when target prices are at
+  least 1% apart.
 - Telegram linking through bot start codes instead of exposing chat IDs to
   users.
 
