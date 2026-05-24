@@ -21,10 +21,13 @@ import { TokenPicker, type TokenPickerNetwork, type TokenPickerOption } from "@/
 import {
   BackendClientError,
   type BackendSession,
+  type NotificationPreference,
   type SaveSwapHistoryRequest,
   type SwapHistoryRecord,
+  getNotificationPreferences,
   listSwapHistory,
   requestAuthNonce,
+  saveNotificationPreferences,
   saveSwapHistory,
   verifyAuthSignature
 } from "@/lib/backendClient";
@@ -150,6 +153,16 @@ export default function Page() {
   const [historyError, setHistoryError] = useState<string>("");
   const [historyNotice, setHistoryNotice] = useState<string>("");
   const historyRequestInFlightRef = useRef<boolean>(false);
+  const [notificationsExpanded, setNotificationsExpanded] = useState<boolean>(false);
+  const [notificationPreference, setNotificationPreference] = useState<NotificationPreference | null>(null);
+  const [notificationPreferenceLoaded, setNotificationPreferenceLoaded] = useState<boolean>(false);
+  const [notificationPreferenceLoading, setNotificationPreferenceLoading] = useState<boolean>(false);
+  const [notificationPreferenceSaving, setNotificationPreferenceSaving] = useState<boolean>(false);
+  const [notificationPreferenceError, setNotificationPreferenceError] = useState<string>("");
+  const [notificationPreferenceNotice, setNotificationPreferenceNotice] = useState<string>("");
+  const [telegramEnabledDraft, setTelegramEnabledDraft] = useState<boolean>(false);
+  const [telegramChatIdDraft, setTelegramChatIdDraft] = useState<string>("");
+  const notificationPreferenceRequestInFlightRef = useRef<boolean>(false);
   const previousBuyTokenAddressRef = useRef<string>("");
   const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
@@ -336,6 +349,7 @@ export default function Page() {
       setHistoryError("");
       setHistoryNotice("");
       setHistoryLoading(false);
+      resetNotificationPreferenceState();
       return;
     }
 
@@ -347,6 +361,7 @@ export default function Page() {
       setHistoryError("");
       setHistoryNotice("");
       setHistoryLoading(false);
+      resetNotificationPreferenceState();
       return;
     }
 
@@ -355,6 +370,7 @@ export default function Page() {
     setHistoryLoaded(false);
     setHistoryError("");
     setHistoryNotice("");
+    resetNotificationPreferenceState();
   }, [walletAddress, provider]);
 
   const sellTokenInfo = useMemo(
@@ -798,6 +814,7 @@ export default function Page() {
       setWalletKind(null);
       setBackendSession(null);
       setDbSwapHistory([]);
+      resetNotificationPreferenceState();
       clearQuoteState();
     }
   }
@@ -873,6 +890,87 @@ export default function Page() {
     const stored = backendSession ?? readStoredBackendSession();
     if (stored && isSessionForWallet(stored, walletAddress)) {
       void refreshBackendHistory();
+    }
+  }
+
+  function resetNotificationPreferenceState() {
+    setNotificationsExpanded(false);
+    setNotificationPreference(null);
+    setNotificationPreferenceLoaded(false);
+    setNotificationPreferenceLoading(false);
+    setNotificationPreferenceSaving(false);
+    setNotificationPreferenceError("");
+    setNotificationPreferenceNotice("");
+    setTelegramEnabledDraft(false);
+    setTelegramChatIdDraft("");
+    notificationPreferenceRequestInFlightRef.current = false;
+  }
+
+  async function refreshNotificationPreferences() {
+    if (notificationPreferenceRequestInFlightRef.current) return;
+    notificationPreferenceRequestInFlightRef.current = true;
+    setNotificationPreferenceLoading(true);
+    setNotificationPreferenceError("");
+    setNotificationPreferenceNotice("");
+    try {
+      const session = await ensureBackendSession();
+      const preference = await getNotificationPreferences(envPublic.BACKEND_BASE_URL, session);
+      applyNotificationPreference(preference);
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setNotificationPreferenceError(normalizeWalletError(e));
+    } finally {
+      setNotificationPreferenceLoading(false);
+      notificationPreferenceRequestInFlightRef.current = false;
+    }
+  }
+
+  function applyNotificationPreference(preference: NotificationPreference) {
+    setNotificationPreference(preference);
+    setNotificationPreferenceLoaded(true);
+    setTelegramEnabledDraft(preference.telegramEnabled);
+    setTelegramChatIdDraft(preference.telegramChatId ?? "");
+  }
+
+  function onNotificationsToggle(event: { currentTarget: HTMLDetailsElement }) {
+    const expanded = event.currentTarget.open;
+    setNotificationsExpanded(expanded);
+
+    if (!expanded || !walletAddress || notificationPreferenceLoaded || notificationPreferenceRequestInFlightRef.current) return;
+
+    const stored = backendSession ?? readStoredBackendSession();
+    if (stored && isSessionForWallet(stored, walletAddress)) {
+      void refreshNotificationPreferences();
+    }
+  }
+
+  async function saveTelegramPreference() {
+    setNotificationPreferenceSaving(true);
+    setNotificationPreferenceError("");
+    setNotificationPreferenceNotice("");
+    try {
+      const session = await ensureBackendSession();
+      const preference = await saveNotificationPreferences(envPublic.BACKEND_BASE_URL, session, {
+        emailAddress: notificationPreference?.emailAddress ?? null,
+        emailEnabled: notificationPreference?.emailEnabled ?? false,
+        telegramChatId: telegramChatIdDraft.trim() || null,
+        telegramEnabled: telegramEnabledDraft,
+        reverseProfitThresholdBps: notificationPreference?.reverseProfitThresholdBps ?? 100,
+        cooldownMinutes: notificationPreference?.cooldownMinutes ?? 360
+      });
+      applyNotificationPreference(preference);
+      setNotificationPreferenceNotice("Telegram notification preferences saved.");
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setNotificationPreferenceError(normalizeWalletError(e));
+    } finally {
+      setNotificationPreferenceSaving(false);
     }
   }
 
@@ -1756,6 +1854,93 @@ export default function Page() {
               </table>
             </div>
           )}
+        </div>
+      </details>
+
+      <details className="panel historyPanel settingsPanel" open={notificationsExpanded} onToggle={onNotificationsToggle}>
+        <summary className="historySummary">
+          <span className="historyChevron" aria-hidden="true" />
+          <span className="historyTitleBlock">
+            <span className="label">Notifications</span>
+            <span className="subtle">
+              {walletAddress
+                ? notificationPreference?.telegramEnabled
+                  ? "Telegram alerts are enabled."
+                  : "Manage Telegram alerts for this wallet."
+                : "Connect your wallet to manage alerts."}
+            </span>
+          </span>
+          <span className="historyActions">
+            <span className="badge">
+              {notificationPreferenceLoading
+                ? "Loading settings"
+                : notificationsExpanded
+                  ? notificationPreferenceLoaded
+                    ? "Ready"
+                    : "Sign in to load"
+                  : "Expand settings"}
+            </span>
+          </span>
+        </summary>
+        <div className="historyContent settingsContent">
+          <div className="quoteHeader">
+            <div className="subtle">
+              {walletAddress
+                ? backendSession
+                  ? "Telegram can notify you when saved swaps or favorite pairs reach alert conditions."
+                  : "Sign once to manage alerts."
+                : "Connect your wallet to manage alerts."}
+            </div>
+            <button
+              className="btn"
+              type="button"
+              onClick={refreshNotificationPreferences}
+              disabled={!walletAddress || notificationPreferenceLoading}
+            >
+              {notificationPreferenceLoading ? "Loading..." : notificationPreferenceLoaded ? "Refresh" : "Load Settings"}
+            </button>
+          </div>
+
+          <div className="settingsGrid">
+            <label className="toggleRow">
+              <input
+                type="checkbox"
+                checked={telegramEnabledDraft}
+                onChange={(event) => setTelegramEnabledDraft(event.target.checked)}
+                disabled={!walletAddress}
+              />
+              <span>
+                <strong>Telegram alerts</strong>
+                <span className="subtle">Receive reverse-profit and favorite-pair alerts in Telegram.</span>
+              </span>
+            </label>
+
+            <div>
+              <div className="label">Telegram chat ID</div>
+              <input
+                className="input"
+                value={telegramChatIdDraft}
+                onChange={(event) => setTelegramChatIdDraft(event.target.value)}
+                placeholder="7088335929"
+                inputMode="numeric"
+                disabled={!walletAddress}
+              />
+            </div>
+          </div>
+
+          {notificationPreferenceNotice ? <div className="ok" style={{ marginTop: 10 }}>{notificationPreferenceNotice}</div> : null}
+          {notificationPreferenceError ? <div className="error" style={{ marginTop: 10 }}>{notificationPreferenceError}</div> : null}
+
+          <div className="settingsActions">
+            <button
+              className="btn btnPrimary"
+              type="button"
+              onClick={saveTelegramPreference}
+              disabled={!walletAddress || notificationPreferenceSaving}
+            >
+              {notificationPreferenceSaving ? "Saving..." : "Save Notifications"}
+            </button>
+          </div>
         </div>
       </details>
     </div>

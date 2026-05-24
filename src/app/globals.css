@@ -994,6 +994,50 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.settingsContent {
+  display: grid;
+  gap: 12px;
+}
+
+.settingsGrid {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 700px) {
+  .settingsGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
+  }
+}
+
+.toggleRow {
+  align-items: flex-start;
+  background: rgba(6, 12, 24, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  min-height: 56px;
+  padding: 11px 12px;
+}
+
+.toggleRow input {
+  accent-color: var(--accent);
+  margin-top: 3px;
+}
+
+.toggleRow strong,
+.toggleRow span {
+  display: block;
+}
+
+.settingsActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .historyTableWrap {
   overflow-x: auto;
 }

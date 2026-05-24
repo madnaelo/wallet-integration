@@ -38,6 +38,25 @@ export type SwapHistoryRecord = SaveSwapHistoryRequest & {
   createdAt: string;
 };
 
+export type NotificationPreference = {
+  walletAddress: string;
+  emailAddress?: string | null;
+  emailEnabled: boolean;
+  telegramChatId?: string | null;
+  telegramEnabled: boolean;
+  reverseProfitThresholdBps: number;
+  cooldownMinutes: number;
+};
+
+export type SaveNotificationPreferenceRequest = {
+  emailAddress?: string | null;
+  emailEnabled?: boolean;
+  telegramChatId?: string | null;
+  telegramEnabled?: boolean;
+  reverseProfitThresholdBps?: number;
+  cooldownMinutes?: number;
+};
+
 export class BackendClientError extends Error {
   status: number;
   body: unknown;
@@ -92,6 +111,32 @@ export async function listSwapHistory(
     headers: {
       Authorization: `Bearer ${session.accessToken}`
     }
+  });
+}
+
+export async function getNotificationPreferences(
+  backendBaseUrl: string,
+  session: BackendSession
+): Promise<NotificationPreference> {
+  return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    }
+  });
+}
+
+export async function saveNotificationPreferences(
+  backendBaseUrl: string,
+  session: BackendSession,
+  request: SaveNotificationPreferenceRequest
+): Promise<NotificationPreference> {
+  return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences", {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    },
+    body: JSON.stringify(request)
   });
 }
 
