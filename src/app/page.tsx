@@ -10,7 +10,7 @@ import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
 import { ERC20_ABI } from "@/lib/erc20";
-import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect } from "@reown/appkit/react";
+import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect, useWalletInfo } from "@reown/appkit/react";
 import { isAppKitConfigured } from "@/context/appkit";
 import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
@@ -95,9 +95,11 @@ const ADDRESS_FAMILY_CONFIG: Record<AddressFamily, AddressFamilyConfig> = {
 export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
   const { open: openAppKit } = useAppKit();
-  const { address: appKitAddress, isConnected: appKitConnected } = useAppKitAccount({ namespace: "eip155" });
+  const evmAccount = useAppKitAccount({ namespace: "eip155" });
+  const { address: appKitAddress, isConnected: appKitConnected } = evmAccount;
   const { address: bitcoinAccountAddress } = useAppKitAccount({ namespace: "bip122" });
   const { walletProvider: appKitProvider, walletProviderType } = useAppKitProvider<Eip1193Provider>("eip155");
+  const { walletInfo } = useWalletInfo("eip155");
   const { disconnect: disconnectAppKit } = useDisconnect();
   const isDryRun = envPublic.DISALLOW_MAINNET;
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
@@ -1157,6 +1159,17 @@ export default function Page() {
     if (walletAddress) return "";
     return "Choose a browser wallet or connect from your phone.";
   }, [walletAddress]);
+  const connectedWalletDisplay = useMemo(
+    () =>
+      buildConnectedWalletDisplay({
+        address: walletAddress,
+        accountLabel: getEmbeddedAccountLabel(evmAccount.embeddedWalletInfo?.user),
+        networkName: getWalletNetworkLabel(walletChainId, chain?.name),
+        providerType: walletProviderType,
+        walletName: walletInfo?.name
+      }),
+    [chain?.name, evmAccount.embeddedWalletInfo?.user, walletAddress, walletChainId, walletInfo?.name, walletProviderType]
+  );
 
   return (
     <div className="container">
@@ -1166,9 +1179,27 @@ export default function Page() {
           <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
         </div>
         <div className="walletActions">
-          <button className="btn btnPrimary" onClick={openWalletChooser} disabled={!!walletAddress}>
-            {walletAddress ? `Connected: ${shortAddr(walletAddress)}` : "Connect Wallet"}
-          </button>
+          {walletAddress ? (
+            <button
+              className="connectedWalletButton"
+              type="button"
+              onClick={() => {
+                void openAppKit({ view: "Account", namespace: "eip155" });
+              }}
+              title={connectedWalletDisplay.title}
+              aria-label={connectedWalletDisplay.title}
+            >
+              <span className="walletStatusDot" aria-hidden="true" />
+              <span className="connectedWalletText">
+                <span className="connectedWalletName">{connectedWalletDisplay.primary}</span>
+                <span className="connectedWalletMeta">{connectedWalletDisplay.secondary}</span>
+              </span>
+            </button>
+          ) : (
+            <button className="btn btnPrimary" onClick={openWalletChooser}>
+              Connect Wallet
+            </button>
+          )}
           {walletAddress ? (
             <button className="btn" onClick={onDisconnectWallet}>
               Disconnect
@@ -1708,6 +1739,43 @@ export default function Page() {
 function shortAddr(a: string) {
   if (!a) return "";
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function buildConnectedWalletDisplay(params: {
+  address: string;
+  accountLabel?: string;
+  networkName: string;
+  providerType: string | undefined;
+  walletName: string | undefined;
+}): { primary: string; secondary: string; title: string } {
+  const walletName = getWalletDisplayName(params.walletName, params.providerType);
+  const shortAddress = shortAddr(params.address);
+  const primary = params.accountLabel || walletName;
+  const secondary = params.accountLabel
+    ? `${walletName} - ${shortAddress} - ${params.networkName}`
+    : `${shortAddress} - ${params.networkName}`;
+  const title = params.accountLabel
+    ? `${params.accountLabel} connected with ${walletName} on ${params.networkName}: ${params.address}`
+    : `${walletName} connected on ${params.networkName}: ${params.address}`;
+
+  return { primary, secondary, title };
+}
+
+function getWalletDisplayName(walletName: string | undefined, providerType: string | undefined): string {
+  const normalized = walletName?.trim();
+  if (normalized) return normalized.replace(/\s+Wallet$/i, " Wallet");
+  if (providerType === "WALLET_CONNECT") return "WalletConnect";
+  if (providerType === "INJECTED" || providerType === "ANNOUNCED") return "Browser Wallet";
+  return "Wallet";
+}
+
+function getWalletNetworkLabel(chainId: number | null, fallback: string | undefined): string {
+  if (chainId) return getChainById(chainId)?.name ?? `Chain ${chainId}`;
+  return fallback ?? "Network";
+}
+
+function getEmbeddedAccountLabel(user: { username?: string | null; email?: string | null } | undefined): string {
+  return user?.username?.trim() || user?.email?.trim() || "";
 }
 
 function buildFallbackTokensByChain(chainIds: number[]): Record<number, TokenInfo[]> {

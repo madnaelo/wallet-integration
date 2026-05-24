@@ -625,6 +625,61 @@ body {
   justify-content: flex-end;
 }
 
+.connectedWalletButton {
+  align-items: center;
+  background: rgba(81, 207, 102, 0.13);
+  border: 1px solid rgba(81, 207, 102, 0.34);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 9px minmax(0, 1fr);
+  min-height: 42px;
+  max-width: min(300px, calc(100vw - 36px));
+  padding: 8px 11px;
+  text-align: left;
+}
+
+.connectedWalletButton:hover,
+.connectedWalletButton:focus-visible {
+  background: rgba(81, 207, 102, 0.19);
+  border-color: rgba(81, 207, 102, 0.55);
+  outline: none;
+}
+
+.walletStatusDot {
+  background: var(--ok);
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px rgba(81, 207, 102, 0.14);
+  height: 9px;
+  width: 9px;
+}
+
+.connectedWalletText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.connectedWalletName,
+.connectedWalletMeta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connectedWalletName {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.connectedWalletMeta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .networkMenu {
   position: relative;
 }
