@@ -7,10 +7,14 @@ export type TokenInfo = {
   logoURI?: string;
   searchAliases?: string[];
   assetKind?: "evm" | "bitcoin";
+  addressFamily?: "evm" | "bitcoin";
+  walletNamespace?: "eip155" | "bip122";
+  networkId?: string;
   networkName?: string;
 };
 
 export const NATIVE_BITCOIN_TOKEN_ADDRESS = "bitcoin";
+export const NATIVE_BITCOIN_NETWORK_ID = "bip122:bitcoin";
 
 export const NATIVE_BITCOIN_TOKEN: TokenInfo = {
   symbol: "BTC",
@@ -20,6 +24,9 @@ export const NATIVE_BITCOIN_TOKEN: TokenInfo = {
   name: "Bitcoin",
   searchAliases: ["BTC", "Bitcoin", "Native Bitcoin"],
   assetKind: "bitcoin",
+  addressFamily: "bitcoin",
+  walletNamespace: "bip122",
+  networkId: NATIVE_BITCOIN_NETWORK_ID,
   networkName: "Bitcoin network"
 };
 

@@ -5,33 +5,35 @@ import type { TokenInfo } from "@/lib/tokens";
 
 const MAX_VISIBLE_TOKENS = 100;
 
-export type TokenPickerChain = {
-  chainId: number;
+export type TokenPickerNetwork = {
+  id: string;
   name: string;
 };
 
 export type TokenPickerOption = TokenInfo & {
-  chainId: number;
-  chainName: string;
+  networkId: string;
+  networkName: string;
+  quoteChainId?: number;
+  supportedQuoteChainIds?: number[];
 };
 
 type TokenPickerProps = {
   label: string;
   value: string;
-  selectedChainId: number;
-  chains: TokenPickerChain[];
+  selectedNetworkId: string;
+  networks: TokenPickerNetwork[];
   tokens: TokenPickerOption[];
   loading: boolean;
   invalid?: boolean;
   describedBy?: string;
-  onChange: (address: string, chainId: number) => void;
+  onChange: (token: TokenPickerOption) => void;
 };
 
 export function TokenPicker({
   label,
   value,
-  selectedChainId,
-  chains,
+  selectedNetworkId,
+  networks,
   tokens,
   loading,
   invalid,
@@ -41,10 +43,10 @@ export function TokenPicker({
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [networkFilter, setNetworkFilter] = useState<number | "all">(selectedChainId);
-  const selectedToken = useMemo(() => findToken(tokens, value, selectedChainId), [tokens, value, selectedChainId]);
+  const [networkFilter, setNetworkFilter] = useState<string | "all">(selectedNetworkId);
+  const selectedToken = useMemo(() => findToken(tokens, value, selectedNetworkId), [tokens, value, selectedNetworkId]);
   const filteredTokens = useMemo(
-    () => tokens.filter((token) => networkFilter === "all" || token.chainId === networkFilter),
+    () => tokens.filter((token) => networkFilter === "all" || token.networkId === networkFilter),
     [networkFilter, tokens]
   );
   const matchingTokens = useMemo(() => searchTokens(filteredTokens, query), [filteredTokens, query]);
@@ -69,8 +71,8 @@ export function TokenPicker({
   }, [open]);
 
   useEffect(() => {
-    if (!open) setNetworkFilter(selectedChainId);
-  }, [open, selectedChainId]);
+    if (!open) setNetworkFilter(selectedNetworkId);
+  }, [open, selectedNetworkId]);
 
   return (
     <div className={`tokenPicker${open ? " tokenPickerOpen" : ""}`} ref={rootRef}>
@@ -84,7 +86,7 @@ export function TokenPicker({
         onClick={() => {
           setOpen((current) => !current);
           setQuery("");
-          setNetworkFilter(selectedChainId);
+          setNetworkFilter(selectedNetworkId);
         }}
       >
         <span className="tokenPickerSymbol">{selectedToken?.symbol ?? "Select token"}</span>
@@ -103,14 +105,14 @@ export function TokenPicker({
             >
               All
             </button>
-            {chains.map((chain) => (
+            {networks.map((network) => (
               <button
-                className={`tokenNetworkTab${networkFilter === chain.chainId ? " tokenNetworkTabActive" : ""}`}
+                className={`tokenNetworkTab${networkFilter === network.id ? " tokenNetworkTabActive" : ""}`}
                 type="button"
-                key={chain.chainId}
-                onClick={() => setNetworkFilter(chain.chainId)}
+                key={network.id}
+                onClick={() => setNetworkFilter(network.id)}
               >
-                {shortNetworkName(chain.name)}
+                {shortNetworkName(network.name)}
               </button>
             ))}
           </div>
@@ -125,18 +127,18 @@ export function TokenPicker({
           <div className="tokenPickerList">
             {visibleTokens.map((token) => (
               <button
-                className={`tokenPickerOption${sameToken(token.address, value) && token.chainId === selectedChainId ? " tokenPickerOptionSelected" : ""}`}
+                className={`tokenPickerOption${sameToken(token.address, value) && token.networkId === selectedNetworkId ? " tokenPickerOptionSelected" : ""}`}
                 type="button"
-                key={`${token.chainId}:${token.address}`}
+                key={`${token.networkId}:${token.address}`}
                 onClick={() => {
-                  onChange(token.address, token.chainId);
+                  onChange(token);
                   setOpen(false);
                 }}
               >
                 <span className="tokenPickerOptionSymbol">{token.symbol}</span>
                 <span className="tokenPickerOptionMeta">
                   <span>{tokenCaption(token)}</span>
-                  <span>{displayNetworkName(token)}</span>
+                  <span>{token.networkName}</span>
                   <span className="mono">{token.isNative ? "" : shortAddress(token.address)}</span>
                 </span>
               </button>
@@ -167,7 +169,7 @@ function scoreTokenMatch(token: TokenPickerOption, query: string): number {
   const symbol = token.symbol.toLowerCase();
   const name = (token.name ?? "").toLowerCase();
   const address = token.address.toLowerCase();
-  const network = displayNetworkName(token).toLowerCase();
+  const network = token.networkName.toLowerCase();
   const aliases = (token.searchAliases ?? []).map((alias) => alias.toLowerCase());
 
   if (address === query) return 0;
@@ -187,8 +189,8 @@ function scoreTokenMatch(token: TokenPickerOption, query: string): number {
   return Number.POSITIVE_INFINITY;
 }
 
-function findToken(tokens: TokenPickerOption[], address: string, chainId: number): TokenPickerOption | undefined {
-  return tokens.find((token) => token.chainId === chainId && sameToken(token.address, address));
+function findToken(tokens: TokenPickerOption[], address: string, networkId: string): TokenPickerOption | undefined {
+  return tokens.find((token) => token.networkId === networkId && sameToken(token.address, address));
 }
 
 function sameToken(first: string, second: string): boolean {
@@ -197,16 +199,11 @@ function sameToken(first: string, second: string): boolean {
 
 function selectedTokenCaption(token: TokenPickerOption): string {
   const name = token.isNative ? token.name ?? "Native" : token.name ?? token.symbol;
-  return `${displayNetworkName(token)}${name ? ` - ${name}` : ""}`;
+  return `${token.networkName}${name ? ` - ${name}` : ""}`;
 }
 
 function tokenCaption(token: TokenPickerOption): string {
-  if (token.assetKind === "bitcoin") return token.name ?? token.symbol;
   return token.isNative ? "Native token" : token.name ?? token.symbol;
-}
-
-function displayNetworkName(token: TokenPickerOption): string {
-  return token.assetKind === "bitcoin" ? token.networkName ?? "Bitcoin network" : token.chainName;
 }
 
 function shortNetworkName(value: string): string {

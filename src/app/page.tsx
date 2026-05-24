@@ -17,7 +17,7 @@ import { buildQuoteUrl } from "@/lib/quoteClient";
 import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import { swapLog } from "@/lib/swapLog";
 import { listTokens } from "@/lib/tokenClient";
-import { TokenPicker, type TokenPickerOption } from "@/components/TokenPicker";
+import { TokenPicker, type TokenPickerNetwork, type TokenPickerOption } from "@/components/TokenPicker";
 import {
   BackendClientError,
   type BackendSession,
@@ -57,12 +57,40 @@ type RouteLine = {
   share: string;
 };
 type WalletNamespace = "eip155" | "bip122";
+type AddressFamily = NonNullable<TokenInfo["addressFamily"]> | "evm";
 type RecipientAddressMode = "connected" | "custom";
 type RecipientDialogMode = "paste" | "scan" | "wallet";
 type QrDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
 };
 type QrDetectorConstructor = new (options?: { formats?: string[] }) => QrDetector;
+type AddressFamilyConfig = {
+  walletNamespace: WalletNamespace;
+  walletLabel: string;
+  recipientLabel: string;
+  placeholder: string;
+  parse: (value: string) => string;
+  isValid: (value: string) => boolean;
+};
+
+const ADDRESS_FAMILY_CONFIG: Record<AddressFamily, AddressFamilyConfig> = {
+  evm: {
+    walletNamespace: "eip155",
+    walletLabel: "wallet",
+    recipientLabel: "recipient address",
+    placeholder: "0x...",
+    parse: parseEvmAddressInput,
+    isValid: isAddress
+  },
+  bitcoin: {
+    walletNamespace: "bip122",
+    walletLabel: "Bitcoin wallet",
+    recipientLabel: "Bitcoin recipient address",
+    placeholder: "bc1...",
+    parse: parseBitcoinAddressInput,
+    isValid: isBitcoinAddressInput
+  }
+};
 
 export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
@@ -139,8 +167,12 @@ export default function Page() {
     [allowedChains, tokensLoadingByChain]
   );
   const tokenPickerTokens = useMemo(
-    () => buildTokenPickerOptions(allowedChains, tokensByChain, selectedChainId),
-    [allowedChains, selectedChainId, tokensByChain]
+    () => buildTokenPickerOptions(allowedChains, tokensByChain),
+    [allowedChains, tokensByChain]
+  );
+  const tokenPickerNetworks = useMemo(
+    () => buildTokenPickerNetworks(allowedChains, tokenPickerTokens),
+    [allowedChains, tokenPickerTokens]
   );
 
   useEffect(() => {
@@ -318,25 +350,37 @@ export default function Page() {
     setHistoryNotice("");
   }, [walletAddress, provider]);
 
-  const sellTokenInfo = useMemo(() => tokens.find((t) => t.address === sellToken), [tokens, sellToken]);
-  const buyTokenInfo = useMemo(() => tokens.find((t) => t.address === buyToken), [tokens, buyToken]);
-  const isBitcoinSourceSwap = sellTokenInfo?.assetKind === "bitcoin";
-  const isBitcoinReceiveSwap = buyTokenInfo?.assetKind === "bitcoin";
-  const sourceWalletAddress = isBitcoinSourceSwap ? bitcoinAccountAddress ?? "" : walletAddress;
-  const destinationWalletAddress = isBitcoinReceiveSwap ? bitcoinAccountAddress ?? "" : walletAddress;
+  const sellTokenInfo = useMemo(
+    () => tokens.find((token) => normalizeTokenKey(token.address) === normalizeTokenKey(sellToken)),
+    [tokens, sellToken]
+  );
+  const buyTokenInfo = useMemo(
+    () => tokens.find((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken)),
+    [tokens, buyToken]
+  );
+  const sellTokenNetworkId = getTokenNetworkId(sellTokenInfo, selectedChainId);
+  const buyTokenNetworkId = getTokenNetworkId(buyTokenInfo, selectedChainId);
+  const connectedWallets = useMemo<Partial<Record<WalletNamespace, string>>>(
+    () => ({
+      eip155: walletAddress,
+      bip122: bitcoinAccountAddress ?? ""
+    }),
+    [bitcoinAccountAddress, walletAddress]
+  );
+  const sourceWalletAddress = getTokenWalletAddress(sellTokenInfo, connectedWallets);
+  const destinationWalletAddress = getTokenWalletAddress(buyTokenInfo, connectedWallets);
   const recipientTooltip = recipientAddressMode === "custom" && recipientAddress
     ? "Custom Recipient Address"
     : destinationWalletAddress
     ? "Currently Connected Wallet"
     : "No recipient address selected";
-  const hasAnyWalletAddress = Boolean(walletAddress || bitcoinAccountAddress);
+  const hasAnyWalletAddress = Object.values(connectedWallets).some(Boolean);
   const sourceWalletNotice = getWalletSupportNotice({
     token: sellTokenInfo,
     side: "sell",
-    chainName: chain?.name,
+    networkName: getTokenNetworkName(sellTokenInfo, chain?.name),
     hasAnyWalletAddress,
-    hasEvmWallet: Boolean(walletAddress),
-    hasBitcoinWallet: Boolean(bitcoinAccountAddress),
+    connectedWallets
   });
   const slippageBps = useMemo(
     () => parseSlippageBps(slippageChoice, customSlippagePct),
@@ -385,7 +429,7 @@ export default function Page() {
   }, [destinationWalletAddress, recipientAddressMode]);
 
   useEffect(() => {
-    const buyTokenAddress = buyTokenInfo?.address ?? "";
+    const buyTokenAddress = `${buyTokenNetworkId}:${buyTokenInfo?.address ?? ""}`;
     if (previousBuyTokenAddressRef.current === buyTokenAddress) return;
 
     previousBuyTokenAddressRef.current = buyTokenAddress;
@@ -394,7 +438,7 @@ export default function Page() {
     setRecipientDialogOpen(false);
     setRecipientDialogError("");
     cancelRecipientWalletImport();
-  }, [buyTokenInfo?.address, cancelRecipientWalletImport, destinationWalletAddress]);
+  }, [buyTokenInfo?.address, buyTokenNetworkId, cancelRecipientWalletImport, destinationWalletAddress]);
 
   useEffect(() => {
     if (!recipientDialogOpen || recipientDialogMode !== "scan") {
@@ -470,23 +514,22 @@ export default function Page() {
   }, [recipientDialogOpen, recipientDialogMode, buyTokenInfo]);
 
   function requireWalletForForm() {
-    if (isBitcoinSourceSwap) {
-      if (bitcoinAccountAddress) return true;
+    if (sourceWalletAddress) return true;
+
+    const sourceNamespace = getTokenWalletNamespace(sellTokenInfo);
+    if (sourceNamespace === "eip155") {
+      setConnectPromptVisible(true);
+    } else {
       setQuoteValidationVisible(true);
-      setQuoteError("");
-      setActionError("");
-      return false;
     }
 
-    if (walletAddress) return true;
-    setConnectPromptVisible(true);
     setQuoteError("");
     setActionError("");
     return false;
   }
 
   function revealQuoteValidation() {
-    if (!walletAddress) requireWalletForForm();
+    if (!sourceWalletAddress) requireWalletForForm();
     if (hasQuoteValidationErrors) setQuoteValidationVisible(true);
   }
 
@@ -500,27 +543,58 @@ export default function Page() {
     setSwapStatus("idle");
   }
 
-  function selectTokenForSide(side: "sell" | "buy", address: string, chainId: number) {
-    const chainChanged = chainId !== selectedChainId;
+  function selectTokenForSide(side: "sell" | "buy", token: TokenPickerOption) {
+    const oppositeToken = side === "sell" ? buyTokenInfo : sellTokenInfo;
+    const nextChainId = getQuoteChainIdForTokenSelection(token, selectedChainId);
+    const chainChanged = typeof nextChainId === "number" && nextChainId !== selectedChainId;
+    const clearOppositeToken = chainChanged && getTokenWalletNamespace(oppositeToken) === "eip155";
 
-    if (chainChanged) {
-      setSelectedChainId(chainId);
-      if (side === "sell") {
-        setSellToken(address);
-        setBuyToken("");
-      } else {
-        setSellToken("");
-        setBuyToken(address);
+    if (typeof nextChainId === "number" && chainChanged) {
+      setSelectedChainId(nextChainId);
+    }
+
+    if (side === "sell") {
+      setSellToken(token.address);
+      if (clearOppositeToken) setBuyToken("");
+      if (getTokenWalletNamespace(token) !== "eip155" || getTokenWalletAddress(token, connectedWallets)) {
+        setConnectPromptVisible(false);
       }
-    } else if (side === "sell") {
-      setSellToken(address);
     } else {
-      setBuyToken(address);
+      setBuyToken(token.address);
+      if (clearOppositeToken) setSellToken("");
     }
 
     if (side === "buy" || chainChanged) {
       setRecipientAddressMode("connected");
     }
+    clearQuoteState();
+    setActionError("");
+  }
+
+  function swapSelectedTokens() {
+    if (!requireWalletForForm()) return;
+
+    const nextSellToken = buyTokenInfo;
+    const nextBuyToken = sellTokenInfo;
+    const nextChainId = getQuoteChainIdForTokenSelection(
+      tokenInfoToPickerLikeOption(nextSellToken, selectedChainId),
+      selectedChainId
+    );
+
+    if (typeof nextChainId === "number" && nextChainId !== selectedChainId) {
+      setSelectedChainId(nextChainId);
+      setSellToken(nextSellToken?.address ?? "");
+      if (getTokenWalletNamespace(nextBuyToken) === "eip155") {
+        setBuyToken("");
+      } else {
+        setBuyToken(nextBuyToken?.address ?? "");
+      }
+    } else {
+      setSellToken(nextSellToken?.address ?? "");
+      setBuyToken(nextBuyToken?.address ?? "");
+    }
+
+    setRecipientAddressMode("connected");
     clearQuoteState();
     setActionError("");
   }
@@ -609,8 +683,8 @@ export default function Page() {
   async function startRecipientWalletImport() {
     chooseRecipientDialogMode("wallet");
 
-    if (buyTokenInfo?.assetKind === "bitcoin") {
-      setRecipientDialogError("Wallet import is available for 0x recipient addresses. Paste or scan a BTC address.");
+    if (getTokenAddressFamily(buyTokenInfo) !== "evm") {
+      setRecipientDialogError("Wallet import is available for 0x recipient addresses. Paste or scan this address instead.");
       return;
     }
 
@@ -1140,13 +1214,12 @@ export default function Page() {
               <TokenPicker
                 label="Sell token"
                 value={sellToken}
-                selectedChainId={selectedChainId}
-                chains={allowedChains}
+                selectedNetworkId={sellTokenNetworkId}
+                networks={tokenPickerNetworks}
                 tokens={tokenPickerTokens}
                 loading={tokensLoading}
-                onChange={(value, chainId) => {
-                  requireWalletForForm();
-                  selectTokenForSide("sell", value, chainId);
+                onChange={(token) => {
+                  selectTokenForSide("sell", token);
                 }}
                 invalid={quoteValidationVisible && !!quoteValidationErrors.sellToken}
                 describedBy="sell-token-error"
@@ -1160,7 +1233,7 @@ export default function Page() {
                 <WalletSupportNotice
                   message={sourceWalletNotice.message}
                   actionLabel={sourceWalletNotice.actionLabel}
-                  onAction={sourceWalletNotice.walletKind === "bitcoin" ? openBitcoinWalletChooser : openWalletChooser}
+                  onAction={sourceWalletNotice.walletNamespace === "bip122" ? openBitcoinWalletChooser : openWalletChooser}
                 />
               ) : null}
             </div>
@@ -1170,13 +1243,7 @@ export default function Page() {
               type="button"
               title="Swap tokens"
               aria-label="Swap sell and buy tokens"
-              onClick={() => {
-                if (!requireWalletForForm()) return;
-                setSellToken(buyToken);
-                setBuyToken(sellToken);
-                setRecipientAddressMode("connected");
-                clearQuoteState();
-              }}
+              onClick={swapSelectedTokens}
               disabled={!sellToken || !buyToken}
             >
               <span aria-hidden="true">&#8644;</span>
@@ -1186,13 +1253,12 @@ export default function Page() {
               <TokenPicker
                 label="Buy token"
                 value={buyToken}
-                selectedChainId={selectedChainId}
-                chains={allowedChains}
+                selectedNetworkId={buyTokenNetworkId}
+                networks={tokenPickerNetworks}
                 tokens={tokenPickerTokens}
                 loading={tokensLoading}
-                onChange={(value, chainId) => {
-                  requireWalletForForm();
-                  selectTokenForSide("buy", value, chainId);
+                onChange={(token) => {
+                  selectTokenForSide("buy", token);
                 }}
                 invalid={quoteValidationVisible && !!quoteValidationErrors.buyToken}
                 describedBy="buy-token-error"
@@ -1215,7 +1281,7 @@ export default function Page() {
                 readOnly
                 aria-invalid={quoteValidationVisible && !!quoteValidationErrors.recipientAddress}
                 aria-describedby="recipient-address-error"
-                placeholder={isBitcoinReceiveSwap ? "bc1..." : "0x..."}
+                placeholder={getRecipientAddressPlaceholder(buyTokenInfo)}
                 spellCheck={false}
                 autoComplete="off"
               />
@@ -1304,7 +1370,7 @@ export default function Page() {
                         setRecipientAddressDraft(event.target.value);
                         setRecipientDialogError("");
                       }}
-                      placeholder={isBitcoinReceiveSwap ? "bc1..." : "0x..."}
+                      placeholder={getRecipientAddressPlaceholder(buyTokenInfo)}
                       spellCheck={false}
                       autoComplete="off"
                     />
@@ -1361,7 +1427,7 @@ export default function Page() {
                         onClick={() => {
                           void startRecipientWalletImport();
                         }}
-                        disabled={recipientWalletImportLoading || isBitcoinReceiveSwap}
+                        disabled={recipientWalletImportLoading || getTokenAddressFamily(buyTokenInfo) !== "evm"}
                       >
                         {recipientWalletImportQrDataUrl ? "Restart" : "Start"}
                       </button>
@@ -1650,29 +1716,121 @@ function buildFallbackTokensByChain(chainIds: number[]): Record<number, TokenInf
 
 function buildTokenPickerOptions(
   chains: Array<{ chainId: number; name: string }>,
-  tokensByChain: Record<number, TokenInfo[]>,
-  selectedChainId: number
+  tokensByChain: Record<number, TokenInfo[]>
 ): TokenPickerOption[] {
-  const options: TokenPickerOption[] = [];
-  const seen = new Set<string>();
+  const optionsByKey = new Map<string, TokenPickerOption>();
 
   for (const chain of chains) {
     const chainTokens = tokensByChain[chain.chainId] ?? DEFAULT_TOKENS_BY_CHAIN[chain.chainId] ?? [];
     for (const token of chainTokens) {
-      if (token.assetKind === "bitcoin" && chain.chainId !== selectedChainId) continue;
+      const networkId = getTokenNetworkId(token, chain.chainId);
+      const key = `${networkId}:${normalizeTokenKey(token.address)}`;
+      const existing = optionsByKey.get(key);
+      if (existing) {
+        const currentSupportedChainIds = existing.supportedQuoteChainIds ?? [];
+        if (!currentSupportedChainIds.includes(chain.chainId)) {
+          existing.supportedQuoteChainIds = [...currentSupportedChainIds, chain.chainId];
+        }
+        continue;
+      }
 
-      const key = `${chain.chainId}:${normalizeTokenKey(token.address)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      options.push({
+      const walletNamespace = getTokenWalletNamespace(token);
+      optionsByKey.set(key, {
         ...token,
-        chainId: chain.chainId,
-        chainName: chain.name
+        networkId,
+        networkName: getTokenNetworkName(token, chain.name),
+        quoteChainId: walletNamespace === "eip155" ? chain.chainId : undefined,
+        supportedQuoteChainIds: [chain.chainId]
       });
     }
   }
 
-  return options;
+  return [...optionsByKey.values()];
+}
+
+function buildTokenPickerNetworks(
+  chains: Array<{ chainId: number; name: string }>,
+  tokens: TokenPickerOption[]
+): TokenPickerNetwork[] {
+  const networks = new Map<string, TokenPickerNetwork>();
+
+  for (const chain of chains) {
+    networks.set(getEvmNetworkId(chain.chainId), {
+      id: getEvmNetworkId(chain.chainId),
+      name: chain.name
+    });
+  }
+
+  for (const token of tokens) {
+    if (!networks.has(token.networkId)) {
+      networks.set(token.networkId, {
+        id: token.networkId,
+        name: token.networkName
+      });
+    }
+  }
+
+  return [...networks.values()];
+}
+
+function getEvmNetworkId(chainId: number): string {
+  return `eip155:${chainId}`;
+}
+
+function getTokenNetworkId(token: TokenInfo | undefined, fallbackChainId: number): string {
+  return token?.networkId ?? getEvmNetworkId(fallbackChainId);
+}
+
+function getTokenNetworkName(token: TokenInfo | undefined, fallbackNetworkName: string | undefined): string {
+  return token?.networkName ?? fallbackNetworkName ?? "this network";
+}
+
+function getTokenAddressFamily(token: TokenInfo | undefined): AddressFamily {
+  return token?.addressFamily ?? "evm";
+}
+
+function getAddressFamilyConfig(token: TokenInfo | undefined): AddressFamilyConfig {
+  return ADDRESS_FAMILY_CONFIG[getTokenAddressFamily(token)];
+}
+
+function getTokenWalletNamespace(token: TokenInfo | undefined): WalletNamespace {
+  return token?.walletNamespace ?? getAddressFamilyConfig(token).walletNamespace;
+}
+
+function getTokenWalletLabel(token: TokenInfo | undefined): string {
+  return getAddressFamilyConfig(token).walletLabel;
+}
+
+function getRecipientAddressPlaceholder(token: TokenInfo | undefined): string {
+  return getAddressFamilyConfig(token).placeholder;
+}
+
+function getTokenWalletAddress(
+  token: TokenInfo | undefined,
+  connectedWallets: Partial<Record<WalletNamespace, string>>
+): string {
+  return connectedWallets[getTokenWalletNamespace(token)] ?? "";
+}
+
+function getQuoteChainIdForTokenSelection(
+  token: Pick<TokenPickerOption, "quoteChainId" | "supportedQuoteChainIds"> | null | undefined,
+  currentChainId: number
+): number | undefined {
+  if (typeof token?.quoteChainId === "number") return token.quoteChainId;
+  if (token?.supportedQuoteChainIds?.includes(currentChainId)) return currentChainId;
+  return token?.supportedQuoteChainIds?.[0];
+}
+
+function tokenInfoToPickerLikeOption(
+  token: TokenInfo | undefined,
+  currentChainId: number
+): Pick<TokenPickerOption, "quoteChainId" | "supportedQuoteChainIds"> | undefined {
+  if (!token) return undefined;
+  const walletNamespace = getTokenWalletNamespace(token);
+  return {
+    quoteChainId: walletNamespace === "eip155" ? currentChainId : undefined,
+    supportedQuoteChainIds: [currentChainId]
+  };
 }
 
 function WalletSupportNotice({
@@ -1697,34 +1855,28 @@ function WalletSupportNotice({
 function getWalletSupportNotice(params: {
   token: TokenInfo | undefined;
   side: "sell" | "buy";
-  chainName: string | undefined;
+  networkName: string | undefined;
   hasAnyWalletAddress: boolean;
-  hasEvmWallet: boolean;
-  hasBitcoinWallet: boolean;
-}): { message: string; actionLabel: string; walletKind: "bitcoin" | "evm" } | null {
-  const { token, side, chainName, hasAnyWalletAddress, hasEvmWallet, hasBitcoinWallet } = params;
+  connectedWallets: Partial<Record<WalletNamespace, string>>;
+}): { message: string; actionLabel: string; walletNamespace: WalletNamespace } | null {
+  const { token, side, networkName, hasAnyWalletAddress, connectedWallets } = params;
   if (!token) return null;
 
-  if (token.assetKind === "bitcoin") {
-    if (hasBitcoinWallet) return null;
-    const actionLabel = hasAnyWalletAddress ? "Switch to Bitcoin wallet" : "Connect Bitcoin wallet";
-    const message = hasAnyWalletAddress
-      ? "Connected wallet does not support BTC on the Bitcoin network."
-      : side === "sell"
-        ? "Connect a Bitcoin wallet to sell BTC."
-        : "Connect a Bitcoin wallet to receive BTC.";
-    return { message, actionLabel, walletKind: "bitcoin" };
-  }
+  const walletNamespace = getTokenWalletNamespace(token);
+  if (connectedWallets[walletNamespace]) return null;
+  if (!hasAnyWalletAddress && walletNamespace === "eip155") return null;
 
-  if (hasEvmWallet) return null;
-  if (!hasAnyWalletAddress) return null;
-
-  const network = chainName ?? "this network";
-  const message =
-    side === "sell"
+  const network = networkName ?? "this network";
+  const walletLabel = getTokenWalletLabel(token);
+  const actionLabel = hasAnyWalletAddress ? `Switch to ${walletLabel}` : `Connect ${walletLabel}`;
+  const message = !hasAnyWalletAddress
+    ? side === "sell"
+      ? `Connect ${walletLabel} to sell ${token.symbol}.`
+      : `Connect ${walletLabel} to receive ${token.symbol}.`
+    : side === "sell"
       ? `Connected wallet does not support ${token.symbol} on ${network}.`
       : `Connected wallet does not support receiving ${token.symbol} on ${network}.`;
-  return { message, actionLabel: "Switch to supported wallet", walletKind: "evm" };
+  return { message, actionLabel, walletNamespace };
 }
 
 function formatHistoryDate(value: string): string {
@@ -1936,16 +2088,20 @@ function getQuoteValidationErrors(params: {
     errors.buyToken = "Choose a different token to buy.";
   }
 
-  if (params.sellTokenInfo?.assetKind === "bitcoin" && !isBitcoinAddressInput(params.sourceWalletAddress)) {
-    errors.sellToken = "Connect a Bitcoin wallet to sell BTC.";
+  if (params.sellTokenInfo) {
+    const sellAddressConfig = getAddressFamilyConfig(params.sellTokenInfo);
+    if (!params.sourceWalletAddress.trim()) {
+      errors.sellToken = `Connect ${sellAddressConfig.walletLabel} to sell ${params.sellTokenInfo.symbol}.`;
+    } else if (!sellAddressConfig.isValid(params.sourceWalletAddress)) {
+      errors.sellToken = `Connect a valid ${sellAddressConfig.walletLabel} to sell ${params.sellTokenInfo.symbol}.`;
+    }
   }
 
-  if (params.buyTokenInfo?.assetKind === "bitcoin") {
-    if (!isBitcoinAddressInput(params.recipientAddress)) {
-      errors.recipientAddress = "Enter a valid BTC recipient address.";
+  if (params.buyTokenInfo) {
+    const recipientAddressConfig = getAddressFamilyConfig(params.buyTokenInfo);
+    if (!recipientAddressConfig.isValid(params.recipientAddress)) {
+      errors.recipientAddress = `Enter a valid ${recipientAddressConfig.recipientLabel}.`;
     }
-  } else if (params.buyTokenInfo && !isAddress(params.recipientAddress)) {
-    errors.recipientAddress = "Enter a valid recipient address.";
   }
 
   if (!params.amountHuman.trim()) {
@@ -1964,12 +2120,7 @@ function getQuoteValidationErrors(params: {
 function parseRecipientAddressInput(value: string, token: TokenInfo | undefined): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
-
-  if (token?.assetKind === "bitcoin") {
-    return parseBitcoinAddressInput(trimmed);
-  }
-
-  return parseEvmAddressInput(trimmed);
+  return getAddressFamilyConfig(token).parse(trimmed);
 }
 
 function parseBitcoinAddressInput(value: string): string {
@@ -1990,10 +2141,8 @@ function parseEvmAddressInput(value: string): string {
 
 function validateRecipientAddress(address: string, token: TokenInfo | undefined): string {
   if (!address.trim()) return "Enter a recipient address.";
-  if (token?.assetKind === "bitcoin") {
-    return isBitcoinAddressInput(address) ? "" : "Enter a valid BTC recipient address.";
-  }
-  return isAddress(address) ? "" : "Enter a valid recipient address.";
+  const config = getAddressFamilyConfig(token);
+  return config.isValid(address) ? "" : `Enter a valid ${config.recipientLabel}.`;
 }
 
 function getQrDetectorConstructor(): QrDetectorConstructor | null {
