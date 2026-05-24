@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ethers } from "ethers";
 import type { QuoteResponse } from "@/lib/types";
 import { CHAINS, getAllowedChains, getChainById } from "@/lib/chains";
@@ -13,6 +14,7 @@ import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect } from "@
 import { isAppKitConfigured } from "@/context/appkit";
 import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
+import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import { swapLog } from "@/lib/swapLog";
 import { listTokens } from "@/lib/tokenClient";
 import { TokenPicker } from "@/components/TokenPicker";
@@ -56,7 +58,7 @@ type RouteLine = {
 };
 type WalletNamespace = "eip155" | "bip122";
 type RecipientAddressMode = "connected" | "custom";
-type RecipientDialogMode = "paste" | "scan";
+type RecipientDialogMode = "paste" | "scan" | "wallet";
 type QrDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
 };
@@ -86,6 +88,9 @@ export default function Page() {
   const [recipientAddressDraft, setRecipientAddressDraft] = useState<string>("");
   const [recipientDialogError, setRecipientDialogError] = useState<string>("");
   const [recipientQrStatus, setRecipientQrStatus] = useState<string>("");
+  const [recipientWalletImportQrDataUrl, setRecipientWalletImportQrDataUrl] = useState<string>("");
+  const [recipientWalletImportStatus, setRecipientWalletImportStatus] = useState<string>("");
+  const [recipientWalletImportLoading, setRecipientWalletImportLoading] = useState<boolean>(false);
   const [amountHuman, setAmountHuman] = useState<string>("");
   const [slippageChoice, setSlippageChoice] = useState<string>("100");
   const [customSlippagePct, setCustomSlippagePct] = useState<string>("1");
@@ -117,6 +122,7 @@ export default function Page() {
   const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
   const recipientQrTimerRef = useRef<number | null>(null);
+  const recipientWalletImportRunRef = useRef<number>(0);
   const applyRecipientAddressRef = useRef<(rawValue: string, sourceLabel?: string) => void>(() => undefined);
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
@@ -316,6 +322,15 @@ export default function Page() {
   const quoteSecondsRemaining = quote ? Math.max(0, QUOTE_TTL_SECONDS - quoteAgeSeconds) : 0;
   const isQuoteExpired = !!quote && quoteSecondsRemaining <= 0;
   const availableQuotes = useMemo(() => quote?.availableQuotes ?? (quote ? [quote] : []), [quote]);
+  const resetRecipientWalletImportState = useCallback(() => {
+    setRecipientWalletImportQrDataUrl("");
+    setRecipientWalletImportStatus("");
+    setRecipientWalletImportLoading(false);
+  }, []);
+  const cancelRecipientWalletImport = useCallback(() => {
+    recipientWalletImportRunRef.current += 1;
+    resetRecipientWalletImportState();
+  }, [resetRecipientWalletImportState]);
 
   useEffect(() => {
     applyRecipientAddressRef.current = applyRecipientAddress;
@@ -336,7 +351,8 @@ export default function Page() {
     setRecipientAddress(destinationWalletAddress);
     setRecipientDialogOpen(false);
     setRecipientDialogError("");
-  }, [buyTokenInfo?.address, destinationWalletAddress]);
+    cancelRecipientWalletImport();
+  }, [buyTokenInfo?.address, cancelRecipientWalletImport, destinationWalletAddress]);
 
   useEffect(() => {
     if (!recipientDialogOpen || recipientDialogMode !== "scan") {
@@ -502,6 +518,7 @@ export default function Page() {
     setRecipientAddressDraft(recipientAddress);
     setRecipientDialogError("");
     setRecipientQrStatus("");
+    resetRecipientWalletImportState();
     setRecipientDialogOpen(true);
   }
 
@@ -509,7 +526,16 @@ export default function Page() {
     setRecipientDialogOpen(false);
     setRecipientDialogError("");
     setRecipientQrStatus("");
+    cancelRecipientWalletImport();
     stopRecipientQrScanner();
+  }
+
+  function chooseRecipientDialogMode(mode: RecipientDialogMode) {
+    setRecipientDialogMode(mode);
+    setRecipientDialogError("");
+    setRecipientQrStatus("");
+    if (mode !== "wallet") cancelRecipientWalletImport();
+    if (mode !== "scan") stopRecipientQrScanner();
   }
 
   function useConnectedRecipientAddress() {
@@ -523,6 +549,53 @@ export default function Page() {
     setQuoteValidationVisible(false);
     closeRecipientAddressDialog();
     clearQuoteState();
+  }
+
+  async function startRecipientWalletImport() {
+    chooseRecipientDialogMode("wallet");
+
+    if (buyTokenInfo?.assetKind === "bitcoin") {
+      setRecipientDialogError("Wallet import is available for 0x recipient addresses. Paste or scan a BTC address.");
+      return;
+    }
+
+    if (!envPublic.WALLETCONNECT_PROJECT_ID) {
+      setRecipientDialogError("Wallet import is unavailable right now. Paste or scan the address instead.");
+      return;
+    }
+
+    const runId = recipientWalletImportRunRef.current + 1;
+    recipientWalletImportRunRef.current = runId;
+    setRecipientWalletImportLoading(true);
+    setRecipientWalletImportQrDataUrl("");
+    setRecipientWalletImportStatus("Preparing wallet import...");
+
+    try {
+      const recipientImport = await createRecipientWalletImport({
+        projectId: envPublic.WALLETCONNECT_PROJECT_ID,
+        chainId: selectedChainId,
+        origin: window.location.origin
+      });
+
+      if (recipientWalletImportRunRef.current !== runId) return;
+      setRecipientWalletImportQrDataUrl(recipientImport.qrDataUrl);
+      setRecipientWalletImportStatus("Scan with the recipient wallet, then approve address sharing.");
+
+      const imported = await recipientImport.waitForAddress();
+      if (recipientWalletImportRunRef.current !== runId) {
+        await recipientImport.disconnect(imported.topic).catch(() => undefined);
+        return;
+      }
+
+      await recipientImport.disconnect(imported.topic).catch(() => undefined);
+      applyRecipientAddress(imported.address, "wallet import");
+    } catch (e: any) {
+      if (recipientWalletImportRunRef.current !== runId) return;
+      setRecipientDialogError(normalizeRecipientImportError(e));
+      setRecipientWalletImportStatus("");
+    } finally {
+      if (recipientWalletImportRunRef.current === runId) setRecipientWalletImportLoading(false);
+    }
   }
 
   function applyRecipientAddress(rawValue: string, sourceLabel = "address") {
@@ -1150,22 +1223,25 @@ export default function Page() {
                   <button
                     className={`recipientMethodButton${recipientDialogMode === "paste" ? " recipientMethodButtonActive" : ""}`}
                     type="button"
-                    onClick={() => {
-                      setRecipientDialogMode("paste");
-                      setRecipientDialogError("");
-                    }}
+                    onClick={() => chooseRecipientDialogMode("paste")}
                   >
                     Paste address
                   </button>
                   <button
                     className={`recipientMethodButton${recipientDialogMode === "scan" ? " recipientMethodButtonActive" : ""}`}
                     type="button"
-                    onClick={() => {
-                      setRecipientDialogMode("scan");
-                      setRecipientDialogError("");
-                    }}
+                    onClick={() => chooseRecipientDialogMode("scan")}
                   >
                     Scan QR
+                  </button>
+                  <button
+                    className={`recipientMethodButton${recipientDialogMode === "wallet" ? " recipientMethodButtonActive" : ""}`}
+                    type="button"
+                    onClick={() => {
+                      void startRecipientWalletImport();
+                    }}
+                  >
+                    Import wallet
                   </button>
                   <button
                     className="recipientMethodButton"
@@ -1206,7 +1282,7 @@ export default function Page() {
                       </button>
                     </div>
                   </form>
-                ) : (
+                ) : recipientDialogMode === "scan" ? (
                   <div className="recipientDialogBody">
                     <div className="qrScannerFrame">
                       <video ref={recipientQrVideoRef} className="qrScannerVideo" muted playsInline />
@@ -1216,6 +1292,42 @@ export default function Page() {
                     <div className="recipientDialogActions">
                       <button className="btn" type="button" onClick={closeRecipientAddressDialog}>
                         Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="recipientDialogBody">
+                    <div className="recipientWalletImportPanel">
+                      {recipientWalletImportQrDataUrl ? (
+                        <Image
+                          className="recipientWalletImportQr"
+                          src={recipientWalletImportQrDataUrl}
+                          alt="Recipient wallet import QR"
+                          width={260}
+                          height={260}
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="recipientWalletImportPlaceholder">
+                          {recipientWalletImportLoading ? "Preparing..." : "Ready"}
+                        </div>
+                      )}
+                    </div>
+                    {recipientWalletImportStatus ? <div className="small">{recipientWalletImportStatus}</div> : null}
+                    {recipientDialogError ? <div className="fieldError">{recipientDialogError}</div> : null}
+                    <div className="recipientDialogActions">
+                      <button className="btn" type="button" onClick={closeRecipientAddressDialog}>
+                        Cancel
+                      </button>
+                      <button
+                        className="btn btnPrimary"
+                        type="button"
+                        onClick={() => {
+                          void startRecipientWalletImport();
+                        }}
+                        disabled={recipientWalletImportLoading || isBitcoinReceiveSwap}
+                      >
+                        {recipientWalletImportQrDataUrl ? "Restart" : "Start"}
                       </button>
                     </div>
                   </div>
@@ -2150,6 +2262,18 @@ function nestedString(obj: unknown, path: string[]): string {
     current = current?.[key];
   }
   return typeof current === "string" ? current : "";
+}
+
+function normalizeRecipientImportError(e: any): string {
+  if (isUserRejectedWalletRequest(e)) return "Wallet import was cancelled.";
+
+  const message = normalizeWalletError(e);
+  if (/wallet import is unavailable/i.test(message)) return message;
+  if (/valid address/i.test(message)) return message;
+  if (/proposal|pairing|session/i.test(message)) {
+    return "Could not complete wallet import. Try again, or paste the address.";
+  }
+  return message || "Could not import the wallet address.";
 }
 
 function normalizeWalletError(e: any): string {
