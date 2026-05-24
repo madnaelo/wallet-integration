@@ -59,6 +59,7 @@ type RouteLine = {
 type WalletNamespace = "eip155" | "bip122";
 type AddressFamily = NonNullable<TokenInfo["addressFamily"]> | "evm";
 type RecipientAddressMode = "connected" | "custom";
+type RecipientAddressSource = "connected" | "pasted" | "scanned" | "wallet_import";
 type RecipientDialogMode = "paste" | "scan" | "wallet";
 type QrDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
@@ -113,6 +114,7 @@ export default function Page() {
   const [buyToken, setBuyToken] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [recipientAddressMode, setRecipientAddressMode] = useState<RecipientAddressMode>("connected");
+  const [recipientAddressSource, setRecipientAddressSource] = useState<RecipientAddressSource>("connected");
   const [recipientDialogOpen, setRecipientDialogOpen] = useState<boolean>(false);
   const [recipientDialogMode, setRecipientDialogMode] = useState<RecipientDialogMode>("paste");
   const [recipientAddressDraft, setRecipientAddressDraft] = useState<string>("");
@@ -152,7 +154,7 @@ export default function Page() {
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
   const recipientQrTimerRef = useRef<number | null>(null);
   const recipientWalletImportRunRef = useRef<number>(0);
-  const applyRecipientAddressRef = useRef<(rawValue: string, sourceLabel?: string) => void>(() => undefined);
+  const applyRecipientAddressRef = useRef<(rawValue: string, source?: RecipientAddressSource) => void>(() => undefined);
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
   const [tokensByChain, setTokensByChain] = useState<Record<number, TokenInfo[]>>(() =>
@@ -371,11 +373,15 @@ export default function Page() {
   );
   const sourceWalletAddress = getTokenWalletAddress(sellTokenInfo, connectedWallets);
   const destinationWalletAddress = getTokenWalletAddress(buyTokenInfo, connectedWallets);
-  const recipientTooltip = recipientAddressMode === "custom" && recipientAddress
-    ? "Custom Recipient Address"
-    : destinationWalletAddress
-    ? "Currently Connected Wallet"
-    : "No recipient address selected";
+  const recipientAddressDisplay = useMemo(
+    () =>
+      buildRecipientAddressDisplay({
+        address: recipientAddress,
+        networkName: getTokenNetworkName(buyTokenInfo, chain?.name),
+        source: recipientAddressMode === "connected" ? "connected" : recipientAddressSource
+      }),
+    [buyTokenInfo, chain?.name, recipientAddress, recipientAddressMode, recipientAddressSource]
+  );
   const hasAnyWalletAddress = Object.values(connectedWallets).some(Boolean);
   const sourceWalletNotice = getWalletSupportNotice({
     token: sellTokenInfo,
@@ -427,6 +433,7 @@ export default function Page() {
   useEffect(() => {
     if (recipientAddressMode === "connected") {
       setRecipientAddress(destinationWalletAddress);
+      setRecipientAddressSource("connected");
     }
   }, [destinationWalletAddress, recipientAddressMode]);
 
@@ -436,6 +443,7 @@ export default function Page() {
 
     previousBuyTokenAddressRef.current = buyTokenAddress;
     setRecipientAddressMode("connected");
+    setRecipientAddressSource("connected");
     setRecipientAddress(destinationWalletAddress);
     setRecipientDialogOpen(false);
     setRecipientDialogError("");
@@ -498,7 +506,7 @@ export default function Page() {
             const rawValue = codes[0]?.rawValue?.trim();
             if (!rawValue) return;
 
-            applyRecipientAddressRef.current(rawValue, "QR code");
+            applyRecipientAddressRef.current(rawValue, "scanned");
           } catch {
             setRecipientQrStatus("Could not read that QR code yet.");
           }
@@ -568,6 +576,7 @@ export default function Page() {
 
     if (side === "buy" || chainChanged) {
       setRecipientAddressMode("connected");
+      setRecipientAddressSource("connected");
     }
     clearQuoteState();
     setActionError("");
@@ -597,6 +606,7 @@ export default function Page() {
     }
 
     setRecipientAddressMode("connected");
+    setRecipientAddressSource("connected");
     clearQuoteState();
     setActionError("");
   }
@@ -677,6 +687,7 @@ export default function Page() {
 
     setRecipientAddress(destinationWalletAddress);
     setRecipientAddressMode("connected");
+    setRecipientAddressSource("connected");
     setQuoteValidationVisible(false);
     closeRecipientAddressDialog();
     clearQuoteState();
@@ -719,7 +730,7 @@ export default function Page() {
       }
 
       await recipientImport.disconnect(imported.topic).catch(() => undefined);
-      applyRecipientAddress(imported.address, "wallet import");
+      applyRecipientAddress(imported.address, "wallet_import");
     } catch (e: any) {
       if (recipientWalletImportRunRef.current !== runId) return;
       setRecipientDialogError(normalizeRecipientImportError(e));
@@ -729,17 +740,18 @@ export default function Page() {
     }
   }
 
-  function applyRecipientAddress(rawValue: string, sourceLabel = "address") {
+  function applyRecipientAddress(rawValue: string, source: RecipientAddressSource = "pasted") {
     const parsedAddress = parseRecipientAddressInput(rawValue, buyTokenInfo);
     const validationError = validateRecipientAddress(parsedAddress, buyTokenInfo);
     if (validationError) {
       setRecipientDialogError(validationError);
-      if (sourceLabel === "QR code") setRecipientQrStatus("QR code did not contain a valid recipient address.");
+      if (source === "scanned") setRecipientQrStatus("QR code did not contain a valid recipient address.");
       return;
     }
 
     setRecipientAddress(parsedAddress);
     setRecipientAddressMode("custom");
+    setRecipientAddressSource(source);
     setQuoteValidationVisible(false);
     closeRecipientAddressDialog();
     clearQuoteState();
@@ -1304,8 +1316,15 @@ export default function Page() {
           <div className="recipientPanel">
             <div className="recipientHeader">
               <div className="label">Recipient address</div>
+              <div className="recipientSourcePill" title={recipientAddressDisplay.title} aria-label={recipientAddressDisplay.title}>
+                <span className="recipientSourceDot" aria-hidden="true" />
+                <span className="recipientSourceText">
+                  <span className="recipientSourceName">{recipientAddressDisplay.primary}</span>
+                  <span className="recipientSourceMeta">{recipientAddressDisplay.secondary}</span>
+                </span>
+              </div>
             </div>
-            <div className="recipientRow" title={recipientTooltip} aria-label={recipientTooltip}>
+            <div className="recipientRow" title={recipientAddressDisplay.title} aria-label={recipientAddressDisplay.title}>
               <input
                 className="input recipientAddressInput"
                 value={recipientAddress}
@@ -1776,6 +1795,43 @@ function getWalletNetworkLabel(chainId: number | null, fallback: string | undefi
 
 function getEmbeddedAccountLabel(user: { username?: string | null; email?: string | null } | undefined): string {
   return user?.username?.trim() || user?.email?.trim() || "";
+}
+
+function buildRecipientAddressDisplay(params: {
+  address: string;
+  networkName: string;
+  source: RecipientAddressSource;
+}): { primary: string; secondary: string; title: string } {
+  const sourceLabel = getRecipientAddressSourceLabel(params.source);
+  if (!params.address.trim()) {
+    return {
+      primary: sourceLabel,
+      secondary: "No address selected",
+      title: `${sourceLabel}: no recipient address selected`
+    };
+  }
+
+  const shortAddress = shortAddr(params.address);
+  return {
+    primary: sourceLabel,
+    secondary: `${shortAddress} - ${params.networkName}`,
+    title: `${sourceLabel} on ${params.networkName}: ${params.address}`
+  };
+}
+
+function getRecipientAddressSourceLabel(source: RecipientAddressSource): string {
+  switch (source) {
+    case "connected":
+      return "Current wallet";
+    case "pasted":
+      return "Pasted address";
+    case "scanned":
+      return "Scanned QR";
+    case "wallet_import":
+      return "Imported wallet";
+    default:
+      return "Recipient";
+  }
 }
 
 function buildFallbackTokensByChain(chainIds: number[]): Record<number, TokenInfo[]> {

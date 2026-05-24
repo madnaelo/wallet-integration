@@ -310,8 +310,57 @@ body {
 .recipientHeader {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 6px;
+}
+
+.recipientSourcePill {
+  align-items: center;
+  background: rgba(110, 168, 254, 0.11);
+  border: 1px solid rgba(110, 168, 254, 0.24);
+  border-radius: 10px;
+  color: var(--text);
+  display: grid;
+  flex: 0 1 260px;
+  gap: 8px;
+  grid-template-columns: 8px minmax(0, 1fr);
+  min-height: 38px;
+  min-width: 0;
+  padding: 7px 10px;
+}
+
+.recipientSourceDot {
+  background: var(--accent);
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px rgba(110, 168, 254, 0.12);
+  height: 8px;
+  width: 8px;
+}
+
+.recipientSourceText {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.recipientSourceName,
+.recipientSourceMeta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipientSourceName {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recipientSourceMeta {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .recipientRow {
