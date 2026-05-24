@@ -181,6 +181,8 @@ Implemented now:
 - Backend notification preferences, scheduled reverse-swap profit scanning, and
   email/Telegram delivery adapters.
 - Favorite pairs with above/below target-rate alerts.
+- Telegram linking through bot start codes instead of exposing chat IDs to
+  users.
 
 Not implemented yet:
 

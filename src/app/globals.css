@@ -52,6 +52,34 @@ body {
   font-size: 13px;
 }
 
+.appNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.appNavButton {
+  background: rgba(110, 168, 254, 0.1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 6px 11px;
+}
+
+.appNavButton:hover,
+.appNavButton:focus-visible,
+.appNavButtonActive {
+  background: rgba(110, 168, 254, 0.22);
+  border-color: rgba(110, 168, 254, 0.62);
+  outline: none;
+}
+
 .panel {
   background: rgba(18, 26, 42, 0.85);
   border: 1px solid var(--border);
@@ -943,6 +971,26 @@ body {
   margin-top: 14px;
 }
 
+.pagePanel {
+  margin-top: 14px;
+}
+
+.pageHeader {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+}
+
+.pageHeader h2 {
+  font-size: 18px;
+  line-height: 1.2;
+  margin: 0 0 4px;
+}
+
 .historyPanel > summary {
   cursor: pointer;
   list-style: none;
@@ -1036,6 +1084,42 @@ body {
 .settingsActions {
   display: flex;
   justify-content: flex-end;
+}
+
+.telegramConnectPanel {
+  background: rgba(6, 12, 24, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 12px;
+}
+
+.telegramStatus {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.telegramCodeBox {
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding: 9px 10px;
+}
+
+.telegramCodeBox strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+.telegramActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .favoriteComposer {

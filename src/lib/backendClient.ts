@@ -57,6 +57,13 @@ export type SaveNotificationPreferenceRequest = {
   cooldownMinutes?: number;
 };
 
+export type TelegramLinkStart = {
+  code: string;
+  botUsername: string;
+  deepLink: string;
+  expiresAt: string;
+};
+
 export type FavoritePair = {
   id: string;
   walletAddress: string;
@@ -167,6 +174,30 @@ export async function saveNotificationPreferences(
       Authorization: `Bearer ${session.accessToken}`
     },
     body: JSON.stringify(request)
+  });
+}
+
+export async function startTelegramLink(
+  backendBaseUrl: string,
+  session: BackendSession
+): Promise<TelegramLinkStart> {
+  return backendFetch<TelegramLinkStart>(backendBaseUrl, "/api/notifications/preferences/telegram-link", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    }
+  });
+}
+
+export async function completeTelegramLink(
+  backendBaseUrl: string,
+  session: BackendSession
+): Promise<NotificationPreference> {
+  return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences/telegram-link/complete", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    }
   });
 }
 

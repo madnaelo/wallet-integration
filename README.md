@@ -38,6 +38,8 @@ Implemented:
   before evaluating historical swaps to reduce provider pressure.
 - Wallet-owned favorite pairs with optional target-rate Telegram/email alerts
   using above/below thresholds.
+- Page-like navigation for Swap, Favorites, and Preferences. Telegram is linked
+  through the bot flow instead of asking users for a chat ID.
 
 Not implemented yet:
 
@@ -229,4 +231,6 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 21](docs/prompt21_f.md): recipient address source label.
 - [Prompt 22](docs/prompt22_f.md): reverse-swap profit notifications.
 - [Prompt 23](docs/prompt23_f.md): Telegram settings and favorite-pair alerts.
+- [Prompt 24](docs/prompt24_f.md): user-friendly Telegram linking and separate
+  settings pages.
 

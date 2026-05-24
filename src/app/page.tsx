@@ -25,7 +25,9 @@ import {
   type NotificationPreference,
   type SaveFavoritePairRequest,
   type SaveSwapHistoryRequest,
+  type TelegramLinkStart,
   type SwapHistoryRecord,
+  completeTelegramLink,
   deleteFavoritePair,
   getNotificationPreferences,
   listFavoritePairs,
@@ -34,10 +36,12 @@ import {
   saveFavoritePair,
   saveNotificationPreferences,
   saveSwapHistory,
+  startTelegramLink,
   verifyAuthSignature
 } from "@/lib/backendClient";
 
 type TxStatus = "idle" | "pending" | "submitted" | "confirmed" | "failed";
+type ActiveView = "swap" | "favorites" | "preferences";
 const QUOTE_TTL_SECONDS = 20;
 const BACKEND_SESSION_STORAGE_KEY = "wallet.swapAssistant.backendSession.v1";
 const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
@@ -111,6 +115,7 @@ export default function Page() {
   const { walletInfo } = useWalletInfo("eip155");
   const { disconnect: disconnectAppKit } = useDisconnect();
   const isDryRun = envPublic.DISALLOW_MAINNET;
+  const [activeView, setActiveView] = useState<ActiveView>("swap");
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
 
   const [provider, setProvider] = useState<Eip1193Provider | null>(null);
@@ -158,7 +163,6 @@ export default function Page() {
   const [historyError, setHistoryError] = useState<string>("");
   const [historyNotice, setHistoryNotice] = useState<string>("");
   const historyRequestInFlightRef = useRef<boolean>(false);
-  const [notificationsExpanded, setNotificationsExpanded] = useState<boolean>(false);
   const [notificationPreference, setNotificationPreference] = useState<NotificationPreference | null>(null);
   const [notificationPreferenceLoaded, setNotificationPreferenceLoaded] = useState<boolean>(false);
   const [notificationPreferenceLoading, setNotificationPreferenceLoading] = useState<boolean>(false);
@@ -166,9 +170,10 @@ export default function Page() {
   const [notificationPreferenceError, setNotificationPreferenceError] = useState<string>("");
   const [notificationPreferenceNotice, setNotificationPreferenceNotice] = useState<string>("");
   const [telegramEnabledDraft, setTelegramEnabledDraft] = useState<boolean>(false);
-  const [telegramChatIdDraft, setTelegramChatIdDraft] = useState<string>("");
+  const [telegramLink, setTelegramLink] = useState<TelegramLinkStart | null>(null);
+  const [telegramLinkLoading, setTelegramLinkLoading] = useState<boolean>(false);
+  const [telegramLinkChecking, setTelegramLinkChecking] = useState<boolean>(false);
   const notificationPreferenceRequestInFlightRef = useRef<boolean>(false);
-  const [favoritesExpanded, setFavoritesExpanded] = useState<boolean>(false);
   const [favoritePairs, setFavoritePairs] = useState<FavoritePair[]>([]);
   const [favoritePairsLoaded, setFavoritePairsLoaded] = useState<boolean>(false);
   const [favoritePairsLoading, setFavoritePairsLoading] = useState<boolean>(false);
@@ -295,6 +300,26 @@ export default function Page() {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (activeView !== "preferences" || !walletAddress || notificationPreferenceLoaded) return;
+    const stored = backendSession ?? readStoredBackendSession();
+    if (stored && isSessionForWallet(stored, walletAddress)) {
+      void refreshNotificationPreferences();
+    }
+    // Load exactly when the Preferences view becomes active with an existing session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, backendSession, notificationPreferenceLoaded, walletAddress]);
+
+  useEffect(() => {
+    if (activeView !== "favorites" || !walletAddress || favoritePairsLoaded) return;
+    const stored = backendSession ?? readStoredBackendSession();
+    if (stored && isSessionForWallet(stored, walletAddress)) {
+      void refreshFavoritePairs();
+    }
+    // Load exactly when the Favorites view becomes active with an existing session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, backendSession, favoritePairsLoaded, walletAddress]);
 
   useEffect(() => {
     if (appKitConnected && appKitAddress && appKitProvider) {
@@ -915,7 +940,6 @@ export default function Page() {
   }
 
   function resetNotificationPreferenceState() {
-    setNotificationsExpanded(false);
     setNotificationPreference(null);
     setNotificationPreferenceLoaded(false);
     setNotificationPreferenceLoading(false);
@@ -923,12 +947,13 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     setTelegramEnabledDraft(false);
-    setTelegramChatIdDraft("");
+    setTelegramLink(null);
+    setTelegramLinkLoading(false);
+    setTelegramLinkChecking(false);
     notificationPreferenceRequestInFlightRef.current = false;
   }
 
   function resetFavoritePairsState() {
-    setFavoritesExpanded(false);
     setFavoritePairs([]);
     setFavoritePairsLoaded(false);
     setFavoritePairsLoading(false);
@@ -968,19 +993,7 @@ export default function Page() {
     setNotificationPreference(preference);
     setNotificationPreferenceLoaded(true);
     setTelegramEnabledDraft(preference.telegramEnabled);
-    setTelegramChatIdDraft(preference.telegramChatId ?? "");
-  }
-
-  function onNotificationsToggle(event: { currentTarget: HTMLDetailsElement }) {
-    const expanded = event.currentTarget.open;
-    setNotificationsExpanded(expanded);
-
-    if (!expanded || !walletAddress || notificationPreferenceLoaded || notificationPreferenceRequestInFlightRef.current) return;
-
-    const stored = backendSession ?? readStoredBackendSession();
-    if (stored && isSessionForWallet(stored, walletAddress)) {
-      void refreshNotificationPreferences();
-    }
+    if (preference.telegramChatId) setTelegramLink(null);
   }
 
   async function saveTelegramPreference() {
@@ -988,11 +1001,14 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
+      if (telegramEnabledDraft && !notificationPreference?.telegramChatId) {
+        throw new Error("Connect Telegram before enabling Telegram alerts.");
+      }
       const session = await ensureBackendSession();
       const preference = await saveNotificationPreferences(envPublic.BACKEND_BASE_URL, session, {
         emailAddress: notificationPreference?.emailAddress ?? null,
         emailEnabled: notificationPreference?.emailEnabled ?? false,
-        telegramChatId: telegramChatIdDraft.trim() || null,
+        telegramChatId: notificationPreference?.telegramChatId ?? null,
         telegramEnabled: telegramEnabledDraft,
         reverseProfitThresholdBps: notificationPreference?.reverseProfitThresholdBps ?? 100,
         cooldownMinutes: notificationPreference?.cooldownMinutes ?? 360
@@ -1007,6 +1023,47 @@ export default function Page() {
       setNotificationPreferenceError(normalizeWalletError(e));
     } finally {
       setNotificationPreferenceSaving(false);
+    }
+  }
+
+  async function startTelegramConnection() {
+    setTelegramLinkLoading(true);
+    setNotificationPreferenceError("");
+    setNotificationPreferenceNotice("");
+    try {
+      const session = await ensureBackendSession();
+      const link = await startTelegramLink(envPublic.BACKEND_BASE_URL, session);
+      setTelegramLink(link);
+      setNotificationPreferenceNotice("Telegram opened with a one-time connection code. Tap Start, then return here.");
+      if (link.deepLink) window.open(link.deepLink, "_blank", "noopener,noreferrer");
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setNotificationPreferenceError(normalizeWalletError(e));
+    } finally {
+      setTelegramLinkLoading(false);
+    }
+  }
+
+  async function checkTelegramConnection() {
+    setTelegramLinkChecking(true);
+    setNotificationPreferenceError("");
+    setNotificationPreferenceNotice("");
+    try {
+      const session = await ensureBackendSession();
+      const preference = await completeTelegramLink(envPublic.BACKEND_BASE_URL, session);
+      applyNotificationPreference(preference);
+      setNotificationPreferenceNotice("Telegram connected. Alerts are enabled for this wallet.");
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setNotificationPreferenceError(normalizeWalletError(e));
+    } finally {
+      setTelegramLinkChecking(false);
     }
   }
 
@@ -1030,18 +1087,6 @@ export default function Page() {
     } finally {
       setFavoritePairsLoading(false);
       favoritePairsRequestInFlightRef.current = false;
-    }
-  }
-
-  function onFavoritesToggle(event: { currentTarget: HTMLDetailsElement }) {
-    const expanded = event.currentTarget.open;
-    setFavoritesExpanded(expanded);
-
-    if (!expanded || !walletAddress || favoritePairsLoaded || favoritePairsRequestInFlightRef.current) return;
-
-    const stored = backendSession ?? readStoredBackendSession();
-    if (stored && isSessionForWallet(stored, walletAddress)) {
-      void refreshFavoritePairs();
     }
   }
 
@@ -1450,6 +1495,29 @@ export default function Page() {
         <div>
           <h1 className="h1">The Wallet</h1>
           <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
+          <nav className="appNav" aria-label="Main navigation">
+            <button
+              className={`appNavButton${activeView === "swap" ? " appNavButtonActive" : ""}`}
+              type="button"
+              onClick={() => setActiveView("swap")}
+            >
+              Swap
+            </button>
+            <button
+              className={`appNavButton${activeView === "favorites" ? " appNavButtonActive" : ""}`}
+              type="button"
+              onClick={() => setActiveView("favorites")}
+            >
+              Favorites
+            </button>
+            <button
+              className={`appNavButton${activeView === "preferences" ? " appNavButtonActive" : ""}`}
+              type="button"
+              onClick={() => setActiveView("preferences")}
+            >
+              Preferences
+            </button>
+          </nav>
         </div>
         <div className="walletActions">
           {walletAddress ? (
@@ -1489,6 +1557,8 @@ export default function Page() {
 
       {!walletAddress ? <div className="small" style={{ marginBottom: 12 }}>{connectHint}</div> : null}
 
+      {activeView === "swap" ? (
+        <>
       <div className="grid">
         <div className="panel">
           <div>
@@ -2009,33 +2079,25 @@ export default function Page() {
           )}
         </div>
       </details>
+        </>
+      ) : null}
 
-      <details className="panel historyPanel settingsPanel" open={notificationsExpanded} onToggle={onNotificationsToggle}>
-        <summary className="historySummary">
-          <span className="historyChevron" aria-hidden="true" />
-          <span className="historyTitleBlock">
-            <span className="label">Notifications</span>
-            <span className="subtle">
-              {walletAddress
-                ? notificationPreference?.telegramEnabled
-                  ? "Telegram alerts are enabled."
-                  : "Manage Telegram alerts for this wallet."
-                : "Connect your wallet to manage alerts."}
-            </span>
-          </span>
-          <span className="historyActions">
+      {activeView === "preferences" ? (
+        <section className="panel pagePanel settingsPanel" aria-labelledby="preferences-title">
+          <div className="pageHeader">
+            <div>
+              <h2 id="preferences-title">Preferences</h2>
+              <div className="subtle">Telegram, alerts, and wallet-owned notification settings.</div>
+            </div>
             <span className="badge">
               {notificationPreferenceLoading
                 ? "Loading settings"
-                : notificationsExpanded
-                  ? notificationPreferenceLoaded
-                    ? "Ready"
-                    : "Sign in to load"
-                  : "Expand settings"}
+                : notificationPreference?.telegramEnabled
+                  ? "Telegram on"
+                  : "Telegram off"}
             </span>
-          </span>
-        </summary>
-        <div className="historyContent settingsContent">
+          </div>
+        <div className="settingsContent">
           <div className="quoteHeader">
             <div className="subtle">
               {walletAddress
@@ -2064,20 +2126,43 @@ export default function Page() {
               />
               <span>
                 <strong>Telegram alerts</strong>
-                <span className="subtle">Receive reverse-profit and favorite-pair alerts in Telegram.</span>
+                <span className="subtle">
+                  {notificationPreference?.telegramChatId
+                    ? "Receive reverse-profit and favorite-pair alerts in Telegram."
+                    : "Connect the Telegram bot once, then alerts can be delivered there."}
+                </span>
               </span>
             </label>
 
-            <div>
-              <div className="label">Telegram chat ID</div>
-              <input
-                className="input"
-                value={telegramChatIdDraft}
-                onChange={(event) => setTelegramChatIdDraft(event.target.value)}
-                placeholder="7088335929"
-                inputMode="numeric"
-                disabled={!walletAddress}
-              />
+            <div className="telegramConnectPanel">
+              <div className="label">Telegram</div>
+              <div className="telegramStatus">
+                {notificationPreference?.telegramChatId ? "Connected" : "Not connected"}
+              </div>
+              {telegramLink ? (
+                <div className="telegramCodeBox">
+                  <span className="subtle">Connection code</span>
+                  <strong>{telegramLink.code}</strong>
+                </div>
+              ) : null}
+              <div className="telegramActions">
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={startTelegramConnection}
+                  disabled={!walletAddress || telegramLinkLoading}
+                >
+                  {telegramLinkLoading ? "Opening..." : notificationPreference?.telegramChatId ? "Reconnect Telegram" : "Connect Telegram"}
+                </button>
+                <button
+                  className="btn btnPrimary"
+                  type="button"
+                  onClick={checkTelegramConnection}
+                  disabled={!walletAddress || telegramLinkChecking || !telegramLink}
+                >
+                  {telegramLinkChecking ? "Checking..." : "Check Connection"}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -2095,34 +2180,25 @@ export default function Page() {
             </button>
           </div>
         </div>
-      </details>
+        </section>
+      ) : null}
 
-      <details className="panel historyPanel favoritesPanel" open={favoritesExpanded} onToggle={onFavoritesToggle}>
-        <summary className="historySummary">
-          <span className="historyChevron" aria-hidden="true" />
-          <span className="historyTitleBlock">
-            <span className="label">Favorite Pairs</span>
-            <span className="subtle">
-              {walletAddress
-                ? favoritePairsLoaded
-                  ? `${favoritePairs.length} saved`
-                  : "Save pairs and target-rate alerts for this wallet."
-                : "Connect your wallet to save favorite pairs."}
-            </span>
-          </span>
-          <span className="historyActions">
-            <span className="badge">
-              {favoritePairsLoading
-                ? "Loading favorites"
-                : favoritesExpanded
+      {activeView === "favorites" ? (
+        <section className="panel pagePanel favoritesPanel" aria-labelledby="favorites-title">
+          <div className="pageHeader">
+            <div>
+              <h2 id="favorites-title">Favorite Pairs</h2>
+              <div className="subtle">
+                {walletAddress
                   ? favoritePairsLoaded
-                    ? "Ready"
-                    : "Sign in to load"
-                  : "Expand favorites"}
-            </span>
-          </span>
-        </summary>
-        <div className="historyContent settingsContent">
+                    ? `${favoritePairs.length} saved`
+                    : "Save pairs and target-rate alerts for this wallet."
+                  : "Connect your wallet to save favorite pairs."}
+              </div>
+            </div>
+            <span className="badge">{favoritePairsLoading ? "Loading favorites" : "Favorites"}</span>
+          </div>
+        <div className="settingsContent">
           <div className="quoteHeader">
             <div className="subtle">
               {sellTokenInfo && buyTokenInfo
@@ -2235,7 +2311,8 @@ export default function Page() {
             </div>
           )}
         </div>
-      </details>
+        </section>
+      ) : null}
     </div>
   );
 }
