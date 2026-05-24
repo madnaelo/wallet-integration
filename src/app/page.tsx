@@ -17,7 +17,7 @@ import { buildQuoteUrl } from "@/lib/quoteClient";
 import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import { swapLog } from "@/lib/swapLog";
 import { listTokens } from "@/lib/tokenClient";
-import { TokenPicker } from "@/components/TokenPicker";
+import { TokenPicker, type TokenPickerOption } from "@/components/TokenPicker";
 import {
   BackendClientError,
   type BackendSession,
@@ -117,7 +117,6 @@ export default function Page() {
   const [historyError, setHistoryError] = useState<string>("");
   const [historyNotice, setHistoryNotice] = useState<string>("");
   const historyRequestInFlightRef = useRef<boolean>(false);
-  const networkMenuRef = useRef<HTMLDetailsElement>(null);
   const previousBuyTokenAddressRef = useRef<string>("");
   const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
@@ -126,43 +125,86 @@ export default function Page() {
   const applyRecipientAddressRef = useRef<(rawValue: string, sourceLabel?: string) => void>(() => undefined);
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
-  const [tokens, setTokens] = useState<TokenInfo[]>(() => DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? []);
-  const [tokensLoading, setTokensLoading] = useState<boolean>(false);
+  const [tokensByChain, setTokensByChain] = useState<Record<number, TokenInfo[]>>(() =>
+    buildFallbackTokensByChain(allowedChains.map((allowedChain) => allowedChain.chainId))
+  );
+  const [tokensLoadingByChain, setTokensLoadingByChain] = useState<Record<number, boolean>>({});
   const [tokenListNotice, setTokenListNotice] = useState<string>("");
+  const tokens = useMemo(
+    () => tokensByChain[selectedChainId] ?? DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [],
+    [selectedChainId, tokensByChain]
+  );
+  const tokensLoading = useMemo(
+    () => allowedChains.some((allowedChain) => tokensLoadingByChain[allowedChain.chainId]),
+    [allowedChains, tokensLoadingByChain]
+  );
+  const tokenPickerTokens = useMemo(
+    () => buildTokenPickerOptions(allowedChains, tokensByChain, selectedChainId),
+    [allowedChains, selectedChainId, tokensByChain]
+  );
 
   useEffect(() => {
-    const fallbackTokens = DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [];
-    const controller = new AbortController();
-    setTokens(fallbackTokens);
-    setTokensLoading(true);
+    const controllers: AbortController[] = [];
+    setTokensByChain((current) => {
+      const next = { ...current };
+      for (const allowedChain of allowedChains) {
+        next[allowedChain.chainId] = next[allowedChain.chainId] ?? DEFAULT_TOKENS_BY_CHAIN[allowedChain.chainId] ?? [];
+      }
+      return next;
+    });
+    setTokensLoadingByChain(
+      Object.fromEntries(allowedChains.map((allowedChain) => [allowedChain.chainId, true]))
+    );
     setTokenListNotice("");
 
-    listTokens(selectedChainId, controller.signal)
-      .then((availableTokens) => {
-        if (!availableTokens.length) {
-          setTokenListNotice("Showing popular tokens for this network.");
-          return;
-        }
-        setTokens(availableTokens);
-      })
-      .catch((error: any) => {
-        if (error?.name === "AbortError") return;
-        setTokenListNotice("Showing popular tokens while the full token list is unavailable.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setTokensLoading(false);
-      });
+    for (const allowedChain of allowedChains) {
+      const controller = new AbortController();
+      controllers.push(controller);
+      listTokens(allowedChain.chainId, controller.signal)
+        .then((availableTokens) => {
+          if (!availableTokens.length) return;
+          setTokensByChain((current) => ({
+            ...current,
+            [allowedChain.chainId]: availableTokens
+          }));
+        })
+        .catch((error: any) => {
+          if (error?.name === "AbortError") return;
+          setTokenListNotice("Showing popular tokens while the full token list is unavailable.");
+        })
+        .finally(() => {
+          if (controller.signal.aborted) return;
+          setTokensLoadingByChain((current) => ({
+            ...current,
+            [allowedChain.chainId]: false
+          }));
+        });
+    }
 
-    return () => controller.abort();
-  }, [selectedChainId]);
+    return () => controllers.forEach((controller) => controller.abort());
+  }, [allowedChains]);
 
   useEffect(() => {
     const sellTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(sellToken));
     const buyTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken));
 
     if (!sellTokenAvailable && tokens.length > 0) setSellToken(tokens[0]!.address);
-    if (!buyTokenAvailable && tokens.length > 1) setBuyToken(tokens[1]!.address);
+    if (!buyTokenAvailable && tokens.length > 1) {
+      const fallbackBuyToken = tokens.find((token) => normalizeTokenKey(token.address) !== normalizeTokenKey(tokens[0]!.address));
+      if (fallbackBuyToken) setBuyToken(fallbackBuyToken.address);
+    }
   }, [tokens, sellToken, buyToken]);
+
+  useEffect(() => {
+    if (!allowedChains.some((allowedChain) => allowedChain.chainId === selectedChainId)) {
+      setSelectedChainId(allowedChains[0]?.chainId ?? 11155111);
+      setSellToken("");
+      setBuyToken("");
+      clearQuoteState();
+      setActionError("");
+      return;
+    }
+  }, [allowedChains, selectedChainId]);
 
   useEffect(() => {
     if (!walletChainId || !allowedChains.some((allowedChain) => allowedChain.chainId === walletChainId)) return;
@@ -458,14 +500,27 @@ export default function Page() {
     setSwapStatus("idle");
   }
 
-  function selectSwapChain(chainId: number) {
-    if (networkMenuRef.current) networkMenuRef.current.open = false;
-    if (chainId === selectedChainId) return;
+  function selectTokenForSide(side: "sell" | "buy", address: string, chainId: number) {
+    const chainChanged = chainId !== selectedChainId;
 
-    setSelectedChainId(chainId);
-    setSellToken("");
-    setBuyToken("");
-    setRecipientAddressMode("connected");
+    if (chainChanged) {
+      setSelectedChainId(chainId);
+      if (side === "sell") {
+        setSellToken(address);
+        setBuyToken("");
+      } else {
+        setSellToken("");
+        setBuyToken(address);
+      }
+    } else if (side === "sell") {
+      setSellToken(address);
+    } else {
+      setBuyToken(address);
+    }
+
+    if (side === "buy" || chainChanged) {
+      setRecipientAddressMode("connected");
+    }
     clearQuoteState();
     setActionError("");
   }
@@ -1037,26 +1092,6 @@ export default function Page() {
           <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
         </div>
         <div className="walletActions">
-          <details className="networkMenu" ref={networkMenuRef}>
-            <summary className="badge networkSummary" aria-label={`Network: ${chain?.name ?? "Network"}`}>
-              <span>Network</span>
-              <strong>{chain?.name ?? "Choose"}</strong>
-              <span className="networkChevron" aria-hidden="true" />
-            </summary>
-            <div className="networkPanel">
-              {allowedChains.map((allowedChain) => (
-                <button
-                  className={`networkOption${allowedChain.chainId === selectedChainId ? " networkOptionSelected" : ""}`}
-                  type="button"
-                  key={allowedChain.chainId}
-                  onClick={() => selectSwapChain(allowedChain.chainId)}
-                >
-                  {allowedChain.name}
-                </button>
-              ))}
-              <div className="small">Wallet: {formatWalletNetwork(walletChainId)}</div>
-            </div>
-          </details>
           <button className="btn btnPrimary" onClick={openWalletChooser} disabled={!!walletAddress}>
             {walletAddress ? `Connected: ${shortAddr(walletAddress)}` : "Connect Wallet"}
           </button>
@@ -1105,12 +1140,13 @@ export default function Page() {
               <TokenPicker
                 label="Sell token"
                 value={sellToken}
-                tokens={tokens}
+                selectedChainId={selectedChainId}
+                chains={allowedChains}
+                tokens={tokenPickerTokens}
                 loading={tokensLoading}
-                onChange={(value) => {
+                onChange={(value, chainId) => {
                   requireWalletForForm();
-                  setSellToken(value);
-                  clearQuoteState();
+                  selectTokenForSide("sell", value, chainId);
                 }}
                 invalid={quoteValidationVisible && !!quoteValidationErrors.sellToken}
                 describedBy="sell-token-error"
@@ -1150,13 +1186,13 @@ export default function Page() {
               <TokenPicker
                 label="Buy token"
                 value={buyToken}
-                tokens={tokens}
+                selectedChainId={selectedChainId}
+                chains={allowedChains}
+                tokens={tokenPickerTokens}
                 loading={tokensLoading}
-                onChange={(value) => {
+                onChange={(value, chainId) => {
                   requireWalletForForm();
-                  setBuyToken(value);
-                  setRecipientAddressMode("connected");
-                  clearQuoteState();
+                  selectTokenForSide("buy", value, chainId);
                 }}
                 invalid={quoteValidationVisible && !!quoteValidationErrors.buyToken}
                 describedBy="buy-token-error"
@@ -1608,6 +1644,37 @@ function shortAddr(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
+function buildFallbackTokensByChain(chainIds: number[]): Record<number, TokenInfo[]> {
+  return Object.fromEntries(chainIds.map((chainId) => [chainId, DEFAULT_TOKENS_BY_CHAIN[chainId] ?? []]));
+}
+
+function buildTokenPickerOptions(
+  chains: Array<{ chainId: number; name: string }>,
+  tokensByChain: Record<number, TokenInfo[]>,
+  selectedChainId: number
+): TokenPickerOption[] {
+  const options: TokenPickerOption[] = [];
+  const seen = new Set<string>();
+
+  for (const chain of chains) {
+    const chainTokens = tokensByChain[chain.chainId] ?? DEFAULT_TOKENS_BY_CHAIN[chain.chainId] ?? [];
+    for (const token of chainTokens) {
+      if (token.assetKind === "bitcoin" && chain.chainId !== selectedChainId) continue;
+
+      const key = `${chain.chainId}:${normalizeTokenKey(token.address)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      options.push({
+        ...token,
+        chainId: chain.chainId,
+        chainName: chain.name
+      });
+    }
+  }
+
+  return options;
+}
+
 function WalletSupportNotice({
   message,
   actionLabel,
@@ -1658,11 +1725,6 @@ function getWalletSupportNotice(params: {
       ? `Connected wallet does not support ${token.symbol} on ${network}.`
       : `Connected wallet does not support receiving ${token.symbol} on ${network}.`;
   return { message, actionLabel: "Switch to supported wallet", walletKind: "evm" };
-}
-
-function formatWalletNetwork(chainId: number | null): string {
-  if (!chainId) return "Not connected";
-  return getChainById(chainId)?.name ?? "Unsupported network";
 }
 
 function formatHistoryDate(value: string): string {
