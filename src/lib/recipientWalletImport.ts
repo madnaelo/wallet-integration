@@ -13,6 +13,7 @@ type RecipientWalletImportParams = {
 type ImportedRecipientAddress = {
   address: string;
   topic: string;
+  walletName?: string;
 };
 
 type RecipientWalletImport = {
@@ -63,7 +64,8 @@ export async function createRecipientWalletImport({
 
       return {
         address,
-        topic: session.topic
+        topic: session.topic,
+        walletName: getWalletNameFromSession(session)
       };
     },
     disconnect: async (topic: string) => {
@@ -103,4 +105,9 @@ function getEvmAccountFromSession(session: any, chainId: number): string {
     accounts.find((account: unknown) => typeof account === "string") ??
     ""
   );
+}
+
+function getWalletNameFromSession(session: any): string | undefined {
+  const name = session?.peer?.metadata?.name;
+  return typeof name === "string" && name.trim() ? name.trim() : undefined;
 }

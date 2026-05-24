@@ -308,11 +308,10 @@ body {
 }
 
 .recipientHeader {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: flex-start;
+  display: grid;
+  gap: 6px;
+  justify-content: start;
   margin-bottom: 6px;
 }
 
@@ -323,12 +322,12 @@ body {
   border-radius: 10px;
   color: var(--text);
   display: grid;
-  flex: 0 1 260px;
   gap: 8px;
   grid-template-columns: 8px minmax(0, 1fr);
-  min-height: 38px;
+  max-width: 100%;
+  min-height: 30px;
   min-width: 0;
-  padding: 7px 10px;
+  padding: 5px 9px;
 }
 
 .recipientSourceDot {
@@ -339,28 +338,13 @@ body {
   width: 8px;
 }
 
-.recipientSourceText {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.recipientSourceName,
-.recipientSourceMeta {
+.recipientSourceLabel {
+  font-size: 12px;
+  font-weight: 700;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.recipientSourceName {
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.recipientSourceMeta {
-  color: var(--muted);
-  font-size: 11px;
 }
 
 .recipientRow {

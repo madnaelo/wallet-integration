@@ -115,6 +115,7 @@ export default function Page() {
   const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [recipientAddressMode, setRecipientAddressMode] = useState<RecipientAddressMode>("connected");
   const [recipientAddressSource, setRecipientAddressSource] = useState<RecipientAddressSource>("connected");
+  const [recipientImportedWalletName, setRecipientImportedWalletName] = useState<string>("");
   const [recipientDialogOpen, setRecipientDialogOpen] = useState<boolean>(false);
   const [recipientDialogMode, setRecipientDialogMode] = useState<RecipientDialogMode>("paste");
   const [recipientAddressDraft, setRecipientAddressDraft] = useState<string>("");
@@ -154,7 +155,9 @@ export default function Page() {
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
   const recipientQrTimerRef = useRef<number | null>(null);
   const recipientWalletImportRunRef = useRef<number>(0);
-  const applyRecipientAddressRef = useRef<(rawValue: string, source?: RecipientAddressSource) => void>(() => undefined);
+  const applyRecipientAddressRef = useRef<(rawValue: string, source?: RecipientAddressSource, walletName?: string) => void>(
+    () => undefined
+  );
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
   const [tokensByChain, setTokensByChain] = useState<Record<number, TokenInfo[]>>(() =>
@@ -378,9 +381,10 @@ export default function Page() {
       buildRecipientAddressDisplay({
         address: recipientAddress,
         networkName: getTokenNetworkName(buyTokenInfo, chain?.name),
-        source: recipientAddressMode === "connected" ? "connected" : recipientAddressSource
+        source: recipientAddressMode === "connected" ? "connected" : recipientAddressSource,
+        walletName: recipientAddressSource === "wallet_import" ? recipientImportedWalletName : ""
       }),
-    [buyTokenInfo, chain?.name, recipientAddress, recipientAddressMode, recipientAddressSource]
+    [buyTokenInfo, chain?.name, recipientAddress, recipientAddressMode, recipientAddressSource, recipientImportedWalletName]
   );
   const hasAnyWalletAddress = Object.values(connectedWallets).some(Boolean);
   const sourceWalletNotice = getWalletSupportNotice({
@@ -434,6 +438,7 @@ export default function Page() {
     if (recipientAddressMode === "connected") {
       setRecipientAddress(destinationWalletAddress);
       setRecipientAddressSource("connected");
+      setRecipientImportedWalletName("");
     }
   }, [destinationWalletAddress, recipientAddressMode]);
 
@@ -444,6 +449,7 @@ export default function Page() {
     previousBuyTokenAddressRef.current = buyTokenAddress;
     setRecipientAddressMode("connected");
     setRecipientAddressSource("connected");
+    setRecipientImportedWalletName("");
     setRecipientAddress(destinationWalletAddress);
     setRecipientDialogOpen(false);
     setRecipientDialogError("");
@@ -577,6 +583,7 @@ export default function Page() {
     if (side === "buy" || chainChanged) {
       setRecipientAddressMode("connected");
       setRecipientAddressSource("connected");
+      setRecipientImportedWalletName("");
     }
     clearQuoteState();
     setActionError("");
@@ -607,6 +614,7 @@ export default function Page() {
 
     setRecipientAddressMode("connected");
     setRecipientAddressSource("connected");
+    setRecipientImportedWalletName("");
     clearQuoteState();
     setActionError("");
   }
@@ -688,6 +696,7 @@ export default function Page() {
     setRecipientAddress(destinationWalletAddress);
     setRecipientAddressMode("connected");
     setRecipientAddressSource("connected");
+    setRecipientImportedWalletName("");
     setQuoteValidationVisible(false);
     closeRecipientAddressDialog();
     clearQuoteState();
@@ -730,7 +739,7 @@ export default function Page() {
       }
 
       await recipientImport.disconnect(imported.topic).catch(() => undefined);
-      applyRecipientAddress(imported.address, "wallet_import");
+      applyRecipientAddress(imported.address, "wallet_import", imported.walletName);
     } catch (e: any) {
       if (recipientWalletImportRunRef.current !== runId) return;
       setRecipientDialogError(normalizeRecipientImportError(e));
@@ -740,7 +749,7 @@ export default function Page() {
     }
   }
 
-  function applyRecipientAddress(rawValue: string, source: RecipientAddressSource = "pasted") {
+  function applyRecipientAddress(rawValue: string, source: RecipientAddressSource = "pasted", walletName = "") {
     const parsedAddress = parseRecipientAddressInput(rawValue, buyTokenInfo);
     const validationError = validateRecipientAddress(parsedAddress, buyTokenInfo);
     if (validationError) {
@@ -752,6 +761,7 @@ export default function Page() {
     setRecipientAddress(parsedAddress);
     setRecipientAddressMode("custom");
     setRecipientAddressSource(source);
+    setRecipientImportedWalletName(source === "wallet_import" ? walletName.trim() : "");
     setQuoteValidationVisible(false);
     closeRecipientAddressDialog();
     clearQuoteState();
@@ -1318,10 +1328,7 @@ export default function Page() {
               <div className="label">Recipient address</div>
               <div className="recipientSourcePill" title={recipientAddressDisplay.title} aria-label={recipientAddressDisplay.title}>
                 <span className="recipientSourceDot" aria-hidden="true" />
-                <span className="recipientSourceText">
-                  <span className="recipientSourceName">{recipientAddressDisplay.primary}</span>
-                  <span className="recipientSourceMeta">{recipientAddressDisplay.secondary}</span>
-                </span>
+                <span className="recipientSourceLabel">{recipientAddressDisplay.label}</span>
               </div>
             </div>
             <div className="recipientRow" title={recipientAddressDisplay.title} aria-label={recipientAddressDisplay.title}>
@@ -1801,21 +1808,24 @@ function buildRecipientAddressDisplay(params: {
   address: string;
   networkName: string;
   source: RecipientAddressSource;
-}): { primary: string; secondary: string; title: string } {
+  walletName?: string;
+}): { label: string; title: string } {
   const sourceLabel = getRecipientAddressSourceLabel(params.source);
+  const walletName = params.source === "wallet_import" && params.walletName?.trim()
+    ? ` - ${params.walletName.trim()}`
+    : "";
+  const label = `${sourceLabel}${walletName} - ${params.networkName}`;
+
   if (!params.address.trim()) {
     return {
-      primary: sourceLabel,
-      secondary: "No address selected",
-      title: `${sourceLabel}: no recipient address selected`
+      label,
+      title: `${label}: no recipient address selected`
     };
   }
 
-  const shortAddress = shortAddr(params.address);
   return {
-    primary: sourceLabel,
-    secondary: `${shortAddress} - ${params.networkName}`,
-    title: `${sourceLabel} on ${params.networkName}: ${params.address}`
+    label,
+    title: `${label}: ${params.address}`
   };
 }
 

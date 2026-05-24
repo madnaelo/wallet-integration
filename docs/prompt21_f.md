@@ -6,13 +6,15 @@ or a custom recipient address they provided.
 
 ## Scope
 
-- Add an informative label beside the recipient address field.
+- Add an informative label directly below the `Recipient address` label.
 - Show `Current wallet` when the recipient is coming from the connected wallet.
 - Show `Pasted address` when the user saved a pasted address.
 - Show `Scanned QR` when the user saved an address from QR scanning.
 - Show `Imported wallet` when the address came from the wallet import flow.
-- Keep the shortened address and selected recipient network visible in the
-  supporting text.
+- Keep the label compact on one line and show the selected recipient network.
+- Do not duplicate the recipient address inside the label because the readonly
+  address field already displays it.
+- When wallet import exposes a wallet name, include it in the label.
 - Preserve the existing pencil edit flow.
 
 ## Product Guidance
