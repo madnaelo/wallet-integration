@@ -8,7 +8,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-@EnableConfigurationProperties({ApiProperties.class, AuthProperties.class})
+@EnableConfigurationProperties({ApiProperties.class, AuthProperties.class, NotificationProperties.class})
 public class WebConfig implements WebMvcConfigurer {
   private final ApiProperties apiProperties;
 
@@ -26,7 +26,7 @@ public class WebConfig implements WebMvcConfigurer {
     if (origins.contains("*")) {
       registry.addMapping("/api/**")
           .allowedOriginPatterns("*")
-          .allowedMethods("GET", "POST", "OPTIONS")
+          .allowedMethods("GET", "POST", "PUT", "OPTIONS")
           .allowedHeaders("*")
           .maxAge(3600);
       return;
@@ -34,7 +34,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     registry.addMapping("/api/**")
         .allowedOrigins(origins.toArray(String[]::new))
-        .allowedMethods("GET", "POST", "OPTIONS")
+        .allowedMethods("GET", "POST", "PUT", "OPTIONS")
         .allowedHeaders("*")
         .maxAge(3600);
   }

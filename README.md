@@ -33,13 +33,16 @@ Implemented:
   history.
 - Collapsed swap history panel that loads authenticated history on demand and
   stores dry-run, submitted cross-chain, or confirmed swaps.
+- Backend notification preferences, scheduled reverse-swap profit scanning, and
+  email/Telegram delivery adapters. The scanner batches market price reads
+  before evaluating historical swaps to reduce provider pressure.
 
 Not implemented yet:
 
 - Favorite token pairs.
-- Scheduled reverse-swap profit scanning.
-- Price alert thresholds.
-- Email, Telegram, push, or in-app notification delivery.
+- Frontend notification preferences UI.
+- General price alert thresholds beyond reverse-swap profit alerts.
+- Push or in-app notification delivery.
 - Guarded import-by-address flow and token risk signals.
 - Native BTC sell execution and cross-chain destination status tracking.
 
@@ -50,7 +53,8 @@ The repository keeps quote execution and persisted user data separate:
 - `src/`: Next.js frontend and quote route.
 - `src/lib/server/`: server-only swap provider clients, quote normalization,
   fee configuration, rate limiting, and quote cache.
-- `backend/`: Spring Boot API for wallet-authenticated history.
+- `backend/`: Spring Boot API for wallet-authenticated history and reverse
+  profit notifications.
 - `backend/src/main/resources/db/migration/`: Flyway database migrations.
 - `docker-compose.yml`: local PostgreSQL and optional full local stack.
 - `docker-compose.prod.yml`, `infra/`, and `scripts/`: OCI-oriented production
@@ -67,6 +71,9 @@ High-level flow:
    and submit the selected transaction.
 5. Swap history uses a signed wallet message to create a backend session before
    PostgreSQL history is saved or read.
+6. The backend scheduler batches token USD prices, evaluates eligible historical
+   swaps for reverse-profit opportunities, and sends enabled email/Telegram
+   alerts after cooldown checks.
 
 Native BTC swaps use the same form model: the source wallet pays, the receive
 wallet/address receives, and the connected destination wallet pre-fills the
@@ -144,6 +151,13 @@ Important backend variables:
 - `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`
 - `CORS_ALLOW_ORIGINS`, `CORS_ALLOWED_ORIGINS`
 - `SESSION_TTL_HOURS`, `NONCE_TTL_MINUTES`
+- `NOTIFICATIONS_MONITOR_ENABLED`, `NOTIFICATIONS_MONITOR_FIXED_DELAY_MS`
+- `NOTIFICATIONS_DEFAULT_PROFIT_THRESHOLD_BPS`,
+  `NOTIFICATIONS_DEFAULT_COOLDOWN_MINUTES`
+- `COINGECKO_BASE_URL`, `COINGECKO_API_KEY`, `COINGECKO_API_KEY_HEADER`
+- `EMAIL_NOTIFICATIONS_ENABLED`, `EMAIL_FROM`, `SMTP_HOST`, `SMTP_USERNAME`,
+  `SMTP_PASSWORD`
+- `TELEGRAM_NOTIFICATIONS_ENABLED`, `TELEGRAM_BOT_TOKEN`
 
 Do not commit real provider keys, production database passwords, or a live fee
 recipient secret bundle. Public `NEXT_PUBLIC_*` values are shipped to the
@@ -175,7 +189,8 @@ The current deployment plan is one OCI VM running Docker Compose:
 - Private PostgreSQL database.
 
 The frontend quote route keeps provider keys server-side. Spring Boot serves
-wallet-authenticated history behind the backend proxy route. See
+wallet-authenticated history and runs the reverse-profit notification scheduler
+behind the backend proxy route. See
 [docs/local-and-deployment.md](docs/local-and-deployment.md) for the deployment
 commands and production env preparation.
 
@@ -205,4 +220,11 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 15](docs/prompt15_f.md): recipient address entry without forcing
   wallet connection.
 - [Prompt 16](docs/prompt16_f.md): token menu stacking above the trade summary.
+- [Prompt 17](docs/prompt17_f.md): import recipient addresses from wallets.
+- [Prompt 18](docs/prompt18_f.md): move network selection into token menus.
+- [Prompt 19](docs/prompt19_f.md): generic token networks and recipient address
+  families.
+- [Prompt 20](docs/prompt20_f.md): connected wallet label.
+- [Prompt 21](docs/prompt21_f.md): recipient address source label.
+- [Prompt 22](docs/prompt22_f.md): reverse-swap profit notifications.
 

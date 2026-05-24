@@ -178,11 +178,13 @@ Implemented now:
 - Frontend reads authenticated swap history from the backend.
 - Native BTC quote paths through LI.FI with separate source and receive wallet
   modeling in the frontend.
+- Backend notification preferences, scheduled reverse-swap profit scanning, and
+  email/Telegram delivery adapters.
 
 Not implemented yet:
 
 - Favorite pairs table.
-- Alert thresholds.
-- Scheduled reverse-swap scanner.
-- Email, Telegram, or push notification delivery.
+- Frontend notification preferences UI.
+- General price alerts beyond reverse-swap profit alerts.
+- Push or in-app notification delivery.
 - Native BTC sell execution and cross-chain destination status tracking.

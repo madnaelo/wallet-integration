@@ -10,6 +10,17 @@ spring:
     password: ${DATABASE_PASSWORD:wallet}
   flyway:
     enabled: true
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:true}
+          starttls:
+            enable: ${SMTP_STARTTLS_ENABLE:true}
 
 wallet:
   api:
@@ -17,3 +28,25 @@ wallet:
   auth:
     nonce-ttl-minutes: ${NONCE_TTL_MINUTES:10}
     session-ttl-hours: ${SESSION_TTL_HOURS:168}
+  notifications:
+    monitor-enabled: ${NOTIFICATIONS_MONITOR_ENABLED:true}
+    monitor-fixed-delay-ms: ${NOTIFICATIONS_MONITOR_FIXED_DELAY_MS:900000}
+    candidate-limit: ${NOTIFICATIONS_CANDIDATE_LIMIT:2000}
+    lookback-days: ${NOTIFICATIONS_LOOKBACK_DAYS:90}
+    default-profit-threshold-bps: ${NOTIFICATIONS_DEFAULT_PROFIT_THRESHOLD_BPS:100}
+    default-cooldown-minutes: ${NOTIFICATIONS_DEFAULT_COOLDOWN_MINUTES:360}
+    eligible-statuses: ${NOTIFICATIONS_ELIGIBLE_STATUSES:submitted,confirmed}
+    app-url: ${APP_URL:http://localhost:3000}
+    price:
+      coingecko-base-url: ${COINGECKO_BASE_URL:https://api.coingecko.com/api/v3}
+      coingecko-api-key: ${COINGECKO_API_KEY:}
+      coingecko-api-key-header: ${COINGECKO_API_KEY_HEADER:x-cg-demo-api-key}
+      request-timeout-seconds: ${COINGECKO_REQUEST_TIMEOUT_SECONDS:8}
+      contract-batch-size: ${COINGECKO_CONTRACT_BATCH_SIZE:100}
+    email:
+      enabled: ${EMAIL_NOTIFICATIONS_ENABLED:false}
+      from: ${EMAIL_FROM:}
+    telegram:
+      enabled: ${TELEGRAM_NOTIFICATIONS_ENABLED:false}
+      bot-token: ${TELEGRAM_BOT_TOKEN:}
+      base-url: ${TELEGRAM_BASE_URL:https://api.telegram.org}
