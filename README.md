@@ -81,17 +81,23 @@ Use the Windows-first workflow in
 
 ```powershell
 Set-Location 'E:\assignments\wallet'
-powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\dev-db.ps1'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\start-dev.ps1'
 ```
 
-Start the backend in a second PowerShell terminal:
+This starts the local database, Spring Boot backend, and Next.js frontend. It
+also installs project dependencies when needed.
+
+For manual debugging, the individual component scripts are still available:
+
+```powershell
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\dev-db.ps1'
+```
 
 ```powershell
 Set-Location 'E:\assignments\wallet'
 powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\backend-dev.ps1'
 ```
-
-Start the frontend in a third PowerShell terminal:
 
 ```powershell
 Set-Location 'E:\assignments\wallet'
@@ -191,4 +197,9 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
   BTC with wrapped EVM tokens.
 - [Prompt 13](docs/prompt13_f.md): source and receive wallet modeling for
   native BTC quote paths.
+- [Prompt 14](docs/prompt14_f.md): Reown single-session source-wallet
+  switching.
+- [Prompt 15](docs/prompt15_f.md): recipient address entry without forcing
+  wallet connection.
+- [Prompt 16](docs/prompt16_f.md): token menu stacking above the trade summary.
 

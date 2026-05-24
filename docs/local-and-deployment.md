@@ -18,7 +18,34 @@ Current local notes:
 
 ## Local Native Workflow
 
-Run these from Windows PowerShell. Each block is copy-paste ready.
+Run this from Windows PowerShell to start the whole local stack:
+
+```powershell
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\start-dev.ps1'
+```
+
+This script:
+
+- installs frontend dependencies with `npm ci` when needed,
+- downloads backend Maven dependencies when needed,
+- starts Docker Desktop on Windows if Docker is installed but the daemon is not
+  running,
+- starts local Postgres through Docker Compose,
+- starts the Spring Boot backend in the background,
+- starts the Next.js frontend in the background,
+- writes logs to `logs/dev`.
+
+Use `-SkipInstall` when dependencies are already installed and you only want to
+start services:
+
+```powershell
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\start-dev.ps1' -SkipInstall
+```
+
+For manual debugging, each component can still be started separately. Each block
+is copy-paste ready.
 
 Terminal 1: start local Postgres:
 
