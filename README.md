@@ -237,4 +237,5 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
   settings pages.
 - [Prompt 25](docs/prompt25_f.md): menu navigation and local Telegram config.
 - [Prompt 26](docs/prompt26_f.md): add favorites from swap and target ladders.
+- [Prompt 27](docs/prompt27_f.md): fix favorite alert price fetching.
 

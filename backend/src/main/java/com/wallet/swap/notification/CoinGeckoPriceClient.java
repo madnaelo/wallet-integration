@@ -83,8 +83,8 @@ public class CoinGeckoPriceClient {
     }
     if (coinIds.isEmpty()) return Map.of();
 
-    URI uri = UriComponentsBuilder
-        .fromPath("/simple/price")
+    URI uri = baseUriBuilder()
+        .path("/simple/price")
         .queryParam("ids", String.join(",", coinIds.keySet()))
         .queryParam("vs_currencies", "usd")
         .build()
@@ -127,8 +127,8 @@ public class CoinGeckoPriceClient {
 
   private Map<TokenKey, BigDecimal> fetchContractPriceBatch(String platform, List<TokenKey> batch) {
     String addresses = String.join(",", batch.stream().map(TokenKey::address).toList());
-    URI uri = UriComponentsBuilder
-        .fromPath("/simple/token_price/{platform}")
+    URI uri = baseUriBuilder()
+        .path("/simple/token_price/{platform}")
         .queryParam("contract_addresses", addresses)
         .queryParam("vs_currencies", "usd")
         .build(platform);
@@ -178,6 +178,10 @@ public class CoinGeckoPriceClient {
       }
     }
     return null;
+  }
+
+  private UriComponentsBuilder baseUriBuilder() {
+    return UriComponentsBuilder.fromHttpUrl(properties.getPrice().getCoingeckoBaseUrl());
   }
 
   private record TokenKey(long chainId, String address) {
