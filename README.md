@@ -233,4 +233,5 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 23](docs/prompt23_f.md): Telegram settings and favorite-pair alerts.
 - [Prompt 24](docs/prompt24_f.md): user-friendly Telegram linking and separate
   settings pages.
+- [Prompt 25](docs/prompt25_f.md): menu navigation and local Telegram config.
 

@@ -32,7 +32,8 @@ This script:
 - starts Docker Desktop on Windows if Docker is installed but the daemon is not
   running,
 - starts local Postgres through Docker Compose,
-- starts the Spring Boot backend in the background,
+- starts the Spring Boot backend in the background, loading `.env.development`
+  for local-only backend secrets when present,
 - starts the Next.js frontend in the background,
 - writes logs to `logs/dev`.
 

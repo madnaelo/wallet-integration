@@ -2,6 +2,10 @@ server:
   port: ${PORT:8080}
 
 spring:
+  config:
+    import:
+      - optional:file:../.env.development[.properties]
+      - optional:file:.env.development[.properties]
   application:
     name: swap-backend
   datasource:

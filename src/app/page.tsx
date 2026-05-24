@@ -45,6 +45,7 @@ type ActiveView = "swap" | "favorites" | "preferences";
 const QUOTE_TTL_SECONDS = 20;
 const BACKEND_SESSION_STORAGE_KEY = "wallet.swapAssistant.backendSession.v1";
 const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
+const ACTIVE_VIEWS: ActiveView[] = ["swap", "favorites", "preferences"];
 const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
 const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
 
@@ -299,6 +300,17 @@ export default function Page() {
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    function syncViewFromHash() {
+      const view = window.location.hash.replace("#", "") as ActiveView;
+      setActiveView(ACTIVE_VIEWS.includes(view) ? view : "swap");
+    }
+
+    syncViewFromHash();
+    window.addEventListener("hashchange", syncViewFromHash);
+    return () => window.removeEventListener("hashchange", syncViewFromHash);
   }, []);
 
   useEffect(() => {
@@ -1496,27 +1508,38 @@ export default function Page() {
           <h1 className="h1">The Wallet</h1>
           <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
           <nav className="appNav" aria-label="Main navigation">
-            <button
-              className={`appNavButton${activeView === "swap" ? " appNavButtonActive" : ""}`}
-              type="button"
-              onClick={() => setActiveView("swap")}
-            >
-              Swap
-            </button>
-            <button
-              className={`appNavButton${activeView === "favorites" ? " appNavButtonActive" : ""}`}
-              type="button"
-              onClick={() => setActiveView("favorites")}
-            >
-              Favorites
-            </button>
-            <button
-              className={`appNavButton${activeView === "preferences" ? " appNavButtonActive" : ""}`}
-              type="button"
-              onClick={() => setActiveView("preferences")}
-            >
-              Preferences
-            </button>
+            <ul className="appMenu">
+              <li>
+                <a
+                  className={`appMenuLink${activeView === "swap" ? " appMenuLinkActive" : ""}`}
+                  href="#swap"
+                  aria-current={activeView === "swap" ? "page" : undefined}
+                  onClick={() => setActiveView("swap")}
+                >
+                  Swap
+                </a>
+              </li>
+              <li>
+                <a
+                  className={`appMenuLink${activeView === "favorites" ? " appMenuLinkActive" : ""}`}
+                  href="#favorites"
+                  aria-current={activeView === "favorites" ? "page" : undefined}
+                  onClick={() => setActiveView("favorites")}
+                >
+                  Favorites
+                </a>
+              </li>
+              <li>
+                <a
+                  className={`appMenuLink${activeView === "preferences" ? " appMenuLinkActive" : ""}`}
+                  href="#preferences"
+                  aria-current={activeView === "preferences" ? "page" : undefined}
+                  onClick={() => setActiveView("preferences")}
+                >
+                  Preferences
+                </a>
+              </li>
+            </ul>
           </nav>
         </div>
         <div className="walletActions">
