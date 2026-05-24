@@ -36,6 +36,30 @@ This script:
 - starts the Next.js frontend in the background,
 - writes logs to `logs/dev`.
 
+Dependency installs are not based only on whether `node_modules` exists. The
+script fingerprints dependency inputs and stores markers in `.dev`:
+
+- frontend: `package.json`, `package-lock.json`, and `.npmrc` when present,
+- backend: backend `pom.xml` files and `.mvn` config when present.
+
+If those inputs change, the script prepares dependencies again. If the inputs
+did not change, it also checks the existing Node install with `npm ls` before
+skipping npm work.
+
+The script installs project dependencies only. It still expects the global
+tools to exist on the machine:
+
+- PowerShell,
+- Node.js and npm,
+- JDK 17 and Maven,
+- Docker and Docker Compose, unless an existing Postgres is already reachable on
+  `localhost:55432`.
+
+On Windows, the script tries to start Docker Desktop when Docker is installed
+but the daemon is not running. On macOS/Linux/other environments, it uses the
+available Docker daemon and tells the developer to start Docker if the daemon is
+not reachable.
+
 Use `-SkipInstall` when dependencies are already installed and you only want to
 start services:
 

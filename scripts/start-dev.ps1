@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$logDir = Join-Path $repoRoot "logs\dev"
+$logDir = Join-Path (Join-Path $repoRoot "logs") "dev"
 $stateDir = Join-Path $repoRoot ".dev"
 $backendHealthUrl = "http://localhost:8080/api/health"
 $frontendUrl = "http://localhost:3000"
@@ -48,6 +48,73 @@ function Invoke-Checked {
   if ($LASTEXITCODE -ne 0) {
     throw "$Description failed with exit code $LASTEXITCODE."
   }
+}
+
+function Invoke-NativeSuccess {
+  param([scriptblock]$Command)
+
+  $previousErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = "Continue"
+    & $Command *> $null
+    return $LASTEXITCODE -eq 0
+  } catch {
+    return $false
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
+}
+
+function Get-FilesFingerprint {
+  param([string[]]$Paths)
+
+  $existingPaths = @()
+  foreach ($path in $Paths) {
+    if ($path -and (Test-Path -LiteralPath $path -PathType Leaf)) {
+      $existingPaths += (Resolve-Path -LiteralPath $path).Path
+    }
+  }
+
+  if ($existingPaths.Count -eq 0) {
+    return ""
+  }
+
+  $fingerprintLines = foreach ($path in ($existingPaths | Sort-Object)) {
+    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash
+    "$path|$hash"
+  }
+
+  $payload = [string]::Join("`n", $fingerprintLines)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
+    return (($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString("x2") }) -join "")
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function Get-StoredFingerprint {
+  param([string]$Path)
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    return ""
+  }
+
+  return (Get-Content -LiteralPath $Path -Raw).Trim()
+}
+
+function Set-StoredFingerprint {
+  param(
+    [string]$Path,
+    [string]$Value
+  )
+
+  $parent = Split-Path -Parent $Path
+  if ($parent) {
+    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+  }
+  Set-Content -LiteralPath $Path -Value $Value
 }
 
 function Test-TcpPort {
@@ -173,16 +240,7 @@ function Test-DockerDaemon {
     return $false
   }
 
-  $previousErrorActionPreference = $ErrorActionPreference
-  try {
-    $ErrorActionPreference = "Continue"
-    & docker info *> $null
-    return $LASTEXITCODE -eq 0
-  } catch {
-    return $false
-  } finally {
-    $ErrorActionPreference = $previousErrorActionPreference
-  }
+  return Invoke-NativeSuccess { docker info }
 }
 
 function Start-DockerDesktop {
@@ -317,23 +375,49 @@ function Install-FrontendDependencies {
   }
 
   $nodeModules = Join-Path $repoRoot "node_modules"
+  $packageJson = Join-Path $repoRoot "package.json"
   $lockFile = Join-Path $repoRoot "package-lock.json"
-  $installedLock = Join-Path $nodeModules ".package-lock.json"
-  $shouldInstall = -not (Test-Path $nodeModules) -or -not (Test-Path $installedLock)
+  $npmRc = Join-Path $repoRoot ".npmrc"
+  $nodeFingerprintPath = Join-Path $stateDir "node-deps.sha256"
+  $nodeFingerprint = Get-FilesFingerprint @($packageJson, $lockFile, $npmRc)
+  $storedNodeFingerprint = Get-StoredFingerprint $nodeFingerprintPath
+  $hasNodeModules = Test-Path -LiteralPath $nodeModules -PathType Container
+  $hasStoredNodeFingerprint = [bool]$storedNodeFingerprint
+  $dependencyInputsChanged = $hasStoredNodeFingerprint -and $nodeFingerprint -ne $storedNodeFingerprint
+  $dependenciesHealthy = $false
 
-  if (-not $shouldInstall -and (Test-Path $lockFile)) {
-    $shouldInstall = (Get-Item $lockFile).LastWriteTimeUtc -gt (Get-Item $installedLock).LastWriteTimeUtc
+  if ($hasNodeModules) {
+    Push-Location $repoRoot
+    try {
+      $dependenciesHealthy = Invoke-NativeSuccess { & $npmExe ls --depth=0 --silent }
+    } finally {
+      Pop-Location
+    }
   }
 
-  if (-not $shouldInstall) {
+  if ($hasNodeModules -and $dependenciesHealthy -and -not $dependencyInputsChanged) {
+    if (-not $hasStoredNodeFingerprint) {
+      Set-StoredFingerprint -Path $nodeFingerprintPath -Value $nodeFingerprint
+    }
     Write-Host "Frontend dependencies are already installed."
     return
   }
 
   Write-Step "Installing frontend dependencies"
+  if (Test-TcpPort -HostName "localhost" -Port 3000) {
+    if (-not (Stop-ManagedProcess -Name "frontend" -Port 3000) -and (Test-TcpPort -HostName "localhost" -Port 3000)) {
+      throw "Frontend dependencies need to be installed, but port 3000 is in use. Stop the frontend and run this script again."
+    }
+  }
+
   Push-Location $repoRoot
   try {
-    Invoke-Checked { & $npmExe ci } "npm ci"
+    if (Test-Path -LiteralPath $lockFile -PathType Leaf) {
+      Invoke-Checked { & $npmExe ci } "npm ci"
+    } else {
+      Invoke-Checked { & $npmExe install } "npm install"
+    }
+    Set-StoredFingerprint -Path $nodeFingerprintPath -Value $nodeFingerprint
   } finally {
     Pop-Location
   }
@@ -347,12 +431,36 @@ function Install-BackendDependencies {
     return
   }
 
+  $backendDependencyFiles = @()
+  $backendDependencyFiles += Get-ChildItem -Path (Join-Path $repoRoot "backend") -Filter "pom.xml" -Recurse -File |
+    Select-Object -ExpandProperty FullName
+  $mvnDir = Join-Path $repoRoot ".mvn"
+  if (Test-Path -LiteralPath $mvnDir -PathType Container) {
+    $backendDependencyFiles += Get-ChildItem -Path $mvnDir -Recurse -File | Select-Object -ExpandProperty FullName
+  }
+
+  $mavenFingerprint = Get-FilesFingerprint $backendDependencyFiles
+  $mavenStateFingerprintPath = Join-Path $stateDir "maven-deps.sha256"
+  $mavenRepoFingerprintPath = Join-Path $env:MAVEN_REPO_LOCAL ".wallet-swap-backend-deps.sha256"
+  $storedMavenStateFingerprint = Get-StoredFingerprint $mavenStateFingerprintPath
+  $storedMavenRepoFingerprint = Get-StoredFingerprint $mavenRepoFingerprintPath
+
+  if ($mavenFingerprint -and $mavenFingerprint -eq $storedMavenRepoFingerprint) {
+    if ($mavenFingerprint -ne $storedMavenStateFingerprint) {
+      Set-StoredFingerprint -Path $mavenStateFingerprintPath -Value $mavenFingerprint
+    }
+    Write-Host "Backend Maven dependencies are already prepared."
+    return
+  }
+
   Write-Step "Preparing backend dependencies"
   Push-Location $repoRoot
   try {
     Invoke-Checked {
       mvn "-Dmaven.repo.local=$env:MAVEN_REPO_LOCAL" -f backend/pom.xml -DskipTests dependency:go-offline
     } "Maven dependency download"
+    Set-StoredFingerprint -Path $mavenStateFingerprintPath -Value $mavenFingerprint
+    Set-StoredFingerprint -Path $mavenRepoFingerprintPath -Value $mavenFingerprint
   } finally {
     Pop-Location
   }
@@ -419,6 +527,81 @@ function Start-ManagedScript {
     -TimeoutSeconds $TimeoutSeconds `
     -Process $process `
     -LogHint "$stdoutLog and $stderrLog"
+}
+
+function Stop-ProcessTree {
+  param([int]$ProcessId)
+
+  $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+  if (-not $process) {
+    return $false
+  }
+
+  if (Get-Command Get-CimInstance -ErrorAction SilentlyContinue) {
+    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId = $ProcessId" -ErrorAction SilentlyContinue
+    foreach ($child in $children) {
+      Stop-ProcessTree -ProcessId ([int]$child.ProcessId) | Out-Null
+    }
+  }
+
+  Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+  try {
+    Wait-Process -Id $ProcessId -Timeout 15 -ErrorAction SilentlyContinue
+  } catch {
+    # The process may have already exited.
+  }
+  return $true
+}
+
+function Get-ProcessIdsUsingPort {
+  param([int]$Port)
+
+  if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
+    return @(
+      Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique |
+        Where-Object { $_ -and $_ -ne 0 }
+    )
+  }
+
+  if (Get-Command lsof -ErrorAction SilentlyContinue) {
+    return @(
+      & lsof -ti "tcp:$Port" -sTCP:LISTEN 2> $null |
+        ForEach-Object { if ($_ -match "^\d+$") { [int]$_ } }
+    )
+  }
+
+  return @()
+}
+
+function Stop-ManagedProcess {
+  param(
+    [string]$Name,
+    [int]$Port = 0
+  )
+
+  $pidFile = Join-Path $stateDir "$Name.pid"
+  $stopped = $false
+  if (-not (Test-Path -LiteralPath $pidFile -PathType Leaf)) {
+    $processId = ""
+  } else {
+    $processId = (Get-Content -LiteralPath $pidFile -Raw).Trim()
+  }
+
+  if ($processId) {
+    Write-Host "Stopping existing $Name before dependency install..."
+    $stopped = (Stop-ProcessTree -ProcessId ([int]$processId)) -or $stopped
+  }
+
+  if ($Port -gt 0) {
+    foreach ($portProcessId in (Get-ProcessIdsUsingPort -Port $Port)) {
+      Write-Host "Stopping process $portProcessId using port $Port..."
+      $stopped = (Stop-ProcessTree -ProcessId ([int]$portProcessId)) -or $stopped
+    }
+  }
+
+  Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
+  return $stopped
 }
 
 Write-Step "Preparing local environment"
