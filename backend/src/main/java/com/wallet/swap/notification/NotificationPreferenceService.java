@@ -41,6 +41,17 @@ public class NotificationPreferenceService {
         properties.getDefaultCooldownMinutes());
   }
 
+  public NotificationPreferenceResponse connectTelegram(String walletAddress, String telegramChatId) {
+    NotificationPreferenceResponse current = get(walletAddress);
+    return save(walletAddress, new NotificationPreferenceRequest(
+        current.emailAddress(),
+        current.emailEnabled(),
+        telegramChatId,
+        true,
+        current.reverseProfitThresholdBps(),
+        current.cooldownMinutes()));
+  }
+
   private void validate(NotificationPreferenceRequest request) {
     String email = trim(request.emailAddress());
     String telegramChatId = trim(request.telegramChatId());

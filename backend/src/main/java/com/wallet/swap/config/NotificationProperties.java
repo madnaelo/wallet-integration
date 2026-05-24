@@ -11,6 +11,7 @@ public class NotificationProperties {
   private int lookbackDays = 90;
   private int defaultProfitThresholdBps = 100;
   private int defaultCooldownMinutes = 360;
+  private int telegramLinkTtlMinutes = 10;
   private List<String> eligibleStatuses = List.of("submitted", "confirmed");
   private String appUrl = "http://localhost:3000";
   private Price price = new Price();
@@ -63,6 +64,14 @@ public class NotificationProperties {
 
   public void setDefaultCooldownMinutes(int defaultCooldownMinutes) {
     this.defaultCooldownMinutes = defaultCooldownMinutes;
+  }
+
+  public int getTelegramLinkTtlMinutes() {
+    return telegramLinkTtlMinutes;
+  }
+
+  public void setTelegramLinkTtlMinutes(int telegramLinkTtlMinutes) {
+    this.telegramLinkTtlMinutes = telegramLinkTtlMinutes;
   }
 
   public List<String> getEligibleStatuses() {
@@ -177,6 +186,7 @@ public class NotificationProperties {
   public static class Telegram {
     private boolean enabled = false;
     private String botToken = "";
+    private String botUsername = "";
     private String baseUrl = "https://api.telegram.org";
 
     public boolean isEnabled() {
@@ -193,6 +203,14 @@ public class NotificationProperties {
 
     public void setBotToken(String botToken) {
       this.botToken = botToken;
+    }
+
+    public String getBotUsername() {
+      return botUsername;
+    }
+
+    public void setBotUsername(String botUsername) {
+      this.botUsername = botUsername;
     }
 
     public String getBaseUrl() {

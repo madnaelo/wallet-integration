@@ -35,6 +35,7 @@ wallet:
     lookback-days: ${NOTIFICATIONS_LOOKBACK_DAYS:90}
     default-profit-threshold-bps: ${NOTIFICATIONS_DEFAULT_PROFIT_THRESHOLD_BPS:100}
     default-cooldown-minutes: ${NOTIFICATIONS_DEFAULT_COOLDOWN_MINUTES:360}
+    telegram-link-ttl-minutes: ${TELEGRAM_LINK_TTL_MINUTES:10}
     eligible-statuses: ${NOTIFICATIONS_ELIGIBLE_STATUSES:submitted,confirmed}
     app-url: ${APP_URL:http://localhost:3000}
     price:
@@ -49,4 +50,5 @@ wallet:
     telegram:
       enabled: ${TELEGRAM_NOTIFICATIONS_ENABLED:false}
       bot-token: ${TELEGRAM_BOT_TOKEN:}
+      bot-username: ${TELEGRAM_BOT_USERNAME:}
       base-url: ${TELEGRAM_BASE_URL:https://api.telegram.org}
