@@ -123,7 +123,7 @@ Default local endpoints:
 
 - Frontend: `http://localhost:3000`
 - Spring Boot health: `http://localhost:8080/api/health`
-- PostgreSQL: `localhost:55432`
+- PostgreSQL: `localhost:55433`
 
 ## Configuration
 

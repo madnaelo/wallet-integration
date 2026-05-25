@@ -46,7 +46,7 @@ if (-not $mavenRepo) {
 }
 
 if (-not $env:DATABASE_URL) {
-  $env:DATABASE_URL = "jdbc:postgresql://localhost:55432/wallet"
+  $env:DATABASE_URL = "jdbc:postgresql://localhost:55433/wallet"
 }
 if (-not $env:DATABASE_USERNAME) {
   $env:DATABASE_USERNAME = "wallet"

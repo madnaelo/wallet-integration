@@ -54,7 +54,7 @@ tools to exist on the machine:
 - Node.js and npm,
 - JDK 17 and Maven,
 - Docker and Docker Compose, unless an existing Postgres is already reachable on
-  `localhost:55432`.
+  `localhost:55433`.
 
 On Windows, the script tries to start Docker Desktop when Docker is installed
 but the daemon is not running. On macOS/Linux/other environments, it uses the
@@ -104,7 +104,7 @@ Default local URLs:
 
 - Frontend: `http://localhost:3000`
 - Backend health: `http://localhost:8080/api/health`
-- Postgres: `localhost:55432`, database/user/password all `wallet`
+- Postgres: `localhost:55433`, database/user/password all `wallet`
 
 ## Local Full Docker Workflow
 

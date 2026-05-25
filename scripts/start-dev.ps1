@@ -337,19 +337,19 @@ function Ensure-Database {
 
   $dockerAvailable = Get-Command docker -ErrorAction SilentlyContinue
   if (-not $dockerAvailable) {
-    if (Test-TcpPort -HostName "localhost" -Port 55432) {
-      Write-Warning "Docker CLI not found; using existing PostgreSQL on localhost:55432."
+    if (Test-TcpPort -HostName "localhost" -Port 55433) {
+      Write-Warning "Docker CLI not found; using existing PostgreSQL on localhost:55433."
       return
     }
-    throw "Docker CLI is not installed and PostgreSQL is not reachable on localhost:55432."
+    throw "Docker CLI is not installed and PostgreSQL is not reachable on localhost:55433."
   }
 
   if (-not (Test-DockerDaemon)) {
     try {
       Start-DockerDesktop
     } catch {
-      if (Test-TcpPort -HostName "localhost" -Port 55432) {
-        Write-Warning "$($_.Exception.Message) Using existing PostgreSQL on localhost:55432."
+      if (Test-TcpPort -HostName "localhost" -Port 55433) {
+        Write-Warning "$($_.Exception.Message) Using existing PostgreSQL on localhost:55433."
         return
       }
       throw
@@ -632,6 +632,6 @@ Write-Host ""
 Write-Host "Development stack is ready." -ForegroundColor Green
 Write-Host "Frontend: $frontendUrl"
 Write-Host "Backend:  $backendHealthUrl"
-Write-Host "Database: localhost:55432 (wallet / wallet / wallet)"
+Write-Host "Database: localhost:55433 (wallet / wallet / wallet)"
 Write-Host "Logs:     $logDir"
 Write-Host "Stop:     powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\stop-dev.ps1'"
