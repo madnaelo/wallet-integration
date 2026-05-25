@@ -64,6 +64,10 @@ export type TelegramLinkStart = {
   expiresAt: string;
 };
 
+export type FeatureFlags = {
+  autoSwapEnabled: boolean;
+};
+
 export type FavoritePair = {
   id: string;
   walletAddress: string;
@@ -94,6 +98,45 @@ export type SaveFavoritePairRequest = {
   alertsEnabled?: boolean;
 };
 
+export type AutoSwapRule = {
+  id: string;
+  walletAddress: string;
+  chainId: number;
+  sellTokenAddress: string;
+  sellTokenSymbol: string;
+  sellTokenDecimals: number;
+  buyTokenAddress: string;
+  buyTokenSymbol: string;
+  buyTokenDecimals: number;
+  sellAmountRaw: string;
+  thresholdRate: string;
+  alertDirection: "above" | "below";
+  slippageBps: number;
+  recipientAddress: string;
+  executionMode: "auto_when_supported" | "notify_to_confirm";
+  executionReadiness: "auto_supported" | "confirmation_required";
+  status: "active" | "paused" | "completed" | "cancelled";
+  lastTriggeredAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SaveAutoSwapRuleRequest = {
+  chainId: number;
+  sellTokenAddress: string;
+  sellTokenSymbol: string;
+  sellTokenDecimals: number;
+  buyTokenAddress: string;
+  buyTokenSymbol: string;
+  buyTokenDecimals: number;
+  sellAmountRaw: string;
+  thresholdRate: string;
+  alertDirection?: "above" | "below";
+  slippageBps: number;
+  recipientAddress: string;
+  executionMode?: "auto_when_supported" | "notify_to_confirm";
+};
+
 export class BackendClientError extends Error {
   status: number;
   body: unknown;
@@ -104,6 +147,12 @@ export class BackendClientError extends Error {
     this.status = status;
     this.body = body;
   }
+}
+
+export async function getFeatureFlags(backendBaseUrl: string): Promise<FeatureFlags> {
+  return backendFetch<FeatureFlags>(backendBaseUrl, "/api/features", {
+    method: "GET"
+  });
 }
 
 export async function requestAuthNonce(backendBaseUrl: string, walletAddress: string): Promise<AuthNonceResponse> {
@@ -233,6 +282,45 @@ export async function deleteFavoritePair(
   id: string
 ): Promise<void> {
   await backendFetch<Record<string, never>>(backendBaseUrl, `/api/favorite-pairs/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    }
+  });
+}
+
+export async function listAutoSwapRules(
+  backendBaseUrl: string,
+  session: BackendSession
+): Promise<AutoSwapRule[]> {
+  return backendFetch<AutoSwapRule[]>(backendBaseUrl, "/api/auto-swap/rules", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    }
+  });
+}
+
+export async function saveAutoSwapRule(
+  backendBaseUrl: string,
+  session: BackendSession,
+  request: SaveAutoSwapRuleRequest
+): Promise<AutoSwapRule> {
+  return backendFetch<AutoSwapRule>(backendBaseUrl, "/api/auto-swap/rules", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`
+    },
+    body: JSON.stringify(request)
+  });
+}
+
+export async function deleteAutoSwapRule(
+  backendBaseUrl: string,
+  session: BackendSession,
+  id: string
+): Promise<void> {
+  await backendFetch<Record<string, never>>(backendBaseUrl, `/api/auto-swap/rules/${id}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${session.accessToken}`

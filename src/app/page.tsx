@@ -19,20 +19,26 @@ import { swapLog } from "@/lib/swapLog";
 import { listTokens } from "@/lib/tokenClient";
 import { TokenPicker, type TokenPickerNetwork, type TokenPickerOption } from "@/components/TokenPicker";
 import {
+  type AutoSwapRule,
   BackendClientError,
   type FavoritePair,
   type BackendSession,
   type NotificationPreference,
+  type SaveAutoSwapRuleRequest,
   type SaveFavoritePairRequest,
   type SaveSwapHistoryRequest,
   type TelegramLinkStart,
   type SwapHistoryRecord,
   completeTelegramLink,
+  deleteAutoSwapRule,
   deleteFavoritePair,
+  getFeatureFlags,
   getNotificationPreferences,
+  listAutoSwapRules,
   listFavoritePairs,
   listSwapHistory,
   requestAuthNonce,
+  saveAutoSwapRule,
   saveFavoritePair,
   saveNotificationPreferences,
   saveSwapHistory,
@@ -41,11 +47,11 @@ import {
 } from "@/lib/backendClient";
 
 type TxStatus = "idle" | "pending" | "submitted" | "confirmed" | "failed";
-type ActiveView = "swap" | "favorites" | "preferences";
+type ActiveView = "swap" | "auto-swap" | "favorites" | "preferences";
 const QUOTE_TTL_SECONDS = 20;
 const BACKEND_SESSION_STORAGE_KEY = "wallet.swapAssistant.backendSession.v1";
 const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
-const ACTIVE_VIEWS: ActiveView[] = ["swap", "favorites", "preferences"];
+const ACTIVE_VIEWS: ActiveView[] = ["swap", "auto-swap", "favorites", "preferences"];
 const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
 const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
 
@@ -117,6 +123,8 @@ export default function Page() {
   const { disconnect: disconnectAppKit } = useDisconnect();
   const isDryRun = envPublic.DISALLOW_MAINNET;
   const [activeView, setActiveView] = useState<ActiveView>("swap");
+  const [featureFlags, setFeatureFlags] = useState({ autoSwapEnabled: false });
+  const [featureFlagsLoaded, setFeatureFlagsLoaded] = useState<boolean>(false);
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
 
   const [provider, setProvider] = useState<Eip1193Provider | null>(null);
@@ -188,6 +196,19 @@ export default function Page() {
   const [favoritePopoverOpen, setFavoritePopoverOpen] = useState<boolean>(false);
   const [favoritePopoverPosition, setFavoritePopoverPosition] = useState<{ x: number; y: number }>({ x: 24, y: 24 });
   const favoritePairsRequestInFlightRef = useRef<boolean>(false);
+  const [autoSwapRules, setAutoSwapRules] = useState<AutoSwapRule[]>([]);
+  const [autoSwapRulesLoaded, setAutoSwapRulesLoaded] = useState<boolean>(false);
+  const [autoSwapRulesLoading, setAutoSwapRulesLoading] = useState<boolean>(false);
+  const [autoSwapRuleSaving, setAutoSwapRuleSaving] = useState<boolean>(false);
+  const [autoSwapRuleDeletingId, setAutoSwapRuleDeletingId] = useState<string>("");
+  const [autoSwapRuleError, setAutoSwapRuleError] = useState<string>("");
+  const [autoSwapRuleNotice, setAutoSwapRuleNotice] = useState<string>("");
+  const [autoSwapDirectionDraft, setAutoSwapDirectionDraft] = useState<"above" | "below">("above");
+  const [autoSwapThresholdRateDraft, setAutoSwapThresholdRateDraft] = useState<string>("");
+  const [autoSwapSlippagePctDraft, setAutoSwapSlippagePctDraft] = useState<string>("1");
+  const [autoSwapExecutionModeDraft, setAutoSwapExecutionModeDraft] =
+    useState<"auto_when_supported" | "notify_to_confirm">("auto_when_supported");
+  const autoSwapRulesRequestInFlightRef = useRef<boolean>(false);
   const previousBuyTokenAddressRef = useRef<string>("");
   const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
@@ -305,6 +326,24 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    getFeatureFlags(envPublic.BACKEND_BASE_URL)
+      .then((flags) => {
+        if (!cancelled) setFeatureFlags(flags);
+      })
+      .catch(() => {
+        if (!cancelled) setFeatureFlags({ autoSwapEnabled: false });
+      })
+      .finally(() => {
+        if (!cancelled) setFeatureFlagsLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     function syncViewFromHash() {
       const view = window.location.hash.replace("#", "") as ActiveView;
       setActiveView(ACTIVE_VIEWS.includes(view) ? view : "swap");
@@ -316,6 +355,14 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    if (!featureFlagsLoaded || featureFlags.autoSwapEnabled || activeView !== "auto-swap") return;
+    setActiveView("swap");
+    if (window.location.hash === "#auto-swap") {
+      window.history.replaceState(null, "", "#swap");
+    }
+  }, [activeView, featureFlags.autoSwapEnabled, featureFlagsLoaded]);
+
+  useEffect(() => {
     if (activeView !== "preferences" || !walletAddress || notificationPreferenceLoaded) return;
     const stored = backendSession ?? readStoredBackendSession();
     if (stored && isSessionForWallet(stored, walletAddress)) {
@@ -324,6 +371,16 @@ export default function Page() {
     // Load exactly when the Preferences view becomes active with an existing session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, backendSession, notificationPreferenceLoaded, walletAddress]);
+
+  useEffect(() => {
+    if (activeView !== "auto-swap" || !featureFlags.autoSwapEnabled || !walletAddress || autoSwapRulesLoaded) return;
+    const stored = backendSession ?? readStoredBackendSession();
+    if (stored && isSessionForWallet(stored, walletAddress)) {
+      void refreshAutoSwapRules();
+    }
+    // Load exactly when the Auto Swap view becomes active with an existing session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, autoSwapRulesLoaded, backendSession, featureFlags.autoSwapEnabled, walletAddress]);
 
   useEffect(() => {
     if (activeView !== "favorites" || !walletAddress || favoritePairsLoaded) return;
@@ -407,6 +464,7 @@ export default function Page() {
       setHistoryLoading(false);
       resetNotificationPreferenceState();
       resetFavoritePairsState();
+      resetAutoSwapRulesState();
       return;
     }
 
@@ -420,6 +478,7 @@ export default function Page() {
       setHistoryLoading(false);
       resetNotificationPreferenceState();
       resetFavoritePairsState();
+      resetAutoSwapRulesState();
       return;
     }
 
@@ -430,6 +489,7 @@ export default function Page() {
     setHistoryNotice("");
     resetNotificationPreferenceState();
     resetFavoritePairsState();
+    resetAutoSwapRulesState();
   }, [walletAddress, provider]);
 
   const sellTokenInfo = useMemo(
@@ -982,6 +1042,21 @@ export default function Page() {
     favoritePairsRequestInFlightRef.current = false;
   }
 
+  function resetAutoSwapRulesState() {
+    setAutoSwapRules([]);
+    setAutoSwapRulesLoaded(false);
+    setAutoSwapRulesLoading(false);
+    setAutoSwapRuleSaving(false);
+    setAutoSwapRuleDeletingId("");
+    setAutoSwapRuleError("");
+    setAutoSwapRuleNotice("");
+    setAutoSwapDirectionDraft("above");
+    setAutoSwapThresholdRateDraft("");
+    setAutoSwapSlippagePctDraft("1");
+    setAutoSwapExecutionModeDraft("auto_when_supported");
+    autoSwapRulesRequestInFlightRef.current = false;
+  }
+
   async function refreshNotificationPreferences() {
     if (notificationPreferenceRequestInFlightRef.current) return;
     notificationPreferenceRequestInFlightRef.current = true;
@@ -1080,6 +1155,106 @@ export default function Page() {
     } finally {
       setTelegramLinkChecking(false);
     }
+  }
+
+  async function refreshAutoSwapRules() {
+    if (autoSwapRulesRequestInFlightRef.current) return;
+    autoSwapRulesRequestInFlightRef.current = true;
+    setAutoSwapRulesLoading(true);
+    setAutoSwapRuleError("");
+    setAutoSwapRuleNotice("");
+    try {
+      const session = await ensureBackendSession();
+      const rules = await listAutoSwapRules(envPublic.BACKEND_BASE_URL, session);
+      setAutoSwapRules(rules);
+      setAutoSwapRulesLoaded(true);
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setAutoSwapRuleError(normalizeWalletError(e));
+    } finally {
+      setAutoSwapRulesLoading(false);
+      autoSwapRulesRequestInFlightRef.current = false;
+    }
+  }
+
+  async function saveCurrentAutoSwapRule() {
+    setAutoSwapRuleSaving(true);
+    setAutoSwapRuleError("");
+    setAutoSwapRuleNotice("");
+    try {
+      const request = buildAutoSwapRuleRequest();
+      const session = await ensureBackendSession();
+      const saved = await saveAutoSwapRule(envPublic.BACKEND_BASE_URL, session, request);
+      setAutoSwapRules((rules) => [saved, ...rules.filter((rule) => rule.id !== saved.id)]);
+      setAutoSwapRulesLoaded(true);
+      setAutoSwapRuleNotice(`${saved.sellTokenSymbol} to ${saved.buyTokenSymbol} Auto Swap saved.`);
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setAutoSwapRuleError(normalizeWalletError(e));
+    } finally {
+      setAutoSwapRuleSaving(false);
+    }
+  }
+
+  async function removeAutoSwapRule(rule: AutoSwapRule) {
+    setAutoSwapRuleDeletingId(rule.id);
+    setAutoSwapRuleError("");
+    setAutoSwapRuleNotice("");
+    try {
+      const session = await ensureBackendSession();
+      await deleteAutoSwapRule(envPublic.BACKEND_BASE_URL, session, rule.id);
+      setAutoSwapRules((rules) => rules.filter((item) => item.id !== rule.id));
+      setAutoSwapRuleNotice(`${rule.sellTokenSymbol} to ${rule.buyTokenSymbol} Auto Swap removed.`);
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setAutoSwapRuleError(normalizeWalletError(e));
+    } finally {
+      setAutoSwapRuleDeletingId("");
+    }
+  }
+
+  function buildAutoSwapRuleRequest(): SaveAutoSwapRuleRequest {
+    if (!featureFlags.autoSwapEnabled) throw new Error("Auto Swap is not available.");
+    if (!sellTokenInfo || !buyTokenInfo) throw new Error("Select a pair before saving Auto Swap.");
+    if (normalizeTokenKey(sellTokenInfo.address) === normalizeTokenKey(buyTokenInfo.address)) {
+      throw new Error("Choose two different tokens before saving Auto Swap.");
+    }
+
+    const sellAmountRaw = parseUnitsSafe(amountHuman, sellTokenInfo.decimals);
+    if (!sellAmountRaw) throw new Error("Enter an amount before saving Auto Swap.");
+    const thresholdRate = normalizePositiveDecimal(autoSwapThresholdRateDraft);
+    if (!thresholdRate) throw new Error("Set a target rate before saving Auto Swap.");
+    const autoSlippageBps = parseSlippagePctToBps(autoSwapSlippagePctDraft);
+    if (autoSlippageBps === null) throw new Error("Enter a slippage tolerance from 0% to 10%.");
+    const recipientAddressConfig = getAddressFamilyConfig(buyTokenInfo);
+    if (!recipientAddressConfig.isValid(recipientAddress)) {
+      throw new Error(`Enter a valid ${recipientAddressConfig.recipientLabel}.`);
+    }
+
+    return {
+      chainId: selectedChainId,
+      sellTokenAddress: sellTokenInfo.address,
+      sellTokenSymbol: sellTokenInfo.symbol,
+      sellTokenDecimals: sellTokenInfo.decimals,
+      buyTokenAddress: buyTokenInfo.address,
+      buyTokenSymbol: buyTokenInfo.symbol,
+      buyTokenDecimals: buyTokenInfo.decimals,
+      sellAmountRaw,
+      thresholdRate,
+      alertDirection: autoSwapDirectionDraft,
+      slippageBps: autoSlippageBps,
+      recipientAddress: recipientAddress.trim(),
+      executionMode: autoSwapExecutionModeDraft
+    };
   }
 
   async function refreshFavoritePairs() {
@@ -1526,6 +1701,23 @@ export default function Page() {
     const buyAmount = stringValue(quote.netBuyAmount) || stringValue(quote.grossBuyAmount) || quote.buyAmount;
     return calculatePairRate(quote.sellAmount, tokenInfoToDisplay(sellTokenInfo), buyAmount, tokenInfoToDisplay(buyTokenInfo));
   }, [buyTokenInfo, quote, sellTokenInfo]);
+  const autoSwapReadiness = useMemo(
+    () => getAutoSwapReadiness(sellTokenInfo, buyTokenInfo),
+    [buyTokenInfo, sellTokenInfo]
+  );
+  const autoSwapCurrentAmount = useMemo(() => {
+    if (!sellTokenInfo) return "";
+    const amountRaw = parseUnitsSafe(amountHuman, sellTokenInfo.decimals);
+    if (!amountRaw) return "";
+    return `${formatTokenAmount(amountRaw, tokenInfoToDisplay(sellTokenInfo))}`;
+  }, [amountHuman, sellTokenInfo]);
+  const autoSwapModeHelper = useMemo(
+    () =>
+      autoSwapReadiness === "auto_supported"
+        ? "This pair can use automatic execution when the target is reached."
+        : "This pair will ask you to confirm when the target is reached.",
+    [autoSwapReadiness]
+  );
   const currentFavoritePairCount = useMemo(
     () =>
       favoritePairs.filter(
@@ -1558,13 +1750,26 @@ export default function Page() {
     setFavoritePairError("");
     setFavoritePairNotice("");
     setFavoritePopoverOpen(false);
+    setAutoSwapThresholdRateDraft("");
+    setAutoSwapDirectionDraft("above");
+    setAutoSwapExecutionModeDraft("auto_when_supported");
+    setAutoSwapRuleError("");
+    setAutoSwapRuleNotice("");
   }, [selectedChainId, sellToken, buyToken]);
 
   useEffect(() => {
     if (currentFavoriteRate && !favoriteTargetRateDraft.trim()) {
       setFavoriteTargetRateDraft(currentFavoriteRate);
     }
+    if (currentFavoriteRate && !autoSwapThresholdRateDraft.trim()) {
+      setAutoSwapThresholdRateDraft(currentFavoriteRate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFavoriteRate, favoriteTargetRateDraft]);
+
+  useEffect(() => {
+    if (slippageBps !== null) setAutoSwapSlippagePctDraft(formatSlippageBpsAsPercent(slippageBps));
+  }, [slippageBps]);
 
   return (
     <div className="container">
@@ -1594,6 +1799,18 @@ export default function Page() {
                   Favorites
                 </a>
               </li>
+              {featureFlags.autoSwapEnabled ? (
+                <li>
+                  <a
+                    className={`appMenuLink${activeView === "auto-swap" ? " appMenuLinkActive" : ""}`}
+                    href="#auto-swap"
+                    aria-current={activeView === "auto-swap" ? "page" : undefined}
+                    onClick={() => setActiveView("auto-swap")}
+                  >
+                    Auto Swap
+                  </a>
+                </li>
+              ) : null}
               <li>
                 <a
                   className={`appMenuLink${activeView === "preferences" ? " appMenuLinkActive" : ""}`}
@@ -2264,6 +2481,172 @@ export default function Page() {
         </>
       ) : null}
 
+      {activeView === "auto-swap" && featureFlags.autoSwapEnabled ? (
+        <section className="panel pagePanel autoSwapPanel" aria-labelledby="auto-swap-title">
+          <div className="pageHeader">
+            <div>
+              <h2 id="auto-swap-title">Auto Swap</h2>
+              <div className="subtle">
+                {walletAddress
+                  ? "Set target-rate rules for the pair selected on the swap page."
+                  : "Connect your wallet to create Auto Swap rules."}
+              </div>
+            </div>
+            <span className="badge">{autoSwapRulesLoading ? "Loading rules" : "Auto Swap"}</span>
+          </div>
+
+          <div className="settingsContent">
+            <div className="quoteHeader">
+              <div className="subtle">
+                {sellTokenInfo && buyTokenInfo
+                  ? `${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}${autoSwapCurrentAmount ? ` - ${autoSwapCurrentAmount}` : ""}`
+                  : "Select a pair in the swap form, then save an Auto Swap rule here."}
+              </div>
+              <button className="btn" type="button" onClick={refreshAutoSwapRules} disabled={!walletAddress || autoSwapRulesLoading}>
+                {autoSwapRulesLoading ? "Loading..." : autoSwapRulesLoaded ? "Refresh" : "Load Rules"}
+              </button>
+            </div>
+
+            <div className="autoSwapComposer">
+              <div className="autoSwapSummary">
+                <div className="label">Selected pair</div>
+                <strong>
+                  {sellTokenInfo && buyTokenInfo ? `${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}` : "No pair selected"}
+                </strong>
+                <span className="subtle">
+                  {autoSwapCurrentAmount || "Enter an amount on the swap page."}
+                </span>
+                <span className={`autoSwapModePill ${autoSwapReadiness === "auto_supported" ? "autoSwapModePillReady" : ""}`}>
+                  {autoSwapReadiness === "auto_supported" ? "Automatic" : "Confirm first"}
+                </span>
+              </div>
+
+              <div>
+                <div className="label">Target</div>
+                <div className="targetRateRow">
+                  <select
+                    className="select"
+                    value={autoSwapDirectionDraft}
+                    onChange={(event) => setAutoSwapDirectionDraft(event.target.value as "above" | "below")}
+                    disabled={!walletAddress}
+                  >
+                    <option value="above">At or above</option>
+                    <option value="below">At or below</option>
+                  </select>
+                  <input
+                    className="input"
+                    value={autoSwapThresholdRateDraft}
+                    onChange={(event) => setAutoSwapThresholdRateDraft(event.target.value)}
+                    placeholder={currentFavoriteRate || "Target rate"}
+                    inputMode="decimal"
+                    disabled={!walletAddress}
+                  />
+                </div>
+                <div className="small" style={{ marginTop: 6 }}>
+                  {currentFavoriteRate && sellTokenInfo && buyTokenInfo
+                    ? `Current quoted rate: ${formatDecimal(currentFavoriteRate, 8)} ${buyTokenInfo.symbol} per ${sellTokenInfo.symbol}`
+                    : "Targets for the same pair need at least a 1% gap."}
+                </div>
+              </div>
+
+              <div>
+                <div className="label">Slippage tolerance</div>
+                <input
+                  className="input"
+                  value={autoSwapSlippagePctDraft}
+                  onChange={(event) => setAutoSwapSlippagePctDraft(event.target.value)}
+                  placeholder="1"
+                  inputMode="decimal"
+                  disabled={!walletAddress}
+                />
+                <div className="small" style={{ marginTop: 6 }}>Percent, from 0 to 10.</div>
+              </div>
+
+              <div>
+                <div className="label">Execution</div>
+                <select
+                  className="select"
+                  value={autoSwapReadiness === "auto_supported" ? autoSwapExecutionModeDraft : "notify_to_confirm"}
+                  onChange={(event) =>
+                    setAutoSwapExecutionModeDraft(event.target.value as "auto_when_supported" | "notify_to_confirm")
+                  }
+                  disabled={!walletAddress || autoSwapReadiness !== "auto_supported"}
+                >
+                  <option value="auto_when_supported">Automatic</option>
+                  <option value="notify_to_confirm">Ask me first</option>
+                </select>
+                <div className="small" style={{ marginTop: 6 }}>{autoSwapModeHelper}</div>
+              </div>
+
+              <div className="settingsActions">
+                <button
+                  className="btn btnPrimary"
+                  type="button"
+                  onClick={() => {
+                    void saveCurrentAutoSwapRule();
+                  }}
+                  disabled={!walletAddress || !sellTokenInfo || !buyTokenInfo || autoSwapRuleSaving}
+                >
+                  {autoSwapRuleSaving ? "Saving..." : "Save Auto Swap"}
+                </button>
+              </div>
+            </div>
+
+            {autoSwapRuleNotice ? <div className="ok" style={{ marginTop: 10 }}>{autoSwapRuleNotice}</div> : null}
+            {autoSwapRuleError ? <div className="error" style={{ marginTop: 10 }}>{autoSwapRuleError}</div> : null}
+
+            {!autoSwapRulesLoaded && autoSwapRules.length === 0 ? (
+              <div className="small">Auto Swap rules have not been loaded yet.</div>
+            ) : autoSwapRules.length === 0 ? (
+              <div className="small">No Auto Swap rules yet.</div>
+            ) : (
+              <div className="historyTableWrap">
+                <table className="historyTable">
+                  <thead>
+                    <tr>
+                      <th>Pair</th>
+                      <th>Amount</th>
+                      <th>Target</th>
+                      <th>Slippage</th>
+                      <th>Execution</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {autoSwapRules.map((rule) => (
+                      <tr key={rule.id}>
+                        <td>
+                          <div>{rule.sellTokenSymbol} to {rule.buyTokenSymbol}</div>
+                          <div className="small">{getChainById(rule.chainId)?.name ?? `Chain ${rule.chainId}`}</div>
+                        </td>
+                        <td>{formatAutoSwapAmount(rule)}</td>
+                        <td>{formatAutoSwapTarget(rule)}</td>
+                        <td>{formatSlippageBps(rule.slippageBps)}</td>
+                        <td>{formatAutoSwapExecution(rule)}</td>
+                        <td>{formatAutoSwapStatus(rule.status)}</td>
+                        <td>
+                          <button
+                            className="tableActionButton"
+                            type="button"
+                            onClick={() => {
+                              void removeAutoSwapRule(rule);
+                            }}
+                            disabled={autoSwapRuleDeletingId === rule.id}
+                          >
+                            {autoSwapRuleDeletingId === rule.id ? "Removing..." : "Remove"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
+      ) : null}
+
       {activeView === "preferences" ? (
         <section className="panel pagePanel settingsPanel" aria-labelledby="preferences-title">
           <div className="pageHeader">
@@ -2785,6 +3168,49 @@ function formatFavoriteTarget(pair: FavoritePair): string {
   return `${direction} ${formatDecimal(String(pair.targetRate), 8)} ${pair.buyTokenSymbol} per ${pair.sellTokenSymbol}`;
 }
 
+function formatAutoSwapAmount(rule: AutoSwapRule): string {
+  return formatTokenAmount(rule.sellAmountRaw, {
+    address: rule.sellTokenAddress,
+    symbol: rule.sellTokenSymbol,
+    decimals: rule.sellTokenDecimals
+  });
+}
+
+function formatAutoSwapTarget(rule: AutoSwapRule): string {
+  const direction = rule.alertDirection === "below" ? "At or below" : "At or above";
+  return `${direction} ${formatDecimal(String(rule.thresholdRate), 8)} ${rule.buyTokenSymbol} per ${rule.sellTokenSymbol}`;
+}
+
+function formatAutoSwapExecution(rule: AutoSwapRule): string {
+  if (rule.executionMode === "auto_when_supported" && rule.executionReadiness === "auto_supported") return "Automatic";
+  return "Ask me first";
+}
+
+function formatAutoSwapStatus(status: AutoSwapRule["status"]): string {
+  switch (status) {
+    case "active":
+      return "Active";
+    case "paused":
+      return "Paused";
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status;
+  }
+}
+
+function formatSlippageBps(slippageBps: number): string {
+  return `${formatSlippageBpsAsPercent(slippageBps)}%`;
+}
+
+function formatSlippageBpsAsPercent(slippageBps: number): string {
+  if (!Number.isFinite(slippageBps)) return "1";
+  const pct = slippageBps / 100;
+  return Number.isInteger(pct) ? String(pct) : String(Number(pct.toFixed(2)));
+}
+
 function formatSwapStatus(status: TxStatus): string {
   if (status === "idle") return "";
   return `${status[0]!.toUpperCase()}${status.slice(1)}`;
@@ -3144,6 +3570,28 @@ function parseSlippageBps(choice: string, customPct: string): number | null {
   const pct = Number(customPct.trim());
   if (!Number.isFinite(pct) || pct < 0 || pct > 10) return null;
   return Math.round(pct * 100);
+}
+
+function parseSlippagePctToBps(value: string): number | null {
+  const pct = Number(value.trim());
+  if (!Number.isFinite(pct) || pct < 0 || pct > 10) return null;
+  return Math.round(pct * 100);
+}
+
+function getAutoSwapReadiness(
+  sellTokenInfo: TokenInfo | undefined,
+  buyTokenInfo: TokenInfo | undefined
+): AutoSwapRule["executionReadiness"] {
+  if (isEvmContractToken(sellTokenInfo) && isEvmContractToken(buyTokenInfo)) return "auto_supported";
+  return "confirmation_required";
+}
+
+function isEvmContractToken(token: TokenInfo | undefined): boolean {
+  return !!token && isEvmContractAddress(token.address);
+}
+
+function isEvmContractAddress(value: string): boolean {
+  return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
 }
 
 function multiplyIntegerStrings(a: string, b: string): string {

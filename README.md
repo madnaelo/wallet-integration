@@ -42,6 +42,9 @@ Implemented:
   through the bot flow instead of asking users for a chat ID.
 - Favorite pairs can be added from the Swap or Favorites pages, including
   laddered target alerts for the same pair when prices are at least 1% apart.
+- Admin-gated Auto Swap rule storage for selected pairs, including amount,
+  target rate, slippage tolerance, recipient address, and whether the pair is
+  automatic-ready or needs user confirmation.
 
 Not implemented yet:
 
@@ -50,6 +53,7 @@ Not implemented yet:
 - Push or in-app notification delivery.
 - Guarded import-by-address flow and token risk signals.
 - Native BTC sell execution and cross-chain destination status tracking.
+- Signed-order submission for automatic Auto Swap execution.
 
 ## Architecture
 
@@ -79,6 +83,9 @@ High-level flow:
 6. The backend scheduler batches token USD prices, evaluates eligible historical
    swaps and favorite pairs for alert opportunities, and sends enabled
    email/Telegram alerts after cooldown checks.
+7. Auto Swap rules are hidden behind a backend feature switch. Saving a rule
+   stores the exact threshold/slippage preference for later signed-order or
+   confirmation-based execution without giving the backend private keys.
 
 Native BTC swaps use the same form model: the source wallet pays, the receive
 wallet/address receives, and the connected destination wallet pre-fills the
@@ -156,6 +163,7 @@ Important backend variables:
 - `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`
 - `CORS_ALLOW_ORIGINS`, `CORS_ALLOWED_ORIGINS`
 - `SESSION_TTL_HOURS`, `NONCE_TTL_MINUTES`
+- `AUTO_SWAP_DEFAULT_ENABLED`, `ADMIN_API_KEY`
 - `NOTIFICATIONS_MONITOR_ENABLED`, `NOTIFICATIONS_MONITOR_FIXED_DELAY_MS`
 - `NOTIFICATIONS_DEFAULT_PROFIT_THRESHOLD_BPS`,
   `NOTIFICATIONS_DEFAULT_COOLDOWN_MINUTES`
@@ -238,4 +246,5 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 25](docs/prompt25_f.md): menu navigation and local Telegram config.
 - [Prompt 26](docs/prompt26_f.md): add favorites from swap and target ladders.
 - [Prompt 27](docs/prompt27_f.md): fix favorite alert price fetching.
+- [Prompt 28](docs/prompt28_f.md): admin-gated Auto Swap preferences.
 

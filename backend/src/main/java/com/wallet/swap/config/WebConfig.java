@@ -8,7 +8,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-@EnableConfigurationProperties({ApiProperties.class, AuthProperties.class, NotificationProperties.class})
+@EnableConfigurationProperties({ApiProperties.class, AuthProperties.class, FeatureProperties.class, NotificationProperties.class})
 public class WebConfig implements WebMvcConfigurer {
   private final ApiProperties apiProperties;
 
