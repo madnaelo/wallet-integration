@@ -1177,10 +1177,16 @@ export default function Page() {
   function openFavoritePopover(event: ReactMouseEvent<HTMLButtonElement>) {
     if (!sellTokenInfo || !buyTokenInfo) return;
     const margin = 16;
+    const gap = 10;
     const popoverWidth = Math.min(360, window.innerWidth - margin * 2);
-    const popoverHeight = 360;
-    const x = Math.max(margin, Math.min(event.clientX + 10, window.innerWidth - popoverWidth - margin));
-    const y = Math.max(margin, Math.min(event.clientY + 10, window.innerHeight - popoverHeight - margin));
+    const popoverHeight = Math.min(360, window.innerHeight - margin * 2);
+    const buttonRect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(margin, Math.min(buttonRect.right - popoverWidth, window.innerWidth - popoverWidth - margin));
+    const preferredBelowY = buttonRect.bottom + gap;
+    const preferredAboveY = buttonRect.top - popoverHeight - gap;
+    const unclampedY =
+      preferredBelowY + popoverHeight <= window.innerHeight - margin ? preferredBelowY : preferredAboveY;
+    const y = Math.max(margin, Math.min(unclampedY, window.innerHeight - popoverHeight - margin));
     if (currentFavoriteRate && !favoriteTargetRateDraft.trim()) {
       setFavoriteTargetRateDraft(currentFavoriteRate);
     }
