@@ -6,6 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class AuthProperties {
   private long nonceTtlMinutes = 10;
   private long sessionTtlHours = 168;
+  private String signingDomain = "localhost:3000";
+  private String signingUri = "http://localhost:3000";
 
   public long getNonceTtlMinutes() {
     return nonceTtlMinutes;
@@ -21,5 +23,21 @@ public class AuthProperties {
 
   public void setSessionTtlHours(long sessionTtlHours) {
     this.sessionTtlHours = sessionTtlHours;
+  }
+
+  public String getSigningDomain() {
+    return signingDomain;
+  }
+
+  public void setSigningDomain(String signingDomain) {
+    this.signingDomain = signingDomain;
+  }
+
+  public String getSigningUri() {
+    return signingUri;
+  }
+
+  public void setSigningUri(String signingUri) {
+    this.signingUri = signingUri;
   }
 }

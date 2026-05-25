@@ -1,10 +1,12 @@
 package com.wallet.swap.autoswap;
 
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -14,18 +16,18 @@ public final class AutoSwapRuleModels {
 
   public record AutoSwapRuleRequest(
       @NotNull @Min(1) Long chainId,
-      @NotBlank String sellTokenAddress,
-      @NotBlank String sellTokenSymbol,
+      @NotBlank @Size(max = 128) String sellTokenAddress,
+      @NotBlank @Size(max = 32) String sellTokenSymbol,
       @Min(0) @Max(30) Integer sellTokenDecimals,
-      @NotBlank String buyTokenAddress,
-      @NotBlank String buyTokenSymbol,
+      @NotBlank @Size(max = 128) String buyTokenAddress,
+      @NotBlank @Size(max = 32) String buyTokenSymbol,
       @Min(0) @Max(30) Integer buyTokenDecimals,
-      @NotBlank @Pattern(regexp = "^[0-9]+$") String sellAmountRaw,
-      @NotNull BigDecimal thresholdRate,
-      String alertDirection,
+      @NotBlank @Size(max = 78) @Pattern(regexp = "^[0-9]+$") String sellAmountRaw,
+      @NotNull @Digits(integer = 20, fraction = 18) BigDecimal thresholdRate,
+      @Size(max = 16) String alertDirection,
       @NotNull @Min(0) @Max(10000) Integer slippageBps,
-      @NotBlank String recipientAddress,
-      String executionMode) {}
+      @NotBlank @Size(max = 256) String recipientAddress,
+      @Size(max = 32) String executionMode) {}
 
   public record AutoSwapRuleResponse(
       UUID id,

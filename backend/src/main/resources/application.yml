@@ -29,9 +29,16 @@ spring:
 wallet:
   api:
     cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    max-request-body-bytes: ${API_MAX_REQUEST_BODY_BYTES:1048576}
+    rate-limit-enabled: ${API_RATE_LIMIT_ENABLED:true}
+    rate-limit-window-ms: ${API_RATE_LIMIT_WINDOW_MS:60000}
+    rate-limit-max-requests: ${API_RATE_LIMIT_MAX_REQUESTS:120}
+    auth-rate-limit-max-requests: ${API_AUTH_RATE_LIMIT_MAX_REQUESTS:20}
   auth:
     nonce-ttl-minutes: ${NONCE_TTL_MINUTES:10}
     session-ttl-hours: ${SESSION_TTL_HOURS:168}
+    signing-domain: ${AUTH_SIGNING_DOMAIN:localhost:3000}
+    signing-uri: ${AUTH_SIGNING_URI:http://localhost:3000}
   features:
     auto-swap-default-enabled: ${AUTO_SWAP_DEFAULT_ENABLED:false}
     admin-api-key: ${ADMIN_API_KEY:}

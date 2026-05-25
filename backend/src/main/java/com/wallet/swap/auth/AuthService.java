@@ -89,19 +89,30 @@ public class AuthService {
 
   private String buildSignInMessage(String walletAddress, String nonce, Instant expiresAt) {
     return """
-        Sign in to Wallet Swap Assistant.
+        Sign in to The Wallet.
 
         This proves ownership of wallet %s.
         It does not grant custody or permission to move funds.
 
+        Domain: %s
+        URI: %s
         Nonce: %s
         Expires: %s
-        """.formatted(walletAddress, nonce, expiresAt);
+        """.formatted(
+        walletAddress,
+        nonBlank(authProperties.getSigningDomain(), "localhost:3000"),
+        nonBlank(authProperties.getSigningUri(), "http://localhost:3000"),
+        nonce,
+        expiresAt);
   }
 
   private String secureToken(int bytes) {
     byte[] tokenBytes = new byte[bytes];
     SECURE_RANDOM.nextBytes(tokenBytes);
     return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+  }
+
+  private String nonBlank(String value, String fallback) {
+    return value == null || value.isBlank() ? fallback : value.trim();
   }
 }

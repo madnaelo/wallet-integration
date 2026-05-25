@@ -7,6 +7,7 @@ import com.wallet.swap.feature.FeatureModels.FeatureFlagUpdateRequest;
 import com.wallet.swap.feature.FeatureModels.FeatureFlagsResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -52,10 +53,18 @@ public class FeatureFlagService {
     if (providedKey == null || providedKey.isBlank()) {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing admin API key.");
     }
-    byte[] expected = expectedKey.getBytes(StandardCharsets.UTF_8);
-    byte[] provided = providedKey.trim().getBytes(StandardCharsets.UTF_8);
+    byte[] expected = sha256(expectedKey);
+    byte[] provided = sha256(providedKey.trim());
     if (!MessageDigest.isEqual(expected, provided)) {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid admin API key.");
+    }
+  }
+
+  private byte[] sha256(String value) {
+    try {
+      return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+    } catch (NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("SHA-256 is not available.", exception);
     }
   }
 }

@@ -1,10 +1,12 @@
 package com.wallet.swap.notification;
 
 import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -14,14 +16,14 @@ public final class FavoritePairModels {
 
   public record FavoritePairRequest(
       @NotNull @Min(1) Long chainId,
-      @NotBlank String sellTokenAddress,
-      @NotBlank String sellTokenSymbol,
+      @NotBlank @Size(max = 128) String sellTokenAddress,
+      @NotBlank @Size(max = 32) String sellTokenSymbol,
       @Min(0) @Max(30) Integer sellTokenDecimals,
-      @NotBlank String buyTokenAddress,
-      @NotBlank String buyTokenSymbol,
+      @NotBlank @Size(max = 128) String buyTokenAddress,
+      @NotBlank @Size(max = 32) String buyTokenSymbol,
       @Min(0) @Max(30) Integer buyTokenDecimals,
-      BigDecimal targetRate,
-      String alertDirection,
+      @Digits(integer = 20, fraction = 18) BigDecimal targetRate,
+      @Size(max = 16) String alertDirection,
       Boolean alertsEnabled) {}
 
   public record FavoritePairResponse(

@@ -6,11 +6,13 @@ type Bucket = {
 };
 
 const buckets = new Map<string, Bucket>();
+let lastSweepAt = 0;
 
 export function rateLimit(key: string): { allowed: boolean; retryAfterMs: number } {
   const now = Date.now();
   const windowMs = env.RATE_LIMIT_WINDOW_MS;
   const max = env.RATE_LIMIT_MAX;
+  sweepExpiredBuckets(now);
 
   const b = buckets.get(key);
   if (!b || now >= b.resetAt) {
@@ -24,4 +26,13 @@ export function rateLimit(key: string): { allowed: boolean; retryAfterMs: number
 
   b.count += 1;
   return { allowed: true, retryAfterMs: 0 };
+}
+
+function sweepExpiredBuckets(now: number) {
+  if (buckets.size < 1_000 && now - lastSweepAt < 60_000) return;
+  lastSweepAt = now;
+
+  for (const [key, bucket] of buckets.entries()) {
+    if (now >= bucket.resetAt) buckets.delete(key);
+  }
 }

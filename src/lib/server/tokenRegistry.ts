@@ -89,7 +89,7 @@ function toTokenInfo(value: unknown, chainId: number): TokenInfo[] {
   const address = typeof value.address === "string" ? value.address.trim() : "";
   const symbol = typeof value.symbol === "string" ? value.symbol.trim() : "";
   const decimals = typeof value.decimals === "number" ? value.decimals : Number.NaN;
-  if (!address || !symbol || !Number.isInteger(decimals) || decimals < 0 || decimals > 255) return [];
+  if (!address || !symbol || !Number.isInteger(decimals) || decimals < 0 || decimals > 30) return [];
   if (!isAddress(address) || NATIVE_TOKEN_SENTINELS.has(normalizeTokenKey(address))) return [];
 
   const token: TokenInfo = { address, symbol, decimals };
