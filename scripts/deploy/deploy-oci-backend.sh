@@ -48,7 +48,9 @@ if ! run_container network exists "$container_network" >/dev/null 2>&1; then
   run_container network create "$container_network" >/dev/null
 fi
 
-run_container volume create "$postgres_volume" >/dev/null
+if ! run_container volume exists "$postgres_volume" >/dev/null 2>&1; then
+  run_container volume create "$postgres_volume" >/dev/null
+fi
 
 if run_container container exists "$postgres_container" >/dev/null 2>&1; then
   run_container start "$postgres_container" >/dev/null
