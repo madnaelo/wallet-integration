@@ -44,9 +44,13 @@ export class ParaswapClient implements DexAggregatorClient {
     url.searchParams.set("slippage", String(params.slippageBps ?? 100));
     url.searchParams.set("partner", this.cfg.platformFee.paraswapPartner);
     url.searchParams.set("version", "6.2");
+    if (this.cfg.platformFee.enabled || isDifferentReceiver(params)) {
+      url.searchParams.set("includeContractMethods", "simpleSwap,multiSwap,megaSwap");
+    }
     if (this.cfg.platformFee.enabled) {
       url.searchParams.set("partnerFeeBps", String(this.cfg.platformFee.feeBps));
       url.searchParams.set("partnerAddress", this.cfg.platformFee.recipient);
+      url.searchParams.set("takeSurplus", "true");
       url.searchParams.set("isDirectFeeTransfer", "true");
     }
 
@@ -94,4 +98,8 @@ function normalizeHeaderName(value: string): string {
   const header = value.trim();
   if (!/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(header)) return "";
   return header;
+}
+
+function isDifferentReceiver(params: QuoteParams): boolean {
+  return Boolean(params.toAddress && params.toAddress.trim().toLowerCase() !== params.takerAddress.trim().toLowerCase());
 }
