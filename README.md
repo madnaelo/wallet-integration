@@ -203,7 +203,9 @@ The current deployment target is split by responsibility:
 The frontend quote route keeps provider keys server-side in Vercel. Spring Boot
 serves wallet-authenticated history and runs the reverse-profit notification
 scheduler behind the OCI backend API domain. See [docs/ci-cd.md](docs/ci-cd.md)
-for GitHub Actions, Vercel, OCI, and secret setup.
+for GitHub Actions, Vercel, OCI, and secret setup. See
+[docs/earning-setup-finalization.md](docs/earning-setup-finalization.md) for
+the fee-recipient, provider monetization, and launch revenue checklist.
 
 ## Prompt Trail
 
