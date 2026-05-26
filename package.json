@@ -28,7 +28,7 @@
     "@types/react-dom": "^18.3.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.16",
-    "typescript": "^5.5.4"
+    "typescript": "^6.0.3"
   },
   "overrides": {
     "@coinbase/cdp-sdk": "^1.50.0",
