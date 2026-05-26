@@ -247,3 +247,7 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 26](docs/prompt26_f.md): add favorites from swap and target ladders.
 - [Prompt 27](docs/prompt27_f.md): fix favorite alert price fetching.
 - [Prompt 28](docs/prompt28_f.md): admin-gated Auto Swap preferences.
+- [Prompt 29](docs/prompt29_f.md): wallet signing and transaction approval
+  clarity.
+- [Prompt 30](docs/prompt30_f.md): Telegram alert links that prefill the swap
+  page.

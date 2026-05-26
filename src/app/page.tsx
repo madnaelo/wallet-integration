@@ -92,6 +92,12 @@ type AddressFamilyConfig = {
   parse: (value: string) => string;
   isValid: (value: string) => boolean;
 };
+type PendingSwapLink = {
+  chainId: number;
+  sellToken: string;
+  buyToken: string;
+  sellAmountRaw: string;
+};
 
 const ADDRESS_FAMILY_CONFIG: Record<AddressFamily, AddressFamilyConfig> = {
   evm: {
@@ -211,6 +217,7 @@ export default function Page() {
   const [autoSwapExecutionModeDraft, setAutoSwapExecutionModeDraft] =
     useState<"auto_when_supported" | "notify_to_confirm">("auto_when_supported");
   const autoSwapRulesRequestInFlightRef = useRef<boolean>(false);
+  const [pendingSwapLink, setPendingSwapLink] = useState<PendingSwapLink | null>(null);
   const previousBuyTokenAddressRef = useRef<string>("");
   const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
@@ -296,6 +303,25 @@ export default function Page() {
   }, [allowedChains]);
 
   useEffect(() => {
+    const swapLink = parseSwapLinkParams(window.location.search);
+    if (!swapLink || !allowedChains.some((allowedChain) => allowedChain.chainId === swapLink.chainId)) return;
+
+    setPendingSwapLink(swapLink);
+    setActiveView("swap");
+    if (window.location.hash !== "#swap") {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#swap`);
+    }
+    setSelectedChainId(swapLink.chainId);
+    setSellToken(swapLink.sellToken);
+    setBuyToken(swapLink.buyToken);
+    setQuoteValidationVisible(false);
+    clearQuoteState();
+    setActionError("");
+  }, [allowedChains]);
+
+  useEffect(() => {
+    if (pendingSwapLink) return;
+
     const sellTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(sellToken));
     const buyTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken));
 
@@ -304,7 +330,7 @@ export default function Page() {
       const fallbackBuyToken = tokens.find((token) => normalizeTokenKey(token.address) !== normalizeTokenKey(tokens[0]!.address));
       if (fallbackBuyToken) setBuyToken(fallbackBuyToken.address);
     }
-  }, [tokens, sellToken, buyToken]);
+  }, [tokens, sellToken, buyToken, pendingSwapLink]);
 
   useEffect(() => {
     if (!allowedChains.some((allowedChain) => allowedChain.chainId === selectedChainId)) {
@@ -514,6 +540,24 @@ export default function Page() {
     () => tokens.find((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken)),
     [tokens, buyToken]
   );
+
+  useEffect(() => {
+    if (!pendingSwapLink || selectedChainId !== pendingSwapLink.chainId) return;
+
+    if (sellTokenInfo && buyTokenInfo) {
+      if (pendingSwapLink.sellAmountRaw) {
+        setAmountHuman(formatUnitsSafe(pendingSwapLink.sellAmountRaw, sellTokenInfo.decimals));
+      }
+      setPendingSwapLink(null);
+      return;
+    }
+
+    const loadingKnown = Object.prototype.hasOwnProperty.call(tokensLoadingByChain, selectedChainId);
+    if (loadingKnown && !tokensLoadingByChain[selectedChainId]) {
+      setPendingSwapLink(null);
+    }
+  }, [buyTokenInfo, pendingSwapLink, selectedChainId, sellTokenInfo, tokensLoadingByChain]);
+
   const sellTokenNetworkId = getTokenNetworkId(sellTokenInfo, selectedChainId);
   const buyTokenNetworkId = getTokenNetworkId(buyTokenInfo, selectedChainId);
   const connectedWallets = useMemo<Partial<Record<WalletNamespace, string>>>(
@@ -2946,6 +2990,35 @@ export default function Page() {
 function shortAddr(a: string) {
   if (!a) return "";
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function parseSwapLinkParams(search: string): PendingSwapLink | null {
+  const params = new URLSearchParams(search);
+  const chainId = Number(params.get("chainId"));
+  const sellToken = sanitizeTokenQueryParam(params.get("sellToken"));
+  const buyToken = sanitizeTokenQueryParam(params.get("buyToken"));
+  const sellAmountRaw = sanitizeRawAmountQueryParam(params.get("sellAmountRaw") ?? params.get("sellAmount"));
+
+  if (!Number.isSafeInteger(chainId) || chainId <= 0 || !sellToken || !buyToken) return null;
+
+  return {
+    chainId,
+    sellToken,
+    buyToken,
+    sellAmountRaw
+  };
+}
+
+function sanitizeTokenQueryParam(value: string | null): string {
+  const normalized = value?.trim() ?? "";
+  if (!normalized || normalized.length > 128) return "";
+  return normalized;
+}
+
+function sanitizeRawAmountQueryParam(value: string | null): string {
+  const normalized = value?.trim() ?? "";
+  if (!normalized || normalized.length > 80 || !/^\d+$/.test(normalized)) return "";
+  return normalized;
 }
 
 function buildConnectedWalletDisplay(params: {
