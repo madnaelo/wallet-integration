@@ -100,7 +100,8 @@ done
 
 if [ -n "$api_domain" ] && [ -f "$caddyfile_path" ] && run_container container exists "$caddy_container" >/dev/null 2>&1; then
   marker="# wallet-backend:$api_domain"
-  if ! sudo grep -qF "$marker" "$caddyfile_path"; then
+  if ! sudo grep -qF "$marker" "$caddyfile_path" \
+    && ! sudo grep -Eq "^[[:space:]]*$api_domain[[:space:]]*\\{" "$caddyfile_path"; then
     sudo cp "$caddyfile_path" "$caddyfile_path.bak-wallet-$(date +%Y%m%d%H%M%S)"
     {
       echo ""
