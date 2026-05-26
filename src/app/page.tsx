@@ -120,6 +120,7 @@ export default function Page() {
   const { address: bitcoinAccountAddress } = useAppKitAccount({ namespace: "bip122" });
   const { walletProvider: appKitProvider, walletProviderType } = useAppKitProvider<Eip1193Provider>("eip155");
   const { walletInfo } = useWalletInfo("eip155");
+  const { walletInfo: bitcoinWalletInfo } = useWalletInfo("bip122");
   const { disconnect: disconnectAppKit } = useDisconnect();
   const isDryRun = envPublic.DISALLOW_MAINNET;
   const [activeView, setActiveView] = useState<ActiveView>("swap");
@@ -219,6 +220,17 @@ export default function Page() {
   );
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
+  const connectedWalletDisplay = useMemo(
+    () =>
+      buildConnectedWalletDisplay({
+        address: walletAddress,
+        accountLabel: getEmbeddedAccountLabel(evmAccount.embeddedWalletInfo?.user),
+        networkName: getWalletNetworkLabel(walletChainId, chain?.name),
+        providerType: walletProviderType,
+        walletName: walletInfo?.name
+      }),
+    [chain?.name, evmAccount.embeddedWalletInfo?.user, walletAddress, walletChainId, walletInfo?.name, walletProviderType]
+  );
   const [tokensByChain, setTokensByChain] = useState<Record<number, TokenInfo[]>>(() =>
     buildFallbackTokensByChain(allowedChains.map((allowedChain) => allowedChain.chainId))
   );
@@ -511,15 +523,38 @@ export default function Page() {
   );
   const sourceWalletAddress = getTokenWalletAddress(sellTokenInfo, connectedWallets);
   const destinationWalletAddress = getTokenWalletAddress(buyTokenInfo, connectedWallets);
+  const recipientConnectedWalletName = useMemo(() => {
+    if (recipientAddressMode !== "connected" || !recipientAddress.trim()) return "";
+    const walletNamespace = getTokenWalletNamespace(buyTokenInfo);
+    return walletNamespace === "bip122"
+      ? getWalletDisplayName(bitcoinWalletInfo?.name, bitcoinWalletInfo?.type)
+      : getWalletDisplayName(walletInfo?.name, walletProviderType);
+  }, [
+    bitcoinWalletInfo?.name,
+    bitcoinWalletInfo?.type,
+    buyTokenInfo,
+    recipientAddress,
+    recipientAddressMode,
+    walletInfo?.name,
+    walletProviderType
+  ]);
   const recipientAddressDisplay = useMemo(
     () =>
       buildRecipientAddressDisplay({
         address: recipientAddress,
         networkName: getTokenNetworkName(buyTokenInfo, chain?.name),
         source: recipientAddressMode === "connected" ? "connected" : recipientAddressSource,
-        walletName: recipientAddressSource === "wallet_import" ? recipientImportedWalletName : ""
+        walletName: recipientAddressSource === "wallet_import" ? recipientImportedWalletName : recipientConnectedWalletName
       }),
-    [buyTokenInfo, chain?.name, recipientAddress, recipientAddressMode, recipientAddressSource, recipientImportedWalletName]
+    [
+      buyTokenInfo,
+      chain?.name,
+      recipientAddress,
+      recipientAddressMode,
+      recipientAddressSource,
+      recipientConnectedWalletName,
+      recipientImportedWalletName
+    ]
   );
   const hasAnyWalletAddress = Object.values(connectedWallets).some(Boolean);
   const sourceWalletNotice = getWalletSupportNotice({
@@ -1685,17 +1720,6 @@ export default function Page() {
     if (walletAddress) return "";
     return "Choose a browser wallet or connect from your phone.";
   }, [walletAddress]);
-  const connectedWalletDisplay = useMemo(
-    () =>
-      buildConnectedWalletDisplay({
-        address: walletAddress,
-        accountLabel: getEmbeddedAccountLabel(evmAccount.embeddedWalletInfo?.user),
-        networkName: getWalletNetworkLabel(walletChainId, chain?.name),
-        providerType: walletProviderType,
-        walletName: walletInfo?.name
-      }),
-    [chain?.name, evmAccount.embeddedWalletInfo?.user, walletAddress, walletChainId, walletInfo?.name, walletProviderType]
-  );
   const currentFavoriteRate = useMemo(() => {
     if (!quote || !sellTokenInfo || !buyTokenInfo) return "";
     const buyAmount = stringValue(quote.netBuyAmount) || stringValue(quote.grossBuyAmount) || quote.buyAmount;
@@ -1774,90 +1798,92 @@ export default function Page() {
   return (
     <div className="container">
       <div className="header">
-        <div>
-          <h1 className="h1">The Wallet</h1>
-          <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
-          <nav className="appNav" aria-label="Main navigation">
-            <ul className="appMenu">
-              <li>
-                <a
-                  className={`appMenuLink${activeView === "swap" ? " appMenuLinkActive" : ""}`}
-                  href="#swap"
-                  aria-current={activeView === "swap" ? "page" : undefined}
-                  onClick={() => setActiveView("swap")}
+        <div className="headerTop">
+          <div className="headerCopy">
+            <h1 className="h1">The Wallet</h1>
+            <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
+          </div>
+          <div className="walletActions">
+            {walletAddress ? (
+              <div className="connectedWalletShell">
+                <button
+                  className="connectedWalletButton"
+                  type="button"
+                  onClick={() => {
+                    void openAppKit({ view: "Account", namespace: "eip155" });
+                  }}
+                  title={connectedWalletDisplay.title}
+                  aria-label={connectedWalletDisplay.title}
                 >
-                  Swap
-                </a>
-              </li>
-              <li>
-                <a
-                  className={`appMenuLink${activeView === "favorites" ? " appMenuLinkActive" : ""}`}
-                  href="#favorites"
-                  aria-current={activeView === "favorites" ? "page" : undefined}
-                  onClick={() => setActiveView("favorites")}
-                >
-                  Favorites
-                </a>
-              </li>
-              {featureFlags.autoSwapEnabled ? (
-                <li>
-                  <a
-                    className={`appMenuLink${activeView === "auto-swap" ? " appMenuLinkActive" : ""}`}
-                    href="#auto-swap"
-                    aria-current={activeView === "auto-swap" ? "page" : undefined}
-                    onClick={() => setActiveView("auto-swap")}
-                  >
-                    Auto Swap
-                  </a>
-                </li>
-              ) : null}
-              <li>
-                <a
-                  className={`appMenuLink${activeView === "preferences" ? " appMenuLinkActive" : ""}`}
-                  href="#preferences"
-                  aria-current={activeView === "preferences" ? "page" : undefined}
-                  onClick={() => setActiveView("preferences")}
-                >
-                  Preferences
-                </a>
-              </li>
-            </ul>
-          </nav>
+                  <span className="walletStatusDot" aria-hidden="true" />
+                  <span className="connectedWalletText">
+                    <span className="connectedWalletName">{connectedWalletDisplay.primary}</span>
+                    <span className="connectedWalletMeta">{connectedWalletDisplay.secondary}</span>
+                  </span>
+                </button>
+                <button className="btn walletDisconnectButton" onClick={onDisconnectWallet}>
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <button className="btn btnPrimary" onClick={openWalletChooser}>
+                Connect Wallet
+              </button>
+            )}
+            {connectPromptVisible && !walletAddress ? (
+              <div className="connectNudge">
+                <strong>Connect wallet first</strong>
+                <span>Connect your wallet to get a quote or change swap details.</span>
+              </div>
+            ) : null}
+          </div>
         </div>
-        <div className="walletActions">
-          {walletAddress ? (
-            <button
-              className="connectedWalletButton"
-              type="button"
-              onClick={() => {
-                void openAppKit({ view: "Account", namespace: "eip155" });
-              }}
-              title={connectedWalletDisplay.title}
-              aria-label={connectedWalletDisplay.title}
-            >
-              <span className="walletStatusDot" aria-hidden="true" />
-              <span className="connectedWalletText">
-                <span className="connectedWalletName">{connectedWalletDisplay.primary}</span>
-                <span className="connectedWalletMeta">{connectedWalletDisplay.secondary}</span>
-              </span>
-            </button>
-          ) : (
-            <button className="btn btnPrimary" onClick={openWalletChooser}>
-              Connect Wallet
-            </button>
-          )}
-          {walletAddress ? (
-            <button className="btn" onClick={onDisconnectWallet}>
-              Disconnect
-            </button>
-          ) : null}
-          {connectPromptVisible && !walletAddress ? (
-            <div className="connectNudge">
-              <strong>Connect wallet first</strong>
-              <span>Connect your wallet to get a quote or change swap details.</span>
-            </div>
-          ) : null}
-        </div>
+        <nav className="appNav" aria-label="Main navigation">
+          <ul className="appMenu">
+            <li>
+              <a
+                className={`appMenuLink${activeView === "swap" ? " appMenuLinkActive" : ""}`}
+                href="#swap"
+                aria-current={activeView === "swap" ? "page" : undefined}
+                onClick={() => setActiveView("swap")}
+              >
+                Swap
+              </a>
+            </li>
+            <li>
+              <a
+                className={`appMenuLink${activeView === "favorites" ? " appMenuLinkActive" : ""}`}
+                href="#favorites"
+                aria-current={activeView === "favorites" ? "page" : undefined}
+                onClick={() => setActiveView("favorites")}
+              >
+                Favorites
+              </a>
+            </li>
+            {featureFlags.autoSwapEnabled ? (
+              <li>
+                <a
+                  className={`appMenuLink${activeView === "auto-swap" ? " appMenuLinkActive" : ""}`}
+                  href="#auto-swap"
+                  aria-current={activeView === "auto-swap" ? "page" : undefined}
+                  onClick={() => setActiveView("auto-swap")}
+                >
+                  Auto Swap
+                </a>
+              </li>
+            ) : null}
+            <li>
+              <a
+                className={`appMenuLink${activeView === "preferences" ? " appMenuLinkActive" : ""}`}
+                href="#preferences"
+                aria-current={activeView === "preferences" ? "page" : undefined}
+                onClick={() => setActiveView("preferences")}
+              >
+                Preferences
+              </a>
+            </li>
+          </ul>
+        </nav>
       </div>
 
       {!walletAddress ? <div className="small" style={{ marginBottom: 12 }}>{connectHint}</div> : null}
@@ -1925,7 +1951,8 @@ export default function Page() {
               onClick={swapSelectedTokens}
               disabled={!sellToken || !buyToken}
             >
-              <span aria-hidden="true">&#8644;</span>
+              <span className="tokenFlipIcon tokenFlipIconHorizontal" aria-hidden="true">&#8644;</span>
+              <span className="tokenFlipIcon tokenFlipIconVertical" aria-hidden="true">&#8645;</span>
             </button>
 
             <div>
@@ -1973,7 +2000,11 @@ export default function Page() {
           <div className="recipientPanel">
             <div className="recipientHeader">
               <div className="label">Recipient address</div>
-              <div className="recipientSourcePill" title={recipientAddressDisplay.title} aria-label={recipientAddressDisplay.title}>
+              <div
+                className={`recipientSourcePill${recipientAddress.trim() ? "" : " recipientSourcePillEmpty"}`}
+                title={recipientAddressDisplay.title}
+                aria-label={recipientAddressDisplay.title}
+              >
                 <span className="recipientSourceDot" aria-hidden="true" />
                 <span className="recipientSourceLabel">{recipientAddressDisplay.label}</span>
               </div>
@@ -2145,10 +2176,9 @@ export default function Page() {
 
           <div style={{ marginTop: 12 }}>
             <div className="label">Slippage tolerance</div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div className="slippageControlRow">
               <select
-                className="select"
-                style={{ maxWidth: 180 }}
+                className="select slippageSelect"
                 value={slippageChoice}
                 onChange={(e) => {
                   requireWalletForForm();
@@ -2166,8 +2196,7 @@ export default function Page() {
               </select>
               {slippageChoice === "custom" ? (
                 <input
-                  className="input"
-                  style={{ maxWidth: 160 }}
+                  className="input slippageInput"
                   value={customSlippagePct}
                   onChange={(e) => {
                     requireWalletForForm();
@@ -2928,18 +2957,16 @@ function buildRecipientAddressDisplay(params: {
   source: RecipientAddressSource;
   walletName?: string;
 }): { label: string; title: string } {
-  const sourceLabel = getRecipientAddressSourceLabel(params.source);
-  const walletName = params.source === "wallet_import" && params.walletName?.trim()
-    ? ` - ${params.walletName.trim()}`
-    : "";
-  const label = `${sourceLabel}${walletName} - ${params.networkName}`;
-
   if (!params.address.trim()) {
     return {
-      label,
-      title: `${label}: no recipient address selected`
+      label: "No wallet selected",
+      title: "No recipient address selected"
     };
   }
+
+  const sourceLabel = getRecipientAddressSourceLabel(params.source);
+  const walletName = params.walletName?.trim();
+  const label = [sourceLabel, walletName, params.networkName].filter(Boolean).join(" - ");
 
   return {
     label,
