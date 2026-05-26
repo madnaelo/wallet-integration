@@ -13,6 +13,8 @@ platform fees in production.
   Velora/ParaSwap, Odos, and LI.FI.
 - Vercel production environment variable names exist for provider keys, fee
   addresses, CORS, and cache/rate-limit settings.
+- LI.FI Partner Portal fee collection is enabled for integration `the-wallet`
+  with default EVM, Solana/SVM, Sui, and Bitcoin receiving wallets.
 - `PARASWAP_API_KEY` is still missing.
 - Fee wallet values must still be replaced or explicitly confirmed with the
   final treasury wallet before relying on revenue collection.
@@ -145,7 +147,7 @@ Reference:
 
 ### LI.FI
 
-Status: code wired, portal payout setup needed.
+Status: code wired, portal payout setup completed.
 
 The LI.FI client sends:
 
@@ -154,14 +156,14 @@ The LI.FI client sends:
 - `x-lifi-api-key`
 
 LI.FI fee wallet/payout routing is configured in the LI.FI Partner Portal.
-The app cannot fully finish LI.FI fee payout setup from env variables alone.
+On May 27, 2026, fee collection was enabled for integration `the-wallet` with
+default EVM, Solana/SVM, Sui, and Bitcoin receiving wallets. The portal also
+shows the FeeForwarder upgrade notice, a `Collectable Fees` section, and a
+`Withdraw Fees` action.
 
 Action remaining:
 
-- Confirm the `LIFI_INTEGRATOR` value in Vercel matches the LI.FI portal
-  integration.
-- Configure fee wallet(s) in the LI.FI Partner Portal.
-- Confirm whether Bitcoin-side fees need a BTC treasury receive address.
+- Keep `LIFI_INTEGRATOR=the-wallet` in Vercel and local env files.
 - Run a small real BTC/EVM test route only after payout configuration is
   confirmed.
 
@@ -181,7 +183,7 @@ Before public launch:
   private key and can hit public rate limits.
 - Confirm 1inch commercial/API terms fit a revenue-generating app.
 - Confirm Odos monetization is enabled provider-side.
-- Confirm LI.FI Partner Portal fee wallet setup.
+- Run a small LI.FI route and confirm the fee appears under Collectable Fees.
 - Add public fee disclosure in the product/legal copy.
 - Add terms/privacy pages before a public launch.
 - Verify CORS origins after the final custom domain is attached.
@@ -237,4 +239,3 @@ Steps:
 5. Choose API Token.
 6. Revoke or regenerate the token.
 7. Paste the new token here so production OCI can be updated.
-
