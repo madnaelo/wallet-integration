@@ -8,8 +8,6 @@ on:
     paths:
       - ".github/workflows/deploy-backend-oci.yml"
       - "backend/**"
-      - "docker-compose.oci-backend.yml"
-      - "infra/Caddyfile.backend"
       - "infra/oci-backend.env.example"
       - "scripts/deploy/deploy-oci-backend.sh"
   workflow_dispatch:
@@ -89,7 +87,7 @@ jobs:
       name: production
     env:
       OCI_SSH_PORT: ${{ secrets.OCI_SSH_PORT || '22' }}
-      OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH || '/opt/wallet' }}
+      OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH || '/home/opc/wallet' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,18 +114,12 @@ jobs:
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "mkdir -p '$OCI_DEPLOY_PATH/infra' '$OCI_DEPLOY_PATH/scripts/deploy'"
-          scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
-            docker-compose.oci-backend.yml \
-            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/docker-compose.oci-backend.yml"
-          scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
-            infra/Caddyfile.backend \
-            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/infra/Caddyfile.backend"
+            "mkdir -p '$OCI_DEPLOY_PATH/scripts/deploy'"
           scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             scripts/deploy/deploy-oci-backend.sh \
             "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh"
           printf '%s\n' "$OCI_BACKEND_ENV" | ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "cat > '$OCI_DEPLOY_PATH/infra/oci-backend.env' && chmod 600 '$OCI_DEPLOY_PATH/infra/oci-backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh'"
+            "cat > '$OCI_DEPLOY_PATH/backend.env' && chmod 600 '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh'"
         env:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
@@ -138,10 +130,14 @@ jobs:
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' ./scripts/deploy/deploy-oci-backend.sh"
+            "cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' WALLET_API_DOMAIN='$WALLET_API_DOMAIN' OCI_CONTAINER_NETWORK='$OCI_CONTAINER_NETWORK' OCI_CADDYFILE_PATH='$OCI_CADDYFILE_PATH' OCI_CADDY_CONTAINER='$OCI_CADDY_CONTAINER' ./scripts/deploy/deploy-oci-backend.sh"
         env:
           BACKEND_IMAGE: ${{ needs.build.outputs.image }}
           GHCR_USERNAME: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
+          WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
+          OCI_CONTAINER_NETWORK: ${{ secrets.OCI_CONTAINER_NETWORK || 'uk-property-check' }}
+          OCI_CADDYFILE_PATH: ${{ secrets.OCI_CADDYFILE_PATH || '/home/opc/uk-property-check-middleware/Caddyfile' }}
+          OCI_CADDY_CONTAINER: ${{ secrets.OCI_CADDY_CONTAINER || 'uk-property-check-caddy' }}

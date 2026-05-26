@@ -20,7 +20,9 @@ The workflows are in `.github/workflows`.
 - `Deploy Frontend - Vercel`: deploys the frontend to Vercel after frontend
   changes land on `master`/`main`, or manually through `workflow_dispatch`.
 - `Deploy Backend - OCI`: builds the Spring Boot backend image, pushes it to
-  GHCR, then deploys it to the OCI VM over SSH.
+  GHCR, then deploys it to the OCI VM over SSH using Podman/Docker containers.
+  It is designed for the current side-by-side OCI VM where another app already
+  owns ports 80/443 through Caddy.
 
 Use GitHub Environments for production approvals before enabling automatic
 deploys on `master`.
@@ -42,6 +44,7 @@ OCI_SSH_HOST
 OCI_SSH_USER
 OCI_SSH_PRIVATE_KEY
 OCI_BACKEND_ENV
+WALLET_API_DOMAIN
 GHCR_READ_TOKEN
 ```
 
@@ -51,6 +54,9 @@ Optional backend deployment secrets:
 OCI_SSH_PORT
 OCI_SSH_KNOWN_HOSTS
 OCI_DEPLOY_PATH
+OCI_CONTAINER_NETWORK
+OCI_CADDYFILE_PATH
+OCI_CADDY_CONTAINER
 ```
 
 `GHCR_READ_TOKEN` is a GitHub personal access token with `read:packages` for
@@ -59,6 +65,18 @@ public, this can be omitted.
 
 `OCI_BACKEND_ENV` is the full contents of `infra/oci-backend.env.example` with
 real production values. Do not commit the real file.
+
+For the current OCI VM, these values match the manual deployment:
+
+```text
+OCI_SSH_HOST=84.235.254.97
+OCI_SSH_USER=opc
+OCI_DEPLOY_PATH=/home/opc/wallet
+OCI_CONTAINER_NETWORK=uk-property-check
+OCI_CADDYFILE_PATH=/home/opc/uk-property-check-middleware/Caddyfile
+OCI_CADDY_CONTAINER=uk-property-check-caddy
+WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
+```
 
 ## Vercel Environment
 
@@ -130,9 +148,10 @@ export VERCEL_PROJECT_ID=...
 Backend from the OCI VM:
 
 ```bash
-cd /opt/wallet
+cd /home/opc/wallet
 export BACKEND_IMAGE=ghcr.io/<owner>/wallet-backend:<tag>
 export GHCR_USERNAME=<github-user>
 export GHCR_TOKEN=<read-packages-token>
+export WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
 ./scripts/deploy/deploy-oci-backend.sh
 ```
