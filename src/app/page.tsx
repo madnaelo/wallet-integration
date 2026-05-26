@@ -1795,6 +1795,11 @@ export default function Page() {
     if (slippageBps !== null) setAutoSwapSlippagePctDraft(formatSlippageBpsAsPercent(slippageBps));
   }, [slippageBps]);
 
+  const historySigning = historyLoading && !backendSession;
+  const historySignWalletName = connectedWalletDisplay.primary || "your wallet";
+  const historySignNotice =
+    historyNotice || `Open ${historySignWalletName} and approve the sign-in message.`;
+
   return (
     <div className="container">
       <div className="header">
@@ -2461,19 +2466,27 @@ export default function Page() {
                   : "Sign once to view your saved swaps."
                 : "Connect your wallet to view your saved swaps."}
             </div>
-            <button className="btn" onClick={refreshBackendHistory} disabled={!walletAddress || historyLoading}>
-              {historyLoading
-                ? backendSession
+            {historySigning ? (
+              <div className="walletSignNotice" role="status" aria-live="polite">
+                <span className="walletSignPulse" aria-hidden="true" />
+                <span className="walletSignCopy">
+                  <span className="walletSignTitle">Waiting for wallet approval</span>
+                  <span className="walletSignText">{historySignNotice}</span>
+                </span>
+              </div>
+            ) : (
+              <button className="btn" onClick={refreshBackendHistory} disabled={!walletAddress || historyLoading}>
+                {historyLoading
                   ? "Syncing..."
-                  : "Open Wallet To Sign"
-                : backendSession
-                  ? historyLoaded
-                    ? "Refresh History"
-                    : "Load History"
-                  : "Sign In To Sync"}
-            </button>
+                  : backendSession
+                    ? historyLoaded
+                      ? "Refresh History"
+                      : "Load History"
+                    : "Sign In To Sync"}
+              </button>
+            )}
           </div>
-          {historyNotice ? <div className="small" style={{ marginTop: 8 }}>{historyNotice}</div> : null}
+          {historyNotice && !historySigning ? <div className="small" style={{ marginTop: 8 }}>{historyNotice}</div> : null}
           {historyError ? <div className="error" style={{ marginTop: 8 }}>{historyError}</div> : null}
           {!historyLoaded && dbSwapHistory.length === 0 ? (
             <div className="small">History has not been loaded yet.</div>
