@@ -136,9 +136,19 @@ This runs:
 - `npm run typecheck`
 - `mvn -f backend/pom.xml test`
 
-## Production Shape On OCI
+## Production Shape
 
-The planned production model is one OCI VM running Docker Compose:
+The active production target is split:
+
+- Vercel runs the Next.js frontend and its server-side quote route.
+- OCI runs PostgreSQL, the Spring Boot backend, and Caddy for the backend API
+  domain.
+
+See [CI/CD](ci-cd.md) for GitHub Actions deployment, required secrets, and
+production setup.
+
+The older all-in-one OCI Compose shape is still available for a single-VM
+deployment:
 
 - `postgres`: private Postgres database
 - `backend`: Spring Boot API

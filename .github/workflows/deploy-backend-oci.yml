@@ -1,0 +1,147 @@
+name: Deploy Backend - OCI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - ".github/workflows/deploy-backend-oci.yml"
+      - "backend/**"
+      - "docker-compose.oci-backend.yml"
+      - "infra/Caddyfile.backend"
+      - "infra/oci-backend.env.example"
+      - "scripts/deploy/deploy-oci-backend.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-backend-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/wallet-backend
+
+jobs:
+  build:
+    name: Build and publish image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Test backend
+        run: mvn -B -ntp -f backend/pom.xml clean test
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Select immutable image
+        id: image
+        run: echo "image=${REGISTRY}/${IMAGE_NAME}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy on OCI
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    env:
+      OCI_SSH_PORT: ${{ secrets.OCI_SSH_PORT || '22' }}
+      OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH || '/opt/wallet' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OCI_SSH_PRIVATE_KEY" > ~/.ssh/oci_deploy_key
+          chmod 600 ~/.ssh/oci_deploy_key
+          if [ -n "${OCI_SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$OCI_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$OCI_SSH_PORT" "$OCI_SSH_HOST" >> ~/.ssh/known_hosts
+          fi
+        env:
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
+
+      - name: Upload deployment files
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+            "mkdir -p '$OCI_DEPLOY_PATH/infra' '$OCI_DEPLOY_PATH/scripts/deploy'"
+          scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+            docker-compose.oci-backend.yml \
+            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/docker-compose.oci-backend.yml"
+          scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+            infra/Caddyfile.backend \
+            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/infra/Caddyfile.backend"
+          scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+            scripts/deploy/deploy-oci-backend.sh \
+            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh"
+          printf '%s\n' "$OCI_BACKEND_ENV" | ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+            "cat > '$OCI_DEPLOY_PATH/infra/oci-backend.env' && chmod 600 '$OCI_DEPLOY_PATH/infra/oci-backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh'"
+        env:
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
+          OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
+
+      - name: Deploy backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+            "cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' ./scripts/deploy/deploy-oci-backend.sh"
+        env:
+          BACKEND_IMAGE: ${{ needs.build.outputs.image }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}

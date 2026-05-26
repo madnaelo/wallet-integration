@@ -194,18 +194,16 @@ npm run lint
 
 ## Deployment Shape
 
-The current deployment plan is one OCI VM running Docker Compose:
+The current deployment target is split by responsibility:
 
-- Caddy for HTTPS and reverse proxy.
-- Next.js frontend.
-- Spring Boot backend.
-- Private PostgreSQL database.
+- Vercel runs the Next.js frontend and its server-side quote route.
+- OCI runs the Spring Boot backend, private PostgreSQL database, and Caddy HTTPS
+  proxy.
 
-The frontend quote route keeps provider keys server-side. Spring Boot serves
-wallet-authenticated history and runs the reverse-profit notification scheduler
-behind the backend proxy route. See
-[docs/local-and-deployment.md](docs/local-and-deployment.md) for the deployment
-commands and production env preparation.
+The frontend quote route keeps provider keys server-side in Vercel. Spring Boot
+serves wallet-authenticated history and runs the reverse-profit notification
+scheduler behind the OCI backend API domain. See [docs/ci-cd.md](docs/ci-cd.md)
+for GitHub Actions, Vercel, OCI, and secret setup.
 
 ## Prompt Trail
 

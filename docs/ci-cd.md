@@ -1,0 +1,138 @@
+# CI/CD
+
+This project uses a split production deployment:
+
+- Vercel runs the Next.js frontend and its `/api/quote` route.
+- OCI runs the Spring Boot backend, PostgreSQL, and Caddy HTTPS proxy.
+
+The workflows are in `.github/workflows`.
+
+## Workflows
+
+- `CI`: runs on pull requests and pushes to `master`/`main`.
+  - `npm ci`
+  - `npm audit --audit-level=moderate`
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run build`
+  - `mvn clean test`
+  - Docker Compose config validation
+- `Deploy Frontend - Vercel`: deploys the frontend to Vercel after frontend
+  changes land on `master`/`main`, or manually through `workflow_dispatch`.
+- `Deploy Backend - OCI`: builds the Spring Boot backend image, pushes it to
+  GHCR, then deploys it to the OCI VM over SSH.
+
+Use GitHub Environments for production approvals before enabling automatic
+deploys on `master`.
+
+## Required GitHub Secrets
+
+Frontend deployment:
+
+```text
+VERCEL_TOKEN
+VERCEL_ORG_ID
+VERCEL_PROJECT_ID
+```
+
+Backend deployment:
+
+```text
+OCI_SSH_HOST
+OCI_SSH_USER
+OCI_SSH_PRIVATE_KEY
+OCI_BACKEND_ENV
+GHCR_READ_TOKEN
+```
+
+Optional backend deployment secrets:
+
+```text
+OCI_SSH_PORT
+OCI_SSH_KNOWN_HOSTS
+OCI_DEPLOY_PATH
+```
+
+`GHCR_READ_TOKEN` is a GitHub personal access token with `read:packages` for
+the OCI VM to pull private backend images from GHCR. If the backend package is
+public, this can be omitted.
+
+`OCI_BACKEND_ENV` is the full contents of `infra/oci-backend.env.example` with
+real production values. Do not commit the real file.
+
+## Vercel Environment
+
+Set these in the Vercel project for Production:
+
+```text
+NEXT_PUBLIC_BACKEND_BASE_URL=https://api.your-domain.com
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
+NEXT_PUBLIC_ALLOWED_CHAIN_IDS=1,137,8453
+NEXT_PUBLIC_DISALLOW_MAINNET=false
+
+ZEROX_API_KEY=...
+ONEINCH_API_KEY=...
+PARASWAP_BASE_URL=https://api.paraswap.io
+PARASWAP_API_KEY=
+PARASWAP_API_KEY_HEADER=X-API-Key
+PARASWAP_PARTNER=thewallet
+ODOS_BASE_URL=https://api.odos.xyz
+ODOS_API_KEY=...
+LIFI_BASE_URL=https://li.quest
+LIFI_API_KEY=...
+LIFI_INTEGRATOR=...
+SWAP_PROVIDERS=0x,1inch,paraswap,odos,lifi
+
+AFFILIATE_ADDRESS=...
+FEE_RECIPIENT_ADDRESS=...
+PLATFORM_FEE_BPS=20
+CORS_ALLOW_ORIGINS=https://your-domain.com
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=30
+QUOTE_CACHE_TTL_MS=8000
+QUOTE_CACHE_MAX_ENTRIES=2000
+```
+
+The provider keys stay server-side in Vercel because they are used by the
+Next.js route handler, not by browser code. `NEXT_PUBLIC_*` values are public by
+design.
+
+## OCI VM Requirements
+
+Install on the VM:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker "$USER"
+```
+
+Log out and back in so the Docker group applies. The deploy user must be able
+to run `docker compose` without `sudo`.
+
+Open ports `80` and `443` in the OCI security list/network security group.
+Point the API DNS record, for example `api.your-domain.com`, to the OCI VM
+public IP before the first deploy so Caddy can issue TLS certificates.
+
+## Manual Deploy Commands
+
+Frontend from a configured workstation:
+
+```bash
+export VERCEL_TOKEN=...
+export VERCEL_ORG_ID=...
+export VERCEL_PROJECT_ID=...
+./scripts/deploy/deploy-vercel-frontend.sh
+```
+
+Backend from the OCI VM:
+
+```bash
+cd /opt/wallet
+export BACKEND_IMAGE=ghcr.io/<owner>/wallet-backend:<tag>
+export GHCR_USERNAME=<github-user>
+export GHCR_TOKEN=<read-packages-token>
+./scripts/deploy/deploy-oci-backend.sh
+```
