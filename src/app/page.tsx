@@ -162,6 +162,7 @@ export default function Page() {
   const [approvalTxHash, setApprovalTxHash] = useState<string>("");
   const [swapTxHash, setSwapTxHash] = useState<string>("");
   const [swapStatus, setSwapStatus] = useState<TxStatus>("idle");
+  const [walletRequestNotice, setWalletRequestNotice] = useState<string>("");
   const [actionError, setActionError] = useState<string>("");
   const [connectPromptVisible, setConnectPromptVisible] = useState<boolean>(false);
   const [quoteValidationVisible, setQuoteValidationVisible] = useState<boolean>(false);
@@ -329,6 +330,7 @@ export default function Page() {
     setApprovalTxHash("");
     setSwapTxHash("");
     setSwapStatus("idle");
+    setWalletRequestNotice("");
     setActionError("");
   }, [allowedChains, walletChainId]);
 
@@ -727,6 +729,7 @@ export default function Page() {
     setApprovalTxHash("");
     setSwapTxHash("");
     setSwapStatus("idle");
+    setWalletRequestNotice("");
   }
 
   function selectTokenForSide(side: "sell" | "buy", token: TokenPickerOption) {
@@ -1493,6 +1496,7 @@ export default function Page() {
     setApprovalTxHash("");
     setSwapTxHash("");
     setSwapStatus("idle");
+    setWalletRequestNotice("");
 
     revealQuoteValidation();
     if (!requireWalletForForm()) return;
@@ -1570,13 +1574,17 @@ export default function Page() {
 
     if (currentAllowance >= needed) return;
 
+    setWalletRequestNotice("Open your wallet app and approve token spending for this swap.");
     const tx = await token.approve(spender, needed);
     setApprovalTxHash(tx.hash);
+    setWalletRequestNotice("Approval submitted. Waiting for the network before opening the swap request.");
     await tx.wait();
+    setWalletRequestNotice("");
   }
 
   async function executeSwap() {
     setActionError("");
+    setWalletRequestNotice("");
     if (!quote) {
       setActionError("Fetch a quote first.");
       return;
@@ -1610,8 +1618,6 @@ export default function Page() {
       const provider = new ethers.BrowserProvider(p);
       const signer = await provider.getSigner();
 
-      setSwapStatus("pending");
-
       // Optional recommended: simulate via eth_call before sending
       try {
         await provider.call({
@@ -1635,6 +1641,8 @@ export default function Page() {
         if (quote.gas) gasLimit = (BigInt(quote.gas) * 120n) / 100n;
       }
 
+      setSwapStatus("pending");
+      setWalletRequestNotice("Open your wallet app and sign the swap transaction.");
       const tx = await signer.sendTransaction({
         to: quote.to,
         data: quote.data,
@@ -1642,6 +1650,8 @@ export default function Page() {
         gasLimit: gasLimit ?? undefined
       });
 
+      setWalletRequestNotice("");
+      setSwapStatus("submitted");
       setSwapTxHash(tx.hash);
       swapLog.add({ txHash: tx.hash, walletAddress, timestampMs: Date.now() });
 
@@ -1656,6 +1666,7 @@ export default function Page() {
         }
       } else setSwapStatus("failed");
     } catch (e: any) {
+      setWalletRequestNotice("");
       setSwapStatus("failed");
       setActionError(normalizeWalletError(e));
     }
@@ -1799,6 +1810,7 @@ export default function Page() {
   const historySignWalletName = connectedWalletDisplay.primary || "your wallet";
   const historySignNotice =
     historyNotice || `Open ${historySignWalletName} and approve the sign-in message.`;
+  const swapBusy = swapStatus === "pending" || swapStatus === "submitted" || Boolean(walletRequestNotice);
 
   return (
     <div className="container">
@@ -2231,7 +2243,7 @@ export default function Page() {
             <button
               className="btn btnPrimary"
               onClick={executeSwap}
-              disabled={!quote || !walletAddress || isQuoteExpired || quote.executionKind === "bitcoin-to-evm"}
+              disabled={!quote || !walletAddress || isQuoteExpired || quote.executionKind === "bitcoin-to-evm" || swapBusy}
             >
               {quote?.executionKind === "bitcoin-to-evm" ? "BTC Sell Quote Only" : isDryRun ? "Preview Swap" : "Swap"}
             </button>
@@ -2315,6 +2327,15 @@ export default function Page() {
 
           {quoteError ? <div className="error" style={{ marginTop: 12 }}>{quoteError}</div> : null}
           {actionError ? <div className="error" style={{ marginTop: 12 }}>{actionError}</div> : null}
+          {walletRequestNotice ? (
+            <div className="walletSignNotice swapWalletNotice" role="status" aria-live="polite">
+              <span className="walletSignPulse" aria-hidden="true" />
+              <span className="walletSignCopy">
+                <span className="walletSignTitle">Waiting for wallet approval</span>
+                <span className="walletSignText">{walletRequestNotice}</span>
+              </span>
+            </div>
+          ) : null}
           {favoritePairNotice ? <div className="ok" style={{ marginTop: 12 }}>{favoritePairNotice}</div> : null}
           {favoritePairError ? <div className="error" style={{ marginTop: 12 }}>{favoritePairError}</div> : null}
 
@@ -2330,7 +2351,7 @@ export default function Page() {
             </div>
           ) : null}
 
-          {swapStatus !== "idle" ? (
+          {swapStatus !== "idle" && !(swapStatus === "pending" && walletRequestNotice) ? (
             <div
               className={swapStatus === "confirmed" ? "ok" : swapStatus === "pending" || swapStatus === "submitted" ? "warn" : "error"}
               style={{ marginTop: 8 }}

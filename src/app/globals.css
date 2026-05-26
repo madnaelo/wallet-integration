@@ -1254,6 +1254,10 @@ body {
   line-height: 1.3;
 }
 
+.swapWalletNotice {
+  margin-top: 12px;
+}
+
 @keyframes walletSignNoticeIn {
   from {
     opacity: 0;
