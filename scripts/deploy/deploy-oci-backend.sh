@@ -75,7 +75,9 @@ for attempt in $(seq 1 60); do
   sleep 2
 done
 
-run_container pull "$BACKEND_IMAGE" >/dev/null
+if ! run_container image exists "$BACKEND_IMAGE" >/dev/null 2>&1; then
+  run_container pull "$BACKEND_IMAGE" >/dev/null
+fi
 run_container rm -f "$backend_container" >/dev/null 2>&1 || true
 run_container run -d \
   --name "$backend_container" \
