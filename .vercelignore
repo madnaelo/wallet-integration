@@ -1,0 +1,17 @@
+.aider*
+.dev/
+.env
+.env.*
+.git/
+.github/
+.next/
+.vercel/
+backend/
+docs/
+future_ideas/
+infra/*.env
+logs/
+node_modules/
+*.tar
+*.tgz
+tsconfig.tsbuildinfo
