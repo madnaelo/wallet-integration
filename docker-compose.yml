@@ -1,12 +1,13 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: wallet
       POSTGRES_USER: wallet
       POSTGRES_PASSWORD: wallet
     ports:
-      - "55433:5432"
+      - "5432"
     volumes:
       - wallet_postgres_data:/var/lib/postgresql/data
     healthcheck:
