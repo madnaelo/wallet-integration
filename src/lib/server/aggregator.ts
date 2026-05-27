@@ -12,6 +12,7 @@ export type QuoteParams = {
   takerAddress: string;
   toAddress?: string;
   slippageBps?: number;
+  signal?: AbortSignal;
 };
 
 export interface DexAggregatorClient {

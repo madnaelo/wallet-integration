@@ -71,6 +71,7 @@ export class OdosClient implements DexAggregatorClient {
       method: "POST",
       headers: this.headers(),
       cache: "no-store",
+      signal: params.signal,
       body: JSON.stringify({
         chainId: params.chainId,
         inputTokens: [
@@ -107,6 +108,7 @@ export class OdosClient implements DexAggregatorClient {
       method: "POST",
       headers: this.headers(),
       cache: "no-store",
+      signal: params.signal,
       body: JSON.stringify({
         userAddr: params.takerAddress,
         pathId,

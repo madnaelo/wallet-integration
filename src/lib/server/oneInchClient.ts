@@ -36,7 +36,7 @@ export class OneInchClient implements DexAggregatorClient {
   }
 
   async getQuote(params: QuoteParams): Promise<QuoteResponse> {
-    const spenderPromise = params.sellToken === "ETH" ? Promise.resolve("") : this.getAllowanceTarget(params.chainId);
+    const spenderPromise = params.sellToken === "ETH" ? Promise.resolve("") : this.getAllowanceTarget(params.chainId, params.signal);
     const url = new URL(`/swap/v6.1/${params.chainId}/swap`, this.cfg.baseUrl);
     url.searchParams.set("src", normalizeNativeToken(params.sellToken, ONEINCH_NATIVE_TOKEN));
     url.searchParams.set("dst", normalizeNativeToken(params.buyToken, ONEINCH_NATIVE_TOKEN));
@@ -58,7 +58,8 @@ export class OneInchClient implements DexAggregatorClient {
     const res = await fetch(url.toString(), {
       method: "GET",
       headers: this.headers(),
-      cache: "no-store"
+      cache: "no-store",
+      signal: params.signal
     });
 
     const body = await readProviderResponse(res, this.providerName);
@@ -83,12 +84,13 @@ export class OneInchClient implements DexAggregatorClient {
     return normalizeQuote(body, params, this, fields);
   }
 
-  private async getAllowanceTarget(chainId: number): Promise<string> {
+  private async getAllowanceTarget(chainId: number, signal?: AbortSignal): Promise<string> {
     const url = new URL(`/swap/v6.1/${chainId}/approve/spender`, this.cfg.baseUrl);
     const res = await fetch(url.toString(), {
       method: "GET",
       headers: this.headers(),
-      cache: "force-cache"
+      cache: "force-cache",
+      signal
     });
     const body = await readProviderResponse(res, this.providerName);
     return stringValue((body as any).address);

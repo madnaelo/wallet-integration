@@ -23,8 +23,9 @@ export class MultiQuoteProvider implements DexAggregatorClient {
     const settled = await Promise.allSettled(
       candidates.map(async (client) => {
         const startedAt = Date.now();
-        const quote = await withTimeout(
-          client.getQuote(params),
+        const quote = await withProviderTimeout(
+          client,
+          params,
           PROVIDER_TIMEOUT_MS,
           `${client.providerName} quote took too long.`
         );
@@ -92,9 +93,20 @@ function normalizeLogError(error: unknown): string {
   return message.length <= 500 ? message : message.substring(0, 500);
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
-    promise.then(resolve, reject).finally(() => clearTimeout(timeout));
+function withProviderTimeout(
+  client: DexAggregatorClient,
+  params: QuoteParams,
+  timeoutMs: number,
+  message: string
+): Promise<QuoteResponse> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    controller.signal.addEventListener("abort", () => reject(new Error(message)), { once: true });
   });
+
+  return Promise.race([
+    client.getQuote({ ...params, signal: controller.signal }),
+    timeoutPromise
+  ]).finally(() => clearTimeout(timeout));
 }

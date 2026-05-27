@@ -57,7 +57,8 @@ export class ZeroXClient implements DexAggregatorClient {
         "0x-api-key": this.cfg.apiKey,
         "0x-version": "v2"
       },
-      cache: "no-store"
+      cache: "no-store",
+      signal: params.signal
     });
 
     const body = await readZeroXResponse(res);

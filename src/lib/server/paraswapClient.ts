@@ -58,7 +58,8 @@ export class ParaswapClient implements DexAggregatorClient {
     const res = await fetch(url.toString(), {
       method: "GET",
       headers: this.headers(),
-      cache: "no-store"
+      cache: "no-store",
+      signal: params.signal
     });
     const body = await readProviderResponse(res, this.providerName);
     const raw: any = body;

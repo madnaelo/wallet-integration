@@ -62,7 +62,7 @@ export class LifiBitcoinClient implements DexAggregatorClient {
         ...(this.cfg.apiKey?.trim() ? { "x-lifi-api-key": this.cfg.apiKey.trim() } : {})
       },
       cache: "no-store",
-      signal: AbortSignal.timeout(LIFI_QUOTE_TIMEOUT_MS)
+      signal: params.signal ?? AbortSignal.timeout(LIFI_QUOTE_TIMEOUT_MS)
     });
     const body = await readProviderResponse(res, this.providerName);
 
