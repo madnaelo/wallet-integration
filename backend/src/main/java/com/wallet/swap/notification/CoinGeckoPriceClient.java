@@ -25,7 +25,11 @@ public class CoinGeckoPriceClient {
       1L, "ethereum",
       11155111L, "ethereum",
       137L, "polygon-pos",
-      8453L, "base");
+      8453L, "base",
+      42161L, "arbitrum-one",
+      10L, "optimistic-ethereum",
+      56L, "binance-smart-chain",
+      43114L, "avalanche");
 
   private final NotificationProperties properties;
   private final RestClient restClient;
@@ -154,6 +158,8 @@ public class CoinGeckoPriceClient {
     if ("bitcoin".equals(key.address())) return Optional.of("bitcoin");
     if (!isNativeEvmAddress(key.address())) return Optional.empty();
     if (key.chainId() == 137L) return Optional.of("matic-network");
+    if (key.chainId() == 56L) return Optional.of("binancecoin");
+    if (key.chainId() == 43114L) return Optional.of("avalanche-2");
     return Optional.of("ethereum");
   }
 
