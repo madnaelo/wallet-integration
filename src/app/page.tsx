@@ -218,6 +218,9 @@ export default function Page() {
     useState<"auto_when_supported" | "notify_to_confirm">("auto_when_supported");
   const autoSwapRulesRequestInFlightRef = useRef<boolean>(false);
   const [pendingSwapLink, setPendingSwapLink] = useState<PendingSwapLink | null>(null);
+  const quoteActionRef = useRef<HTMLDivElement>(null);
+  const quoteDetailsRef = useRef<HTMLDivElement>(null);
+  const quoteScrollPendingRef = useRef<boolean>(false);
   const previousBuyTokenAddressRef = useRef<string>("");
   const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
@@ -364,6 +367,15 @@ export default function Page() {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!quote || !quoteScrollPendingRef.current) return;
+
+    quoteScrollPendingRef.current = false;
+    window.requestAnimationFrame(() => {
+      scrollQuoteIntoViewOnMobile(quoteActionRef.current, quoteDetailsRef.current);
+    });
+  }, [quote, quoteFetchedAtMs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1575,6 +1587,7 @@ export default function Page() {
         throw new Error(msg);
       }
       const fetchedQuote = body as QuoteResponse;
+      quoteScrollPendingRef.current = true;
       setQuote(fetchedQuote);
       setSelectedQuoteId(fetchedQuote.quoteId ?? "");
       setQuoteFetchedAtMs(Date.now());
@@ -2278,10 +2291,13 @@ export default function Page() {
             ) : null}
           </div>
 
-          <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+          <div className="quoteActionRow" ref={quoteActionRef}>
             <span className="quoteButtonWrap" onMouseEnter={revealQuoteValidation} onClick={revealQuoteValidation}>
               <button className="btn" onClick={fetchQuote} disabled={(!!walletAddress && !canQuote) || quoteLoading}>
-                {quoteLoading ? "Fetching quote..." : quote ? "Refresh Quote" : "Get Quote"}
+                <span className="quoteButtonContent">
+                  {quoteLoading ? <span className="buttonSpinner" aria-hidden="true" /> : null}
+                  <span>{quoteLoading ? "Fetching quote..." : quote ? "Refresh Quote" : "Get Quote"}</span>
+                </span>
               </button>
             </span>
             <button
@@ -2405,7 +2421,7 @@ export default function Page() {
           ) : null}
         </div>
 
-        <div className="panel">
+        <div className="panel" ref={quoteDetailsRef}>
           <div className="quoteHeader">
             <div className="label">Trade Summary</div>
             {quote ? (
@@ -3635,6 +3651,23 @@ function isBitcoinAddressInput(value: string): boolean {
 
 function waitMs(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function scrollQuoteIntoViewOnMobile(actionElement: HTMLElement | null, detailsElement: HTMLElement | null) {
+  if (!window.matchMedia("(max-width: 859px)").matches) return;
+
+  const detailsRect = detailsElement?.getBoundingClientRect();
+  if (detailsRect && detailsRect.top >= 0 && detailsRect.top < window.innerHeight * 0.68) return;
+
+  const target = actionElement ?? detailsElement;
+  if (!target) return;
+
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const targetTop = target.getBoundingClientRect().top + window.scrollY - 16;
+  window.scrollTo({
+    top: Math.max(0, targetTop),
+    behavior: prefersReducedMotion ? "auto" : "smooth"
+  });
 }
 
 function formatTokenAmount(amountBaseUnits: string, token: DisplayToken): string {

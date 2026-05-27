@@ -739,13 +739,16 @@ body {
 }
 
 .btn {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  align-items: center;
   background: rgba(110, 168, 254, 0.18);
+  border: 1px solid var(--border);
+  border-radius: 10px;
   color: var(--text);
   cursor: pointer;
+  display: inline-flex;
   font-weight: 600;
+  justify-content: center;
+  padding: 10px 12px;
 }
 
 .btn:disabled {
@@ -764,6 +767,37 @@ body {
 
 .quoteButtonWrap .btn:disabled {
   pointer-events: none;
+}
+
+.quoteActionRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.quoteButtonContent {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.buttonSpinner {
+  animation: spin 780ms linear infinite;
+  border: 2px solid rgba(232, 238, 252, 0.35);
+  border-radius: 999px;
+  border-top-color: #e8eefc;
+  display: inline-block;
+  height: 14px;
+  width: 14px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .walletActions {
@@ -868,6 +902,15 @@ body {
     flex-wrap: nowrap;
     gap: 16px;
     min-width: max-content;
+  }
+
+  .quoteButtonWrap {
+    flex: 1 1 180px;
+  }
+
+  .quoteButtonWrap .btn,
+  .quoteActionRow > .btn {
+    width: 100%;
   }
 
 }
