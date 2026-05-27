@@ -2,7 +2,7 @@ import type { QuoteResponse } from "@/lib/types";
 
 export type BackendSession = {
   walletAddress: string;
-  accessToken: string;
+  accessToken?: string | null;
   expiresAt: string;
 };
 
@@ -176,6 +176,13 @@ export async function verifyAuthSignature(
   });
 }
 
+export async function logoutBackendSession(backendBaseUrl: string, session?: BackendSession | null): Promise<void> {
+  await backendFetch<Record<string, never>>(backendBaseUrl, "/api/auth/logout", {
+    method: "POST",
+    headers: authHeaders(session)
+  });
+}
+
 export async function saveSwapHistory(
   backendBaseUrl: string,
   session: BackendSession,
@@ -183,9 +190,7 @@ export async function saveSwapHistory(
 ): Promise<SwapHistoryRecord> {
   return backendFetch<SwapHistoryRecord>(backendBaseUrl, "/api/swap-history", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    },
+    headers: authHeaders(session),
     body: JSON.stringify(request)
   });
 }
@@ -197,9 +202,7 @@ export async function listSwapHistory(
 ): Promise<SwapHistoryRecord[]> {
   return backendFetch<SwapHistoryRecord[]>(backendBaseUrl, `/api/swap-history?limit=${limit}`, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    }
+    headers: authHeaders(session)
   });
 }
 
@@ -209,9 +212,7 @@ export async function getNotificationPreferences(
 ): Promise<NotificationPreference> {
   return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences", {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    }
+    headers: authHeaders(session)
   });
 }
 
@@ -222,9 +223,7 @@ export async function saveNotificationPreferences(
 ): Promise<NotificationPreference> {
   return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences", {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    },
+    headers: authHeaders(session),
     body: JSON.stringify(request)
   });
 }
@@ -235,9 +234,7 @@ export async function startTelegramLink(
 ): Promise<TelegramLinkStart> {
   return backendFetch<TelegramLinkStart>(backendBaseUrl, "/api/notifications/preferences/telegram-link", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    }
+    headers: authHeaders(session)
   });
 }
 
@@ -247,9 +244,7 @@ export async function completeTelegramLink(
 ): Promise<NotificationPreference> {
   return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences/telegram-link/complete", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    }
+    headers: authHeaders(session)
   });
 }
 
@@ -259,9 +254,7 @@ export async function listFavoritePairs(
 ): Promise<FavoritePair[]> {
   return backendFetch<FavoritePair[]>(backendBaseUrl, "/api/favorite-pairs", {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    }
+    headers: authHeaders(session)
   });
 }
 
@@ -272,9 +265,7 @@ export async function saveFavoritePair(
 ): Promise<FavoritePair> {
   return backendFetch<FavoritePair>(backendBaseUrl, "/api/favorite-pairs", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    },
+    headers: authHeaders(session),
     body: JSON.stringify(request)
   });
 }
@@ -286,9 +277,7 @@ export async function deleteFavoritePair(
 ): Promise<void> {
   await backendFetch<Record<string, never>>(backendBaseUrl, `/api/favorite-pairs/${id}`, {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    }
+    headers: authHeaders(session)
   });
 }
 
@@ -298,9 +287,7 @@ export async function listAutoSwapRules(
 ): Promise<AutoSwapRule[]> {
   return backendFetch<AutoSwapRule[]>(backendBaseUrl, "/api/auto-swap/rules", {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    }
+    headers: authHeaders(session)
   });
 }
 
@@ -311,9 +298,7 @@ export async function saveAutoSwapRule(
 ): Promise<AutoSwapRule> {
   return backendFetch<AutoSwapRule>(backendBaseUrl, "/api/auto-swap/rules", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    },
+    headers: authHeaders(session),
     body: JSON.stringify(request)
   });
 }
@@ -325,15 +310,14 @@ export async function deleteAutoSwapRule(
 ): Promise<void> {
   await backendFetch<Record<string, never>>(backendBaseUrl, `/api/auto-swap/rules/${id}`, {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`
-    }
+    headers: authHeaders(session)
   });
 }
 
 async function backendFetch<T>(backendBaseUrl: string, path: string, init: RequestInit): Promise<T> {
   const res = await fetch(`${backendBaseUrl.replace(/\/$/, "")}${path}`, {
     ...init,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(init.headers ?? {})
@@ -345,4 +329,8 @@ async function backendFetch<T>(backendBaseUrl: string, path: string, init: Reque
     throw new BackendClientError(message, res.status, body);
   }
   return body as T;
+}
+
+function authHeaders(session?: BackendSession | null): HeadersInit {
+  return session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {};
 }

@@ -38,6 +38,7 @@ import {
   listAutoSwapRules,
   listFavoritePairs,
   listSwapHistory,
+  logoutBackendSession,
   requestAuthNonce,
   saveAutoSwapRule,
   saveFavoritePair,
@@ -474,6 +475,8 @@ export default function Page() {
     if (!p) return;
 
     const onAccountsChanged = (accounts: string[]) => {
+      clearStoredBackendSession();
+      setBackendSession(null);
       setWalletAddress(accounts?.[0] ?? "");
       if (accounts?.[0]) setConnectPromptVisible(false);
     };
@@ -484,10 +487,12 @@ export default function Page() {
     };
 
     const onDisconnect = () => {
+      clearStoredBackendSession();
       setWalletAddress("");
       setWalletChainId(null);
       setProvider(null);
       setWalletKind(null);
+      setBackendSession(null);
     };
 
     p.on?.("accountsChanged", onAccountsChanged);
@@ -868,6 +873,12 @@ export default function Page() {
     ];
 
     if (connectedNamespaces.length > 0) {
+      const shouldClearBackendSession = connectedNamespaces.includes("eip155");
+      const sessionToLogout = shouldClearBackendSession ? backendSession ?? readStoredBackendSession() : null;
+      if (sessionToLogout) {
+        await logoutBackendSession(envPublic.BACKEND_BASE_URL, sessionToLogout).catch(() => undefined);
+      }
+
       for (const connectedNamespace of connectedNamespaces) {
         try {
           await disconnectAppKit({ namespace: connectedNamespace });
@@ -876,7 +887,8 @@ export default function Page() {
         }
       }
 
-      if (connectedNamespaces.includes("eip155")) {
+      if (shouldClearBackendSession) {
+        clearStoredBackendSession();
         setWalletAddress("");
         setWalletChainId(null);
         setProvider(null);
@@ -1023,11 +1035,16 @@ export default function Page() {
     setActionError("");
     setHistoryError("");
     setHistoryNotice("");
+    const sessionToLogout = backendSession ?? readStoredBackendSession();
     try {
+      if (sessionToLogout) {
+        await logoutBackendSession(envPublic.BACKEND_BASE_URL, sessionToLogout).catch(() => undefined);
+      }
       await disconnectAppKit({ namespace: "eip155" });
     } catch {
       // Best-effort local cleanup still happens below.
     } finally {
+      clearStoredBackendSession();
       setWalletAddress("");
       setWalletChainId(null);
       setProvider(null);
@@ -3547,7 +3564,7 @@ function readStoredBackendSession(): BackendSession | null {
     const raw = window.sessionStorage.getItem(BACKEND_SESSION_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as BackendSession;
-    if (!parsed.walletAddress || !parsed.accessToken || !parsed.expiresAt) {
+    if (!parsed.walletAddress || !parsed.expiresAt) {
       clearStoredBackendSession();
       return null;
     }

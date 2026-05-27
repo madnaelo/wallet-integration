@@ -3,6 +3,7 @@ package com.wallet.swap.history;
 import com.wallet.swap.auth.AuthService;
 import com.wallet.swap.history.SwapHistoryModels.SaveSwapHistoryRequest;
 import com.wallet.swap.history.SwapHistoryModels.SwapHistoryResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,16 +28,18 @@ public class SwapHistoryController {
   @PostMapping
   public SwapHistoryResponse save(
       @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest,
       @Valid @RequestBody SaveSwapHistoryRequest request) {
-    String walletAddress = authService.authenticateBearerToken(authorization);
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     return swapHistoryService.save(walletAddress, request);
   }
 
   @GetMapping
   public List<SwapHistoryResponse> list(
       @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest,
       @RequestParam(defaultValue = "25") int limit) {
-    String walletAddress = authService.authenticateBearerToken(authorization);
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     return swapHistoryService.list(walletAddress, limit);
   }
 }

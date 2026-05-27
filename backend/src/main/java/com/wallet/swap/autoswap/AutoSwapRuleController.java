@@ -3,6 +3,7 @@ package com.wallet.swap.autoswap;
 import com.wallet.swap.auth.AuthService;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleRequest;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -30,16 +31,18 @@ public class AutoSwapRuleController {
 
   @GetMapping
   public List<AutoSwapRuleResponse> list(
-      @RequestHeader(name = "Authorization", required = false) String authorization) {
-    String walletAddress = authService.authenticateBearerToken(authorization);
+      @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest) {
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     return autoSwapRuleService.list(walletAddress);
   }
 
   @PostMapping
   public AutoSwapRuleResponse save(
       @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest,
       @Valid @RequestBody AutoSwapRuleRequest request) {
-    String walletAddress = authService.authenticateBearerToken(authorization);
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     return autoSwapRuleService.save(walletAddress, request);
   }
 
@@ -47,8 +50,9 @@ public class AutoSwapRuleController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(
       @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest,
       @PathVariable UUID id) {
-    String walletAddress = authService.authenticateBearerToken(authorization);
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     autoSwapRuleService.delete(walletAddress, id);
   }
 }

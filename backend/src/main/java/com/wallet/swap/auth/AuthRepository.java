@@ -83,6 +83,10 @@ public class AuthRepository {
         Timestamp.from(now));
   }
 
+  public void deleteSessionByTokenHash(String tokenHash) {
+    jdbcTemplate.update("DELETE FROM wallet_sessions WHERE token_hash = ?", tokenHash);
+  }
+
   public int deleteExpiredNonces(Instant now) {
     return jdbcTemplate.update("DELETE FROM wallet_nonces WHERE expires_at <= ?", Timestamp.from(now));
   }

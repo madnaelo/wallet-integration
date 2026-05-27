@@ -4,6 +4,7 @@ import com.wallet.swap.auth.AuthService;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
 import com.wallet.swap.notification.TelegramLinkModels.TelegramLinkStartResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,30 +32,34 @@ public class NotificationPreferenceController {
 
   @GetMapping
   public NotificationPreferenceResponse get(
-      @RequestHeader(name = "Authorization", required = false) String authorization) {
-    String walletAddress = authService.authenticateBearerToken(authorization);
+      @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest) {
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     return preferenceService.get(walletAddress);
   }
 
   @PutMapping
   public NotificationPreferenceResponse save(
       @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest,
       @Valid @RequestBody NotificationPreferenceRequest request) {
-    String walletAddress = authService.authenticateBearerToken(authorization);
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     return preferenceService.save(walletAddress, request);
   }
 
   @PostMapping("/telegram-link")
   public TelegramLinkStartResponse startTelegramLink(
-      @RequestHeader(name = "Authorization", required = false) String authorization) {
-    String walletAddress = authService.authenticateBearerToken(authorization);
+      @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest) {
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     return telegramLinkService.start(walletAddress);
   }
 
   @PostMapping("/telegram-link/complete")
   public NotificationPreferenceResponse completeTelegramLink(
-      @RequestHeader(name = "Authorization", required = false) String authorization) {
-    String walletAddress = authService.authenticateBearerToken(authorization);
+      @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest) {
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     return telegramLinkService.complete(walletAddress);
   }
 }

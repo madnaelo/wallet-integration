@@ -4,16 +4,22 @@ import com.wallet.swap.auth.AuthModels.NonceResponse;
 import com.wallet.swap.auth.AuthModels.VerifyResponse;
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.config.AuthProperties;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.UUID;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
+  public static final String SESSION_COOKIE_NAME = "wallet_session";
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
   private final AuthProperties authProperties;
@@ -67,16 +73,73 @@ public class AuthService {
     return new VerifyResponse(walletAddress, accessToken, sessionExpiresAt);
   }
 
+  public VerifyResponse clientVerifyResponse(VerifyResponse session) {
+    return authProperties.isExposeAccessToken()
+        ? session
+        : new VerifyResponse(session.walletAddress(), null, session.expiresAt());
+  }
+
+  public ResponseCookie sessionCookie(String accessToken, Instant expiresAt) {
+    long maxAgeSeconds = Math.max(1, Duration.between(Instant.now(), expiresAt).toSeconds());
+    return ResponseCookie.from(SESSION_COOKIE_NAME, accessToken)
+        .httpOnly(true)
+        .secure(authProperties.isSessionCookieSecure())
+        .sameSite(sameSite())
+        .path("/")
+        .maxAge(Duration.ofSeconds(maxAgeSeconds))
+        .build();
+  }
+
+  public ResponseCookie expiredSessionCookie() {
+    return ResponseCookie.from(SESSION_COOKIE_NAME, "")
+        .httpOnly(true)
+        .secure(authProperties.isSessionCookieSecure())
+        .sameSite(sameSite())
+        .path("/")
+        .maxAge(Duration.ZERO)
+        .build();
+  }
+
   public String authenticateBearerToken(String authorizationHeader) {
-    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-      throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing bearer token.");
-    }
+    return authenticateToken(extractBearerToken(authorizationHeader));
+  }
 
-    String token = authorizationHeader.substring("Bearer ".length()).trim();
-    if (token.isBlank()) throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing bearer token.");
+  public String authenticateRequest(String authorizationHeader, HttpServletRequest request) {
+    String cookieToken = sessionCookieValue(request);
+    if (cookieToken != null && !cookieToken.isBlank()) return authenticateToken(cookieToken);
+    return authenticateBearerToken(authorizationHeader);
+  }
 
+  public void logout(String authorizationHeader, HttpServletRequest request) {
+    String token = sessionCookieValue(request);
+    if (token == null || token.isBlank()) token = extractBearerTokenOrNull(authorizationHeader);
+    if (token == null || token.isBlank()) return;
+    authRepository.deleteSessionByTokenHash(tokenHasher.sha256(token));
+  }
+
+  private String authenticateToken(String token) {
     return authRepository.findWalletBySessionTokenHash(tokenHasher.sha256(token), Instant.now())
         .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Session expired or invalid."));
+  }
+
+  private String extractBearerToken(String authorizationHeader) {
+    String token = extractBearerTokenOrNull(authorizationHeader);
+    if (token == null || token.isBlank()) throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing bearer token.");
+    return token;
+  }
+
+  private String extractBearerTokenOrNull(String authorizationHeader) {
+    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) return null;
+    String token = authorizationHeader.substring("Bearer ".length()).trim();
+    return token.isBlank() ? null : token;
+  }
+
+  private String sessionCookieValue(HttpServletRequest request) {
+    if (request == null || request.getCookies() == null) return null;
+    for (Cookie cookie : request.getCookies()) {
+      if (SESSION_COOKIE_NAME.equals(cookie.getName())) return cookie.getValue();
+    }
+    return null;
   }
 
   private String normalizeOrBadRequest(String walletAddress) {
@@ -114,5 +177,15 @@ public class AuthService {
 
   private String nonBlank(String value, String fallback) {
     return value == null || value.isBlank() ? fallback : value.trim();
+  }
+
+  private String sameSite() {
+    String configured = nonBlank(authProperties.getSessionCookieSameSite(), "Lax");
+    String normalized = configured.substring(0, 1).toUpperCase(Locale.ROOT)
+        + configured.substring(1).toLowerCase(Locale.ROOT);
+    return switch (normalized) {
+      case "Strict", "Lax", "None" -> normalized;
+      default -> "Lax";
+    };
   }
 }
