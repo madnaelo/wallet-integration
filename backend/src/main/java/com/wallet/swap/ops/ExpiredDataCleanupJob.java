@@ -2,6 +2,7 @@ package com.wallet.swap.ops;
 
 import com.wallet.swap.auth.AuthRepository;
 import com.wallet.swap.config.DatabaseApiRateLimiter;
+import com.wallet.swap.config.MaintenanceProperties;
 import com.wallet.swap.notification.TelegramLinkCodeRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -18,6 +19,8 @@ public class ExpiredDataCleanupJob {
   private final AuthRepository authRepository;
   private final TelegramLinkCodeRepository telegramLinkCodeRepository;
   private final DatabaseApiRateLimiter apiRateLimiter;
+  private final ExpiredDataRepository expiredDataRepository;
+  private final MaintenanceProperties maintenanceProperties;
   private final JobLockService jobLockService;
   private final AtomicBoolean running = new AtomicBoolean(false);
 
@@ -25,10 +28,14 @@ public class ExpiredDataCleanupJob {
       AuthRepository authRepository,
       TelegramLinkCodeRepository telegramLinkCodeRepository,
       DatabaseApiRateLimiter apiRateLimiter,
+      ExpiredDataRepository expiredDataRepository,
+      MaintenanceProperties maintenanceProperties,
       JobLockService jobLockService) {
     this.authRepository = authRepository;
     this.telegramLinkCodeRepository = telegramLinkCodeRepository;
     this.apiRateLimiter = apiRateLimiter;
+    this.expiredDataRepository = expiredDataRepository;
+    this.maintenanceProperties = maintenanceProperties;
     this.jobLockService = jobLockService;
   }
 
@@ -48,15 +55,42 @@ public class ExpiredDataCleanupJob {
     int sessions = authRepository.deleteExpiredSessions(now);
     int telegramCodes = telegramLinkCodeRepository.deleteExpired(now);
     int rateLimitBuckets = apiRateLimiter.deleteExpiredBuckets(now);
-    int total = nonces + sessions + telegramCodes + rateLimitBuckets;
+    int dryRunHistory = deleteOlderThan(maintenanceProperties.getDryRunHistoryRetentionDays(), now,
+        expiredDataRepository::deleteOldDryRunSwapHistory);
+    int reverseAlerts = deleteOlderThan(maintenanceProperties.getAlertRetentionDays(), now,
+        expiredDataRepository::deleteOldReverseProfitAlerts);
+    int favoriteAlerts = deleteOlderThan(maintenanceProperties.getAlertRetentionDays(), now,
+        expiredDataRepository::deleteOldFavoritePairAlerts);
+    int autoSwapAlerts = deleteOlderThan(maintenanceProperties.getAlertRetentionDays(), now,
+        expiredDataRepository::deleteOldAutoSwapAlerts);
+    int outboxRows = deleteOlderThan(maintenanceProperties.getNotificationOutboxRetentionDays(), now,
+        expiredDataRepository::deleteOldNotificationOutbox);
+    int total = nonces + sessions + telegramCodes + rateLimitBuckets + dryRunHistory
+        + reverseAlerts + favoriteAlerts + autoSwapAlerts + outboxRows;
     if (total > 0) {
       log.info(
-          "Cleaned up {} expired rows: {} nonces, {} sessions, {} Telegram link codes, {} rate-limit buckets.",
+          "Cleaned up {} expired rows: {} nonces, {} sessions, {} Telegram link codes, {} rate-limit buckets, "
+              + "{} dry-run swaps, {} reverse alerts, {} favorite alerts, {} Auto Swap alerts, {} outbox rows.",
           total,
           nonces,
           sessions,
           telegramCodes,
-          rateLimitBuckets);
+          rateLimitBuckets,
+          dryRunHistory,
+          reverseAlerts,
+          favoriteAlerts,
+          autoSwapAlerts,
+          outboxRows);
     }
+  }
+
+  private int deleteOlderThan(int retentionDays, Instant now, ExpiredRowDeleter deleter) {
+    if (retentionDays <= 0) return 0;
+    return deleter.delete(now.minus(Duration.ofDays(retentionDays)));
+  }
+
+  @FunctionalInterface
+  private interface ExpiredRowDeleter {
+    int delete(Instant cutoff);
   }
 }
