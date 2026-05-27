@@ -3543,23 +3543,45 @@ function formatQuoteOption(quote: QuoteResponse, buyToken: DisplayToken): string
 
 function readStoredBackendSession(): BackendSession | null {
   try {
-    const raw = window.localStorage.getItem(BACKEND_SESSION_STORAGE_KEY);
+    removeBackendSessionCopy(window.localStorage);
+    const raw = window.sessionStorage.getItem(BACKEND_SESSION_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as BackendSession;
-    if (!parsed.walletAddress || !parsed.accessToken || !parsed.expiresAt) return null;
-    if (new Date(parsed.expiresAt).getTime() <= Date.now() + 60_000) return null;
+    if (!parsed.walletAddress || !parsed.accessToken || !parsed.expiresAt) {
+      clearStoredBackendSession();
+      return null;
+    }
+    if (new Date(parsed.expiresAt).getTime() <= Date.now() + 60_000) {
+      clearStoredBackendSession();
+      return null;
+    }
     return parsed;
   } catch {
+    clearStoredBackendSession();
     return null;
   }
 }
 
 function writeStoredBackendSession(session: BackendSession) {
-  window.localStorage.setItem(BACKEND_SESSION_STORAGE_KEY, JSON.stringify(session));
+  removeBackendSessionCopy(window.localStorage);
+  try {
+    window.sessionStorage.setItem(BACKEND_SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // The in-memory React state still carries the session for the current view.
+  }
 }
 
 function clearStoredBackendSession() {
-  window.localStorage.removeItem(BACKEND_SESSION_STORAGE_KEY);
+  removeBackendSessionCopy(window.localStorage);
+  removeBackendSessionCopy(window.sessionStorage);
+}
+
+function removeBackendSessionCopy(storage: Storage) {
+  try {
+    storage.removeItem(BACKEND_SESSION_STORAGE_KEY);
+  } catch {
+    // Storage access can fail in strict browser privacy modes.
+  }
 }
 
 function isSessionForWallet(session: BackendSession, walletAddress: string): boolean {

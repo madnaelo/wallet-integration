@@ -189,6 +189,10 @@ Do not commit real provider keys, production database passwords, or a live fee
 recipient secret bundle. Public `NEXT_PUBLIC_*` values are shipped to the
 browser by design.
 
+Wallet sign-in sessions are kept in tab-scoped browser storage. Closing the tab
+requires a fresh wallet signature and old persistent local copies are cleared
+automatically.
+
 ## Verification
 
 Run the combined local verification script:
