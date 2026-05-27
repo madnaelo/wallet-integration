@@ -10,14 +10,17 @@ platform fees in production.
 - Production frontend is live on Vercel.
 - Production backend health is live on OCI.
 - The quote route has provider-side fee parameters wired for 0x, 1inch,
-  Velora/ParaSwap, Odos, and LI.FI.
+  Velora/ParaSwap, Odos, and LI.FI, but provider-side commercial approval and
+  live fee receipt still need to be verified provider by provider.
 - Vercel production environment variable names exist for provider keys, fee
   addresses, CORS, and cache/rate-limit settings.
 - LI.FI Partner Portal fee collection is enabled for integration `the-wallet`
   with default EVM, Solana/SVM, Sui, and Bitcoin receiving wallets.
 - Current EVM launch networks are Ethereum, Arbitrum, Optimism, Base, Polygon,
   BNB Smart Chain, and Avalanche.
-- `PARASWAP_API_KEY` is still missing.
+- `PARASWAP_API_KEY` is still missing. A Velora Pro API/rate-limit request was
+  submitted on May 27, 2026, using the public production URL and the
+  `madnaelo@yahoo.com` contact address.
 - Treasury receive addresses have been provided. Keep the actual values in
   deployment/provider configuration, not in committed docs, and verify them with
   small real swaps before relying on revenue collection.
@@ -80,7 +83,7 @@ Reference:
 
 ### 1inch
 
-Status: code wired, compliance review needed.
+Status: code wired, compliance review needed before production revenue use.
 
 The 1inch quote client sends:
 
@@ -91,8 +94,14 @@ The 1inch quote client sends:
 Action remaining:
 
 - Confirm our 1inch API account is allowed for commercial/fee-collecting use.
+  Gmail shows a KYC/KYB approval email from May 8, 2026, but also a
+  Non-Commercial API Customer Security Due Diligence email from May 15, 2026.
+  Because The Wallet intends to collect fees, do not certify the usage as
+  personal/non-commercial unless 1inch explicitly confirms that this is correct.
 - Complete 1inch due diligence truthfully. Do not submit as personal
   non-commercial if the app is taking platform fees.
+- If commercial/fee-collecting use is not approved, disable `1inch` in
+  production `SWAP_PROVIDERS` until the account terms are resolved.
 - Run a small real swap and verify fee behavior.
 
 Reference:
@@ -116,6 +125,11 @@ The Velora/ParaSwap client sends:
 
 Action remaining:
 
+- Wait for Velora's response to the May 27, 2026, Pro API/rate-limit request.
+  Submitted values were: project name `The Wallet`, website
+  `https://wallet-integration-theta.vercel.app`, GitHub profile
+  `https://github.com/madnaelo`, initial target `5 requests per second`, and
+  contact `madnaelo@yahoo.com`.
 - Obtain the Velora/ParaSwap API key or confirmation of partner access.
 - Add `PARASWAP_API_KEY` to Vercel.
 - Run a small real swap and verify fee behavior.
@@ -130,22 +144,26 @@ Reference:
 
 ### Odos
 
-Status: code wired, provider-side monetization enablement needed.
+Status: code wired, delegated-fee quote accepted; live payout verification
+pending.
 
 The Odos client sends:
 
 - `partnerFeePercent`
 - `feeRecipient`
 
-Odos documents an automatic 80% partner / 20% Odos split for delegated fees,
-but their pricing page also says monetization must be configured by the Odos
-team.
+Odos documents an automatic 80% partner / 20% Odos split for delegated fees
+when `partnerFeePercent` and `feeRecipient` are supplied. On May 27, 2026, the
+configured API key accepted a Base quote request with those fee parameters and
+returned a route id. That confirms our request shape is accepted, but it does
+not prove payout until a real swap settles and the treasury receives its share.
 
 Action remaining:
 
-- Confirm our Odos API plan/key has swap monetization enabled.
-- Contact Odos if it is not enabled.
-- Run a small real swap and verify fee behavior.
+- Run a small real Odos swap and verify that the expected fee reaches the
+  treasury.
+- Contact Odos if the fee does not appear or if their dashboard indicates that
+  provider-side monetization is not enabled for the key.
 
 Reference:
 
@@ -188,10 +206,10 @@ Before public launch:
 - Replace or confirm `FEE_RECIPIENT_ADDRESS` and `AFFILIATE_ADDRESS`.
 - Verify fee receipt on every enabled EVM chain, not only Ethereum.
 - Rotate the Telegram bot token because the old token was pasted in chat.
-- Confirm `PARASWAP_API_KEY`, or document that ParaSwap is running without a
-  private key and can hit public rate limits.
+- Confirm `PARASWAP_API_KEY`, or keep ParaSwap documented as a public/best
+  effort provider that can hit lower rate limits.
 - Confirm 1inch commercial/API terms fit a revenue-generating app.
-- Confirm Odos monetization is enabled provider-side.
+- Verify Odos delegated-fee payout with a settled real swap.
 - Run a small LI.FI route and confirm the fee appears under Collectable Fees.
 - Add public fee disclosure in the product/legal copy.
 - Add clear alert wording that notifications are estimates, not financial
