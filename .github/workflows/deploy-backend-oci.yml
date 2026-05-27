@@ -130,12 +130,17 @@ jobs:
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "mkdir -p '$OCI_DEPLOY_PATH/scripts/deploy'"
+            "mkdir -p '$OCI_DEPLOY_PATH/scripts/deploy' '$OCI_DEPLOY_PATH/infra/systemd'"
           scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             scripts/deploy/deploy-oci-backend.sh \
-            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh"
+            scripts/deploy/backup-oci-postgres.sh \
+            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/scripts/deploy/"
+          scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+            infra/systemd/wallet-postgres-backup.service \
+            infra/systemd/wallet-postgres-backup.timer \
+            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/infra/systemd/"
           printf '%s\n' "$OCI_BACKEND_ENV" | ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "cat > '$OCI_DEPLOY_PATH/backend.env' && chmod 600 '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh'"
+            "cat > '$OCI_DEPLOY_PATH/backend.env' && chmod 600 '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh' '$OCI_DEPLOY_PATH/scripts/deploy/backup-oci-postgres.sh'"
         env:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}

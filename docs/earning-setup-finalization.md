@@ -216,7 +216,7 @@ Before public launch:
 - Keep clear alert wording that notifications are estimates, not financial
   advice.
 - Verify CORS origins after the final custom domain is attached.
-- Set up automated DB backups for OCI PostgreSQL.
+- Enable the OCI PostgreSQL backup timer after confirming VM disk retention.
 - Set up uptime/error alerts for Vercel and OCI.
 - Monitor `/api/health` and `/api/admin/ops/summary` after each deployment.
 - Run small real swaps through each provider and record the fee receipt result.

@@ -68,6 +68,13 @@ requires a separate read token.
 `OCI_BACKEND_ENV` is the full contents of `infra/oci-backend.env.example` with
 real production values. Do not commit the real file.
 
+Set `ENABLE_POSTGRES_BACKUP_TIMER=true` inside `OCI_BACKEND_ENV` after the OCI
+VM has enough disk space for retention. The backend deploy workflow uploads the
+backup script and systemd timer assets, and the deploy script enables
+`wallet-postgres-backup.timer` when that flag is true. Backups are written to
+`BACKUP_DIR` as custom-format `pg_dump` files and old backups are pruned by
+`BACKUP_RETENTION_DAYS`.
+
 For the current OCI VM, these values match the manual deployment:
 
 ```text
@@ -176,3 +183,10 @@ curl -fsS \
 The operations summary reports in-memory monitor and notification-delivery
 counters since the backend process started. It is intentionally protected by the
 same admin key used for feature switches.
+
+Manual PostgreSQL backup on the OCI VM:
+
+```bash
+cd /home/opc/wallet
+./scripts/deploy/backup-oci-postgres.sh
+```

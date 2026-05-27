@@ -1,0 +1,11 @@
+[Unit]
+Description=Run The Wallet PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+RandomizedDelaySec=20m
+Persistent=true
+Unit=wallet-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

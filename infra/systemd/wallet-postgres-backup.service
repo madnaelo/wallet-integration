@@ -1,0 +1,10 @@
+[Unit]
+Description=The Wallet PostgreSQL backup
+After=docker.service podman.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__WALLET_DEPLOY_PATH__
+Environment=OCI_DEPLOY_PATH=__WALLET_DEPLOY_PATH__
+ExecStart=__WALLET_DEPLOY_PATH__/scripts/deploy/backup-oci-postgres.sh

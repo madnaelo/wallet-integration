@@ -116,6 +116,28 @@ if [ -n "$api_domain" ] && [ -f "$caddyfile_path" ] && run_container container e
   run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null
 fi
 
+if [ "${ENABLE_POSTGRES_BACKUP_TIMER:-false}" = "true" ]; then
+  backup_script="$deploy_path/scripts/deploy/backup-oci-postgres.sh"
+  backup_service_template="$deploy_path/infra/systemd/wallet-postgres-backup.service"
+  backup_timer_template="$deploy_path/infra/systemd/wallet-postgres-backup.timer"
+  if [ ! -f "$backup_script" ] || [ ! -f "$backup_service_template" ] || [ ! -f "$backup_timer_template" ]; then
+    echo "Backup timer requested, but backup assets were not uploaded." >&2
+    exit 1
+  fi
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "Backup timer requested, but systemctl is unavailable on this host." >&2
+    exit 1
+  fi
+
+  chmod +x "$backup_script"
+  escaped_deploy_path="$(printf '%s' "$deploy_path" | sed 's/[&|\\]/\\&/g')"
+  sudo sed "s|__WALLET_DEPLOY_PATH__|$escaped_deploy_path|g" "$backup_service_template" \
+    | sudo tee /etc/systemd/system/wallet-postgres-backup.service >/dev/null
+  sudo cp "$backup_timer_template" /etc/systemd/system/wallet-postgres-backup.timer
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now wallet-postgres-backup.timer >/dev/null
+fi
+
 health_url="${BACKEND_HEALTH_URL:-}"
 if [ -z "$health_url" ] && [ -n "$api_domain" ]; then
   health_url="https://$api_domain/api/health"

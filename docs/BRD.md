@@ -80,5 +80,5 @@ Before public launch:
 - Confirm provider terms for fee-generating use.
 - Rotate any exposed notification tokens.
 - Maintain public fee disclosure, terms, and privacy pages.
-- Enable database backups and uptime/error monitoring.
+- Keep database backups and uptime/error monitoring enabled.
 - Run small real swaps through each enabled provider and verify fee behavior.
