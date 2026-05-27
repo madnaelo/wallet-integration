@@ -1,11 +1,5 @@
-import { ethers } from "ethers";
-
 export function isAddress(v: string): boolean {
-  try {
-    return ethers.isAddress(v);
-  } catch {
-    return false;
-  }
+  return /^0x[a-fA-F0-9]{40}$/.test(v.trim());
 }
 
 export function isPositiveIntegerString(v: string): boolean {

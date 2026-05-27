@@ -3,7 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { ethers } from "ethers";
 import type { QuoteResponse } from "@/lib/types";
 import { CHAINS, getAllowedChains, getChainById } from "@/lib/chains";
 import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
@@ -1674,10 +1673,11 @@ export default function Page() {
     if (sellTokenInfo.isNative) return;
 
     const p = getProviderOrThrow();
-    const provider = new ethers.BrowserProvider(p);
+    const { BrowserProvider, Contract } = await import("ethers");
+    const provider = new BrowserProvider(p);
     const signer = await provider.getSigner();
 
-    const token = new ethers.Contract(sellTokenInfo.address, ERC20_ABI, signer);
+    const token = new Contract(sellTokenInfo.address, ERC20_ABI, signer);
 
     const spender = (quote.allowanceTarget as string | undefined) ?? quote.to;
     if (!spender || !isAddress(spender)) throw new Error("Invalid spender from quote.");
@@ -1728,7 +1728,8 @@ export default function Page() {
       await ensureAllowanceAndApproveIfNeeded();
 
       const p = getProviderOrThrow();
-      const provider = new ethers.BrowserProvider(p);
+      const { BrowserProvider } = await import("ethers");
+      const provider = new BrowserProvider(p);
       const signer = await provider.getSigner();
 
       // Optional recommended: simulate via eth_call before sending
