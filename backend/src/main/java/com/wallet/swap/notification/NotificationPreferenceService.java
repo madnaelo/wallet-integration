@@ -35,10 +35,13 @@ public class NotificationPreferenceService {
   }
 
   public NotificationPreferenceResponse save(String walletAddress, NotificationPreferenceRequest request) {
-    validate(request);
+    NotificationPreferenceResponse current = get(walletAddress);
+    validate(request, current.telegramChatId());
     return repository.upsert(
         walletAddress,
         request,
+        current.telegramChatId(),
+        Boolean.TRUE.equals(request.telegramEnabled()),
         properties.getDefaultProfitThresholdBps(),
         properties.getDefaultLossThresholdBps(),
         properties.getDefaultCooldownMinutes());
@@ -46,20 +49,28 @@ public class NotificationPreferenceService {
 
   public NotificationPreferenceResponse connectTelegram(String walletAddress, String telegramChatId) {
     NotificationPreferenceResponse current = get(walletAddress);
-    return save(walletAddress, new NotificationPreferenceRequest(
+    NotificationPreferenceRequest request = new NotificationPreferenceRequest(
         current.emailAddress(),
         current.emailEnabled(),
-        telegramChatId,
         true,
         current.reverseProfitThresholdBps(),
         current.reverseLossEnabled(),
         current.reverseLossThresholdBps(),
-        current.cooldownMinutes()));
+        current.cooldownMinutes());
+    validate(request, telegramChatId);
+    return repository.upsert(
+        walletAddress,
+        request,
+        telegramChatId,
+        true,
+        properties.getDefaultProfitThresholdBps(),
+        properties.getDefaultLossThresholdBps(),
+        properties.getDefaultCooldownMinutes());
   }
 
-  private void validate(NotificationPreferenceRequest request) {
+  private void validate(NotificationPreferenceRequest request, String linkedTelegramChatId) {
     String email = trim(request.emailAddress());
-    String telegramChatId = trim(request.telegramChatId());
+    String telegramChatId = trim(linkedTelegramChatId);
 
     if (email != null && !BASIC_EMAIL_PATTERN.matcher(email).matches()) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Enter a valid email address.");
@@ -68,7 +79,7 @@ public class NotificationPreferenceService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Email address is required when email alerts are enabled.");
     }
     if (Boolean.TRUE.equals(request.telegramEnabled()) && telegramChatId == null) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Telegram chat ID is required when Telegram alerts are enabled.");
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Connect Telegram before enabling Telegram alerts.");
     }
   }
 

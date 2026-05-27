@@ -11,7 +11,6 @@ public final class NotificationModels {
   public record NotificationPreferenceRequest(
       @Email @Size(max = 254) String emailAddress,
       Boolean emailEnabled,
-      @Size(max = 64) String telegramChatId,
       Boolean telegramEnabled,
       @Min(0) @Max(100000) Integer reverseProfitThresholdBps,
       Boolean reverseLossEnabled,

@@ -32,6 +32,8 @@ public class NotificationPreferenceRepository {
   public NotificationPreferenceResponse upsert(
       String walletAddress,
       NotificationPreferenceRequest request,
+      String telegramChatId,
+      boolean telegramEnabled,
       int defaultThresholdBps,
       int defaultLossThresholdBps,
       int defaultCooldownMinutes) {
@@ -56,8 +58,8 @@ public class NotificationPreferenceRepository {
         walletAddress,
         blankToNull(request.emailAddress()),
         Boolean.TRUE.equals(request.emailEnabled()),
-        blankToNull(request.telegramChatId()),
-        Boolean.TRUE.equals(request.telegramEnabled()),
+        blankToNull(telegramChatId),
+        telegramEnabled,
         request.reverseProfitThresholdBps() == null ? defaultThresholdBps : request.reverseProfitThresholdBps(),
         Boolean.TRUE.equals(request.reverseLossEnabled()),
         request.reverseLossThresholdBps() == null ? defaultLossThresholdBps : request.reverseLossThresholdBps(),

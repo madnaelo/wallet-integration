@@ -1212,7 +1212,6 @@ export default function Page() {
       const preference = await saveNotificationPreferences(envPublic.BACKEND_BASE_URL, session, {
         emailAddress: notificationPreference?.emailAddress ?? null,
         emailEnabled: notificationPreference?.emailEnabled ?? false,
-        telegramChatId: notificationPreference?.telegramChatId ?? null,
         telegramEnabled: telegramEnabledDraft,
         reverseProfitThresholdBps: profitThresholdBps,
         reverseLossEnabled: reverseLossEnabledDraft,

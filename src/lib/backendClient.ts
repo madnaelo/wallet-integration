@@ -53,7 +53,6 @@ export type NotificationPreference = {
 export type SaveNotificationPreferenceRequest = {
   emailAddress?: string | null;
   emailEnabled?: boolean;
-  telegramChatId?: string | null;
   telegramEnabled?: boolean;
   reverseProfitThresholdBps?: number;
   reverseLossEnabled?: boolean;
