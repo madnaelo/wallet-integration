@@ -8,6 +8,9 @@ backend_container="${BACKEND_CONTAINER_NAME:-wallet-backend}"
 postgres_container="${POSTGRES_CONTAINER_NAME:-wallet-postgres}"
 postgres_volume="${POSTGRES_VOLUME_NAME:-wallet-postgres-data}"
 backend_memory="${BACKEND_MEMORY:-520m}"
+app_version="${APP_VERSION:-${BACKEND_IMAGE##*:}}"
+git_commit="${GIT_COMMIT:-}"
+deployed_at="${DEPLOYED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 api_domain="${WALLET_API_DOMAIN:-}"
 caddyfile_path="${OCI_CADDYFILE_PATH:-/home/opc/uk-property-check-middleware/Caddyfile}"
 caddy_container="${OCI_CADDY_CONTAINER:-uk-property-check-caddy}"
@@ -84,6 +87,9 @@ run_container run -d \
   --restart unless-stopped \
   --network "$container_network" \
   --env-file "$env_file" \
+  -e "APP_VERSION=$app_version" \
+  -e "GIT_COMMIT=$git_commit" \
+  -e "DEPLOYED_AT=$deployed_at" \
   --memory "$backend_memory" \
   "$BACKEND_IMAGE" >/dev/null
 

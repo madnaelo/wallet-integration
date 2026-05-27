@@ -29,6 +29,7 @@ jobs:
       NEXT_PUBLIC_DISALLOW_MAINNET: "false"
       NEXT_PUBLIC_BACKEND_BASE_URL: "http://localhost:8080"
       NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
+      NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
       ZEROX_API_KEY: ""
       ONEINCH_API_KEY: ""
       PARASWAP_API_KEY: ""

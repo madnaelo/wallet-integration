@@ -159,6 +159,22 @@ body {
   gap: 12px;
 }
 
+.footerMeta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.versionLabel {
+  border: 1px solid rgba(207, 224, 255, 0.22);
+  border-radius: 999px;
+  color: #b7c8e8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
 .siteFooter a,
 .legalBackLink {
   color: #cfe0ff;

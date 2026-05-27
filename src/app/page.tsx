@@ -3103,11 +3103,16 @@ export default function Page() {
 
       <footer className="siteFooter">
         <span>The Wallet is non-custodial. Review every wallet request before signing.</span>
-        <nav aria-label="Legal links">
-          <Link href="/fees">Fees & Risks</Link>
-          <Link href="/terms">Terms</Link>
-          <Link href="/privacy">Privacy</Link>
-        </nav>
+        <div className="footerMeta">
+          <span className="versionLabel" title={`Build ${envPublic.APP_VERSION}`}>
+            Build {formatBuildVersion(envPublic.APP_VERSION)}
+          </span>
+          <nav aria-label="Legal links">
+            <Link href="/fees">Fees & Risks</Link>
+            <Link href="/terms">Terms</Link>
+            <Link href="/privacy">Privacy</Link>
+          </nav>
+        </div>
       </footer>
     </div>
   );
@@ -3116,6 +3121,12 @@ export default function Page() {
 function shortAddr(a: string) {
   if (!a) return "";
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function formatBuildVersion(version: string): string {
+  const trimmed = version.trim();
+  if (!trimmed || trimmed === "local") return "local";
+  return trimmed.replace(/^sha-/, "").slice(0, 7);
 }
 
 function parseSwapLinkParams(search: string): PendingSwapLink | null {

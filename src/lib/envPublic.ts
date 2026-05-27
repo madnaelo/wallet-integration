@@ -6,5 +6,10 @@ export const envPublic = {
     process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ??
     process.env.NEXT_PUBLIC_WALLETCONNECT_ID ??
     ""
+  ).trim(),
+  APP_VERSION: (
+    process.env.NEXT_PUBLIC_APP_VERSION ??
+    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
+    "local"
   ).trim()
 };
