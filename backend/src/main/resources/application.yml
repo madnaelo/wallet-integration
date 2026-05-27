@@ -60,6 +60,10 @@ wallet:
     default-loss-threshold-bps: ${NOTIFICATIONS_DEFAULT_LOSS_THRESHOLD_BPS:500}
     default-cooldown-minutes: ${NOTIFICATIONS_DEFAULT_COOLDOWN_MINUTES:360}
     telegram-link-ttl-minutes: ${TELEGRAM_LINK_TTL_MINUTES:10}
+    outbox-fixed-delay-ms: ${NOTIFICATIONS_OUTBOX_FIXED_DELAY_MS:15000}
+    outbox-batch-size: ${NOTIFICATIONS_OUTBOX_BATCH_SIZE:50}
+    outbox-max-attempts: ${NOTIFICATIONS_OUTBOX_MAX_ATTEMPTS:8}
+    outbox-lock-ttl-seconds: ${NOTIFICATIONS_OUTBOX_LOCK_TTL_SECONDS:120}
     eligible-statuses: ${NOTIFICATIONS_ELIGIBLE_STATUSES:submitted,confirmed}
     app-url: ${APP_URL:http://localhost:3000}
     price:

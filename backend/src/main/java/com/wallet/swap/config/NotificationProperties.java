@@ -13,6 +13,10 @@ public class NotificationProperties {
   private int defaultLossThresholdBps = 500;
   private int defaultCooldownMinutes = 360;
   private int telegramLinkTtlMinutes = 10;
+  private long outboxFixedDelayMs = 15_000;
+  private int outboxBatchSize = 50;
+  private int outboxMaxAttempts = 8;
+  private int outboxLockTtlSeconds = 120;
   private List<String> eligibleStatuses = List.of("submitted", "confirmed");
   private String appUrl = "http://localhost:3000";
   private Price price = new Price();
@@ -81,6 +85,38 @@ public class NotificationProperties {
 
   public void setTelegramLinkTtlMinutes(int telegramLinkTtlMinutes) {
     this.telegramLinkTtlMinutes = telegramLinkTtlMinutes;
+  }
+
+  public long getOutboxFixedDelayMs() {
+    return outboxFixedDelayMs;
+  }
+
+  public void setOutboxFixedDelayMs(long outboxFixedDelayMs) {
+    this.outboxFixedDelayMs = outboxFixedDelayMs;
+  }
+
+  public int getOutboxBatchSize() {
+    return outboxBatchSize;
+  }
+
+  public void setOutboxBatchSize(int outboxBatchSize) {
+    this.outboxBatchSize = outboxBatchSize;
+  }
+
+  public int getOutboxMaxAttempts() {
+    return outboxMaxAttempts;
+  }
+
+  public void setOutboxMaxAttempts(int outboxMaxAttempts) {
+    this.outboxMaxAttempts = outboxMaxAttempts;
+  }
+
+  public int getOutboxLockTtlSeconds() {
+    return outboxLockTtlSeconds;
+  }
+
+  public void setOutboxLockTtlSeconds(int outboxLockTtlSeconds) {
+    this.outboxLockTtlSeconds = outboxLockTtlSeconds;
   }
 
   public List<String> getEligibleStatuses() {
