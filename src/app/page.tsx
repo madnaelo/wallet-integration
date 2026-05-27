@@ -1439,6 +1439,27 @@ export default function Page() {
     }
   }
 
+  function openFavoritePair(pair: FavoritePair, direction: "saved" | "reverse" = "saved") {
+    const swapLink: PendingSwapLink = {
+      chainId: pair.chainId,
+      sellToken: direction === "reverse" ? pair.buyTokenAddress : pair.sellTokenAddress,
+      buyToken: direction === "reverse" ? pair.sellTokenAddress : pair.buyTokenAddress,
+      sellAmountRaw: ""
+    };
+
+    setPendingSwapLink(swapLink);
+    setActiveView("swap");
+    setSelectedChainId(swapLink.chainId);
+    setSellToken(swapLink.sellToken);
+    setBuyToken(swapLink.buyToken);
+    setAmountHuman("");
+    setQuoteValidationVisible(false);
+    clearQuoteState();
+    setActionError("");
+    setFavoritePairNotice("");
+    window.history.pushState(null, "", buildSwapLinkHref(swapLink));
+  }
+
   function buildFavoritePairRequest(): SaveFavoritePairRequest {
     if (!sellTokenInfo || !buyTokenInfo) throw new Error("Select a pair before saving it.");
     if (normalizeTokenKey(sellTokenInfo.address) === normalizeTokenKey(buyTokenInfo.address)) {
@@ -3045,7 +3066,7 @@ export default function Page() {
                     <th>Pair</th>
                     <th>Target</th>
                     <th>Alerts</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3057,16 +3078,24 @@ export default function Page() {
                       <td>{formatFavoriteTarget(pair)}</td>
                       <td>{pair.alertsEnabled ? "On" : "Off"}</td>
                       <td>
-                        <button
-                          className="tableActionButton"
-                          type="button"
-                          onClick={() => {
-                            void removeFavoritePair(pair);
-                          }}
-                          disabled={favoritePairDeletingId === pair.id}
-                        >
-                          {favoritePairDeletingId === pair.id ? "Removing..." : "Remove"}
-                        </button>
+                        <div className="tableActionGroup">
+                          <button className="tableActionButton" type="button" onClick={() => openFavoritePair(pair)}>
+                            Open
+                          </button>
+                          <button className="tableActionButton" type="button" onClick={() => openFavoritePair(pair, "reverse")}>
+                            Reverse
+                          </button>
+                          <button
+                            className="tableActionButton tableActionDanger"
+                            type="button"
+                            onClick={() => {
+                              void removeFavoritePair(pair);
+                            }}
+                            disabled={favoritePairDeletingId === pair.id}
+                          >
+                            {favoritePairDeletingId === pair.id ? "Removing..." : "Remove"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -3101,6 +3130,20 @@ function parseSwapLinkParams(search: string): PendingSwapLink | null {
     buyToken,
     sellAmountRaw
   };
+}
+
+function buildSwapLinkHref(params: PendingSwapLink): string {
+  const searchParams = new URLSearchParams({
+    chainId: String(params.chainId),
+    sellToken: params.sellToken,
+    buyToken: params.buyToken
+  });
+
+  if (params.sellAmountRaw) {
+    searchParams.set("sellAmountRaw", params.sellAmountRaw);
+  }
+
+  return `?${searchParams.toString()}#swap`;
 }
 
 function sanitizeTokenQueryParam(value: string | null): string {

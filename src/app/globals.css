@@ -1707,6 +1707,18 @@ body {
   text-underline-offset: 3px;
 }
 
+.tableActionGroup {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  justify-content: flex-end;
+}
+
+.tableActionDanger {
+  color: var(--danger);
+}
+
 .tableActionButton:disabled {
   color: var(--muted);
   cursor: not-allowed;
