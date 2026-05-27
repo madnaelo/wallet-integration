@@ -1,5 +1,6 @@
 import type { QuoteResponse } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
+import { SAME_CHAIN_QUOTE_CHAIN_IDS } from "@/lib/chains";
 import {
   assertExecutableQuote,
   collectNestedProtocolLines,
@@ -22,7 +23,7 @@ export type OneInchClientConfig = {
 export class OneInchClient implements DexAggregatorClient {
   providerId = "1inch";
   providerName = "1inch";
-  supportedChainIds = [1, 137, 8453];
+  supportedChainIds: number[] = [...SAME_CHAIN_QUOTE_CHAIN_IDS];
 
   private cfg: Required<OneInchClientConfig>;
 

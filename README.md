@@ -15,8 +15,9 @@ Implemented:
 - Next.js App Router frontend with ethers-based wallet transaction execution.
 - Reown AppKit wallet connection for installed wallets and WalletConnect-style
   QR/mobile flows.
-- Same-chain swap selection for configured Ethereum, Polygon, and Base
-  networks. The connected wallet chain is selected when it is allowed.
+- Same-chain swap selection for configured Ethereum, Arbitrum, Optimism, Base,
+  Polygon, BNB Smart Chain, and Avalanche networks. The connected wallet chain
+  is selected when it is allowed.
 - Searchable token pickers backed by cached token-list/provider metadata,
   native/popular-token fallbacks, native BTC selection, and a sell/buy reversal
   control.

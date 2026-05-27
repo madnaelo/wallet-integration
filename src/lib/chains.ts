@@ -9,6 +9,8 @@ export type ChainConfig = {
   nativeCurrency?: { name: string; symbol: string; decimals: number };
 };
 
+export const SAME_CHAIN_QUOTE_CHAIN_IDS = [1, 137, 8453, 42161, 10, 56, 43114] as const;
+
 export const CHAINS: Record<number, ChainConfig> = {
   1: {
     chainId: 1,
@@ -41,6 +43,38 @@ export const CHAINS: Record<number, ChainConfig> = {
     rpcUrls: ["https://mainnet.base.org"],
     blockExplorerUrls: ["https://basescan.org"],
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }
+  },
+  42161: {
+    chainId: 42161,
+    name: "Arbitrum One",
+    zeroXBaseUrl: "https://api.0x.org",
+    rpcUrls: ["https://arb1.arbitrum.io/rpc"],
+    blockExplorerUrls: ["https://arbiscan.io"],
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }
+  },
+  10: {
+    chainId: 10,
+    name: "Optimism",
+    zeroXBaseUrl: "https://api.0x.org",
+    rpcUrls: ["https://mainnet.optimism.io"],
+    blockExplorerUrls: ["https://optimistic.etherscan.io"],
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }
+  },
+  56: {
+    chainId: 56,
+    name: "BNB Smart Chain",
+    zeroXBaseUrl: "https://api.0x.org",
+    rpcUrls: ["https://bsc-dataseed.binance.org"],
+    blockExplorerUrls: ["https://bscscan.com"],
+    nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 }
+  },
+  43114: {
+    chainId: 43114,
+    name: "Avalanche C-Chain",
+    zeroXBaseUrl: "https://api.0x.org",
+    rpcUrls: ["https://api.avax.network/ext/bc/C/rpc"],
+    blockExplorerUrls: ["https://snowtrace.io"],
+    nativeCurrency: { name: "Avalanche", symbol: "AVAX", decimals: 18 }
   }
 };
 

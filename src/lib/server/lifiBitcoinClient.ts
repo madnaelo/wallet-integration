@@ -1,5 +1,6 @@
 import type { QuoteResponse, QuoteFee, QuoteToken } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
+import { SAME_CHAIN_QUOTE_CHAIN_IDS } from "@/lib/chains";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 import {
   assertExecutableQuote,
@@ -23,7 +24,7 @@ export type LifiBitcoinClientConfig = {
 export class LifiBitcoinClient implements DexAggregatorClient {
   providerId = "lifi";
   providerName = "LI.FI";
-  supportedChainIds = [1, 137, 8453];
+  supportedChainIds: number[] = [...SAME_CHAIN_QUOTE_CHAIN_IDS];
 
   constructor(private readonly cfg: LifiBitcoinClientConfig) {}
 

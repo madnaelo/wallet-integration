@@ -95,5 +95,93 @@ export const DEFAULT_TOKENS_BY_CHAIN: Record<number, TokenInfo[]> = {
     },
     { symbol: "WETH", address: "0x4200000000000000000000000000000000000006", decimals: 18, name: "Wrapped Ether" },
     { symbol: "LINK", address: "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196", decimals: 18, name: "Chainlink" }
+  ],
+  42161: [
+    { symbol: "ETH", address: "ETH", decimals: 18, isNative: true, name: "Ether", searchAliases: ["Ethereum"] },
+    { symbol: "USDT", address: "0xFd086bC7CD5C481DCC9C85ebe478A1C0b69FCbb9", decimals: 6, name: "Tether USD" },
+    { symbol: "USDC", address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", decimals: 6, name: "USD Coin" },
+    NATIVE_BITCOIN_TOKEN,
+    {
+      symbol: "WBTC",
+      address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
+      decimals: 8,
+      name: "Wrapped BTC",
+      searchAliases: ["BTC", "Bitcoin", "Wrapped Bitcoin"]
+    },
+    { symbol: "WETH", address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", decimals: 18, name: "Wrapped Ether" },
+    { symbol: "DAI", address: "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1", decimals: 18, name: "Dai Stablecoin" },
+    { symbol: "ARB", address: "0x912CE59144191C1204E64559FE8253a0e49E6548", decimals: 18, name: "Arbitrum" },
+    { symbol: "LINK", address: "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4", decimals: 18, name: "Chainlink" }
+  ],
+  10: [
+    { symbol: "ETH", address: "ETH", decimals: 18, isNative: true, name: "Ether", searchAliases: ["Ethereum"] },
+    { symbol: "USDT", address: "0x94b008aD9eC95854314bF3F5f9b71E7ceB2A6B3", decimals: 6, name: "Tether USD" },
+    { symbol: "USDC", address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", decimals: 6, name: "USD Coin" },
+    NATIVE_BITCOIN_TOKEN,
+    {
+      symbol: "WBTC",
+      address: "0x68f180fcCe6836688e9084f035309E29Bf0A2095",
+      decimals: 8,
+      name: "Wrapped BTC",
+      searchAliases: ["BTC", "Bitcoin", "Wrapped Bitcoin"]
+    },
+    { symbol: "WETH", address: "0x4200000000000000000000000000000000000006", decimals: 18, name: "Wrapped Ether" },
+    { symbol: "DAI", address: "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1", decimals: 18, name: "Dai Stablecoin" },
+    { symbol: "OP", address: "0x4200000000000000000000000000000000000042", decimals: 18, name: "Optimism" },
+    { symbol: "LINK", address: "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6", decimals: 18, name: "Chainlink" }
+  ],
+  56: [
+    {
+      symbol: "BNB",
+      address: "ETH",
+      decimals: 18,
+      isNative: true,
+      name: "BNB",
+      searchAliases: ["Binance Coin", "BNB Chain"]
+    },
+    { symbol: "USDT", address: "0x55d398326f99059fF775485246999027B3197955", decimals: 18, name: "Tether USD" },
+    { symbol: "USDC", address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", decimals: 18, name: "USD Coin" },
+    NATIVE_BITCOIN_TOKEN,
+    {
+      symbol: "BTCB",
+      address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+      decimals: 18,
+      name: "Bitcoin BEP2",
+      searchAliases: ["BTC", "Bitcoin", "Binance Bitcoin"]
+    },
+    { symbol: "WBNB", address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", decimals: 18, name: "Wrapped BNB" },
+    {
+      symbol: "ETH",
+      address: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+      decimals: 18,
+      name: "Ethereum Token",
+      searchAliases: ["Ethereum"]
+    },
+    { symbol: "DAI", address: "0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3", decimals: 18, name: "Dai Stablecoin" },
+    { symbol: "CAKE", address: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82", decimals: 18, name: "PancakeSwap" }
+  ],
+  43114: [
+    {
+      symbol: "AVAX",
+      address: "ETH",
+      decimals: 18,
+      isNative: true,
+      name: "Avalanche",
+      searchAliases: ["Avalanche C-Chain"]
+    },
+    { symbol: "USDT", address: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7", decimals: 6, name: "Tether USD" },
+    { symbol: "USDC", address: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E", decimals: 6, name: "USD Coin" },
+    NATIVE_BITCOIN_TOKEN,
+    {
+      symbol: "WBTC.e",
+      address: "0x50b7545627a5162F82A992c33b87aDc75187B218",
+      decimals: 8,
+      name: "Wrapped BTC",
+      searchAliases: ["BTC", "Bitcoin", "Wrapped Bitcoin"]
+    },
+    { symbol: "WAVAX", address: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", decimals: 18, name: "Wrapped AVAX" },
+    { symbol: "WETH.e", address: "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB", decimals: 18, name: "Wrapped Ether" },
+    { symbol: "DAI.e", address: "0xd586E7F844cEa2F87f50152665BCbc2C279D8d70", decimals: 18, name: "Dai Stablecoin" },
+    { symbol: "LINK.e", address: "0x5947BB275c521040051D82396192181b413227A3", decimals: 18, name: "Chainlink" }
   ]
 };

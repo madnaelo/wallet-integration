@@ -1,5 +1,6 @@
 import type { QuoteResponse } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
+import { SAME_CHAIN_QUOTE_CHAIN_IDS } from "@/lib/chains";
 import {
   assertExecutableQuote,
   normalizeNativeToken,
@@ -21,7 +22,7 @@ export type OdosClientConfig = {
 export class OdosClient implements DexAggregatorClient {
   providerId = "odos";
   providerName = "Odos";
-  supportedChainIds = [1, 137, 8453];
+  supportedChainIds: number[] = [...SAME_CHAIN_QUOTE_CHAIN_IDS];
 
   private cfg: OdosClientConfig;
 

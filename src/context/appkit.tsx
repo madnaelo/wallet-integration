@@ -4,7 +4,18 @@ import type { ReactNode } from "react";
 import { createAppKit } from "@reown/appkit/react";
 import { BitcoinAdapter } from "@reown/appkit-adapter-bitcoin";
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
-import { base, bitcoin, mainnet, polygon, sepolia, type AppKitNetwork } from "@reown/appkit/networks";
+import {
+  arbitrum,
+  avalanche,
+  base,
+  bitcoin,
+  bsc,
+  mainnet,
+  optimism,
+  polygon,
+  sepolia,
+  type AppKitNetwork
+} from "@reown/appkit/networks";
 import { getAllowedChainIds } from "@/lib/chains";
 
 const rawProjectId = (
@@ -21,7 +32,11 @@ const networkByChainId: Record<number, AppKitNetwork> = {
   1: mainnet,
   11155111: sepolia,
   137: polygon,
-  8453: base
+  8453: base,
+  42161: arbitrum,
+  10: optimism,
+  56: bsc,
+  43114: avalanche
 };
 
 const configuredNetworks = getAllowedChainIds()

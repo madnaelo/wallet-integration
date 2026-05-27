@@ -35,7 +35,8 @@ The treasury address must:
 
 - Start with `0x`.
 - Be controlled by us, not an exchange deposit address.
-- Be usable across Ethereum, Polygon, and Base.
+- Be usable across Ethereum, Arbitrum, Optimism, Base, Polygon, BNB Smart Chain,
+  and Avalanche.
 - Be safe to receive many ERC-20 fee tokens.
 
 Recommended path:
