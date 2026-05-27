@@ -8,7 +8,9 @@ import com.wallet.swap.notification.FavoritePairModels.FavoritePairCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
 import com.wallet.swap.ops.OperationalMetricsService;
+import com.wallet.swap.ops.JobLockService;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ public class ReverseProfitMonitor {
   private final AutoSwapCalculator autoSwapCalculator;
   private final NotificationDeliveryService deliveryService;
   private final OperationalMetricsService metricsService;
+  private final JobLockService jobLockService;
   private final AtomicBoolean running = new AtomicBoolean(false);
 
   public ReverseProfitMonitor(
@@ -45,7 +48,8 @@ public class ReverseProfitMonitor {
       FavoritePairCalculator favoritePairCalculator,
       AutoSwapCalculator autoSwapCalculator,
       NotificationDeliveryService deliveryService,
-      OperationalMetricsService metricsService) {
+      OperationalMetricsService metricsService,
+      JobLockService jobLockService) {
     this.properties = properties;
     this.candidateRepository = candidateRepository;
     this.favoritePairCandidateRepository = favoritePairCandidateRepository;
@@ -56,6 +60,7 @@ public class ReverseProfitMonitor {
     this.autoSwapCalculator = autoSwapCalculator;
     this.deliveryService = deliveryService;
     this.metricsService = metricsService;
+    this.jobLockService = jobLockService;
   }
 
   @Scheduled(fixedDelayString = "${wallet.notifications.monitor-fixed-delay-ms:900000}")
@@ -63,6 +68,17 @@ public class ReverseProfitMonitor {
     if (!properties.isMonitorEnabled()) return;
     if (!running.compareAndSet(false, true)) return;
 
+    try {
+      jobLockService.runIfAcquired(
+          "notification-monitor",
+          Duration.ofMillis(Math.max(60_000, properties.getMonitorFixedDelayMs() * 2)),
+          this::runMonitorCycle);
+    } finally {
+      running.set(false);
+    }
+  }
+
+  private void runMonitorCycle() {
     int reverseCandidateCount = 0;
     int favoritePairCandidateCount = 0;
     int autoSwapCandidateCount = 0;
@@ -147,8 +163,6 @@ public class ReverseProfitMonitor {
     } catch (Exception exception) {
       metricsService.recordMonitorFailure(exception);
       log.warn("Reverse profit monitor failed.", exception);
-    } finally {
-      running.set(false);
     }
   }
 }
