@@ -156,3 +156,23 @@ export GHCR_TOKEN=<read-packages-token>
 export WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
 ./scripts/deploy/deploy-oci-backend.sh
 ```
+
+## Operations Checks
+
+Public backend health:
+
+```bash
+curl -fsS https://wallet-api.84-235-254-97.sslip.io/api/health
+```
+
+Admin-only backend operations summary:
+
+```bash
+curl -fsS \
+  -H "X-Admin-Key: $ADMIN_API_KEY" \
+  https://wallet-api.84-235-254-97.sslip.io/api/admin/ops/summary
+```
+
+The operations summary reports in-memory monitor and notification-delivery
+counters since the backend process started. It is intentionally protected by the
+same admin key used for feature switches.

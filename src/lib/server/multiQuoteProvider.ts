@@ -22,11 +22,13 @@ export class MultiQuoteProvider implements DexAggregatorClient {
 
     const settled = await Promise.allSettled(
       candidates.map(async (client) => {
+        const startedAt = Date.now();
         const quote = await withTimeout(
           client.getQuote(params),
           PROVIDER_TIMEOUT_MS,
           `${client.providerName} quote took too long.`
         );
+        logProviderResult(client, params.chainId, Date.now() - startedAt);
         return { client, quote };
       })
     );
@@ -39,6 +41,7 @@ export class MultiQuoteProvider implements DexAggregatorClient {
       if (result.status === "fulfilled") {
         quotes.push(result.value.quote);
       } else {
+        logProviderResult(client, params.chainId, undefined, result.reason);
         quoteErrors.push(providerError(client.providerId, client.providerName, result.reason));
       }
     });
@@ -62,6 +65,31 @@ export class MultiQuoteProvider implements DexAggregatorClient {
       quoteErrors
     };
   }
+}
+
+function logProviderResult(
+  client: DexAggregatorClient,
+  chainId: number,
+  durationMs?: number,
+  error?: unknown
+) {
+  const event = {
+    event: error ? "quote_provider_failed" : "quote_provider_succeeded",
+    providerId: client.providerId,
+    providerName: client.providerName,
+    chainId,
+    durationMs
+  };
+  if (error) {
+    console.warn({ ...event, message: normalizeLogError(error) });
+  } else {
+    console.info(event);
+  }
+}
+
+function normalizeLogError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.length <= 500 ? message : message.substring(0, 500);
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {

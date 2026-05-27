@@ -4,6 +4,7 @@ import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
+import com.wallet.swap.ops.OperationalMetricsService;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +27,7 @@ public class ReverseProfitMonitor {
   private final ReverseProfitCalculator calculator;
   private final FavoritePairCalculator favoritePairCalculator;
   private final NotificationDeliveryService deliveryService;
+  private final OperationalMetricsService metricsService;
   private final AtomicBoolean running = new AtomicBoolean(false);
 
   public ReverseProfitMonitor(
@@ -35,7 +37,8 @@ public class ReverseProfitMonitor {
       CoinGeckoPriceClient priceClient,
       ReverseProfitCalculator calculator,
       FavoritePairCalculator favoritePairCalculator,
-      NotificationDeliveryService deliveryService) {
+      NotificationDeliveryService deliveryService,
+      OperationalMetricsService metricsService) {
     this.properties = properties;
     this.candidateRepository = candidateRepository;
     this.favoritePairCandidateRepository = favoritePairCandidateRepository;
@@ -43,6 +46,7 @@ public class ReverseProfitMonitor {
     this.calculator = calculator;
     this.favoritePairCalculator = favoritePairCalculator;
     this.deliveryService = deliveryService;
+    this.metricsService = metricsService;
   }
 
   @Scheduled(fixedDelayString = "${wallet.notifications.monitor-fixed-delay-ms:900000}")
@@ -50,14 +54,23 @@ public class ReverseProfitMonitor {
     if (!properties.isMonitorEnabled()) return;
     if (!running.compareAndSet(false, true)) return;
 
+    int reverseCandidateCount = 0;
+    int favoritePairCandidateCount = 0;
+    int totalOpportunities = 0;
     try {
+      metricsService.recordMonitorStarted();
       List<ReverseProfitCandidate> candidates = candidateRepository.findCandidates(
           properties.getEligibleStatuses(),
           properties.getLookbackDays(),
           properties.getCandidateLimit());
       List<FavoritePairCandidate> favoritePairCandidates = favoritePairCandidateRepository.findCandidates(
           properties.getCandidateLimit());
-      if (candidates.isEmpty() && favoritePairCandidates.isEmpty()) return;
+      reverseCandidateCount = candidates.size();
+      favoritePairCandidateCount = favoritePairCandidates.size();
+      if (candidates.isEmpty() && favoritePairCandidates.isEmpty()) {
+        metricsService.recordMonitorCompleted(0, 0, 0);
+        return;
+      }
 
       Set<TokenRef> tokenRefs = new HashSet<>();
       for (ReverseProfitCandidate candidate : candidates) {
@@ -90,7 +103,8 @@ public class ReverseProfitMonitor {
             .orElse(0);
       }
 
-      int totalOpportunities = reverseOpportunities + favoritePairOpportunities;
+      totalOpportunities = reverseOpportunities + favoritePairOpportunities;
+      metricsService.recordMonitorCompleted(reverseCandidateCount, favoritePairCandidateCount, totalOpportunities);
       if (totalOpportunities > 0) {
         log.info(
             "Notification monitor processed {} reverse candidates and {} favorite pairs; found {} opportunities.",
@@ -99,6 +113,7 @@ public class ReverseProfitMonitor {
             totalOpportunities);
       }
     } catch (Exception exception) {
+      metricsService.recordMonitorFailure(exception);
       log.warn("Reverse profit monitor failed.", exception);
     } finally {
       running.set(false);

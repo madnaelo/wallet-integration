@@ -2,6 +2,7 @@ package com.wallet.swap.notification;
 
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitOpportunity;
+import com.wallet.swap.ops.OperationalMetricsService;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -17,18 +18,21 @@ public class NotificationDeliveryService {
   private final NotificationMessageFormatter messageFormatter;
   private final ReverseProfitAlertRepository alertRepository;
   private final FavoritePairAlertRepository favoritePairAlertRepository;
+  private final OperationalMetricsService metricsService;
 
   public NotificationDeliveryService(
       EmailNotificationSender emailSender,
       TelegramNotificationSender telegramSender,
       NotificationMessageFormatter messageFormatter,
       ReverseProfitAlertRepository alertRepository,
-      FavoritePairAlertRepository favoritePairAlertRepository) {
+      FavoritePairAlertRepository favoritePairAlertRepository,
+      OperationalMetricsService metricsService) {
     this.emailSender = emailSender;
     this.telegramSender = telegramSender;
     this.messageFormatter = messageFormatter;
     this.alertRepository = alertRepository;
     this.favoritePairAlertRepository = favoritePairAlertRepository;
+    this.metricsService = metricsService;
   }
 
   public void deliver(ReverseProfitOpportunity opportunity) {
@@ -60,9 +64,11 @@ public class NotificationDeliveryService {
     try {
       emailSender.send(target, messageFormatter.subject(opportunity), messageFormatter.body(opportunity));
       alertRepository.saveDelivery(opportunity, "email", target, true, null);
+      metricsService.recordDelivery(true, null);
     } catch (Exception exception) {
       log.warn("Reverse profit email delivery failed for swap {}", opportunity.candidate().swapHistoryId(), exception);
       alertRepository.saveDelivery(opportunity, "email", target, false, exception.getMessage());
+      metricsService.recordDelivery(false, exception);
     }
   }
 
@@ -71,9 +77,11 @@ public class NotificationDeliveryService {
     try {
       telegramSender.send(target, messageFormatter.body(opportunity));
       alertRepository.saveDelivery(opportunity, "telegram", target, true, null);
+      metricsService.recordDelivery(true, null);
     } catch (Exception exception) {
       log.warn("Reverse profit Telegram delivery failed for swap {}", opportunity.candidate().swapHistoryId(), exception);
       alertRepository.saveDelivery(opportunity, "telegram", target, false, exception.getMessage());
+      metricsService.recordDelivery(false, exception);
     }
   }
 
@@ -82,9 +90,11 @@ public class NotificationDeliveryService {
     try {
       emailSender.send(target, messageFormatter.subject(opportunity), messageFormatter.body(opportunity));
       favoritePairAlertRepository.saveDelivery(opportunity, "email", target, true, null);
+      metricsService.recordDelivery(true, null);
     } catch (Exception exception) {
       log.warn("Favorite pair email delivery failed for pair {}", opportunity.candidate().id(), exception);
       favoritePairAlertRepository.saveDelivery(opportunity, "email", target, false, exception.getMessage());
+      metricsService.recordDelivery(false, exception);
     }
   }
 
@@ -93,9 +103,11 @@ public class NotificationDeliveryService {
     try {
       telegramSender.send(target, messageFormatter.body(opportunity));
       favoritePairAlertRepository.saveDelivery(opportunity, "telegram", target, true, null);
+      metricsService.recordDelivery(true, null);
     } catch (Exception exception) {
       log.warn("Favorite pair Telegram delivery failed for pair {}", opportunity.candidate().id(), exception);
       favoritePairAlertRepository.saveDelivery(opportunity, "telegram", target, false, exception.getMessage());
+      metricsService.recordDelivery(false, exception);
     }
   }
 

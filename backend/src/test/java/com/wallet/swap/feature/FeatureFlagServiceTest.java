@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 class FeatureFlagServiceTest {
   private final FeatureProperties properties = new FeatureProperties();
   private final FeatureFlagRepository repository = mock(FeatureFlagRepository.class);
-  private final FeatureFlagService service = new FeatureFlagService(properties, repository);
+  private final FeatureFlagService service = new FeatureFlagService(properties, repository, new AdminAuthService(properties));
 
   @Test
   void usesConfiguredDefaultWhenDatabaseFlagIsMissing() {
