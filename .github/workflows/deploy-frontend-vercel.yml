@@ -30,12 +30,16 @@ env:
   CORS_ALLOW_ORIGINS: "http://localhost:3000"
   RATE_LIMIT_WINDOW_MS: "60000"
   RATE_LIMIT_MAX: "30"
+  UPSTASH_REDIS_REST_URL: ""
+  UPSTASH_REDIS_REST_TOKEN: ""
+  RATE_LIMIT_REDIS_PREFIX: "wallet-ci"
+  RATE_LIMIT_REDIS_FAIL_OPEN: "false"
   QUOTE_CACHE_TTL_MS: "8000"
   QUOTE_CACHE_MAX_ENTRIES: "2000"
 
 jobs:
   deploy:
-    name: Validate and trigger frontend deploy
+    name: Validate and deploy frontend
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment:
@@ -66,15 +70,29 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Trigger Vercel production deployment
+      - name: Validate deployment secrets
         shell: bash
         env:
-          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           set -euo pipefail
-          if [ -z "${VERCEL_DEPLOY_HOOK_URL:-}" ]; then
-            echo "Missing required GitHub secret: VERCEL_DEPLOY_HOOK_URL" >&2
+          missing=()
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required GitHub secrets: %s\n' "${missing[*]}" >&2
             exit 1
           fi
-          curl --fail --silent --show-error --retry 3 --request POST "$VERCEL_DEPLOY_HOOK_URL" >/dev/null
-          echo "Triggered Vercel production deployment."
+
+      - name: Deploy validated Vercel build
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: ./scripts/deploy/deploy-vercel-frontend.sh

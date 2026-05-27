@@ -3,31 +3,29 @@ set -Eeuo pipefail
 
 cd "$(dirname "$0")/../.."
 
+environment="${VERCEL_ENVIRONMENT:-production}"
+vercel_cli_version="${VERCEL_CLI_VERSION:-54.5.0}"
+prod_flag=()
+if [ "$environment" = "production" ]; then
+  prod_flag=(--prod)
+fi
+
+export NEXT_TELEMETRY_DISABLED=1
+export VERCEL_TELEMETRY_DISABLED=1
+
+if [ -n "${VERCEL_TOKEN:-}" ] && [ -n "${VERCEL_ORG_ID:-}" ] && [ -n "${VERCEL_PROJECT_ID:-}" ]; then
+  npx --yes "vercel@$vercel_cli_version" pull --yes --environment="$environment" --token "$VERCEL_TOKEN"
+  npx --yes "vercel@$vercel_cli_version" build "${prod_flag[@]}" --token "$VERCEL_TOKEN"
+  npx --yes "vercel@$vercel_cli_version" deploy --prebuilt "${prod_flag[@]}" --token "$VERCEL_TOKEN"
+  exit 0
+fi
+
 if [ -n "${VERCEL_DEPLOY_HOOK_URL:-}" ]; then
   curl --fail --silent --show-error --retry 3 --request POST "$VERCEL_DEPLOY_HOOK_URL" >/dev/null
   echo "Triggered Vercel deployment through deploy hook."
   exit 0
 fi
 
-environment="${VERCEL_ENVIRONMENT:-production}"
-prod_flag=()
-if [ "$environment" = "production" ]; then
-  prod_flag=(--prod)
-fi
-
-if [ -z "${VERCEL_TOKEN:-}" ]; then
-  echo "VERCEL_DEPLOY_HOOK_URL is required. Set VERCEL_TOKEN only for the optional CLI deployment path." >&2
-  exit 1
-fi
-
-if [ -z "${VERCEL_ORG_ID:-}" ] || [ -z "${VERCEL_PROJECT_ID:-}" ]; then
-  echo "VERCEL_ORG_ID and VERCEL_PROJECT_ID are required." >&2
-  exit 1
-fi
-
-export NEXT_TELEMETRY_DISABLED=1
-export VERCEL_TELEMETRY_DISABLED=1
-
-npx --yes vercel@latest pull --yes --environment="$environment" --token "$VERCEL_TOKEN"
-npx --yes vercel@latest build "${prod_flag[@]}" --token "$VERCEL_TOKEN"
-npx --yes vercel@latest deploy --prebuilt "${prod_flag[@]}" --token "$VERCEL_TOKEN"
+echo "Set VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID for verified prebuilt deploys." >&2
+echo "VERCEL_DEPLOY_HOOK_URL remains supported only as a fallback." >&2
+exit 1

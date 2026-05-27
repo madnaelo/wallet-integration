@@ -93,12 +93,13 @@ jobs:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
           OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
           OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
           WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
         run: |
           set -euo pipefail
           missing=()
-          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_BACKEND_ENV WALLET_API_DOMAIN; do
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV WALLET_API_DOMAIN; do
             if [ -z "${!name:-}" ]; then
               missing+=("$name")
             fi
@@ -115,11 +116,8 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$OCI_SSH_PRIVATE_KEY" > ~/.ssh/oci_deploy_key
           chmod 600 ~/.ssh/oci_deploy_key
-          if [ -n "${OCI_SSH_KNOWN_HOSTS:-}" ]; then
-            printf '%s\n' "$OCI_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          else
-            ssh-keyscan -p "$OCI_SSH_PORT" "$OCI_SSH_HOST" >> ~/.ssh/known_hosts
-          fi
+          printf '%s\n' "$OCI_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
         env:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}

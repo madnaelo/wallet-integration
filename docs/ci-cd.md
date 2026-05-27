@@ -17,9 +17,13 @@ The workflows are in `.github/workflows`.
   - `npm run build`
   - `mvn clean test`
   - Docker Compose config validation
-- `Deploy Frontend - Vercel`: validates the frontend, then triggers the Vercel
-  production deploy hook after every push to `master`/`main`, or manually through
-  `workflow_dispatch`.
+- `Security`: runs dependency review on pull requests, CodeQL for frontend and
+  backend code, and Gitleaks secret scanning.
+- `Deploy Frontend - Vercel`: validates the frontend, pulls production Vercel
+  environment, builds through Vercel CLI, and deploys the validated prebuilt
+  artifact after every push to `master`/`main`, or manually through
+  `workflow_dispatch`. A Vercel deploy hook is still supported by the local
+  script as a fallback, but CI expects the CLI secrets below.
 - `Deploy Backend - OCI`: builds the Spring Boot backend image, pushes it to
   GHCR, then deploys it to the OCI VM after every push to `master`/`main`, or
   manually through `workflow_dispatch`. It is designed for the current
@@ -39,7 +43,9 @@ manual release gates later.
 Frontend deployment:
 
 ```text
-VERCEL_DEPLOY_HOOK_URL
+VERCEL_TOKEN
+VERCEL_ORG_ID
+VERCEL_PROJECT_ID
 ```
 
 Backend deployment:
@@ -48,6 +54,7 @@ Backend deployment:
 OCI_SSH_HOST
 OCI_SSH_USER
 OCI_SSH_PRIVATE_KEY
+OCI_SSH_KNOWN_HOSTS
 OCI_BACKEND_ENV
 WALLET_API_DOMAIN
 ```
@@ -56,7 +63,6 @@ Optional backend deployment secrets:
 
 ```text
 OCI_SSH_PORT
-OCI_SSH_KNOWN_HOSTS
 OCI_DEPLOY_PATH
 OCI_CONTAINER_NETWORK
 OCI_CADDYFILE_PATH
@@ -83,6 +89,9 @@ The Telegram monitor secrets are optional, but recommended after the Telegram
 bot token is rotated. Without them, GitHub Actions failures still show that
 production is unhealthy.
 
+`VERCEL_CLI_VERSION` is optional and defaults to the pinned version in
+`scripts/deploy/deploy-vercel-frontend.sh`.
+
 `GHCR_READ_TOKEN` is optional. By default the backend workflow passes the
 ephemeral `GITHUB_TOKEN` to the OCI deploy script for pulling the image it just
 published to GHCR. Add `GHCR_READ_TOKEN` only if the package permission model
@@ -90,6 +99,11 @@ requires a separate read token.
 
 `OCI_BACKEND_ENV` is the full contents of `infra/oci-backend.env.example` with
 real production values. Do not commit the real file.
+
+`OCI_SSH_KNOWN_HOSTS` must contain the OCI host key line for
+`OCI_SSH_HOST`/`OCI_SSH_PORT`. Generate it once from a trusted machine with
+`ssh-keyscan -p 22 <oci-host>` and verify the fingerprint in the OCI console
+before saving it as a GitHub secret.
 
 Set `ENABLE_POSTGRES_BACKUP_TIMER=true` inside `OCI_BACKEND_ENV` after the OCI
 VM has enough disk space for retention. The backend deploy workflow uploads the
@@ -176,7 +190,9 @@ custom API domain later by pointing it at the OCI VM public IP and updating
 Frontend from a configured workstation:
 
 ```bash
-export VERCEL_DEPLOY_HOOK_URL=...
+export VERCEL_TOKEN=...
+export VERCEL_ORG_ID=...
+export VERCEL_PROJECT_ID=...
 ./scripts/deploy/deploy-vercel-frontend.sh
 ```
 
