@@ -98,7 +98,9 @@ published to GHCR. Add `GHCR_READ_TOKEN` only if the package permission model
 requires a separate read token.
 
 `OCI_BACKEND_ENV` is the full contents of `infra/oci-backend.env.example` with
-real production values. Do not commit the real file.
+real production values. Keep `API_RATE_LIMIT_KEY_PEPPER` as a long random
+secret, keep `AUTH_SESSION_COOKIE_SECURE=true` with `SameSite=None` for the
+cross-origin production frontend/backend setup, and do not commit the real file.
 
 `OCI_SSH_KNOWN_HOSTS` must contain the OCI host key line for
 `OCI_SSH_HOST`/`OCI_SSH_PORT`. Generate it once from a trusted machine with
@@ -152,6 +154,7 @@ AFFILIATE_ADDRESS=...
 FEE_RECIPIENT_ADDRESS=...
 PLATFORM_FEE_BPS=20
 CORS_ALLOW_ORIGINS=https://wallet-integration-theta.vercel.app
+REQUIRE_ALLOWED_ORIGIN=true
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=30
 UPSTASH_REDIS_REST_URL=
