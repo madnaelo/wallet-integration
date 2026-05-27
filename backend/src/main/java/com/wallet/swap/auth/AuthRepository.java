@@ -83,6 +83,14 @@ public class AuthRepository {
         Timestamp.from(now));
   }
 
+  public int deleteExpiredNonces(Instant now) {
+    return jdbcTemplate.update("DELETE FROM wallet_nonces WHERE expires_at <= ?", Timestamp.from(now));
+  }
+
+  public int deleteExpiredSessions(Instant now) {
+    return jdbcTemplate.update("DELETE FROM wallet_sessions WHERE expires_at <= ?", Timestamp.from(now));
+  }
+
   public void markLastLogin(String walletAddress) {
     jdbcTemplate.update("UPDATE wallet_users SET last_login_at = now() WHERE wallet_address = ?", walletAddress);
   }
