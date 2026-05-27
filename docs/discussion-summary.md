@@ -11,7 +11,7 @@ assistant that combines quote aggregation with memory and alerts:
 
 - favorite token pairs,
 - wallet-owned swap history,
-- reverse-swap opportunity checks,
+- reverse-swap profit and loss-protection checks,
 - target-rate notifications,
 - user-controlled execution through their own wallet.
 
@@ -45,6 +45,8 @@ assistant that combines quote aggregation with memory and alerts:
 ## Notification Decisions
 
 - Favorite-pair alerts and reverse-swap alerts are separate product concepts.
+- Loss-protection alerts are opt-in, threshold-based, and use the same efficient
+  batched price monitor as reverse-profit alerts.
 - Alerts should use thresholds and cooldowns to avoid noisy delivery.
 - Telegram linking should use bot start codes; users should not be asked for
   Telegram chat IDs or phone numbers.

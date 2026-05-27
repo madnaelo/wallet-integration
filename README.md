@@ -28,7 +28,9 @@ Implemented:
 - Provider failure isolation: one timed-out or rejected provider does not hide
   successful quotes from other configured providers.
 - User-facing trade summary with slippage, quote expiry, provider selection,
-  receive/minimum-received amounts, service fees, and network cost.
+  receive/minimum-received amounts, service fees, network cost, and visible
+  risk cues for high slippage, large service-fee ratio, or partial route
+  outages.
 - Dry-run guardrails for real quote testing without accidental live swaps.
 - Spring Boot and PostgreSQL backend for signed wallet sessions and swap
   history.
@@ -43,6 +45,8 @@ Implemented:
   through the bot flow instead of asking users for a chat ID.
 - Favorite pairs can be added from the Swap or Favorites pages, including
   laddered target alerts for the same pair when prices are at least 1% apart.
+- Favorite pairs can be opened or reversed from the Favorites page using the
+  same prefilled swap-link format used by Telegram alerts.
 - Admin-gated Auto Swap rule storage for selected pairs, including amount,
   target rate, slippage tolerance, recipient address, and whether the pair is
   automatic-ready or needs user confirmation.
@@ -50,7 +54,7 @@ Implemented:
 Not implemented yet:
 
 - General price alert workflows beyond favorite-pair target rates and
-  reverse-swap profit alerts.
+  reverse-swap profit/loss alerts.
 - Push or in-app notification delivery.
 - Guarded import-by-address flow and token risk signals.
 - Native BTC sell execution and cross-chain destination status tracking.
@@ -224,3 +228,5 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
   target ladders, and alert delivery fixes.
 - Prompts 28-32: admin-gated Auto Swap preferences, clearer signing/approval
   guidance, Telegram deep links, and mobile quote/wallet-return UX.
+- Prompts 33-36: operations diagnostics, additional EVM networks, loss
+  protection alerts, trade risk cues, and actionable favorite-pair links.

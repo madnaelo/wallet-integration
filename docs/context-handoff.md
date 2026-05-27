@@ -23,7 +23,7 @@ The Wallet is a non-custodial swap assistant:
 - let the user's wallet execute swaps,
 - persist wallet-owned history,
 - save favorite pairs and target alerts,
-- detect reverse-swap opportunities,
+- detect reverse-swap profit and loss-protection opportunities,
 - notify users through configured channels,
 - store Auto Swap preferences only when the admin feature switch allows it.
 
@@ -38,6 +38,8 @@ preference/rule storage, not autonomous private-key signing.
 - Wallet connection: Reown AppKit plus provider-specific signing handling.
 - Backend: Spring Boot, Flyway, PostgreSQL.
 - Notifications: scheduled monitor with email and Telegram adapters.
+- Operations: health endpoint plus admin operations summary for monitor and
+  notification counters.
 - Deployment: Vercel for frontend/quote route, OCI for backend/PostgreSQL/Caddy.
 - CI/CD: GitHub Actions deploys both frontend and backend on pushes to
   `master`/`main`.

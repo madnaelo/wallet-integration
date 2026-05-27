@@ -12,11 +12,14 @@ provider/earning checklist.
 - Added user-facing quote state: provider options, route/provider selection,
   quote expiry, slippage, service fees, network cost, expected receive, and
   minimum received.
+- Added trade-summary risk cues for high slippage, high fee ratio, and partial
+  route/provider outages.
 - Added dry-run protections and clearer wallet-signing/transaction-approval
   guidance.
 - Added responsive mobile behavior for wallet labels, navigation, token
   switcher direction, quote loading feedback, and quote-summary reveal.
 - Added Favorites and Preferences as separate app areas.
+- Added one-click Open and Reverse actions for saved favorite pairs.
 
 ## Quote Route And Providers
 
@@ -37,6 +40,8 @@ provider/earning checklist.
   email/Telegram delivery adapters.
 - Added scheduled monitoring for reverse-swap opportunities and favorite-pair
   thresholds.
+- Extended reverse-swap monitoring to support loss protection alerts with
+  type-specific alert cooldowns.
 - Added Auto Swap preference/rule storage behind an admin feature switch.
 
 ## Deployment And Operations
@@ -48,6 +53,8 @@ provider/earning checklist.
   backend/PostgreSQL/Caddy.
 - Added GitHub Actions CI and automatic deployments for frontend and backend on
   pushes to `master`/`main`.
+- Added backend health and admin operations summaries for database, monitor,
+  and notification-delivery visibility.
 
 ## Security Notes
 

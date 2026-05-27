@@ -5,7 +5,7 @@
 The Wallet is a non-custodial personal swap aggregator and swap assistant.
 Users connect wallets, compare quotes from supported swap aggregators, execute
 swaps from their own wallet, save favorite pairs, and receive alerts when saved
-pairs or reverse-swap opportunities become attractive.
+pairs or reverse-swap profit/loss conditions become important.
 
 The app never stores private keys, never takes custody of funds, and never signs
 transactions for users.
@@ -37,8 +37,10 @@ Fee collection must be transparent in product/legal copy before public launch.
 - Dry-run safeguards for testing.
 - Wallet-authenticated swap history.
 - Favorite pairs with target-rate alerts.
-- Reverse-swap opportunity monitoring.
+- Reverse-swap profit and loss-protection monitoring.
 - Telegram/email notification plumbing.
+- Trade-summary risk cues for high slippage, large fee ratio, and partial route
+  outages.
 - Admin-gated Auto Swap preference storage, without backend custody of keys.
 
 ## Technical Shape
@@ -49,6 +51,8 @@ Fee collection must be transparent in product/legal copy before public launch.
 - PostgreSQL for persisted wallet-owned data.
 - Vercel for frontend/quote route.
 - OCI for backend, PostgreSQL, and Caddy HTTPS proxy.
+- Operational health and admin diagnostics for database, monitor, and
+  notification-delivery status.
 
 ## Security Principles
 

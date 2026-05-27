@@ -15,6 +15,8 @@ platform fees in production.
   addresses, CORS, and cache/rate-limit settings.
 - LI.FI Partner Portal fee collection is enabled for integration `the-wallet`
   with default EVM, Solana/SVM, Sui, and Bitcoin receiving wallets.
+- Current EVM launch networks are Ethereum, Arbitrum, Optimism, Base, Polygon,
+  BNB Smart Chain, and Avalanche.
 - `PARASWAP_API_KEY` is still missing.
 - Treasury receive addresses have been provided. Keep the actual values in
   deployment/provider configuration, not in committed docs, and verify them with
@@ -49,6 +51,10 @@ Recommended path:
 Native Bitcoin through LI.FI is separate. LI.FI fee wallets are configured in
 the LI.FI Partner Portal. Bitcoin-side fees may require a Bitcoin receive
 address there; the app's `FEE_RECIPIENT_ADDRESS` remains EVM-only.
+
+Use self-custody treasury wallets where possible. If an exchange receive
+address is used for any provider payout, verify the exact network, memo/tag
+requirements, and withdrawal behavior with a small test first.
 
 ## Provider Checklist
 
@@ -180,6 +186,7 @@ Reference:
 Before public launch:
 
 - Replace or confirm `FEE_RECIPIENT_ADDRESS` and `AFFILIATE_ADDRESS`.
+- Verify fee receipt on every enabled EVM chain, not only Ethereum.
 - Rotate the Telegram bot token because the old token was pasted in chat.
 - Confirm `PARASWAP_API_KEY`, or document that ParaSwap is running without a
   private key and can hit public rate limits.
@@ -187,10 +194,13 @@ Before public launch:
 - Confirm Odos monetization is enabled provider-side.
 - Run a small LI.FI route and confirm the fee appears under Collectable Fees.
 - Add public fee disclosure in the product/legal copy.
+- Add clear alert wording that notifications are estimates, not financial
+  advice.
 - Add terms/privacy pages before a public launch.
 - Verify CORS origins after the final custom domain is attached.
 - Set up automated DB backups for OCI PostgreSQL.
 - Set up uptime/error alerts for Vercel and OCI.
+- Monitor `/api/health` and `/api/admin/ops/summary` after each deployment.
 - Run small real swaps through each provider and record the fee receipt result.
 
 ## Remaining Owner Actions
