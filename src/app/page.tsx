@@ -219,8 +219,6 @@ export default function Page() {
   const [autoSwapDirectionDraft, setAutoSwapDirectionDraft] = useState<"above" | "below">("above");
   const [autoSwapThresholdRateDraft, setAutoSwapThresholdRateDraft] = useState<string>("");
   const [autoSwapSlippagePctDraft, setAutoSwapSlippagePctDraft] = useState<string>("1");
-  const [autoSwapExecutionModeDraft, setAutoSwapExecutionModeDraft] =
-    useState<"auto_when_supported" | "notify_to_confirm">("auto_when_supported");
   const autoSwapRulesRequestInFlightRef = useRef<boolean>(false);
   const [pendingSwapLink, setPendingSwapLink] = useState<PendingSwapLink | null>(null);
   const quoteActionRef = useRef<HTMLDivElement>(null);
@@ -1160,7 +1158,6 @@ export default function Page() {
     setAutoSwapDirectionDraft("above");
     setAutoSwapThresholdRateDraft("");
     setAutoSwapSlippagePctDraft("1");
-    setAutoSwapExecutionModeDraft("auto_when_supported");
     autoSwapRulesRequestInFlightRef.current = false;
   }
 
@@ -1368,7 +1365,7 @@ export default function Page() {
       alertDirection: autoSwapDirectionDraft,
       slippageBps: autoSlippageBps,
       recipientAddress: recipientAddress.trim(),
-      executionMode: autoSwapExecutionModeDraft
+      executionMode: "notify_to_confirm"
     };
   }
 
@@ -1842,23 +1839,13 @@ export default function Page() {
     const buyAmount = stringValue(quote.netBuyAmount) || stringValue(quote.grossBuyAmount) || quote.buyAmount;
     return calculatePairRate(quote.sellAmount, tokenInfoToDisplay(sellTokenInfo), buyAmount, tokenInfoToDisplay(buyTokenInfo));
   }, [buyTokenInfo, quote, sellTokenInfo]);
-  const autoSwapReadiness = useMemo(
-    () => getAutoSwapReadiness(sellTokenInfo, buyTokenInfo),
-    [buyTokenInfo, sellTokenInfo]
-  );
   const autoSwapCurrentAmount = useMemo(() => {
     if (!sellTokenInfo) return "";
     const amountRaw = parseUnitsSafe(amountHuman, sellTokenInfo.decimals);
     if (!amountRaw) return "";
     return `${formatTokenAmount(amountRaw, tokenInfoToDisplay(sellTokenInfo))}`;
   }, [amountHuman, sellTokenInfo]);
-  const autoSwapModeHelper = useMemo(
-    () =>
-      autoSwapReadiness === "auto_supported"
-        ? "This pair can use automatic execution when the target is reached."
-        : "This pair will ask you to confirm when the target is reached.",
-    [autoSwapReadiness]
-  );
+  const autoSwapModeHelper = "You will receive an alert with a prefilled swap link when the target is reached.";
   const currentFavoritePairCount = useMemo(
     () =>
       favoritePairs.filter(
@@ -1893,7 +1880,6 @@ export default function Page() {
     setFavoritePopoverOpen(false);
     setAutoSwapThresholdRateDraft("");
     setAutoSwapDirectionDraft("above");
-    setAutoSwapExecutionModeDraft("auto_when_supported");
     setAutoSwapRuleError("");
     setAutoSwapRuleNotice("");
   }, [selectedChainId, sellToken, buyToken]);
@@ -2697,8 +2683,8 @@ export default function Page() {
                 <span className="subtle">
                   {autoSwapCurrentAmount || "Enter an amount on the swap page."}
                 </span>
-                <span className={`autoSwapModePill ${autoSwapReadiness === "auto_supported" ? "autoSwapModePillReady" : ""}`}>
-                  {autoSwapReadiness === "auto_supported" ? "Automatic" : "Confirm first"}
+                <span className="autoSwapModePill">
+                  Confirm in wallet
                 </span>
               </div>
 
@@ -2745,17 +2731,7 @@ export default function Page() {
 
               <div>
                 <div className="label">Execution</div>
-                <select
-                  className="select"
-                  value={autoSwapReadiness === "auto_supported" ? autoSwapExecutionModeDraft : "notify_to_confirm"}
-                  onChange={(event) =>
-                    setAutoSwapExecutionModeDraft(event.target.value as "auto_when_supported" | "notify_to_confirm")
-                  }
-                  disabled={!walletAddress || autoSwapReadiness !== "auto_supported"}
-                >
-                  <option value="auto_when_supported">Automatic</option>
-                  <option value="notify_to_confirm">Ask me first</option>
-                </select>
+                <div className="autoSwapModePill">Wallet confirmation required</div>
                 <div className="small" style={{ marginTop: 6 }}>{autoSwapModeHelper}</div>
               </div>
 
@@ -2768,7 +2744,7 @@ export default function Page() {
                   }}
                   disabled={!walletAddress || !sellTokenInfo || !buyTokenInfo || autoSwapRuleSaving}
                 >
-                  {autoSwapRuleSaving ? "Saving..." : "Save Auto Swap"}
+                  {autoSwapRuleSaving ? "Saving..." : "Save Auto Swap Alert"}
                 </button>
               </div>
             </div>
@@ -2804,7 +2780,7 @@ export default function Page() {
                         <td>{formatAutoSwapAmount(rule)}</td>
                         <td>{formatAutoSwapTarget(rule)}</td>
                         <td>{formatSlippageBps(rule.slippageBps)}</td>
-                        <td>{formatAutoSwapExecution(rule)}</td>
+                        <td>{formatAutoSwapExecution()}</td>
                         <td>{formatAutoSwapStatus(rule.status)}</td>
                         <td>
                           <button
@@ -3488,9 +3464,8 @@ function formatAutoSwapTarget(rule: AutoSwapRule): string {
   return `${direction} ${formatDecimal(String(rule.thresholdRate), 8)} ${rule.buyTokenSymbol} per ${rule.sellTokenSymbol}`;
 }
 
-function formatAutoSwapExecution(rule: AutoSwapRule): string {
-  if (rule.executionMode === "auto_when_supported" && rule.executionReadiness === "auto_supported") return "Automatic";
-  return "Ask me first";
+function formatAutoSwapExecution(): string {
+  return "Wallet confirmation";
 }
 
 function formatAutoSwapStatus(status: AutoSwapRule["status"]): string {
@@ -3935,22 +3910,6 @@ function parseThresholdPctToBps(value: string): number | null {
   const pct = Number(value.trim());
   if (!Number.isFinite(pct) || pct < 0 || pct > 1000) return null;
   return Math.round(pct * 100);
-}
-
-function getAutoSwapReadiness(
-  sellTokenInfo: TokenInfo | undefined,
-  buyTokenInfo: TokenInfo | undefined
-): AutoSwapRule["executionReadiness"] {
-  if (isEvmContractToken(sellTokenInfo) && isEvmContractToken(buyTokenInfo)) return "auto_supported";
-  return "confirmation_required";
-}
-
-function isEvmContractToken(token: TokenInfo | undefined): boolean {
-  return !!token && isEvmContractAddress(token.address);
-}
-
-function isEvmContractAddress(value: string): boolean {
-  return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
 }
 
 function multiplyIntegerStrings(a: string, b: string): string {

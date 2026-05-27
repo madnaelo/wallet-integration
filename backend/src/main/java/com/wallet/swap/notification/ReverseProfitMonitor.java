@@ -1,5 +1,8 @@
 package com.wallet.swap.notification;
 
+import com.wallet.swap.autoswap.AutoSwapCalculator;
+import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleCandidate;
+import com.wallet.swap.autoswap.AutoSwapRuleRepository;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitCandidate;
@@ -23,9 +26,11 @@ public class ReverseProfitMonitor {
   private final NotificationProperties properties;
   private final ReverseProfitCandidateRepository candidateRepository;
   private final FavoritePairCandidateRepository favoritePairCandidateRepository;
+  private final AutoSwapRuleRepository autoSwapRuleRepository;
   private final CoinGeckoPriceClient priceClient;
   private final ReverseProfitCalculator calculator;
   private final FavoritePairCalculator favoritePairCalculator;
+  private final AutoSwapCalculator autoSwapCalculator;
   private final NotificationDeliveryService deliveryService;
   private final OperationalMetricsService metricsService;
   private final AtomicBoolean running = new AtomicBoolean(false);
@@ -34,17 +39,21 @@ public class ReverseProfitMonitor {
       NotificationProperties properties,
       ReverseProfitCandidateRepository candidateRepository,
       FavoritePairCandidateRepository favoritePairCandidateRepository,
+      AutoSwapRuleRepository autoSwapRuleRepository,
       CoinGeckoPriceClient priceClient,
       ReverseProfitCalculator calculator,
       FavoritePairCalculator favoritePairCalculator,
+      AutoSwapCalculator autoSwapCalculator,
       NotificationDeliveryService deliveryService,
       OperationalMetricsService metricsService) {
     this.properties = properties;
     this.candidateRepository = candidateRepository;
     this.favoritePairCandidateRepository = favoritePairCandidateRepository;
+    this.autoSwapRuleRepository = autoSwapRuleRepository;
     this.priceClient = priceClient;
     this.calculator = calculator;
     this.favoritePairCalculator = favoritePairCalculator;
+    this.autoSwapCalculator = autoSwapCalculator;
     this.deliveryService = deliveryService;
     this.metricsService = metricsService;
   }
@@ -56,6 +65,7 @@ public class ReverseProfitMonitor {
 
     int reverseCandidateCount = 0;
     int favoritePairCandidateCount = 0;
+    int autoSwapCandidateCount = 0;
     int totalOpportunities = 0;
     try {
       metricsService.recordMonitorStarted();
@@ -65,10 +75,13 @@ public class ReverseProfitMonitor {
           properties.getCandidateLimit());
       List<FavoritePairCandidate> favoritePairCandidates = favoritePairCandidateRepository.findCandidates(
           properties.getCandidateLimit());
+      List<AutoSwapRuleCandidate> autoSwapCandidates = autoSwapRuleRepository.findNotificationCandidates(
+          properties.getCandidateLimit());
       reverseCandidateCount = candidates.size();
       favoritePairCandidateCount = favoritePairCandidates.size();
-      if (candidates.isEmpty() && favoritePairCandidates.isEmpty()) {
-        metricsService.recordMonitorCompleted(0, 0, 0);
+      autoSwapCandidateCount = autoSwapCandidates.size();
+      if (candidates.isEmpty() && favoritePairCandidates.isEmpty() && autoSwapCandidates.isEmpty()) {
+        metricsService.recordMonitorCompleted(0, 0, 0, 0);
         return;
       }
 
@@ -78,6 +91,10 @@ public class ReverseProfitMonitor {
         tokenRefs.add(candidate.buyToken());
       }
       for (FavoritePairCandidate candidate : favoritePairCandidates) {
+        tokenRefs.add(candidate.sellToken());
+        tokenRefs.add(candidate.buyToken());
+      }
+      for (AutoSwapRuleCandidate candidate : autoSwapCandidates) {
         tokenRefs.add(candidate.sellToken());
         tokenRefs.add(candidate.buyToken());
       }
@@ -103,13 +120,28 @@ public class ReverseProfitMonitor {
             .orElse(0);
       }
 
-      totalOpportunities = reverseOpportunities + favoritePairOpportunities;
-      metricsService.recordMonitorCompleted(reverseCandidateCount, favoritePairCandidateCount, totalOpportunities);
+      int autoSwapOpportunities = 0;
+      for (AutoSwapRuleCandidate candidate : autoSwapCandidates) {
+        autoSwapOpportunities += autoSwapCalculator.evaluate(candidate, prices)
+            .map(opportunity -> {
+              deliveryService.deliver(opportunity);
+              return 1;
+            })
+            .orElse(0);
+      }
+
+      totalOpportunities = reverseOpportunities + favoritePairOpportunities + autoSwapOpportunities;
+      metricsService.recordMonitorCompleted(
+          reverseCandidateCount,
+          favoritePairCandidateCount,
+          autoSwapCandidateCount,
+          totalOpportunities);
       if (totalOpportunities > 0) {
         log.info(
-            "Notification monitor processed {} reverse candidates and {} favorite pairs; found {} opportunities.",
+            "Notification monitor processed {} reverse candidates, {} favorite pairs, and {} Auto Swap rules; found {} opportunities.",
             candidates.size(),
             favoritePairCandidates.size(),
+            autoSwapCandidates.size(),
             totalOpportunities);
       }
     } catch (Exception exception) {

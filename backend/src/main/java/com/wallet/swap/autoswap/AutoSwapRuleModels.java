@@ -1,5 +1,6 @@
 package com.wallet.swap.autoswap;
 
+import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -52,4 +53,43 @@ public final class AutoSwapRuleModels {
       Instant updatedAt) {}
 
   public record AutoSwapRuleTarget(UUID id, BigDecimal thresholdRate) {}
+
+  public record AutoSwapRuleCandidate(
+      UUID id,
+      String walletAddress,
+      long chainId,
+      String sellTokenAddress,
+      String sellTokenSymbol,
+      int sellTokenDecimals,
+      String buyTokenAddress,
+      String buyTokenSymbol,
+      int buyTokenDecimals,
+      String sellAmountRaw,
+      BigDecimal thresholdRate,
+      String alertDirection,
+      int slippageBps,
+      String recipientAddress,
+      String executionMode,
+      String executionReadiness,
+      String emailAddress,
+      boolean emailEnabled,
+      Instant lastEmailAlertAt,
+      String telegramChatId,
+      boolean telegramEnabled,
+      Instant lastTelegramAlertAt,
+      int cooldownMinutes) {
+    public TokenRef sellToken() {
+      return new TokenRef(chainId, sellTokenAddress, sellTokenSymbol, sellTokenDecimals);
+    }
+
+    public TokenRef buyToken() {
+      return new TokenRef(chainId, buyTokenAddress, buyTokenSymbol, buyTokenDecimals);
+    }
+  }
+
+  public record AutoSwapOpportunity(
+      AutoSwapRuleCandidate candidate,
+      BigDecimal currentRate,
+      BigDecimal sellTokenUsd,
+      BigDecimal buyTokenUsd) {}
 }

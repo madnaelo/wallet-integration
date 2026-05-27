@@ -25,7 +25,7 @@ class AutoSwapRuleServiceTest {
 
   @Test
   void checksFeatureFlagBeforeSaving() {
-    AutoSwapRuleRequest request = evmRequest("2500", "above", "auto_when_supported");
+    AutoSwapRuleRequest request = evmRequest("2500", "above", "notify_to_confirm");
 
     service.save(WALLET, request);
 
@@ -34,7 +34,7 @@ class AutoSwapRuleServiceTest {
 
   @Test
   void rejectsTargetTooCloseToExistingActiveRule() {
-    AutoSwapRuleRequest request = evmRequest("2509", "above", "auto_when_supported");
+    AutoSwapRuleRequest request = evmRequest("2509", "above", "notify_to_confirm");
     when(repository.listTargetsForPair(eq(WALLET), any()))
         .thenReturn(List.of(new AutoSwapRuleTarget(UUID.randomUUID(), new BigDecimal("2500"))));
 
@@ -44,21 +44,21 @@ class AutoSwapRuleServiceTest {
   }
 
   @Test
-  void storesEvmContractPairsAsAutoSupportedWhenRequested() {
-    AutoSwapRuleRequest request = evmRequest("2525", "above", "auto_when_supported");
-
-    service.save(WALLET, request);
-
-    verify(repository).insert(eq(WALLET), any(), eq("auto_when_supported"), eq("auto_supported"));
-  }
-
-  @Test
-  void storesNativeOrNonContractPairsAsConfirmationRules() {
-    AutoSwapRuleRequest request = nativeRequest("2525", "above", "auto_when_supported");
+  void storesEvmContractPairsAsConfirmationRules() {
+    AutoSwapRuleRequest request = evmRequest("2525", "above", "notify_to_confirm");
 
     service.save(WALLET, request);
 
     verify(repository).insert(eq(WALLET), any(), eq("notify_to_confirm"), eq("confirmation_required"));
+  }
+
+  @Test
+  void rejectsAutomaticExecutionMode() {
+    AutoSwapRuleRequest request = nativeRequest("2525", "above", "auto_when_supported");
+
+    assertThatThrownBy(() -> service.save(WALLET, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Invalid Auto Swap execution mode");
   }
 
   private AutoSwapRuleRequest evmRequest(String thresholdRate, String direction, String executionMode) {

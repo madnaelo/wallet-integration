@@ -1,6 +1,7 @@
 package com.wallet.swap.notification;
 
 import com.wallet.swap.config.NotificationProperties;
+import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitOpportunity;
 import java.math.BigDecimal;
@@ -34,6 +35,12 @@ public class NotificationMessageFormatter {
 
   public String subject(FavoritePairOpportunity opportunity) {
     return "Favorite pair alert: %s to %s".formatted(
+        opportunity.candidate().sellTokenSymbol(),
+        opportunity.candidate().buyTokenSymbol());
+  }
+
+  public String subject(AutoSwapOpportunity opportunity) {
+    return "Auto Swap alert: %s to %s".formatted(
         opportunity.candidate().sellTokenSymbol(),
         opportunity.candidate().buyTokenSymbol());
   }
@@ -92,6 +99,38 @@ public class NotificationMessageFormatter {
         swapUrl);
   }
 
+  public String body(AutoSwapOpportunity opportunity) {
+    String swapUrl = autoSwapUrl(opportunity);
+    String direction = "below".equals(opportunity.candidate().alertDirection()) ? "at or below" : "at or above";
+
+    return """
+        Auto Swap target reached.
+
+        Pair: %s to %s
+        Amount: %s %s
+        Current rate: 1 %s = %s %s
+        Target: %s %s %s
+        Slippage tolerance: %s%%
+
+        The Wallet cannot sign transactions for you. Open the prefilled swap, review the live quote, and confirm from your wallet.
+
+        Open prefilled swap:
+        %s
+        """.formatted(
+        opportunity.candidate().sellTokenSymbol(),
+        opportunity.candidate().buyTokenSymbol(),
+        amount(toHuman(opportunity.candidate().sellAmountRaw(), opportunity.candidate().sellTokenDecimals())),
+        opportunity.candidate().sellTokenSymbol(),
+        opportunity.candidate().sellTokenSymbol(),
+        amount(opportunity.currentRate()),
+        opportunity.candidate().buyTokenSymbol(),
+        direction,
+        amount(opportunity.candidate().thresholdRate()),
+        opportunity.candidate().buyTokenSymbol(),
+        percent(opportunity.candidate().slippageBps()),
+        swapUrl);
+  }
+
   private String reverseSwapUrl(ReverseProfitOpportunity opportunity) {
     return swapUrl(
         opportunity.candidate().chainId(),
@@ -106,6 +145,14 @@ public class NotificationMessageFormatter {
         opportunity.candidate().sellTokenAddress(),
         opportunity.candidate().buyTokenAddress(),
         "");
+  }
+
+  private String autoSwapUrl(AutoSwapOpportunity opportunity) {
+    return swapUrl(
+        opportunity.candidate().chainId(),
+        opportunity.candidate().sellTokenAddress(),
+        opportunity.candidate().buyTokenAddress(),
+        rawAmount(new BigDecimal(opportunity.candidate().sellAmountRaw())));
   }
 
   private String swapUrl(long chainId, String sellToken, String buyToken, String sellAmountRaw) {
@@ -187,6 +234,12 @@ public class NotificationMessageFormatter {
   private String rawAmount(BigDecimal value) {
     if (value == null) return "";
     return value.setScale(0, RoundingMode.DOWN).toPlainString();
+  }
+
+  private BigDecimal toHuman(String rawAmount, int decimals) {
+    BigDecimal amount = new BigDecimal(rawAmount);
+    if (decimals <= 0) return amount;
+    return amount.movePointLeft(decimals);
   }
 
   private String percent(int bps) {

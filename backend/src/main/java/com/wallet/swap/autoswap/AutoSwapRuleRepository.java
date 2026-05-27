@@ -2,6 +2,7 @@ package com.wallet.swap.autoswap;
 
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleRequest;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleResponse;
+import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleCandidate;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleTarget;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -89,6 +90,58 @@ public class AutoSwapRuleRepository {
         normalizeDirection(request.alertDirection()));
   }
 
+  public List<AutoSwapRuleCandidate> findNotificationCandidates(int limit) {
+    return jdbcTemplate.query(
+        """
+        SELECT
+          r.id,
+          r.wallet_address,
+          r.chain_id,
+          r.sell_token_address,
+          r.sell_token_symbol,
+          r.sell_token_decimals,
+          r.buy_token_address,
+          r.buy_token_symbol,
+          r.buy_token_decimals,
+          r.sell_amount_raw,
+          r.threshold_rate,
+          r.alert_direction,
+          r.slippage_bps,
+          r.recipient_address,
+          r.execution_mode,
+          r.execution_readiness,
+          p.email_address,
+          p.email_enabled,
+          p.telegram_chat_id,
+          p.telegram_enabled,
+          p.cooldown_minutes,
+          email_alert.last_sent_at AS last_email_alert_at,
+          telegram_alert.last_sent_at AS last_telegram_alert_at
+        FROM auto_swap_rules r
+        JOIN notification_preferences p ON p.wallet_address = r.wallet_address
+        LEFT JOIN LATERAL (
+          SELECT max(sent_at) AS last_sent_at
+          FROM auto_swap_alerts a
+          WHERE a.auto_swap_rule_id = r.id
+            AND a.channel = 'email'
+            AND a.delivery_status = 'sent'
+        ) email_alert ON true
+        LEFT JOIN LATERAL (
+          SELECT max(sent_at) AS last_sent_at
+          FROM auto_swap_alerts a
+          WHERE a.auto_swap_rule_id = r.id
+            AND a.channel = 'telegram'
+            AND a.delivery_status = 'sent'
+        ) telegram_alert ON true
+        WHERE r.status = 'active'
+          AND (p.email_enabled OR p.telegram_enabled)
+        ORDER BY r.updated_at DESC
+        LIMIT ?
+        """,
+        (rs, rowNum) -> mapCandidateRow(rs),
+        Math.max(1, limit));
+  }
+
   public void delete(String walletAddress, UUID id) {
     jdbcTemplate.update(
         """
@@ -96,6 +149,17 @@ public class AutoSwapRuleRepository {
         WHERE wallet_address = ? AND id = ?
         """,
         walletAddress,
+        id);
+  }
+
+  public void markTriggered(UUID id, Instant triggeredAt) {
+    jdbcTemplate.update(
+        """
+        UPDATE auto_swap_rules
+        SET last_triggered_at = ?, updated_at = now()
+        WHERE id = ?
+        """,
+        Timestamp.from(triggeredAt),
         id);
   }
 
@@ -125,6 +189,33 @@ public class AutoSwapRuleRepository {
 
   private String normalizeDirection(String direction) {
     return direction == null || direction.isBlank() ? "above" : direction.trim().toLowerCase();
+  }
+
+  private AutoSwapRuleCandidate mapCandidateRow(ResultSet rs) throws SQLException {
+    return new AutoSwapRuleCandidate(
+        rs.getObject("id", UUID.class),
+        rs.getString("wallet_address"),
+        rs.getLong("chain_id"),
+        rs.getString("sell_token_address"),
+        rs.getString("sell_token_symbol"),
+        rs.getInt("sell_token_decimals"),
+        rs.getString("buy_token_address"),
+        rs.getString("buy_token_symbol"),
+        rs.getInt("buy_token_decimals"),
+        rs.getString("sell_amount_raw"),
+        rs.getBigDecimal("threshold_rate"),
+        rs.getString("alert_direction"),
+        rs.getInt("slippage_bps"),
+        rs.getString("recipient_address"),
+        rs.getString("execution_mode"),
+        rs.getString("execution_readiness"),
+        rs.getString("email_address"),
+        rs.getBoolean("email_enabled"),
+        timestampToInstant(rs.getTimestamp("last_email_alert_at")),
+        rs.getString("telegram_chat_id"),
+        rs.getBoolean("telegram_enabled"),
+        timestampToInstant(rs.getTimestamp("last_telegram_alert_at")),
+        rs.getInt("cooldown_minutes"));
   }
 
   private Instant timestampToInstant(Timestamp timestamp) {

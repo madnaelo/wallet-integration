@@ -16,11 +16,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class AutoSwapRuleService {
   private static final Set<String> ALERT_DIRECTIONS = Set.of("above", "below");
-  private static final Set<String> EXECUTION_MODES = Set.of("auto_when_supported", "notify_to_confirm");
-  private static final String AUTO_SUPPORTED = "auto_supported";
   private static final String CONFIRMATION_REQUIRED = "confirmation_required";
-  private static final String AUTO_WHEN_SUPPORTED = "auto_when_supported";
   private static final String NOTIFY_TO_CONFIRM = "notify_to_confirm";
+  private static final Set<String> EXECUTION_MODES = Set.of(NOTIFY_TO_CONFIRM);
   private static final BigDecimal MIN_TARGET_GAP_RATIO = new BigDecimal("0.01");
   private static final BigDecimal MIN_TARGET_GAP_FLOOR = new BigDecimal("0.000000000000000001");
 
@@ -43,9 +41,7 @@ public class AutoSwapRuleService {
     AutoSwapRuleRequest normalized = normalized(request);
     validateTargetSpacing(walletAddress, normalized);
 
-    String readiness = determineExecutionReadiness(normalized);
-    String mode = normalizeExecutionMode(normalized.executionMode(), readiness);
-    return repository.insert(walletAddress, normalized, mode, readiness);
+    return repository.insert(walletAddress, normalized, NOTIFY_TO_CONFIRM, CONFIRMATION_REQUIRED);
   }
 
   public void delete(String walletAddress, UUID id) {
@@ -83,7 +79,7 @@ public class AutoSwapRuleService {
     if (request.slippageBps() == null || request.slippageBps() < 0 || request.slippageBps() > 10_000) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Slippage tolerance must be between 0% and 100%.");
     }
-    String executionMode = normalizeBlank(request.executionMode(), AUTO_WHEN_SUPPORTED);
+    String executionMode = normalizeBlank(request.executionMode(), NOTIFY_TO_CONFIRM);
     if (!EXECUTION_MODES.contains(executionMode)) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid Auto Swap execution mode.");
     }
@@ -122,24 +118,7 @@ public class AutoSwapRuleService {
         normalizeDirection(request.alertDirection()),
         request.slippageBps(),
         request.recipientAddress().trim(),
-        normalizeBlank(request.executionMode(), AUTO_WHEN_SUPPORTED));
-  }
-
-  private String normalizeExecutionMode(String requestedMode, String readiness) {
-    String mode = normalizeBlank(requestedMode, AUTO_WHEN_SUPPORTED);
-    if (!AUTO_SUPPORTED.equals(readiness)) return NOTIFY_TO_CONFIRM;
-    return mode;
-  }
-
-  private String determineExecutionReadiness(AutoSwapRuleRequest request) {
-    if (isEvmContractAddress(request.sellTokenAddress()) && isEvmContractAddress(request.buyTokenAddress())) {
-      return AUTO_SUPPORTED;
-    }
-    return CONFIRMATION_REQUIRED;
-  }
-
-  private boolean isEvmContractAddress(String value) {
-    return value != null && value.trim().matches("^0x[0-9a-fA-F]{40}$");
+        NOTIFY_TO_CONFIRM);
   }
 
   private String normalizeDirection(String direction) {

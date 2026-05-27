@@ -137,7 +137,7 @@ export type SaveAutoSwapRuleRequest = {
   alertDirection?: "above" | "below";
   slippageBps: number;
   recipientAddress: string;
-  executionMode?: "auto_when_supported" | "notify_to_confirm";
+  executionMode?: "notify_to_confirm";
 };
 
 export class BackendClientError extends Error {
