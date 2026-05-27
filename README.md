@@ -135,8 +135,9 @@ Default local endpoints:
 ## Configuration
 
 Start from [.env.example](.env.example) for frontend/quote-route and local
-backend variables. Production Compose uses
-[infra/prod.env.example](infra/prod.env.example) as its secret template.
+backend variables. Active production environment setup is documented in
+[docs/ci-cd.md](docs/ci-cd.md); the legacy all-in-one Compose path uses
+[infra/prod.env.example](infra/prod.env.example).
 
 Important quote and wallet variables:
 
@@ -211,45 +212,13 @@ the fee-recipient, provider monetization, and launch revenue checklist.
 
 The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 
-- [Prompt 1](docs/prompt1_f.md): first non-custodial swap sketch.
-- [Prompt 2](docs/prompt2_f.md): production-ready MVP requirements.
-- [Prompt 3](docs/prompt3_f.md): wallet choice beyond MetaMask.
-- [Prompt 4](docs/prompt4_f.md): safe quote testing and quote-form guardrails.
-- [Prompt 5](docs/prompt5_f.md): Spring Boot/PostgreSQL swap history.
-- [Prompt 6](docs/prompt6_f.md): multi-wallet connection and wallet sign-in
-  hardening.
-- [Prompt 7](docs/prompt7_f.md): honest trade summary and provider-route UX.
-- [Prompt 8](docs/prompt8_f.md): multi-provider quote aggregation.
-- [Prompt 9](docs/prompt9_f.md): platform fee and provider operations config.
-- [Prompt 10](docs/prompt10_f.md): chain and token selector ergonomics.
-- [Prompt 11](docs/prompt11_f.md): searchable same-chain tokens and simpler
-  network UX.
-- [Prompt 12](docs/prompt12_f.md): native BTC receive quotes without confusing
-  BTC with wrapped EVM tokens.
-- [Prompt 13](docs/prompt13_f.md): source and receive wallet modeling for
-  native BTC quote paths.
-- [Prompt 14](docs/prompt14_f.md): Reown single-session source-wallet
-  switching.
-- [Prompt 15](docs/prompt15_f.md): recipient address entry without forcing
-  wallet connection.
-- [Prompt 16](docs/prompt16_f.md): token menu stacking above the trade summary.
-- [Prompt 17](docs/prompt17_f.md): import recipient addresses from wallets.
-- [Prompt 18](docs/prompt18_f.md): move network selection into token menus.
-- [Prompt 19](docs/prompt19_f.md): generic token networks and recipient address
-  families.
-- [Prompt 20](docs/prompt20_f.md): connected wallet label.
-- [Prompt 21](docs/prompt21_f.md): recipient address source label.
-- [Prompt 22](docs/prompt22_f.md): reverse-swap profit notifications.
-- [Prompt 23](docs/prompt23_f.md): Telegram settings and favorite-pair alerts.
-- [Prompt 24](docs/prompt24_f.md): user-friendly Telegram linking and separate
-  settings pages.
-- [Prompt 25](docs/prompt25_f.md): menu navigation and local Telegram config.
-- [Prompt 26](docs/prompt26_f.md): add favorites from swap and target ladders.
-- [Prompt 27](docs/prompt27_f.md): fix favorite alert price fetching.
-- [Prompt 28](docs/prompt28_f.md): admin-gated Auto Swap preferences.
-- [Prompt 29](docs/prompt29_f.md): wallet signing and transaction approval
-  clarity.
-- [Prompt 30](docs/prompt30_f.md): Telegram alert links that prefill the swap
-  page.
-- [Prompt 31](docs/prompt31_f.md): mobile quote loading and summary reveal.
-- [Prompt 32](docs/prompt32_f.md): mobile wallet return guidance.
+- Prompts 1-4: initial non-custodial swap MVP, wallet choice, safe quote
+  testing, and quote-form guardrails.
+- Prompts 5-9: Spring Boot/PostgreSQL history, wallet sign-in, honest trade
+  summaries, multi-provider quotes, and monetization configuration.
+- Prompts 10-19: token/network ergonomics, native BTC quote paths, source and
+  recipient wallet modeling, and generic recipient-address handling.
+- Prompts 20-27: wallet labels, Telegram settings/linking, favorite pairs,
+  target ladders, and alert delivery fixes.
+- Prompts 28-32: admin-gated Auto Swap preferences, clearer signing/approval
+  guidance, Telegram deep links, and mobile quote/wallet-return UX.

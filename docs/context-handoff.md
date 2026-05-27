@@ -2,124 +2,84 @@
 
 Use this file first when restarting in a fresh context.
 
-## Recommended Read Order
+## Read Order
 
-1. `docs/BRD.md`
-2. `docs/prompt1_f.md`
-3. `docs/prompt2_f.md`
-4. `docs/prompt3_f.md`
-5. `docs/discussion-summary.md`
-6. `docs/implementation-change-summary.md`
-7. Current git diff/status
+1. `README.md`
+2. `docs/BRD.md`
+3. `docs/local-and-deployment.md`
+4. `docs/ci-cd.md`
+5. `docs/earning-setup-finalization.md`
+6. Recent `docs/prompt*_f.md` files relevant to the task
+7. Current git status/diff
+
+The prompt files are the detailed AI pair-programming trail. The README and
+BRD are the current product/architecture summary.
 
 ## Current Product Direction
 
-The app is a non-custodial swap intelligence product, not merely a generic swap screen.
+The Wallet is a non-custodial swap assistant:
 
-Core wedge:
+- compare quotes across configured providers,
+- let the user's wallet execute swaps,
+- persist wallet-owned history,
+- save favorite pairs and target alerts,
+- detect reverse-swap opportunities,
+- notify users through configured channels,
+- store Auto Swap preferences only when the admin feature switch allows it.
 
-- Users save favorite token pairs.
-- App monitors quote/rate movement.
-- App stores historical swaps.
-- App detects profitable reverse-swap opportunities.
-- App notifies users when an opportunity appears.
+The backend still does not custody funds or private keys. Auto Swap storage is
+preference/rule storage, not autonomous private-key signing.
 
-The current codebase is still a swap/quote MVP. The future product work is to add persistence, monitoring, and notifications.
+## Current Implementation
 
-## Current Testing Direction
+- Frontend: Next.js App Router.
+- Quote route: server-side provider clients for 0x, 1inch, ParaSwap/Velora,
+  Odos, and LI.FI.
+- Wallet connection: Reown AppKit plus provider-specific signing handling.
+- Backend: Spring Boot, Flyway, PostgreSQL.
+- Notifications: scheduled monitor with email and Telegram adapters.
+- Deployment: Vercel for frontend/quote route, OCI for backend/PostgreSQL/Caddy.
+- CI/CD: GitHub Actions deploys both frontend and backend on pushes to
+  `master`/`main`.
 
-0x does not support Sepolia for Swap API quotes. Sepolia remains useful for wallet/mock/future-provider testing, but not for real 0x E2E swaps.
+## Local Workflow
 
-Current practical test mode:
+Start the local stack:
 
-- Real 0x API quotes on supported chains.
-- Dry-run swap execution when `NEXT_PUBLIC_DISALLOW_MAINNET=true`.
-- No live transaction submission in dry-run mode.
-
-## Current Env Model
-
-Active env model:
-
-```env
-ZEROX_API_KEY=...
-AFFILIATE_ADDRESS=...
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
-NEXT_PUBLIC_ALLOWED_CHAIN_IDS=...
-NEXT_PUBLIC_DISALLOW_MAINNET=...
+```powershell
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\start-dev.ps1'
 ```
 
-Behavior:
+Stop it:
 
-- `ZEROX_API_KEY` present: real 0x quote calls.
-- `ZEROX_API_KEY` absent and dry-run enabled: mock quote fallback.
-- `NEXT_PUBLIC_DISALLOW_MAINNET=true`: dry-run, no live approvals/swaps.
-- `NEXT_PUBLIC_DISALLOW_MAINNET=false`: live execution allowed.
+```powershell
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\stop-dev.ps1'
+```
 
-## Important UX Decisions
+Default local endpoints:
 
-Trade summary should show only user-facing values:
-
-- You pay.
-- Rate.
-- Total fees.
-- Expandable fee breakdown.
-- You receive.
-- Minimum received.
-
-Developer details such as raw calldata, gas units, and gas price should not be shown in the main summary.
-
-Minimum received is controlled by slippage:
-
-- Default: `1%`.
-- Presets: `0%`, `0.5%`, `1%`, `2%`, `Custom`.
-- Custom range: `0%` to `10%`.
-
-Quote freshness:
-
-- Quote TTL is `20` seconds.
-- Expired quotes remain visible.
-- Expired quotes disable swap/dry-run.
-- User must refresh the quote before execution.
-
-Form behavior:
-
-- If wallet is disconnected and user interacts with the form, show a non-modal connect prompt near the connect wallet button.
-- If fields are invalid, show field-level validation messages.
-- Any quote-affecting input change clears the existing quote.
-
-## Main Files Changed Recently
-
-- `src/app/page.tsx`
-- `src/app/globals.css`
-- `src/app/api/quote/route.ts`
-- `src/lib/quoteClient.ts`
-- `src/lib/server/aggregator.ts`
-- `src/lib/server/zeroxClient.ts`
-- `src/lib/server/mockAggregatorClient.ts`
-- `src/lib/server/quoteProvider.ts`
-- `src/lib/envPublic.ts`
-- `src/lib/chains.ts`
-- `src/lib/walletConnector.ts`
+- Frontend: `http://localhost:3000`
+- Backend health: `http://localhost:8080/api/health`
+- PostgreSQL: `localhost:55434`
 
 ## Verification Habit
 
-Run after changes:
+Run before committing meaningful code changes:
 
 ```powershell
-npm run typecheck
+Set-Location 'E:\assignments\wallet'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\verify.ps1'
 ```
 
-This has been passing after recent implementation changes.
+For documentation-only changes, `git diff --check` is usually enough.
 
-## Suggested Restart Prompt
-
-Paste this into a new session:
+## Restart Prompt
 
 ```text
-We are continuing work on the wallet swap MVP in E:\assignments\wallet.
-Please first read docs/context-handoff.md, docs/BRD.md, docs/prompt*.md,
-docs/discussion-summary.md, and docs/implementation-change-summary.md.
-Then inspect git status/diff before making changes.
-Current focus is improving the non-custodial swap UI and evolving it toward the
-favorite-pairs, price-alerts, reverse-swap-profit product described in the docs.
+We are continuing work on The Wallet in E:\assignments\wallet.
+Please first read README.md, docs/BRD.md, docs/context-handoff.md, and any
+prompt files relevant to the task. Then inspect git status/diff before making
+changes.
 ```

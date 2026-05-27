@@ -120,7 +120,7 @@ design.
 
 ## OCI VM Requirements
 
-Install on the VM:
+Required on the VM:
 
 ```bash
 sudo apt-get update
@@ -133,8 +133,9 @@ Log out and back in so the Docker group applies. The deploy user must be able
 to run `docker compose` without `sudo`.
 
 Open ports `80` and `443` in the OCI security list/network security group.
-Point the API DNS record, for example `api.your-domain.com`, to the OCI VM
-public IP before the first deploy so Caddy can issue TLS certificates.
+The current backend API uses `wallet-api.84-235-254-97.sslip.io`; attach a
+custom API domain later by pointing it at the OCI VM public IP and updating
+`WALLET_API_DOMAIN`, Caddy, CORS, and Vercel environment values together.
 
 ## Manual Deploy Commands
 

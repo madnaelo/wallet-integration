@@ -1,123 +1,80 @@
-**🧠 Business Overview (Simple & Clear)**
+# Business Requirements
 
-We are building a **non-custodial crypto swap aggregator platform**.
+## Product
 
-**🎯 What it does**
+The Wallet is a non-custodial personal swap aggregator and swap assistant.
+Users connect wallets, compare quotes from supported swap aggregators, execute
+swaps from their own wallet, save favorite pairs, and receive alerts when saved
+pairs or reverse-swap opportunities become attractive.
 
-- Users connect their crypto wallet (MetaMask, WalletConnect, etc.)
-- The platform fetches **best token swap rates** across multiple decentralized exchanges (DEXs)
-- Users execute trades **directly from their wallet**
-- The platform **never holds user funds**
+The app never stores private keys, never takes custody of funds, and never signs
+transactions for users.
 
-**💰 How it makes money**
+## Value Proposition
 
-- Adds a small **markup fee (0.1%-0.3%)** on each swap via aggregator APIs (like 0x / 1inch)
-- Optional: earns referral commissions from fiat on-ramp providers
+- Compare swap quotes in one UI instead of visiting several DEX or wallet apps.
+- Keep the execution path non-custodial: the user's wallet approves and submits
+  transactions.
+- Remember useful swap context: history, favorite pairs, thresholds, and
+  notification preferences.
+- Move beyond a plain swap screen by alerting users when prior or favorite pairs
+  may be worth revisiting.
 
-**⚖️ Legal positioning**
+## Revenue Model
 
-- Non-custodial → **no handling of funds**
-- No fiat processing → **no banking/license required**
-- Users sign their own transactions → platform is just a **software interface**
+- Primary: provider/integrator/platform fee on successful swaps where the
+  selected provider supports it.
+- Optional later: premium alerting, advanced analytics, or embedded swap
+  assistant widgets.
 
-👉 This keeps it **\$0 licensing, low risk, and fast to launch**
+Fee collection must be transparent in product/legal copy before public launch.
 
-**🧩 Core Value Proposition**
+## MVP Scope
 
-"A simple interface that gives users the best crypto swap rates across multiple exchanges in one place."
+- Wallet connection through installed wallets and WalletConnect/Reown flows.
+- Quote aggregation through configured providers.
+- User-signed swap execution.
+- Dry-run safeguards for testing.
+- Wallet-authenticated swap history.
+- Favorite pairs with target-rate alerts.
+- Reverse-swap opportunity monitoring.
+- Telegram/email notification plumbing.
+- Admin-gated Auto Swap preference storage, without backend custody of keys.
 
-Users benefit from:
+## Technical Shape
 
-- Better prices (aggregated liquidity)
-- Convenience (one UI instead of many DEXs)
-- No signup required (wallet-based login)
+- Next.js frontend and server-side quote route.
+- Spring Boot backend for wallet sessions, history, preferences, alerts, and
+  scheduled monitoring.
+- PostgreSQL for persisted wallet-owned data.
+- Vercel for frontend/quote route.
+- OCI for backend, PostgreSQL, and Caddy HTTPS proxy.
 
-**⚙️ Technical Overview (High-Level)**
+## Security Principles
 
-**🧱 Architecture**
+- Do not store seed phrases, private keys, or signing material.
+- Validate and normalize all quote and token inputs server-side.
+- Keep provider API keys server-side.
+- Treat wallet signatures as authentication only, not transaction approval.
+- Scope history, favorites, and preferences to the authenticated wallet.
+- Keep fee-recipient, provider, Telegram, SMTP, and database secrets out of git.
 
-\[ User Wallet \]  
-↓  
-\[ Frontend (React / Next.js) \]  
-↓  
-\[ Backend API (Spring Boot or Node.js) \]  
-↓  
-\[ DEX Aggregator APIs \]  
-↓  
-\[ Blockchain \]
+## Data Model Areas
 
-**🔹 Frontend Responsibilities**
+- Wallet sessions and nonces.
+- Swap history.
+- Notification preferences and channel links.
+- Favorite pair alert rules.
+- Alert delivery/cooldown records.
+- Auto Swap preference rules.
 
-- Wallet connection (MetaMask, WalletConnect)
-- UI for token swap (from/to, amount)
-- Display balances (via blockchain RPC)
-- Show best price and route
-- Ask user to sign transaction
+## Launch Readiness
 
-**🔹 Backend Responsibilities**
+Before public launch:
 
-- Call DEX aggregator APIs (0x, 1inch, ParaSwap)
-- Inject **hidden fee wallet address**
-- Return best quote to frontend
-- Handle wallet-based login (signature verification)
-- Store user preferences (optional)
-- (Optional) analytics/logging
-
-**🔹 Third-Party APIs Used**
-
-**DEX Aggregators (core)**
-
-- 0x API
-- 1inch API
-- ParaSwap API
-
-**Optional**
-
-- Jupiter (Solana)
-- OpenOcean
-
-**Fiat On-Ramp (optional)**
-
-- Transak
-- Ramp
-- MoonPay
-
-**🔐 Key Design Principles**
-
-- ❌ Never store private keys
-- ❌ Never custody funds
-- ❌ Never execute trades on behalf of user
-- ✅ User signs transactions in wallet
-- ✅ Platform only builds transaction payload
-- ✅ Fee is embedded in swap via API
-
-**👤 Authentication Model**
-
-- Wallet-based login (signature-based)
-- No passwords required
-- Wallet address = user ID
-
-Optional:
-
-- Store preferences (favorite tokens, settings)
-
-**🗄️ Minimal Database Schema (Optional)**
-
-**users**
-
-- wallet_address (primary key)
-- preferences (JSON)
-
-**swap_logs (optional)**
-
-- tx_hash
-- timestamp
-- fee_earned
-
-**🚀 MVP Scope**
-
-- Connect wallet
-- Select tokens (from/to)
-- Get best swap quote (via 0x API initially)
-- Execute swap (user signs transaction)
-- Collect fee via affiliate parameter
+- Confirm fee-recipient and affiliate wallet setup.
+- Confirm provider terms for fee-generating use.
+- Rotate any exposed notification tokens.
+- Add public fee disclosure, terms, and privacy pages.
+- Enable database backups and uptime/error monitoring.
+- Run small real swaps through each enabled provider and verify fee behavior.

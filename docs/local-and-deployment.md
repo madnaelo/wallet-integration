@@ -138,27 +138,13 @@ This runs:
 
 ## Production Shape
 
-The active production target is split:
-
-- Vercel runs the Next.js frontend and its server-side quote route.
-- OCI runs PostgreSQL, the Spring Boot backend, and Caddy for the backend API
-  domain.
-
-See [CI/CD](ci-cd.md) for GitHub Actions deployment, required secrets, and
-production setup.
+The active production target is split: Vercel runs the frontend/quote route,
+and OCI runs PostgreSQL, the Spring Boot backend, and Caddy for the backend API
+domain. See [CI/CD](ci-cd.md) for GitHub Actions deployment, required secrets,
+and production setup.
 
 The older all-in-one OCI Compose shape is still available for a single-VM
-deployment:
-
-- `postgres`: private Postgres database
-- `backend`: Spring Boot API
-- `frontend`: Next.js app
-- `caddy`: HTTPS and reverse proxy
-
-Public routes:
-
-- `https://yourdomain.com` -> frontend
-- `https://yourdomain.com/api/backend/*` -> Spring Boot backend
+deployment, but it is not the current production path.
 
 Prepare production env:
 
@@ -177,29 +163,3 @@ cd /opt/wallet
 chmod +x scripts/prod-deploy.sh
 ./scripts/prod-deploy.sh
 ```
-
-## Product Scope In This Milestone
-
-Implemented now:
-
-- Wallet-owned backend session via signed wallet message.
-- Postgres-backed swap history.
-- Frontend saves dry-run, submitted cross-chain, and confirmed swaps to the
-  backend.
-- Frontend reads authenticated swap history from the backend.
-- Native BTC quote paths through LI.FI with separate source and receive wallet
-  modeling in the frontend.
-- Backend notification preferences, scheduled reverse-swap profit scanning, and
-  email/Telegram delivery adapters.
-- Favorite pairs with above/below target-rate alerts.
-- Multiple target alerts for the same favorite pair when target prices are at
-  least 1% apart.
-- Telegram linking through bot start codes instead of exposing chat IDs to
-  users.
-
-Not implemented yet:
-
-- General price alerts beyond favorite-pair target rates and reverse-swap
-  profit alerts.
-- Push or in-app notification delivery.
-- Native BTC sell execution and cross-chain destination status tracking.

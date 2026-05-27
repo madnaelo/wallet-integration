@@ -1,6 +1,6 @@
 # Earning Setup Finalization
 
-Last reviewed: May 26, 2026
+Last reviewed: May 27, 2026
 
 This checklist tracks what is required before The Wallet can reliably collect
 platform fees in production.
@@ -16,8 +16,9 @@ platform fees in production.
 - LI.FI Partner Portal fee collection is enabled for integration `the-wallet`
   with default EVM, Solana/SVM, Sui, and Bitcoin receiving wallets.
 - `PARASWAP_API_KEY` is still missing.
-- Fee wallet values must still be replaced or explicitly confirmed with the
-  final treasury wallet before relying on revenue collection.
+- Treasury receive addresses have been provided. Keep the actual values in
+  deployment/provider configuration, not in committed docs, and verify them with
+  small real swaps before relying on revenue collection.
 
 ## Fee Address Model
 
@@ -191,40 +192,7 @@ Before public launch:
 - Set up uptime/error alerts for Vercel and OCI.
 - Run small real swaps through each provider and record the fee receipt result.
 
-## User Input Needed
-
-### EVM treasury wallet
-
-Needed for:
-
-- `FEE_RECIPIENT_ADDRESS`
-- `AFFILIATE_ADDRESS`
-- 0x, 1inch, Velora/ParaSwap, Odos EVM fee collection.
-
-Steps using MetaMask:
-
-1. Open MetaMask.
-2. Select the account you want to use as treasury.
-3. Make sure it is an address you control long-term.
-4. Click the account/address at the top to copy it.
-5. Paste only the public address here. It should start with `0x`.
-
-Do not paste a private key or seed phrase.
-
-Do not use a centralized exchange deposit address.
-
-### Bitcoin treasury receive address
-
-Needed only for LI.FI native Bitcoin fee payout if we enable BTC-side fee
-collection.
-
-Steps:
-
-1. Open your Bitcoin wallet.
-2. Choose Receive.
-3. Select the Bitcoin network.
-4. Copy a receive address, preferably starting with `bc1`.
-5. Paste only the public receive address here.
+## Remaining Owner Actions
 
 ### Telegram token rotation
 
@@ -238,4 +206,14 @@ Steps:
 4. Select the bot used for The Wallet.
 5. Choose API Token.
 6. Revoke or regenerate the token.
-7. Paste the new token here so production OCI can be updated.
+7. Update production OCI and local development env files with the new token.
+
+### Fee receipt verification
+
+Run small real swaps after funding a test wallet:
+
+- one EVM route through each enabled fee-supporting provider,
+- one LI.FI route after confirming portal fee routing,
+- one ParaSwap/Velora route after API-key or partner-access status is resolved.
+
+Record whether the expected fee reached the configured treasury destination.
