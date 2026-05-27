@@ -78,8 +78,13 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
           set -euo pipefail
+          if [ -n "${VERCEL_DEPLOY_HOOK_URL:-}" ]; then
+            exit 0
+          fi
+
           missing=()
           for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
             if [ -z "${!name:-}" ]; then
@@ -87,7 +92,7 @@ jobs:
             fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            printf 'Missing required GitHub secrets: %s\n' "${missing[*]}" >&2
+            printf 'Missing required GitHub secrets: %s, or set VERCEL_DEPLOY_HOOK_URL.\n' "${missing[*]}" >&2
             exit 1
           fi
 
@@ -97,4 +102,5 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: ./scripts/deploy/deploy-vercel-frontend.sh
