@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { AppKitProvider } from "@/context/appkit";
 
 const siteUrl = getSiteUrl();
 const title = "The Wallet";
@@ -80,9 +79,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-US">
-      <body>
-        <AppKitProvider>{children}</AppKitProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

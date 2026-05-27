@@ -1,8 +1,15 @@
-import SignClient from "@walletconnect/sign-client";
-import QRCode from "qrcode";
 import { isAddress } from "@/lib/validation";
 
-type RecipientImportClient = Awaited<ReturnType<typeof SignClient.init>>;
+type RecipientImportClient = {
+  connect: (params: {
+    requiredNamespaces: Record<string, {
+      chains: string[];
+      methods: string[];
+      events: string[];
+    }>;
+  }) => Promise<{ uri?: string; approval: () => Promise<any> }>;
+  disconnect: (params: { topic: string; reason: { code: number; message: string } }) => Promise<void>;
+};
 
 type RecipientWalletImportParams = {
   projectId: string;
@@ -45,7 +52,7 @@ export async function createRecipientWalletImport({
 
   if (!uri) throw new Error("Could not start wallet import.");
 
-  const qrDataUrl = await QRCode.toDataURL(uri, {
+  const qrDataUrl = await createQrDataUrl(uri, {
     margin: 1,
     width: 260,
     color: {
@@ -82,7 +89,7 @@ export async function createRecipientWalletImport({
 
 function getRecipientImportClient(projectId: string, origin: string): Promise<RecipientImportClient> {
   if (!clientPromise) {
-    clientPromise = SignClient.init({
+    clientPromise = import("@walletconnect/sign-client").then(({ default: SignClient }) => SignClient.init({
       projectId,
       metadata: {
         name: "The Wallet",
@@ -90,10 +97,25 @@ function getRecipientImportClient(projectId: string, origin: string): Promise<Re
         url: origin,
         icons: []
       }
-    });
+    }));
   }
 
   return clientPromise;
+}
+
+async function createQrDataUrl(
+  uri: string,
+  options: {
+    margin: number;
+    width: number;
+    color: {
+      dark: string;
+      light: string;
+    };
+  }
+): Promise<string> {
+  const qrCode = await import("qrcode");
+  return qrCode.toDataURL(uri, options);
 }
 
 function getEvmAccountFromSession(session: any, chainId: number): string {

@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { createAppKit } from "@reown/appkit/react";
 import { BitcoinAdapter } from "@reown/appkit-adapter-bitcoin";
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
@@ -88,7 +87,3 @@ createAppKit({
     "--w3m-border-radius-master": "2px"
   }
 });
-
-export function AppKitProvider({ children }: { children: ReactNode }) {
-  return <>{children}</>;
-}
