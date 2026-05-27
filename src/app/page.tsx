@@ -3046,10 +3046,9 @@ function sanitizeRawAmountQueryParam(value: string | null): string {
 function buildWalletApprovalNotice(walletName: string, action: WalletApprovalAction): string {
   const walletLabel = normalizeWalletApprovalName(walletName);
   const actionText = getWalletApprovalActionText(action);
-  const returnHint = isMetaMaskWalletName(walletLabel) ? ", then tap Back to return to The Wallet" : "";
   const safetyHint = action === "signIn" ? " This cannot move funds." : "";
 
-  return `${actionText} in ${walletLabel}${returnHint}.${safetyHint}`;
+  return `${actionText} in ${walletLabel}, then return to The Wallet.${safetyHint}`;
 }
 
 function normalizeWalletApprovalName(walletName: string): string {
@@ -3069,10 +3068,6 @@ function getWalletApprovalActionText(action: WalletApprovalAction): string {
     default:
       return "Approve the request";
   }
-}
-
-function isMetaMaskWalletName(walletName: string): boolean {
-  return /metamask/i.test(walletName);
 }
 
 function buildConnectedWalletDisplay(params: {

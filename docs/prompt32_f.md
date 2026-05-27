@@ -2,9 +2,9 @@
 
 ## Product Context
 
-Mobile wallet behavior differs by wallet. Binance Wallet returns users to The
-Wallet after sign-in and signing, while MetaMask Mobile may keep the wallet app
-open and require the user to tap Back manually.
+Mobile wallet behavior differs by wallet. Some wallets return users to The
+Wallet after sign-in and signing, while others keep the wallet app open and
+require the user to return manually.
 
 ## Requirement
 
@@ -12,8 +12,8 @@ Improve the mobile signing experience without changing wallet security:
 
 - Show wallet-aware signing guidance when history sign-in, token approval, or
   swap signing is waiting for the wallet.
-- For MetaMask, explicitly tell the user to approve/sign and then tap Back to
-  return to The Wallet.
+- Keep the return guidance generic for all wallets: approve or sign in the
+  wallet, then return to The Wallet.
 - Keep the safety reassurance for sign-in messages because they prove wallet
   ownership and cannot move funds.
 - Add WalletConnect/Reown redirect metadata so wallets that honor the metadata
@@ -30,8 +30,7 @@ Improve the mobile signing experience without changing wallet security:
 
 ## Acceptance Criteria
 
-- MetaMask users see a clear Back-to-The-Wallet hint during sign-in and swap
-  approvals.
-- Non-MetaMask wallets continue to see clean approve/sign instructions.
+- Users see clear approve/sign and return-to-The-Wallet guidance during
+  sign-in and swap approvals.
 - Reown/AppKit receives redirect metadata with the current app URL.
 - Frontend typecheck and lint pass.
