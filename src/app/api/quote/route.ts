@@ -70,9 +70,18 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (!isPositiveIntegerString(sellAmount)) {
+  if (!/^\d+$/.test(sellAmount)) {
     return withCors(
       NextResponse.json({ error: "sellAmount must be a positive integer string (base units)." }, { status: 400 }),
+      corsOrigin
+    );
+  }
+  if (sellAmount.length > 78) {
+    return withCors(NextResponse.json({ error: "sellAmount is too large." }, { status: 400 }), corsOrigin);
+  }
+  if (!isPositiveIntegerString(sellAmount)) {
+    return withCors(
+      NextResponse.json({ error: "sellAmount must be greater than zero." }, { status: 400 }),
       corsOrigin
     );
   }
@@ -93,6 +102,17 @@ export async function GET(req: NextRequest) {
     return withCors(NextResponse.json({ error: "Invalid receive address." }, { status: 400 }), corsOrigin);
   } else if (isNativeBitcoinToken(sellToken) && !toAddress) {
     return withCors(NextResponse.json({ error: "Choose a receive address." }, { status: 400 }), corsOrigin);
+  }
+
+  const walletLimit = await rateLimit(`quote-wallet:${normalizeTokenKey(takerAddress)}`);
+  if (!walletLimit.allowed) {
+    return withCors(
+      NextResponse.json(
+        { error: "Rate limit exceeded. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(walletLimit.retryAfterMs / 1000)) } }
+      ),
+      corsOrigin
+    );
   }
 
   let slippageBps: number | undefined;
@@ -116,7 +136,16 @@ export async function GET(req: NextRequest) {
   if (!sellTokenInfo || !buyTokenInfo) {
     return withCors(NextResponse.json({ error: "Token is not available on this network." }, { status: 400 }), corsOrigin);
   }
-  const cacheKey = `quote:${chainId}:${sellToken}:${buyToken}:${sellAmount}:${takerAddress}:${toAddress}:${slippageBps ?? "default"}`;
+  const cacheKey = [
+    "quote",
+    chainId,
+    normalizeTokenKey(sellToken),
+    normalizeTokenKey(buyToken),
+    sellAmount,
+    normalizeTokenKey(takerAddress),
+    normalizeTokenKey(toAddress),
+    slippageBps ?? "default"
+  ].join(":");
   const cached = quoteCache.get(cacheKey);
   if (cached) {
     return withCors(NextResponse.json(cached, { status: 200 }), corsOrigin);
@@ -155,7 +184,7 @@ function isOriginAllowed(origin: string | null): boolean {
   if (!allow || allow.trim().length === 0) return true;
   const parts = allow.split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.includes("*")) return true;
-  if (!origin) return true;
+  if (!origin) return !env.REQUIRE_ALLOWED_ORIGIN;
   return parts.includes(origin);
 }
 
