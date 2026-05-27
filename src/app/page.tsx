@@ -1788,6 +1788,12 @@ export default function Page() {
     const platformFeeBps = numberValue(quote.platformFeeBps);
     const platformFeeLabel = platformFeeBps > 0 ? formatFeeBps(platformFeeBps) : "";
     const swapFeeTotal = swapFeeLines.length ? formatConvertedFeeTotal(swapFeeLines, buyDisplayToken) : platformFeeLabel || "None";
+    const warnings = buildQuoteWarnings({
+      quote,
+      slippageBps,
+      buyTokenFeesDeducted,
+      grossBuyAmount
+    });
 
     return {
       providerName: stringValue(quote.providerName) || "Best route",
@@ -1801,9 +1807,10 @@ export default function Page() {
       routeSummary: formatRouteSummary(routeLines, stringValue(quote.providerName)),
       swapFeeLines,
       swapFeeTotal,
-      platformFeeLabel
+      platformFeeLabel,
+      warnings
     };
-  }, [quote, sellTokenInfo, buyTokenInfo, chain, tokens, rateInverted]);
+  }, [quote, sellTokenInfo, buyTokenInfo, chain, tokens, rateInverted, slippageBps]);
 
   const connectHint = useMemo(() => {
     if (walletAddress) return "";
@@ -2493,6 +2500,15 @@ export default function Page() {
                 <div className="subtle">Service fee</div>
                 <div className="mono">{quoteSummary?.swapFeeTotal ?? ""}</div>
               </div>
+              {quoteSummary?.warnings.length ? (
+                <div className="quoteWarnings" role="status" aria-live="polite">
+                  {quoteSummary.warnings.map((warning) => (
+                    <div className="quoteWarningItem" key={warning}>
+                      {warning}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {quoteSummary ? (
                 <details className="feeDetails routeDetails">
                   <summary>
@@ -3460,6 +3476,36 @@ function quoteForHistory(quote: QuoteResponse): QuoteResponse {
   return rest;
 }
 
+function buildQuoteWarnings({
+  quote,
+  slippageBps,
+  buyTokenFeesDeducted,
+  grossBuyAmount
+}: {
+  quote: QuoteResponse;
+  slippageBps: number | null;
+  buyTokenFeesDeducted: string;
+  grossBuyAmount: string;
+}): string[] {
+  const warnings: string[] = [];
+
+  if (slippageBps !== null && slippageBps >= 300) {
+    warnings.push(`Slippage is set to ${formatSlippageBps(slippageBps)}. The final amount can move before your wallet rejects the swap.`);
+  }
+
+  const effectiveFeeBps = calculateBps(buyTokenFeesDeducted, grossBuyAmount);
+  if (effectiveFeeBps >= 100) {
+    warnings.push(`Service fee is about ${formatFeeBps(effectiveFeeBps)} of the quoted output.`);
+  }
+
+  const quoteErrors = quote.quoteErrors ?? [];
+  if (quoteErrors.length > 0) {
+    warnings.push(formatProviderWarning(quoteErrors));
+  }
+
+  return warnings;
+}
+
 function formatQuoteOption(quote: QuoteResponse, buyToken: DisplayToken): string {
   const providerName = stringValue(quote.providerName) || "Route";
   const rankLabel = quote.isBest ? "Best - " : "";
@@ -3988,6 +4034,23 @@ function multiplyDivideIntegerStrings(value: string, multiplier: string, divisor
   const divisorBigInt = BigInt(divisor);
   if (divisorBigInt === 0n) return "";
   return ((BigInt(value) * BigInt(multiplier)) / divisorBigInt).toString();
+}
+
+function calculateBps(numerator: string, denominator: string): number {
+  if (!/^\d+$/.test(numerator) || !/^\d+$/.test(denominator)) return 0;
+  const denominatorBigInt = BigInt(denominator);
+  if (denominatorBigInt === 0n) return 0;
+  const bps = (BigInt(numerator) * 10_000n) / denominatorBigInt;
+  return bps > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Number(bps);
+}
+
+function formatProviderWarning(errors: QuoteResponse["quoteErrors"]): string {
+  const providerNames = (errors ?? [])
+    .map((error) => error.providerName || error.providerId)
+    .filter((name): name is string => Boolean(name));
+  const uniqueNames = Array.from(new Set(providerNames)).slice(0, 3);
+  const suffix = uniqueNames.length ? `: ${uniqueNames.join(", ")}` : "";
+  return `Some routes were unavailable${suffix}. The selected quote is still from a responding route.`;
 }
 
 function sumBuyTokenFees(lines: FeeLine[]): string {

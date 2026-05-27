@@ -1790,6 +1790,22 @@ body {
   white-space: pre-wrap;
 }
 
+.quoteWarnings {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.quoteWarningItem {
+  background: rgba(255, 212, 59, 0.08);
+  border: 1px solid rgba(255, 212, 59, 0.28);
+  border-radius: 8px;
+  color: #ffe08a;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 9px 10px;
+}
+
 .small {
   font-size: 12px;
   color: var(--muted);
