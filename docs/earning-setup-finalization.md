@@ -211,10 +211,10 @@ Before public launch:
 - Confirm 1inch commercial/API terms fit a revenue-generating app.
 - Verify Odos delegated-fee payout with a settled real swap.
 - Run a small LI.FI route and confirm the fee appears under Collectable Fees.
-- Add public fee disclosure in the product/legal copy.
-- Add clear alert wording that notifications are estimates, not financial
+- Keep public fee disclosure, terms, and privacy pages current as provider
+  terms and fee settings change.
+- Keep clear alert wording that notifications are estimates, not financial
   advice.
-- Add terms/privacy pages before a public launch.
 - Verify CORS origins after the final custom domain is attached.
 - Set up automated DB backups for OCI PostgreSQL.
 - Set up uptime/error alerts for Vercel and OCI.

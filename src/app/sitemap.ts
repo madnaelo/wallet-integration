@@ -10,6 +10,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "weekly",
       priority: 1
+    },
+    {
+      url: new URL("/fees", baseUrl).toString(),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6
+    },
+    {
+      url: new URL("/terms", baseUrl).toString(),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5
+    },
+    {
+      url: new URL("/privacy", baseUrl).toString(),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5
     }
   ];
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { ethers } from "ethers";
 import type { QuoteResponse } from "@/lib/types";
@@ -3106,6 +3107,15 @@ export default function Page() {
         </div>
         </section>
       ) : null}
+
+      <footer className="siteFooter">
+        <span>The Wallet is non-custodial. Review every wallet request before signing.</span>
+        <nav aria-label="Legal links">
+          <Link href="/fees">Fees & Risks</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/privacy">Privacy</Link>
+        </nav>
+      </footer>
     </div>
   );
 }

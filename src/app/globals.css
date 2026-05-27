@@ -141,6 +141,69 @@ body {
   z-index: 2;
 }
 
+.siteFooter {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 10px 16px;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.siteFooter nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.siteFooter a,
+.legalBackLink {
+  color: #cfe0ff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.siteFooter a:hover,
+.siteFooter a:focus-visible,
+.legalBackLink:hover,
+.legalBackLink:focus-visible {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.legalPage {
+  margin: 0 auto;
+  max-width: 820px;
+  padding: 34px 18px 64px;
+}
+
+.legalShell {
+  background: rgba(18, 26, 42, 0.88);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+}
+
+.legalShell h1 {
+  font-size: 26px;
+  margin: 16px 0 12px;
+}
+
+.legalShell h2 {
+  font-size: 16px;
+  margin: 22px 0 8px;
+}
+
+.legalShell p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
 .grid > .panel:first-child {
   position: relative;
   z-index: 3;

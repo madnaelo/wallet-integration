@@ -79,6 +79,6 @@ Before public launch:
 - Confirm fee-recipient and affiliate wallet setup.
 - Confirm provider terms for fee-generating use.
 - Rotate any exposed notification tokens.
-- Add public fee disclosure, terms, and privacy pages.
+- Maintain public fee disclosure, terms, and privacy pages.
 - Enable database backups and uptime/error monitoring.
 - Run small real swaps through each enabled provider and verify fee behavior.
