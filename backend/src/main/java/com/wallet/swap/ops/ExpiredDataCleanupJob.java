@@ -1,6 +1,7 @@
 package com.wallet.swap.ops;
 
 import com.wallet.swap.auth.AuthRepository;
+import com.wallet.swap.config.DatabaseApiRateLimiter;
 import com.wallet.swap.notification.TelegramLinkCodeRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,15 +17,18 @@ public class ExpiredDataCleanupJob {
 
   private final AuthRepository authRepository;
   private final TelegramLinkCodeRepository telegramLinkCodeRepository;
+  private final DatabaseApiRateLimiter apiRateLimiter;
   private final JobLockService jobLockService;
   private final AtomicBoolean running = new AtomicBoolean(false);
 
   public ExpiredDataCleanupJob(
       AuthRepository authRepository,
       TelegramLinkCodeRepository telegramLinkCodeRepository,
+      DatabaseApiRateLimiter apiRateLimiter,
       JobLockService jobLockService) {
     this.authRepository = authRepository;
     this.telegramLinkCodeRepository = telegramLinkCodeRepository;
+    this.apiRateLimiter = apiRateLimiter;
     this.jobLockService = jobLockService;
   }
 
@@ -43,14 +47,16 @@ public class ExpiredDataCleanupJob {
     int nonces = authRepository.deleteExpiredNonces(now);
     int sessions = authRepository.deleteExpiredSessions(now);
     int telegramCodes = telegramLinkCodeRepository.deleteExpired(now);
-    int total = nonces + sessions + telegramCodes;
+    int rateLimitBuckets = apiRateLimiter.deleteExpiredBuckets(now);
+    int total = nonces + sessions + telegramCodes + rateLimitBuckets;
     if (total > 0) {
       log.info(
-          "Cleaned up {} expired rows: {} nonces, {} sessions, {} Telegram link codes.",
+          "Cleaned up {} expired rows: {} nonces, {} sessions, {} Telegram link codes, {} rate-limit buckets.",
           total,
           nonces,
           sessions,
-          telegramCodes);
+          telegramCodes,
+          rateLimitBuckets);
     }
   }
 }

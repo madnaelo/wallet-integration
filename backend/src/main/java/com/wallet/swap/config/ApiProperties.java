@@ -10,6 +10,7 @@ public class ApiProperties {
   private long rateLimitWindowMs = 60_000;
   private int rateLimitMaxRequests = 120;
   private int authRateLimitMaxRequests = 20;
+  private String rateLimitKeyPepper = "";
   private boolean trustForwardedHeaders = true;
   private boolean trustPrivateProxyHeaders = true;
   private String trustedProxyCidrs = "";
@@ -60,6 +61,14 @@ public class ApiProperties {
 
   public void setAuthRateLimitMaxRequests(int authRateLimitMaxRequests) {
     this.authRateLimitMaxRequests = authRateLimitMaxRequests;
+  }
+
+  public String getRateLimitKeyPepper() {
+    return rateLimitKeyPepper;
+  }
+
+  public void setRateLimitKeyPepper(String rateLimitKeyPepper) {
+    this.rateLimitKeyPepper = rateLimitKeyPepper;
   }
 
   public boolean isTrustForwardedHeaders() {

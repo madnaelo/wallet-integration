@@ -6,7 +6,10 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,7 +21,7 @@ class ApiRequestGuardFilterTest {
   void rejectsRequestsWithOversizedContentLength() throws Exception {
     ApiProperties properties = new ApiProperties();
     properties.setMaxRequestBodyBytes(4);
-    ApiRequestGuardFilter filter = new ApiRequestGuardFilter(properties);
+    ApiRequestGuardFilter filter = newFilter(properties);
     MockHttpServletRequest request = apiRequest("POST", "/api/auth/nonce", "203.0.113.10");
     request.setContentType(MediaType.APPLICATION_JSON_VALUE);
     request.setContent("{\"x\":1}".getBytes(StandardCharsets.UTF_8));
@@ -37,7 +40,7 @@ class ApiRequestGuardFilterTest {
     ApiProperties properties = new ApiProperties();
     properties.setAuthRateLimitMaxRequests(1);
     properties.setRateLimitWindowMs(60_000);
-    ApiRequestGuardFilter filter = new ApiRequestGuardFilter(properties);
+    ApiRequestGuardFilter filter = newFilter(properties);
     AtomicBoolean chainCalled = new AtomicBoolean(false);
 
     MockHttpServletResponse firstResponse = new MockHttpServletResponse();
@@ -58,7 +61,7 @@ class ApiRequestGuardFilterTest {
   void doesNotRateLimitHealthChecks() throws Exception {
     ApiProperties properties = new ApiProperties();
     properties.setRateLimitMaxRequests(1);
-    ApiRequestGuardFilter filter = new ApiRequestGuardFilter(properties);
+    ApiRequestGuardFilter filter = newFilter(properties);
     AtomicBoolean chainCalled = new AtomicBoolean(false);
 
     filter.doFilter(apiRequest("GET", "/api/health", "203.0.113.30"), new MockHttpServletResponse(), flaggingChain(chainCalled));
@@ -75,7 +78,7 @@ class ApiRequestGuardFilterTest {
     ApiProperties properties = new ApiProperties();
     properties.setAuthRateLimitMaxRequests(1);
     properties.setRateLimitWindowMs(60_000);
-    ApiRequestGuardFilter filter = new ApiRequestGuardFilter(properties);
+    ApiRequestGuardFilter filter = newFilter(properties);
 
     MockHttpServletResponse firstResponse = new MockHttpServletResponse();
     MockHttpServletRequest firstRequest = apiRequest("POST", "/api/auth/nonce", "203.0.113.40");
@@ -96,7 +99,7 @@ class ApiRequestGuardFilterTest {
     ApiProperties properties = new ApiProperties();
     properties.setAuthRateLimitMaxRequests(1);
     properties.setRateLimitWindowMs(60_000);
-    ApiRequestGuardFilter filter = new ApiRequestGuardFilter(properties);
+    ApiRequestGuardFilter filter = newFilter(properties);
 
     MockHttpServletResponse firstResponse = new MockHttpServletResponse();
     MockHttpServletRequest firstRequest = apiRequest("POST", "/api/auth/nonce", "10.0.0.5");
@@ -126,4 +129,34 @@ class ApiRequestGuardFilterTest {
   private FilterChain flaggingChain(AtomicBoolean chainCalled) {
     return (ServletRequest request, ServletResponse response) -> chainCalled.set(true);
   }
+
+  private ApiRequestGuardFilter newFilter(ApiProperties properties) {
+    return new ApiRequestGuardFilter(properties, new TestApiRateLimiter());
+  }
+
+  private static final class TestApiRateLimiter implements ApiRateLimiter {
+    private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+
+    @Override
+    public ApiRateLimitDecision check(String key, int maxRequests, long windowMs) {
+      long now = System.currentTimeMillis();
+      AtomicReference<ApiRateLimitDecision> decision = new AtomicReference<>();
+      buckets.compute(key, (ignored, bucket) -> {
+        if (bucket == null || now >= bucket.resetAt()) {
+          decision.set(ApiRateLimitDecision.permit());
+          return new Bucket(1, now + windowMs);
+        }
+        int nextCount = bucket.count() + 1;
+        if (nextCount > maxRequests) {
+          decision.set(ApiRateLimitDecision.reject(Duration.ofMillis(Math.max(0, bucket.resetAt() - now))));
+          return new Bucket(nextCount, bucket.resetAt());
+        }
+        decision.set(ApiRateLimitDecision.permit());
+        return new Bucket(nextCount, bucket.resetAt());
+      });
+      return decision.get();
+    }
+  }
+
+  private record Bucket(int count, long resetAt) {}
 }

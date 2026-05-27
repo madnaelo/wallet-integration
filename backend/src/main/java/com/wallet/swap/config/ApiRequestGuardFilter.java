@@ -13,10 +13,10 @@ import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Locale;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -28,14 +28,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ApiRequestGuardFilter extends OncePerRequestFilter {
   private static final String APPLICATION_JSON = "application/json";
-  private static final int MAX_TRACKED_BUCKETS = 10_000;
 
   private final ApiProperties apiProperties;
-  private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
-  private volatile long lastSweepAt = 0;
+  private final ApiRateLimiter rateLimiter;
 
-  public ApiRequestGuardFilter(ApiProperties apiProperties) {
+  public ApiRequestGuardFilter(ApiProperties apiProperties, ApiRateLimiter rateLimiter) {
     this.apiProperties = apiProperties;
+    this.rateLimiter = rateLimiter;
   }
 
   @Override
@@ -60,7 +59,7 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
     }
 
     if (!path.equals("/api/health") && apiProperties.isRateLimitEnabled()) {
-      RateDecision decision = checkRateLimit(path, clientIp(request));
+      ApiRateLimitDecision decision = checkRateLimit(path, clientIp(request));
       if (!decision.allowed()) {
         response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(Math.max(1, decision.retryAfter().toSeconds())));
         writeError(response, HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Please try again later.");
@@ -89,28 +88,10 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
     response.setHeader("Cache-Control", "no-store");
   }
 
-  private RateDecision checkRateLimit(String path, String ip) {
-    long now = System.currentTimeMillis();
+  private ApiRateLimitDecision checkRateLimit(String path, String ip) {
     long windowMs = Math.max(1_000, apiProperties.getRateLimitWindowMs());
     int maxRequests = maxRequestsFor(path);
-    String key = rateLimitGroup(path) + ":" + ip;
-    maybeSweep(now);
-
-    AtomicReference<RateDecision> decision = new AtomicReference<>();
-    buckets.compute(key, (ignored, bucket) -> {
-      if (bucket == null || now >= bucket.resetAt()) {
-        decision.set(new RateDecision(true, Duration.ZERO));
-        return new Bucket(1, now + windowMs);
-      }
-      if (bucket.count() >= maxRequests) {
-        decision.set(new RateDecision(false, Duration.ofMillis(Math.max(0, bucket.resetAt() - now))));
-        return bucket;
-      }
-      decision.set(new RateDecision(true, Duration.ZERO));
-      return new Bucket(bucket.count() + 1, bucket.resetAt());
-    });
-
-    return decision.get();
+    return rateLimiter.check(rateLimitKey(rateLimitGroup(path), ip), maxRequests, windowMs);
   }
 
   private int maxRequestsFor(String path) {
@@ -124,20 +105,6 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
     if (path.startsWith("/api/auth/")) return "auth";
     if (path.startsWith("/api/admin/")) return "admin";
     return "api";
-  }
-
-  private void maybeSweep(long now) {
-    long windowMs = Math.max(1_000, apiProperties.getRateLimitWindowMs());
-    if (buckets.size() < MAX_TRACKED_BUCKETS && now - lastSweepAt < windowMs) return;
-    lastSweepAt = now;
-    buckets.entrySet().removeIf(entry -> now >= entry.getValue().resetAt());
-    if (buckets.size() <= MAX_TRACKED_BUCKETS) return;
-
-    int targetSize = MAX_TRACKED_BUCKETS * 9 / 10;
-    for (String key : buckets.keySet()) {
-      if (buckets.size() <= targetSize) break;
-      buckets.remove(key);
-    }
   }
 
   private String clientIp(HttpServletRequest request) {
@@ -255,6 +222,17 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
     return bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
   }
 
+  private String rateLimitKey(String group, String clientIp) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      String pepper = apiProperties.getRateLimitKeyPepper() == null ? "" : apiProperties.getRateLimitKeyPepper();
+      byte[] hash = digest.digest((pepper + ":" + group + ":" + clientIp).getBytes(StandardCharsets.UTF_8));
+      return group + ":" + HexFormat.of().formatHex(hash);
+    } catch (NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("SHA-256 is not available.", exception);
+    }
+  }
+
   private void writeError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
     response.setStatus(status.value());
     response.setContentType(APPLICATION_JSON);
@@ -268,10 +246,6 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
       default -> false;
     };
   }
-
-  private record Bucket(int count, long resetAt) {}
-
-  private record RateDecision(boolean allowed, Duration retryAfter) {}
 
   private static final class BodySizeLimitRequestWrapper extends HttpServletRequestWrapper {
     private final long maxBodyBytes;
