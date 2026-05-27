@@ -24,6 +24,9 @@ The workflows are in `.github/workflows`.
   GHCR, then deploys it to the OCI VM after every push to `master`/`main`, or
   manually through `workflow_dispatch`. It is designed for the current
   side-by-side OCI VM where another app already owns ports 80/443 through Caddy.
+- `Monitor Production`: checks the frontend, backend health, and optional
+  admin operations summary every 15 minutes. It fails the workflow and can send
+  a Telegram alert when production health is not acceptable.
 
 `vercel.json` disables direct Vercel Git auto-deploys so the GitHub Actions
 workflow is the single production deployment trigger.
@@ -59,6 +62,26 @@ OCI_CONTAINER_NETWORK
 OCI_CADDYFILE_PATH
 OCI_CADDY_CONTAINER
 ```
+
+Production monitor variables:
+
+```text
+PRODUCTION_FRONTEND_URL
+PRODUCTION_BACKEND_HEALTH_URL
+PRODUCTION_ADMIN_OPS_URL
+```
+
+Production monitor secrets:
+
+```text
+PRODUCTION_ADMIN_API_KEY
+PRODUCTION_MONITOR_TELEGRAM_BOT_TOKEN
+PRODUCTION_MONITOR_TELEGRAM_CHAT_ID
+```
+
+The Telegram monitor secrets are optional, but recommended after the Telegram
+bot token is rotated. Without them, GitHub Actions failures still show that
+production is unhealthy.
 
 `GHCR_READ_TOKEN` is optional. By default the backend workflow passes the
 ephemeral `GITHUB_TOKEN` to the OCI deploy script for pulling the image it just
@@ -170,6 +193,14 @@ Public backend health:
 
 ```bash
 curl -fsS https://wallet-api.84-235-254-97.sslip.io/api/health
+```
+
+Production monitor locally:
+
+```bash
+FRONTEND_URL=https://wallet-integration-theta.vercel.app \
+BACKEND_HEALTH_URL=https://wallet-api.84-235-254-97.sslip.io/api/health \
+./scripts/ops/check-production-health.sh
 ```
 
 Admin-only backend operations summary:

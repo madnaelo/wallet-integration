@@ -217,7 +217,8 @@ Before public launch:
   advice.
 - Verify CORS origins after the final custom domain is attached.
 - Enable the OCI PostgreSQL backup timer after confirming VM disk retention.
-- Set up uptime/error alerts for Vercel and OCI.
+- Configure production monitor secrets so GitHub Actions can send uptime/error
+  alerts to Telegram after the bot token is rotated.
 - Monitor `/api/health` and `/api/admin/ops/summary` after each deployment.
 - Run small real swaps through each provider and record the fee receipt result.
 
