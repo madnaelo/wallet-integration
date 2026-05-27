@@ -17,24 +17,26 @@ The workflows are in `.github/workflows`.
   - `npm run build`
   - `mvn clean test`
   - Docker Compose config validation
-- `Deploy Frontend - Vercel`: deploys the frontend to Vercel after frontend
-  changes land on `master`/`main`, or manually through `workflow_dispatch`.
+- `Deploy Frontend - Vercel`: validates the frontend, then triggers the Vercel
+  production deploy hook after every push to `master`/`main`, or manually through
+  `workflow_dispatch`.
 - `Deploy Backend - OCI`: builds the Spring Boot backend image, pushes it to
-  GHCR, then deploys it to the OCI VM over SSH using Podman/Docker containers.
-  It is designed for the current side-by-side OCI VM where another app already
-  owns ports 80/443 through Caddy.
+  GHCR, then deploys it to the OCI VM after every push to `master`/`main`, or
+  manually through `workflow_dispatch`. It is designed for the current
+  side-by-side OCI VM where another app already owns ports 80/443 through Caddy.
 
-Use GitHub Environments for production approvals before enabling automatic
-deploys on `master`.
+`vercel.json` disables direct Vercel Git auto-deploys so the GitHub Actions
+workflow is the single production deployment trigger.
+
+Use GitHub Environments for production approvals if production deployments need
+manual release gates later.
 
 ## Required GitHub Secrets
 
 Frontend deployment:
 
 ```text
-VERCEL_TOKEN
-VERCEL_ORG_ID
-VERCEL_PROJECT_ID
+VERCEL_DEPLOY_HOOK_URL
 ```
 
 Backend deployment:
@@ -45,7 +47,6 @@ OCI_SSH_USER
 OCI_SSH_PRIVATE_KEY
 OCI_BACKEND_ENV
 WALLET_API_DOMAIN
-GHCR_READ_TOKEN
 ```
 
 Optional backend deployment secrets:
@@ -59,9 +60,10 @@ OCI_CADDYFILE_PATH
 OCI_CADDY_CONTAINER
 ```
 
-`GHCR_READ_TOKEN` is a GitHub personal access token with `read:packages` for
-the OCI VM to pull private backend images from GHCR. If the backend package is
-public, this can be omitted.
+`GHCR_READ_TOKEN` is optional. By default the backend workflow passes the
+ephemeral `GITHUB_TOKEN` to the OCI deploy script for pulling the image it just
+published to GHCR. Add `GHCR_READ_TOKEN` only if the package permission model
+requires a separate read token.
 
 `OCI_BACKEND_ENV` is the full contents of `infra/oci-backend.env.example` with
 real production values. Do not commit the real file.
@@ -83,8 +85,8 @@ WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
 Set these in the Vercel project for Production:
 
 ```text
-NEXT_PUBLIC_BACKEND_BASE_URL=https://api.your-domain.com
-NEXT_PUBLIC_SITE_URL=https://your-domain.com
+NEXT_PUBLIC_BACKEND_BASE_URL=https://wallet-api.84-235-254-97.sslip.io
+NEXT_PUBLIC_SITE_URL=https://wallet-integration-theta.vercel.app
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
 NEXT_PUBLIC_ALLOWED_CHAIN_IDS=1,137,8453
 NEXT_PUBLIC_DISALLOW_MAINNET=false
@@ -105,7 +107,7 @@ SWAP_PROVIDERS=0x,1inch,paraswap,odos,lifi
 AFFILIATE_ADDRESS=...
 FEE_RECIPIENT_ADDRESS=...
 PLATFORM_FEE_BPS=20
-CORS_ALLOW_ORIGINS=https://your-domain.com
+CORS_ALLOW_ORIGINS=https://wallet-integration-theta.vercel.app
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=30
 QUOTE_CACHE_TTL_MS=8000
@@ -139,9 +141,7 @@ public IP before the first deploy so Caddy can issue TLS certificates.
 Frontend from a configured workstation:
 
 ```bash
-export VERCEL_TOKEN=...
-export VERCEL_ORG_ID=...
-export VERCEL_PROJECT_ID=...
+export VERCEL_DEPLOY_HOOK_URL=...
 ./scripts/deploy/deploy-vercel-frontend.sh
 ```
 

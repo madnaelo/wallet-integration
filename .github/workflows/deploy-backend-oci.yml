@@ -5,11 +5,6 @@ on:
     branches:
       - master
       - main
-    paths:
-      - ".github/workflows/deploy-backend-oci.yml"
-      - "backend/**"
-      - "infra/oci-backend.env.example"
-      - "scripts/deploy/deploy-oci-backend.sh"
   workflow_dispatch:
 
 permissions:
@@ -92,6 +87,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate deployment secrets
+        shell: bash
+        env:
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
+          WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_BACKEND_ENV WALLET_API_DOMAIN; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required GitHub secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
       - name: Configure SSH
         shell: bash
         run: |
@@ -134,7 +150,7 @@ jobs:
         env:
           BACKEND_IMAGE: ${{ needs.build.outputs.image }}
           GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN || github.token }}
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
           WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}

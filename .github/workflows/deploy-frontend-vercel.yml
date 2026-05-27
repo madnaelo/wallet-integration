@@ -5,15 +5,6 @@ on:
     branches:
       - master
       - main
-    paths:
-      - ".github/workflows/deploy-frontend-vercel.yml"
-      - "Dockerfile.frontend"
-      - "next.config.mjs"
-      - "package.json"
-      - "package-lock.json"
-      - "public/**"
-      - "src/**"
-      - "tsconfig.json"
   workflow_dispatch:
 
 permissions:
@@ -25,18 +16,31 @@ concurrency:
 
 env:
   NEXT_TELEMETRY_DISABLED: "1"
-  VERCEL_TELEMETRY_DISABLED: "1"
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ci_walletconnect_project_id
+  NEXT_PUBLIC_ALLOWED_CHAIN_IDS: "1,137,8453"
+  NEXT_PUBLIC_DISALLOW_MAINNET: "false"
+  NEXT_PUBLIC_BACKEND_BASE_URL: "http://localhost:8080"
+  NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
+  ZEROX_API_KEY: ""
+  ONEINCH_API_KEY: ""
+  PARASWAP_API_KEY: ""
+  ODOS_API_KEY: ""
+  LIFI_API_KEY: ""
+  SWAP_PROVIDERS: "0x,1inch,paraswap,odos,lifi"
+  CORS_ALLOW_ORIGINS: "http://localhost:3000"
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX: "30"
+  QUOTE_CACHE_TTL_MS: "8000"
+  QUOTE_CACHE_MAX_ENTRIES: "2000"
 
 jobs:
   deploy:
-    name: Deploy frontend
+    name: Validate and trigger frontend deploy
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment:
       name: production
-      url: ${{ steps.deploy.outputs.url }}
+      url: https://wallet-integration-theta.vercel.app
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,23 +63,18 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Pull Vercel production environment
-        run: npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Build
+        run: npm run build
 
-      - name: Build with Vercel
-        run: npx --yes vercel@latest build --prod --token "$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy prebuilt output
-        id: deploy
+      - name: Trigger Vercel production deployment
         shell: bash
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
           set -euo pipefail
-          deployment_url="$(npx --yes vercel@latest deploy --prebuilt --prod --token "$VERCEL_TOKEN")"
-          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
-          echo "Deployed frontend to $deployment_url"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          if [ -z "${VERCEL_DEPLOY_HOOK_URL:-}" ]; then
+            echo "Missing required GitHub secret: VERCEL_DEPLOY_HOOK_URL" >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --retry 3 --request POST "$VERCEL_DEPLOY_HOOK_URL" >/dev/null
+          echo "Triggered Vercel production deployment."

@@ -3,6 +3,12 @@ set -Eeuo pipefail
 
 cd "$(dirname "$0")/../.."
 
+if [ -n "${VERCEL_DEPLOY_HOOK_URL:-}" ]; then
+  curl --fail --silent --show-error --retry 3 --request POST "$VERCEL_DEPLOY_HOOK_URL" >/dev/null
+  echo "Triggered Vercel deployment through deploy hook."
+  exit 0
+fi
+
 environment="${VERCEL_ENVIRONMENT:-production}"
 prod_flag=()
 if [ "$environment" = "production" ]; then
@@ -10,7 +16,7 @@ if [ "$environment" = "production" ]; then
 fi
 
 if [ -z "${VERCEL_TOKEN:-}" ]; then
-  echo "VERCEL_TOKEN is required." >&2
+  echo "VERCEL_DEPLOY_HOOK_URL is required. Set VERCEL_TOKEN only for the optional CLI deployment path." >&2
   exit 1
 fi
 
