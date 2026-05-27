@@ -80,6 +80,7 @@ type AddressFamily = NonNullable<TokenInfo["addressFamily"]> | "evm";
 type RecipientAddressMode = "connected" | "custom";
 type RecipientAddressSource = "connected" | "pasted" | "scanned" | "wallet_import";
 type RecipientDialogMode = "paste" | "scan" | "wallet";
+type WalletApprovalAction = "signIn" | "tokenApproval" | "swap";
 type QrDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
 };
@@ -231,6 +232,10 @@ export default function Page() {
   );
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
+  const connectedWalletName = useMemo(
+    () => getWalletDisplayName(walletInfo?.name, walletProviderType),
+    [walletInfo?.name, walletProviderType]
+  );
   const connectedWalletDisplay = useMemo(
     () =>
       buildConnectedWalletDisplay({
@@ -238,9 +243,9 @@ export default function Page() {
         accountLabel: getEmbeddedAccountLabel(evmAccount.embeddedWalletInfo?.user),
         networkName: getWalletNetworkLabel(walletChainId, chain?.name),
         providerType: walletProviderType,
-        walletName: walletInfo?.name
+        walletName: connectedWalletName
       }),
-    [chain?.name, evmAccount.embeddedWalletInfo?.user, walletAddress, walletChainId, walletInfo?.name, walletProviderType]
+    [chain?.name, connectedWalletName, evmAccount.embeddedWalletInfo?.user, walletAddress, walletChainId, walletProviderType]
   );
   const [tokensByChain, setTokensByChain] = useState<Record<number, TokenInfo[]>>(() =>
     buildFallbackTokensByChain(allowedChains.map((allowedChain) => allowedChain.chainId))
@@ -1056,7 +1061,8 @@ export default function Page() {
       walletAddress,
       nonce.message,
       walletKind,
-      setHistoryNotice
+      setHistoryNotice,
+      connectedWalletName
     );
     setHistoryNotice("Signature received. Verifying wallet ownership...");
     const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, walletAddress, signature);
@@ -1631,7 +1637,7 @@ export default function Page() {
 
     if (currentAllowance >= needed) return;
 
-    setWalletRequestNotice("Open your wallet app and approve token spending for this swap.");
+    setWalletRequestNotice(buildWalletApprovalNotice(connectedWalletName, "tokenApproval"));
     const tx = await token.approve(spender, needed);
     setApprovalTxHash(tx.hash);
     setWalletRequestNotice("Approval submitted. Waiting for the network before opening the swap request.");
@@ -1699,7 +1705,7 @@ export default function Page() {
       }
 
       setSwapStatus("pending");
-      setWalletRequestNotice("Open your wallet app and sign the swap transaction.");
+      setWalletRequestNotice(buildWalletApprovalNotice(connectedWalletName, "swap"));
       const tx = await signer.sendTransaction({
         to: quote.to,
         data: quote.data,
@@ -1864,9 +1870,9 @@ export default function Page() {
   }, [slippageBps]);
 
   const historySigning = historyLoading && !backendSession;
-  const historySignWalletName = connectedWalletDisplay.primary || "your wallet";
+  const historySignWalletName = connectedWalletName || connectedWalletDisplay.primary || "your wallet";
   const historySignNotice =
-    historyNotice || `Open ${historySignWalletName} and approve the sign-in message.`;
+    historyNotice || buildWalletApprovalNotice(historySignWalletName, "signIn");
   const swapBusy = swapStatus === "pending" || swapStatus === "submitted" || Boolean(walletRequestNotice);
 
   return (
@@ -3037,6 +3043,38 @@ function sanitizeRawAmountQueryParam(value: string | null): string {
   return normalized;
 }
 
+function buildWalletApprovalNotice(walletName: string, action: WalletApprovalAction): string {
+  const walletLabel = normalizeWalletApprovalName(walletName);
+  const actionText = getWalletApprovalActionText(action);
+  const returnHint = isMetaMaskWalletName(walletLabel) ? ", then tap Back to return to The Wallet" : "";
+  const safetyHint = action === "signIn" ? " This cannot move funds." : "";
+
+  return `${actionText} in ${walletLabel}${returnHint}.${safetyHint}`;
+}
+
+function normalizeWalletApprovalName(walletName: string): string {
+  const normalized = walletName.trim();
+  if (!normalized || /^wallet(connect)?$/i.test(normalized)) return "your wallet";
+  return normalized;
+}
+
+function getWalletApprovalActionText(action: WalletApprovalAction): string {
+  switch (action) {
+    case "signIn":
+      return "Approve the sign-in message";
+    case "tokenApproval":
+      return "Approve token spending";
+    case "swap":
+      return "Sign the swap transaction";
+    default:
+      return "Approve the request";
+  }
+}
+
+function isMetaMaskWalletName(walletName: string): boolean {
+  return /metamask/i.test(walletName);
+}
+
 function buildConnectedWalletDisplay(params: {
   address: string;
   accountLabel?: string;
@@ -3413,7 +3451,8 @@ async function signMessageWithProvider(
   walletAddress: string,
   message: string,
   providerKind: "injected" | "walletconnect" | null,
-  setNotice: (message: string) => void
+  setNotice: (message: string) => void,
+  walletName: string
 ): Promise<string> {
   const hexMessage = utf8ToHex(message);
   const supportsPersonalSign = walletSessionSupportsMethod(provider, "personal_sign");
@@ -3437,9 +3476,7 @@ async function signMessageWithProvider(
   let lastError: unknown = null;
   for (const [index, attempt] of attempts.entries()) {
     try {
-      setNotice(
-        `Open your connected wallet and approve the sign-in message. This proves wallet ownership and cannot move funds.`
-      );
+      setNotice(buildWalletApprovalNotice(walletName, "signIn"));
       const signature = await requestWithTimeout(
         requestWalletSignature(provider, attempt.params, providerKind),
         providerKind === "walletconnect" ? WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS : SIGNING_ATTEMPT_TIMEOUT_MS,

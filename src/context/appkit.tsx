@@ -34,18 +34,34 @@ const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
   ...evmNetworks.slice(1),
   bitcoin
 ];
+const appUrl = typeof window === "undefined"
+  ? (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://thewallet.local")
+  : window.location.origin;
+type AppKitMetadataWithRedirect = {
+  name: string;
+  description: string;
+  url: string;
+  icons: string[];
+  redirect?: {
+    universal?: string;
+  };
+};
+const metadata: AppKitMetadataWithRedirect = {
+  name: "The Wallet",
+  description: "Your Personal Swap Aggregator",
+  url: appUrl,
+  icons: [],
+  redirect: {
+    universal: appUrl
+  }
+};
 
 createAppKit({
   adapters: [new EthersAdapter(), new BitcoinAdapter({ projectId })],
   projectId,
   networks,
   defaultNetwork: evmNetworks[0],
-  metadata: {
-    name: "The Wallet",
-    description: "Your Personal Swap Aggregator",
-    url: typeof window === "undefined" ? "https://thewallet.local" : window.location.origin,
-    icons: []
-  },
+  metadata,
   features: {
     analytics: false,
     email: false,

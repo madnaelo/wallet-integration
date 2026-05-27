@@ -252,3 +252,4 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
 - [Prompt 30](docs/prompt30_f.md): Telegram alert links that prefill the swap
   page.
 - [Prompt 31](docs/prompt31_f.md): mobile quote loading and summary reveal.
+- [Prompt 32](docs/prompt32_f.md): mobile wallet return guidance.
