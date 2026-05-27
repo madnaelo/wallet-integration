@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">The Wallet</title>
+  <desc id="desc">Your personal swap aggregator for finding better crypto swap prices.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.54" stop-color="#10243b"/>
+      <stop offset="1" stop-color="#163c45"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1">
+      <stop offset="0" stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#020617" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="64" y="58" width="1072" height="514" rx="36" fill="#f8fafc" opacity="0.05"/>
+  <rect x="96" y="90" width="1008" height="450" rx="30" fill="#f8fafc" opacity="0.07"/>
+  <g filter="url(#shadow)">
+    <rect x="116" y="128" width="292" height="156" rx="28" fill="#f8fafc"/>
+    <rect x="792" y="346" width="292" height="156" rx="28" fill="#f8fafc"/>
+    <path d="M464 236h230c38 0 69 31 69 69v0" fill="none" stroke="url(#accent)" stroke-width="24" stroke-linecap="round"/>
+    <path d="M733 270l41 35-41 35" fill="none" stroke="url(#accent)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M736 393H506c-38 0-69-31-69-69v0" fill="none" stroke="url(#accent)" stroke-width="24" stroke-linecap="round"/>
+    <path d="M467 359l-41-35 41-35" fill="none" stroke="url(#accent)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="146" y="204" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="800">ETH</text>
+  <text x="146" y="246" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="600">Best route</text>
+  <text x="822" y="422" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="800">USDT</text>
+  <text x="822" y="464" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="600">Price alert</text>
+  <text x="110" y="604" fill="#bae6fd" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700" opacity="0.85">Non-custodial swaps, favorites, alerts, and provider comparison</text>
+  <text x="104" y="96" fill="#e0f2fe" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" opacity="0.9">THE WALLET</text>
+  <text x="458" y="154" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="74" font-weight="900">The Wallet</text>
+  <text x="460" y="210" fill="#cbd5e1" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="600">Your Personal Swap Aggregator</text>
+</svg>

@@ -4,6 +4,7 @@ import "./globals.css";
 const siteUrl = getSiteUrl();
 const title = "The Wallet";
 const description = "Your Personal Swap Aggregator. Get the best price for your swaps.";
+const ogImage = "/og-image.svg";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
@@ -36,18 +37,18 @@ export const metadata: Metadata = {
     description,
     images: [
       {
-        url: "/apple-touch-icon.svg",
-        width: 180,
-        height: 180,
+        url: ogImage,
+        width: 1200,
+        height: 630,
         alt: title
       }
     ]
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title,
     description,
-    images: ["/apple-touch-icon.svg"]
+    images: [ogImage]
   },
   robots: {
     index: true,
@@ -77,9 +78,30 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: title,
+    applicationCategory: "FinanceApplication",
+    operatingSystem: "Any",
+    url: siteUrl.toString(),
+    description,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD"
+    }
+  };
+
   return (
     <html lang="en-US">
-      <body>{children}</body>
+      <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+        />
+        {children}
+      </body>
     </html>
   );
 }
