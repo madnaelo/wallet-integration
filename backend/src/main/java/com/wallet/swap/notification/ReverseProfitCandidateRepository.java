@@ -45,9 +45,13 @@ public class ReverseProfitCandidateRepository {
           p.telegram_chat_id,
           p.telegram_enabled,
           p.reverse_profit_threshold_bps,
+          p.reverse_loss_enabled,
+          p.reverse_loss_threshold_bps,
           p.cooldown_minutes,
-          email_alert.last_sent_at AS last_email_alert_at,
-          telegram_alert.last_sent_at AS last_telegram_alert_at
+          email_profit_alert.last_sent_at AS last_email_profit_alert_at,
+          email_loss_alert.last_sent_at AS last_email_loss_alert_at,
+          telegram_profit_alert.last_sent_at AS last_telegram_profit_alert_at,
+          telegram_loss_alert.last_sent_at AS last_telegram_loss_alert_at
         FROM notification_preferences p
         JOIN swap_history h ON h.wallet_address = p.wallet_address
         LEFT JOIN LATERAL (
@@ -55,15 +59,33 @@ public class ReverseProfitCandidateRepository {
           FROM reverse_profit_alerts a
           WHERE a.original_swap_history_id = h.id
             AND a.channel = 'email'
+            AND a.alert_type = 'profit'
             AND a.delivery_status = 'sent'
-        ) email_alert ON true
+        ) email_profit_alert ON true
+        LEFT JOIN LATERAL (
+          SELECT max(sent_at) AS last_sent_at
+          FROM reverse_profit_alerts a
+          WHERE a.original_swap_history_id = h.id
+            AND a.channel = 'email'
+            AND a.alert_type = 'loss'
+            AND a.delivery_status = 'sent'
+        ) email_loss_alert ON true
         LEFT JOIN LATERAL (
           SELECT max(sent_at) AS last_sent_at
           FROM reverse_profit_alerts a
           WHERE a.original_swap_history_id = h.id
             AND a.channel = 'telegram'
+            AND a.alert_type = 'profit'
             AND a.delivery_status = 'sent'
-        ) telegram_alert ON true
+        ) telegram_profit_alert ON true
+        LEFT JOIN LATERAL (
+          SELECT max(sent_at) AS last_sent_at
+          FROM reverse_profit_alerts a
+          WHERE a.original_swap_history_id = h.id
+            AND a.channel = 'telegram'
+            AND a.alert_type = 'loss'
+            AND a.delivery_status = 'sent'
+        ) telegram_loss_alert ON true
         WHERE (p.email_enabled OR p.telegram_enabled)
           AND h.status IN (%s)
           AND h.created_at >= now() - (? * interval '1 day')
@@ -88,13 +110,17 @@ public class ReverseProfitCandidateRepository {
         rs.getBigDecimal("sell_amount_raw"),
         rs.getBigDecimal("buy_amount_raw"),
         rs.getInt("reverse_profit_threshold_bps"),
+        rs.getBoolean("reverse_loss_enabled"),
+        rs.getInt("reverse_loss_threshold_bps"),
         rs.getInt("cooldown_minutes"),
         rs.getString("email_address"),
         rs.getBoolean("email_enabled"),
-        timestampToInstant(rs.getTimestamp("last_email_alert_at")),
+        timestampToInstant(rs.getTimestamp("last_email_profit_alert_at")),
+        timestampToInstant(rs.getTimestamp("last_email_loss_alert_at")),
         rs.getString("telegram_chat_id"),
         rs.getBoolean("telegram_enabled"),
-        timestampToInstant(rs.getTimestamp("last_telegram_alert_at")),
+        timestampToInstant(rs.getTimestamp("last_telegram_profit_alert_at")),
+        timestampToInstant(rs.getTimestamp("last_telegram_loss_alert_at")),
         timestampToInstant(rs.getTimestamp("created_at")));
   }
 

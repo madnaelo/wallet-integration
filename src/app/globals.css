@@ -1378,6 +1378,42 @@ body {
   padding: 11px 12px;
 }
 
+.settingsCard {
+  background: rgba(6, 12, 24, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+  padding: 11px 12px;
+}
+
+.settingsCard strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.inlineCheck {
+  align-items: center;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 8px;
+}
+
+.inlineCheck input {
+  accent-color: var(--accent);
+}
+
+.percentInputRow {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 120px) auto;
+  max-width: 170px;
+}
+
 .telegramStatus {
   color: var(--text);
   font-size: 13px;

@@ -29,6 +29,8 @@ public class NotificationPreferenceService {
             null,
             false,
             properties.getDefaultProfitThresholdBps(),
+            false,
+            properties.getDefaultLossThresholdBps(),
             properties.getDefaultCooldownMinutes()));
   }
 
@@ -38,6 +40,7 @@ public class NotificationPreferenceService {
         walletAddress,
         request,
         properties.getDefaultProfitThresholdBps(),
+        properties.getDefaultLossThresholdBps(),
         properties.getDefaultCooldownMinutes());
   }
 
@@ -49,6 +52,8 @@ public class NotificationPreferenceService {
         telegramChatId,
         true,
         current.reverseProfitThresholdBps(),
+        current.reverseLossEnabled(),
+        current.reverseLossThresholdBps(),
         current.cooldownMinutes()));
   }
 

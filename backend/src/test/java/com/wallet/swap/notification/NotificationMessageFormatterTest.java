@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairCandidate;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
+import com.wallet.swap.notification.ReverseProfitModels.ReverseAlertType;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitOpportunity;
 import java.math.BigDecimal;
@@ -25,12 +26,34 @@ class NotificationMessageFormatterTest {
         new BigDecimal("2286"),
         BigDecimal.ONE,
         new BigDecimal("1020000000000000000"),
-        200));
+        200,
+        ReverseAlertType.PROFIT));
 
     assertThat(body).contains("Open prefilled swap:");
     assertThat(body).contains(
         "https://wallet.example?chainId=1&sellToken=0xdAC17F958D2ee523a2206206994597C13D831ec7"
             + "&buyToken=ETH&sellAmountRaw=2286868739#swap");
+  }
+
+  @Test
+  void reverseLossAlertUsesLossProtectionText() {
+    NotificationMessageFormatter formatter = formatter("https://wallet.example");
+    ReverseProfitCandidate candidate = reverseCandidate();
+
+    ReverseProfitOpportunity opportunity = new ReverseProfitOpportunity(
+        candidate,
+        new BigDecimal("1"),
+        new BigDecimal("2286.868739"),
+        new BigDecimal("0.95"),
+        new BigDecimal("2400"),
+        BigDecimal.ONE,
+        new BigDecimal("950000000000000000"),
+        -500,
+        ReverseAlertType.LOSS);
+
+    assertThat(formatter.subject(opportunity)).startsWith("Loss protection alert");
+    assertThat(formatter.body(opportunity)).contains("Loss protection alert triggered.");
+    assertThat(formatter.body(opportunity)).contains("Current movement: -5%");
   }
 
   @Test
@@ -71,12 +94,16 @@ class NotificationMessageFormatterTest {
         new BigDecimal("1000000000000000000"),
         new BigDecimal("2286868739"),
         100,
+        false,
+        500,
         360,
         "user@example.com",
         false,
         null,
+        null,
         "12345",
         true,
+        null,
         null,
         null);
   }

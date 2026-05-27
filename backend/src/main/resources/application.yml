@@ -48,6 +48,7 @@ wallet:
     candidate-limit: ${NOTIFICATIONS_CANDIDATE_LIMIT:2000}
     lookback-days: ${NOTIFICATIONS_LOOKBACK_DAYS:90}
     default-profit-threshold-bps: ${NOTIFICATIONS_DEFAULT_PROFIT_THRESHOLD_BPS:100}
+    default-loss-threshold-bps: ${NOTIFICATIONS_DEFAULT_LOSS_THRESHOLD_BPS:500}
     default-cooldown-minutes: ${NOTIFICATIONS_DEFAULT_COOLDOWN_MINUTES:360}
     telegram-link-ttl-minutes: ${TELEGRAM_LINK_TTL_MINUTES:10}
     eligible-statuses: ${NOTIFICATIONS_ELIGIBLE_STATUSES:submitted,confirmed}

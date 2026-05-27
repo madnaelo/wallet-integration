@@ -29,16 +29,17 @@ public class ReverseProfitAlertRepository {
     jdbcTemplate.update(
         """
         INSERT INTO reverse_profit_alerts (
-          id, wallet_address, original_swap_history_id, channel, target,
+          id, wallet_address, original_swap_history_id, alert_type, channel, target,
           delivery_status, error_message, profit_bps,
           original_sell_amount_raw, estimated_reverse_sell_amount_raw,
           price_snapshot_json, sent_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?)
         """,
         UUID.randomUUID(),
         opportunity.candidate().walletAddress(),
         opportunity.candidate().swapHistoryId(),
+        opportunity.alertType().value(),
         channel,
         target,
         sent ? "sent" : "failed",

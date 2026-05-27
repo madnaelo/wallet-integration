@@ -10,6 +10,7 @@ public class NotificationProperties {
   private int candidateLimit = 2_000;
   private int lookbackDays = 90;
   private int defaultProfitThresholdBps = 100;
+  private int defaultLossThresholdBps = 500;
   private int defaultCooldownMinutes = 360;
   private int telegramLinkTtlMinutes = 10;
   private List<String> eligibleStatuses = List.of("submitted", "confirmed");
@@ -56,6 +57,14 @@ public class NotificationProperties {
 
   public void setDefaultProfitThresholdBps(int defaultProfitThresholdBps) {
     this.defaultProfitThresholdBps = defaultProfitThresholdBps;
+  }
+
+  public int getDefaultLossThresholdBps() {
+    return defaultLossThresholdBps;
+  }
+
+  public void setDefaultLossThresholdBps(int defaultLossThresholdBps) {
+    this.defaultLossThresholdBps = defaultLossThresholdBps;
   }
 
   public int getDefaultCooldownMinutes() {

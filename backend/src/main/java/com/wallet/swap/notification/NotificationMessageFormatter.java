@@ -23,7 +23,11 @@ public class NotificationMessageFormatter {
   }
 
   public String subject(ReverseProfitOpportunity opportunity) {
-    return "Reverse swap opportunity: %s to %s".formatted(
+    String prefix = opportunity.alertType().value().equals("loss")
+        ? "Loss protection alert"
+        : "Reverse swap opportunity";
+    return "%s: %s to %s".formatted(
+        prefix,
         opportunity.candidate().buyTokenSymbol(),
         opportunity.candidate().sellTokenSymbol());
   }
@@ -36,26 +40,28 @@ public class NotificationMessageFormatter {
 
   public String body(ReverseProfitOpportunity opportunity) {
     String swapUrl = reverseSwapUrl(opportunity);
+    boolean lossAlert = opportunity.alertType().value().equals("loss");
 
     return """
-        Reverse swap opportunity detected.
+        %s
 
         Original swap: %s %s to %s %s
         Estimated reverse now: %s %s
-        Indicative profit: +%s%%
+        Current movement: %s
 
         This estimate uses batched USD market prices to avoid excessive quote API calls. Check a live quote before swapping.
 
         Open prefilled swap:
         %s
         """.formatted(
+        lossAlert ? "Loss protection alert triggered." : "Reverse swap opportunity detected.",
         amount(opportunity.originalSellAmount()),
         opportunity.candidate().sellTokenSymbol(),
         amount(opportunity.receivedBuyAmount()),
         opportunity.candidate().buyTokenSymbol(),
         amount(opportunity.estimatedReverseSellAmount()),
         opportunity.candidate().sellTokenSymbol(),
-        percent(opportunity.profitBps()),
+        movementLabel(opportunity.profitBps()),
         swapUrl);
   }
 
@@ -188,5 +194,10 @@ public class NotificationMessageFormatter {
         .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
         .stripTrailingZeros()
         .toPlainString();
+  }
+
+  private String movementLabel(int bps) {
+    String prefix = bps > 0 ? "+" : "";
+    return "%s%s%%".formatted(prefix, percent(bps));
   }
 }

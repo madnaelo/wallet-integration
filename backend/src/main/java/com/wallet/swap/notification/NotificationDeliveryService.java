@@ -37,12 +37,12 @@ public class NotificationDeliveryService {
 
   public void deliver(ReverseProfitOpportunity opportunity) {
     if (opportunity.candidate().emailEnabled() && emailSender.isEnabled()
-        && isCooldownElapsed(opportunity.candidate().lastEmailAlertAt(), opportunity.candidate().cooldownMinutes())) {
+        && isCooldownElapsed(opportunity.lastEmailAlertAt(), opportunity.candidate().cooldownMinutes())) {
       deliverEmail(opportunity);
     }
 
     if (opportunity.candidate().telegramEnabled() && telegramSender.isEnabled()
-        && isCooldownElapsed(opportunity.candidate().lastTelegramAlertAt(), opportunity.candidate().cooldownMinutes())) {
+        && isCooldownElapsed(opportunity.lastTelegramAlertAt(), opportunity.candidate().cooldownMinutes())) {
       deliverTelegram(opportunity);
     }
   }

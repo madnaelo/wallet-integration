@@ -188,6 +188,9 @@ export default function Page() {
   const [notificationPreferenceError, setNotificationPreferenceError] = useState<string>("");
   const [notificationPreferenceNotice, setNotificationPreferenceNotice] = useState<string>("");
   const [telegramEnabledDraft, setTelegramEnabledDraft] = useState<boolean>(false);
+  const [reverseProfitThresholdPctDraft, setReverseProfitThresholdPctDraft] = useState<string>("1");
+  const [reverseLossEnabledDraft, setReverseLossEnabledDraft] = useState<boolean>(false);
+  const [reverseLossThresholdPctDraft, setReverseLossThresholdPctDraft] = useState<string>("5");
   const [telegramLink, setTelegramLink] = useState<TelegramLinkStart | null>(null);
   const [telegramLinkLoading, setTelegramLinkLoading] = useState<boolean>(false);
   const [telegramLinkChecking, setTelegramLinkChecking] = useState<boolean>(false);
@@ -1121,6 +1124,9 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     setTelegramEnabledDraft(false);
+    setReverseProfitThresholdPctDraft("1");
+    setReverseLossEnabledDraft(false);
+    setReverseLossThresholdPctDraft("5");
     setTelegramLink(null);
     setTelegramLinkLoading(false);
     setTelegramLinkChecking(false);
@@ -1183,10 +1189,13 @@ export default function Page() {
     setNotificationPreference(preference);
     setNotificationPreferenceLoaded(true);
     setTelegramEnabledDraft(preference.telegramEnabled);
+    setReverseProfitThresholdPctDraft(formatSlippageBpsAsPercent(preference.reverseProfitThresholdBps));
+    setReverseLossEnabledDraft(preference.reverseLossEnabled);
+    setReverseLossThresholdPctDraft(formatSlippageBpsAsPercent(preference.reverseLossThresholdBps));
     if (preference.telegramChatId) setTelegramLink(null);
   }
 
-  async function saveTelegramPreference() {
+  async function saveNotificationPreferenceSettings() {
     setNotificationPreferenceSaving(true);
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
@@ -1194,17 +1203,23 @@ export default function Page() {
       if (telegramEnabledDraft && !notificationPreference?.telegramChatId) {
         throw new Error("Connect Telegram before enabling Telegram alerts.");
       }
+      const profitThresholdBps = parseThresholdPctToBps(reverseProfitThresholdPctDraft);
+      if (profitThresholdBps === null) throw new Error("Enter a profit alert threshold from 0% to 1000%.");
+      const lossThresholdBps = parseThresholdPctToBps(reverseLossThresholdPctDraft);
+      if (lossThresholdBps === null) throw new Error("Enter a loss alert threshold from 0% to 1000%.");
       const session = await ensureBackendSession();
       const preference = await saveNotificationPreferences(envPublic.BACKEND_BASE_URL, session, {
         emailAddress: notificationPreference?.emailAddress ?? null,
         emailEnabled: notificationPreference?.emailEnabled ?? false,
         telegramChatId: notificationPreference?.telegramChatId ?? null,
         telegramEnabled: telegramEnabledDraft,
-        reverseProfitThresholdBps: notificationPreference?.reverseProfitThresholdBps ?? 100,
+        reverseProfitThresholdBps: profitThresholdBps,
+        reverseLossEnabled: reverseLossEnabledDraft,
+        reverseLossThresholdBps: lossThresholdBps,
         cooldownMinutes: notificationPreference?.cooldownMinutes ?? 360
       });
       applyNotificationPreference(preference);
-      setNotificationPreferenceNotice("Telegram notification preferences saved.");
+      setNotificationPreferenceNotice("Notification preferences saved.");
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
@@ -2822,7 +2837,7 @@ export default function Page() {
                 <strong>Telegram alerts</strong>
                 <span className="subtle">
                   {notificationPreference?.telegramChatId
-                    ? "Receive reverse-profit and favorite-pair alerts in Telegram."
+                    ? "Receive saved-swap and favorite-pair alerts in Telegram."
                     : "Connect the Telegram bot once, then alerts can be delivered there."}
                 </span>
               </span>
@@ -2858,6 +2873,47 @@ export default function Page() {
                 </button>
               </div>
             </div>
+
+            <div className="settingsCard">
+              <div className="label">Saved-swap profit alerts</div>
+              <strong>Notify when a saved swap can reverse in profit</strong>
+              <div className="subtle">Alert me when the estimated reverse move reaches this gain.</div>
+              <div className="percentInputRow">
+                <input
+                  className="input"
+                  inputMode="decimal"
+                  value={reverseProfitThresholdPctDraft}
+                  onChange={(event) => setReverseProfitThresholdPctDraft(event.target.value)}
+                  disabled={!walletAddress}
+                  aria-label="Reverse profit alert threshold percent"
+                />
+                <span>%</span>
+              </div>
+            </div>
+
+            <div className="settingsCard">
+              <label className="inlineCheck">
+                <input
+                  type="checkbox"
+                  checked={reverseLossEnabledDraft}
+                  onChange={(event) => setReverseLossEnabledDraft(event.target.checked)}
+                  disabled={!walletAddress}
+                />
+                <span>Loss protection alerts</span>
+              </label>
+              <div className="subtle">Notify me when a saved swap has moved against me by this amount.</div>
+              <div className="percentInputRow">
+                <input
+                  className="input"
+                  inputMode="decimal"
+                  value={reverseLossThresholdPctDraft}
+                  onChange={(event) => setReverseLossThresholdPctDraft(event.target.value)}
+                  disabled={!walletAddress || !reverseLossEnabledDraft}
+                  aria-label="Loss protection alert threshold percent"
+                />
+                <span>%</span>
+              </div>
+            </div>
           </div>
 
           {notificationPreferenceNotice ? <div className="ok" style={{ marginTop: 10 }}>{notificationPreferenceNotice}</div> : null}
@@ -2867,7 +2923,7 @@ export default function Page() {
             <button
               className="btn btnPrimary"
               type="button"
-              onClick={saveTelegramPreference}
+              onClick={saveNotificationPreferenceSettings}
               disabled={!walletAddress || notificationPreferenceSaving}
             >
               {notificationPreferenceSaving ? "Saving..." : "Save Notifications"}
@@ -3774,6 +3830,12 @@ function parseSlippageBps(choice: string, customPct: string): number | null {
 function parseSlippagePctToBps(value: string): number | null {
   const pct = Number(value.trim());
   if (!Number.isFinite(pct) || pct < 0 || pct > 10) return null;
+  return Math.round(pct * 100);
+}
+
+function parseThresholdPctToBps(value: string): number | null {
+  const pct = Number(value.trim());
+  if (!Number.isFinite(pct) || pct < 0 || pct > 1000) return null;
   return Math.round(pct * 100);
 }
 

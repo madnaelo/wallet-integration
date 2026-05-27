@@ -33,20 +33,23 @@ public class NotificationPreferenceRepository {
       String walletAddress,
       NotificationPreferenceRequest request,
       int defaultThresholdBps,
+      int defaultLossThresholdBps,
       int defaultCooldownMinutes) {
     jdbcTemplate.update(
         """
         INSERT INTO notification_preferences (
           wallet_address, email_address, email_enabled, telegram_chat_id, telegram_enabled,
-          reverse_profit_threshold_bps, cooldown_minutes
+          reverse_profit_threshold_bps, reverse_loss_enabled, reverse_loss_threshold_bps, cooldown_minutes
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (wallet_address) DO UPDATE SET
           email_address = EXCLUDED.email_address,
           email_enabled = EXCLUDED.email_enabled,
           telegram_chat_id = EXCLUDED.telegram_chat_id,
           telegram_enabled = EXCLUDED.telegram_enabled,
           reverse_profit_threshold_bps = EXCLUDED.reverse_profit_threshold_bps,
+          reverse_loss_enabled = EXCLUDED.reverse_loss_enabled,
+          reverse_loss_threshold_bps = EXCLUDED.reverse_loss_threshold_bps,
           cooldown_minutes = EXCLUDED.cooldown_minutes,
           updated_at = now()
         """,
@@ -56,6 +59,8 @@ public class NotificationPreferenceRepository {
         blankToNull(request.telegramChatId()),
         Boolean.TRUE.equals(request.telegramEnabled()),
         request.reverseProfitThresholdBps() == null ? defaultThresholdBps : request.reverseProfitThresholdBps(),
+        Boolean.TRUE.equals(request.reverseLossEnabled()),
+        request.reverseLossThresholdBps() == null ? defaultLossThresholdBps : request.reverseLossThresholdBps(),
         request.cooldownMinutes() == null ? defaultCooldownMinutes : request.cooldownMinutes());
 
     return find(walletAddress).orElseThrow();
@@ -69,6 +74,8 @@ public class NotificationPreferenceRepository {
         rs.getString("telegram_chat_id"),
         rs.getBoolean("telegram_enabled"),
         rs.getInt("reverse_profit_threshold_bps"),
+        rs.getBoolean("reverse_loss_enabled"),
+        rs.getInt("reverse_loss_threshold_bps"),
         rs.getInt("cooldown_minutes"));
   }
 

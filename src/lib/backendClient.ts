@@ -45,6 +45,8 @@ export type NotificationPreference = {
   telegramChatId?: string | null;
   telegramEnabled: boolean;
   reverseProfitThresholdBps: number;
+  reverseLossEnabled: boolean;
+  reverseLossThresholdBps: number;
   cooldownMinutes: number;
 };
 
@@ -54,6 +56,8 @@ export type SaveNotificationPreferenceRequest = {
   telegramChatId?: string | null;
   telegramEnabled?: boolean;
   reverseProfitThresholdBps?: number;
+  reverseLossEnabled?: boolean;
+  reverseLossThresholdBps?: number;
   cooldownMinutes?: number;
 };
 

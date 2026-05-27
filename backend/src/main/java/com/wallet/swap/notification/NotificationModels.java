@@ -14,6 +14,8 @@ public final class NotificationModels {
       @Size(max = 64) String telegramChatId,
       Boolean telegramEnabled,
       @Min(0) @Max(100000) Integer reverseProfitThresholdBps,
+      Boolean reverseLossEnabled,
+      @Min(0) @Max(100000) Integer reverseLossThresholdBps,
       @Min(5) @Max(10080) Integer cooldownMinutes) {}
 
   public record NotificationPreferenceResponse(
@@ -23,5 +25,7 @@ public final class NotificationModels {
       String telegramChatId,
       boolean telegramEnabled,
       int reverseProfitThresholdBps,
+      boolean reverseLossEnabled,
+      int reverseLossThresholdBps,
       int cooldownMinutes) {}
 }

@@ -34,8 +34,8 @@ Implemented:
   history.
 - Collapsed swap history panel that loads authenticated history on demand and
   stores dry-run, submitted cross-chain, or confirmed swaps.
-- Backend notification preferences, scheduled reverse-swap profit scanning, and
-  email/Telegram delivery adapters. The scanner batches market price reads
+- Backend notification preferences, scheduled reverse-swap profit/loss scanning,
+  and email/Telegram delivery adapters. The scanner batches market price reads
   before evaluating historical swaps to reduce provider pressure.
 - Wallet-owned favorite pairs with optional target-rate Telegram/email alerts
   using above/below thresholds.
@@ -168,6 +168,7 @@ Important backend variables:
 - `AUTO_SWAP_DEFAULT_ENABLED`, `ADMIN_API_KEY`
 - `NOTIFICATIONS_MONITOR_ENABLED`, `NOTIFICATIONS_MONITOR_FIXED_DELAY_MS`
 - `NOTIFICATIONS_DEFAULT_PROFIT_THRESHOLD_BPS`,
+  `NOTIFICATIONS_DEFAULT_LOSS_THRESHOLD_BPS`,
   `NOTIFICATIONS_DEFAULT_COOLDOWN_MINUTES`
 - `COINGECKO_BASE_URL`, `COINGECKO_API_KEY`, `COINGECKO_API_KEY_HEADER`
 - `EMAIL_NOTIFICATIONS_ENABLED`, `EMAIL_FROM`, `SMTP_HOST`, `SMTP_USERNAME`,
