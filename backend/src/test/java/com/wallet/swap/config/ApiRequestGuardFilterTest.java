@@ -70,6 +70,53 @@ class ApiRequestGuardFilterTest {
     assertThat(response.getStatus()).isEqualTo(HttpStatus.OK.value());
   }
 
+  @Test
+  void ignoresForwardedForFromUntrustedRemoteAddress() throws Exception {
+    ApiProperties properties = new ApiProperties();
+    properties.setAuthRateLimitMaxRequests(1);
+    properties.setRateLimitWindowMs(60_000);
+    ApiRequestGuardFilter filter = new ApiRequestGuardFilter(properties);
+
+    MockHttpServletResponse firstResponse = new MockHttpServletResponse();
+    MockHttpServletRequest firstRequest = apiRequest("POST", "/api/auth/nonce", "203.0.113.40");
+    firstRequest.addHeader("X-Forwarded-For", "198.51.100.10");
+    filter.doFilter(firstRequest, firstResponse, flaggingChain(new AtomicBoolean(false)));
+    assertThat(firstResponse.getStatus()).isEqualTo(HttpStatus.OK.value());
+
+    MockHttpServletResponse secondResponse = new MockHttpServletResponse();
+    MockHttpServletRequest secondRequest = apiRequest("POST", "/api/auth/nonce", "203.0.113.40");
+    secondRequest.addHeader("X-Forwarded-For", "198.51.100.11");
+    filter.doFilter(secondRequest, secondResponse, flaggingChain(new AtomicBoolean(false)));
+
+    assertThat(secondResponse.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+  }
+
+  @Test
+  void usesForwardedForFromTrustedPrivateProxy() throws Exception {
+    ApiProperties properties = new ApiProperties();
+    properties.setAuthRateLimitMaxRequests(1);
+    properties.setRateLimitWindowMs(60_000);
+    ApiRequestGuardFilter filter = new ApiRequestGuardFilter(properties);
+
+    MockHttpServletResponse firstResponse = new MockHttpServletResponse();
+    MockHttpServletRequest firstRequest = apiRequest("POST", "/api/auth/nonce", "10.0.0.5");
+    firstRequest.addHeader("X-Forwarded-For", "198.51.100.20");
+    filter.doFilter(firstRequest, firstResponse, flaggingChain(new AtomicBoolean(false)));
+    assertThat(firstResponse.getStatus()).isEqualTo(HttpStatus.OK.value());
+
+    MockHttpServletResponse secondResponse = new MockHttpServletResponse();
+    MockHttpServletRequest secondRequest = apiRequest("POST", "/api/auth/nonce", "10.0.0.5");
+    secondRequest.addHeader("X-Forwarded-For", "198.51.100.21");
+    filter.doFilter(secondRequest, secondResponse, flaggingChain(new AtomicBoolean(false)));
+    assertThat(secondResponse.getStatus()).isEqualTo(HttpStatus.OK.value());
+
+    MockHttpServletResponse thirdResponse = new MockHttpServletResponse();
+    MockHttpServletRequest thirdRequest = apiRequest("POST", "/api/auth/nonce", "10.0.0.5");
+    thirdRequest.addHeader("X-Forwarded-For", "198.51.100.20");
+    filter.doFilter(thirdRequest, thirdResponse, flaggingChain(new AtomicBoolean(false)));
+    assertThat(thirdResponse.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+  }
+
   private MockHttpServletRequest apiRequest(String method, String path, String remoteAddr) {
     MockHttpServletRequest request = new MockHttpServletRequest(method, path);
     request.setRemoteAddr(remoteAddr);

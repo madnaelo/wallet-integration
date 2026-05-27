@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "CORS origin not allowed." }, { status: 403 });
   }
 
-  const rl = rateLimit(ip);
+  const rl = await rateLimit(ip);
   if (!rl.allowed) {
     return withCors(
       NextResponse.json(

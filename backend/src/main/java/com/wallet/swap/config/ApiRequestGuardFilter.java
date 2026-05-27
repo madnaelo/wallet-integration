@@ -10,6 +10,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
@@ -139,13 +141,118 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
   }
 
   private String clientIp(HttpServletRequest request) {
-    String forwardedFor = request.getHeader("X-Forwarded-For");
-    if (forwardedFor != null && !forwardedFor.isBlank()) {
-      return forwardedFor.split(",", 2)[0].trim().toLowerCase(Locale.ROOT);
+    String remoteAddress = normalizeIp(request.getRemoteAddr());
+    if (apiProperties.isTrustForwardedHeaders() && isTrustedProxy(remoteAddress)) {
+      String forwardedIp = firstValidForwardedIp(request.getHeader("X-Forwarded-For"));
+      if (forwardedIp != null) return forwardedIp;
+
+      String realIp = normalizeIp(request.getHeader("X-Real-IP"));
+      if (realIp != null) return realIp;
     }
-    String realIp = request.getHeader("X-Real-IP");
-    if (realIp != null && !realIp.isBlank()) return realIp.trim().toLowerCase(Locale.ROOT);
-    return request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
+    return remoteAddress == null ? "unknown" : remoteAddress;
+  }
+
+  private String firstValidForwardedIp(String forwardedFor) {
+    if (forwardedFor == null || forwardedFor.isBlank()) return null;
+    for (String part : forwardedFor.split(",")) {
+      String ip = normalizeIp(part);
+      if (ip != null) return ip;
+    }
+    return null;
+  }
+
+  private String normalizeIp(String value) {
+    if (value == null || value.isBlank()) return null;
+    String ip = value.trim();
+    if (ip.startsWith("[") && ip.contains("]")) {
+      ip = ip.substring(1, ip.indexOf(']'));
+    }
+    int zoneIndex = ip.indexOf('%');
+    if (zoneIndex >= 0) ip = ip.substring(0, zoneIndex);
+    InetAddress address = parseIpLiteral(ip);
+    return address == null ? null : address.getHostAddress().toLowerCase(Locale.ROOT);
+  }
+
+  private boolean isTrustedProxy(String remoteAddress) {
+    InetAddress address = parseIpLiteral(remoteAddress);
+    if (address == null) return false;
+    if (matchesTrustedProxyCidr(address)) return true;
+    if (!apiProperties.isTrustPrivateProxyHeaders()) return false;
+    return address.isLoopbackAddress()
+        || address.isSiteLocalAddress()
+        || address.isLinkLocalAddress()
+        || isUniqueLocalIpv6(address);
+  }
+
+  private boolean matchesTrustedProxyCidr(InetAddress address) {
+    String cidrs = apiProperties.getTrustedProxyCidrs();
+    if (cidrs == null || cidrs.isBlank()) return false;
+    for (String rawCidr : cidrs.split(",")) {
+      if (isInCidr(address, rawCidr.trim())) return true;
+    }
+    return false;
+  }
+
+  private boolean isInCidr(InetAddress address, String cidr) {
+    if (cidr.isBlank()) return false;
+    String[] parts = cidr.split("/", 2);
+    InetAddress network = parseIpLiteral(parts[0].trim());
+    if (network == null) return false;
+
+    byte[] addressBytes = address.getAddress();
+    byte[] networkBytes = network.getAddress();
+    if (addressBytes.length != networkBytes.length) return false;
+
+    int maxPrefix = addressBytes.length * 8;
+    int prefixLength = maxPrefix;
+    if (parts.length == 2) {
+      try {
+        prefixLength = Integer.parseInt(parts[1].trim());
+      } catch (NumberFormatException exception) {
+        return false;
+      }
+    }
+    if (prefixLength < 0 || prefixLength > maxPrefix) return false;
+
+    int fullBytes = prefixLength / 8;
+    int remainingBits = prefixLength % 8;
+    for (int i = 0; i < fullBytes; i++) {
+      if (addressBytes[i] != networkBytes[i]) return false;
+    }
+    if (remainingBits == 0) return true;
+
+    int mask = (0xff << (8 - remainingBits)) & 0xff;
+    return ((addressBytes[fullBytes] & 0xff) & mask) == ((networkBytes[fullBytes] & 0xff) & mask);
+  }
+
+  private InetAddress parseIpLiteral(String ip) {
+    if (ip == null || ip.isBlank()) return null;
+    try {
+      if (isIpv4Literal(ip) || isIpv6Literal(ip)) return InetAddress.getByName(ip);
+    } catch (UnknownHostException exception) {
+      return null;
+    }
+    return null;
+  }
+
+  private boolean isIpv4Literal(String ip) {
+    String[] parts = ip.split("\\.", -1);
+    if (parts.length != 4) return false;
+    for (String part : parts) {
+      if (part.isBlank() || part.length() > 3 || !part.chars().allMatch(Character::isDigit)) return false;
+      int value = Integer.parseInt(part);
+      if (value < 0 || value > 255) return false;
+    }
+    return true;
+  }
+
+  private boolean isIpv6Literal(String ip) {
+    return ip.contains(":") && ip.matches("[0-9a-fA-F:.]+");
+  }
+
+  private boolean isUniqueLocalIpv6(InetAddress address) {
+    byte[] bytes = address.getAddress();
+    return bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
   }
 
   private void writeError(HttpServletResponse response, HttpStatus status, String message) throws IOException {

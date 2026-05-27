@@ -11,6 +11,12 @@ function optionalNumber(name: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function optionalBoolean(name: string, fallback: boolean): boolean {
+  const v = process.env[name];
+  if (!v || v.trim().length === 0) return fallback;
+  return ["1", "true", "yes", "on"].includes(v.trim().toLowerCase());
+}
+
 export const env = {
   ZEROX_API_KEY: optional("ZEROX_API_KEY", ""),
   ONEINCH_API_KEY: optional("ONEINCH_API_KEY", ""),
@@ -30,6 +36,10 @@ export const env = {
   CORS_ALLOW_ORIGINS: optional("CORS_ALLOW_ORIGINS", "http://localhost:3000"),
   RATE_LIMIT_WINDOW_MS: optionalNumber("RATE_LIMIT_WINDOW_MS", 60_000),
   RATE_LIMIT_MAX: optionalNumber("RATE_LIMIT_MAX", 30),
+  UPSTASH_REDIS_REST_URL: optional("UPSTASH_REDIS_REST_URL", ""),
+  UPSTASH_REDIS_REST_TOKEN: optional("UPSTASH_REDIS_REST_TOKEN", ""),
+  RATE_LIMIT_REDIS_PREFIX: optional("RATE_LIMIT_REDIS_PREFIX", "wallet"),
+  RATE_LIMIT_REDIS_FAIL_OPEN: optionalBoolean("RATE_LIMIT_REDIS_FAIL_OPEN", false),
   QUOTE_CACHE_TTL_MS: optionalNumber("QUOTE_CACHE_TTL_MS", 8_000),
   QUOTE_CACHE_MAX_ENTRIES: optionalNumber("QUOTE_CACHE_MAX_ENTRIES", 2_000)
 };

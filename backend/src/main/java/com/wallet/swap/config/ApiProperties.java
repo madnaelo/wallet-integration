@@ -10,6 +10,9 @@ public class ApiProperties {
   private long rateLimitWindowMs = 60_000;
   private int rateLimitMaxRequests = 120;
   private int authRateLimitMaxRequests = 20;
+  private boolean trustForwardedHeaders = true;
+  private boolean trustPrivateProxyHeaders = true;
+  private String trustedProxyCidrs = "";
 
   public String getCorsAllowedOrigins() {
     return corsAllowedOrigins;
@@ -57,5 +60,29 @@ public class ApiProperties {
 
   public void setAuthRateLimitMaxRequests(int authRateLimitMaxRequests) {
     this.authRateLimitMaxRequests = authRateLimitMaxRequests;
+  }
+
+  public boolean isTrustForwardedHeaders() {
+    return trustForwardedHeaders;
+  }
+
+  public void setTrustForwardedHeaders(boolean trustForwardedHeaders) {
+    this.trustForwardedHeaders = trustForwardedHeaders;
+  }
+
+  public boolean isTrustPrivateProxyHeaders() {
+    return trustPrivateProxyHeaders;
+  }
+
+  public void setTrustPrivateProxyHeaders(boolean trustPrivateProxyHeaders) {
+    this.trustPrivateProxyHeaders = trustPrivateProxyHeaders;
+  }
+
+  public String getTrustedProxyCidrs() {
+    return trustedProxyCidrs;
+  }
+
+  public void setTrustedProxyCidrs(String trustedProxyCidrs) {
+    this.trustedProxyCidrs = trustedProxyCidrs;
   }
 }

@@ -7,7 +7,7 @@ import { getTokensForChain } from "@/lib/server/tokenRegistry";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const rl = rateLimit(`tokens:${getClientIp(req) ?? "unknown"}`);
+  const rl = await rateLimit(`tokens:${getClientIp(req) ?? "unknown"}`);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again later." },
