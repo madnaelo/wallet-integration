@@ -257,5 +257,6 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
   target ladders, and alert delivery fixes.
 - Prompts 28-32: admin-gated Auto Swap preferences, clearer signing/approval
   guidance, Telegram deep links, and mobile quote/wallet-return UX.
-- Prompts 33-36: operations diagnostics, additional EVM networks, loss
-  protection alerts, trade risk cues, and actionable favorite-pair links.
+- Prompts 33-37: operations diagnostics, additional EVM networks, loss
+  protection alerts, trade risk cues, actionable favorite-pair links, PWA
+  installability, browser push alerts, onboarding, and mobile polish.
