@@ -94,6 +94,7 @@ type RecipientAddressMode = "connected" | "custom";
 type RecipientAddressSource = "connected" | "pasted" | "scanned" | "wallet_import";
 type RecipientDialogMode = "paste" | "scan" | "wallet";
 type WalletApprovalAction = "signIn" | "tokenApproval" | "swap";
+type WalletApprovalNoticeTarget = "history" | "preferences";
 type QrDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
 };
@@ -237,6 +238,7 @@ export default function Page() {
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [historyError, setHistoryError] = useState<string>("");
   const [historyNotice, setHistoryNotice] = useState<string>("");
+  const [preferencesAuthNotice, setPreferencesAuthNotice] = useState<string>("");
   const historyRequestInFlightRef = useRef<boolean>(false);
   const [notificationPreference, setNotificationPreference] = useState<NotificationPreference | null>(null);
   const [notificationPreferenceLoaded, setNotificationPreferenceLoaded] = useState<boolean>(false);
@@ -1172,7 +1174,7 @@ export default function Page() {
     return p;
   }
 
-  async function ensureBackendSession(): Promise<BackendSession> {
+  async function ensureBackendSession(noticeTarget: WalletApprovalNoticeTarget = "history"): Promise<BackendSession> {
     if (!walletAddress) throw new Error("Connect your wallet before saving swap history.");
 
     const stored = readStoredBackendSession();
@@ -1182,21 +1184,22 @@ export default function Page() {
     }
 
     const p = getProviderOrThrow();
-    setHistoryNotice("Open your wallet and approve the sign-in message. This only lets The Wallet save your history and preferences.");
+    const setAuthNotice = noticeTarget === "preferences" ? setPreferencesAuthNotice : setHistoryNotice;
+    setAuthNotice("Open your wallet and approve the sign-in message. This only lets The Wallet save your history and preferences.");
     const nonce = await requestAuthNonce(envPublic.BACKEND_BASE_URL, walletAddress);
     const signature = await signMessageWithProvider(
       p,
       walletAddress,
       nonce.message,
       walletKind,
-      setHistoryNotice,
+      setAuthNotice,
       connectedWalletName
     );
-    setHistoryNotice("Thanks. Loading your saved data...");
+    setAuthNotice("Thanks. Loading your saved data...");
     const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, walletAddress, signature);
     writeStoredBackendSession(session);
     setBackendSession(session);
-    setHistoryNotice("");
+    setAuthNotice("");
     return session;
   }
 
@@ -1294,7 +1297,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = await ensureBackendSession();
+      const session = await ensureBackendSession("preferences");
       const preference = await getNotificationPreferences(envPublic.BACKEND_BASE_URL, session);
       applyNotificationPreference(preference);
     } catch (e: any) {
@@ -1305,6 +1308,7 @@ export default function Page() {
       setNotificationPreferenceError(normalizeWalletError(e));
     } finally {
       setNotificationPreferenceLoading(false);
+      setPreferencesAuthNotice("");
       notificationPreferenceRequestInFlightRef.current = false;
     }
   }
@@ -1335,7 +1339,7 @@ export default function Page() {
       if (profitThresholdBps === null) throw new Error("Enter a profit alert threshold from 0% to 1000%.");
       const lossThresholdBps = parseThresholdPctToBps(reverseLossThresholdPctDraft);
       if (lossThresholdBps === null) throw new Error("Enter a loss alert threshold from 0% to 1000%.");
-      const session = await ensureBackendSession();
+      const session = await ensureBackendSession("preferences");
       const preference = await saveNotificationPreferences(envPublic.BACKEND_BASE_URL, session, {
         emailAddress: notificationPreference?.emailAddress ?? null,
         emailEnabled: notificationPreference?.emailEnabled ?? false,
@@ -1356,6 +1360,7 @@ export default function Page() {
       setNotificationPreferenceError(normalizeWalletError(e));
     } finally {
       setNotificationPreferenceSaving(false);
+      setPreferencesAuthNotice("");
     }
   }
 
@@ -1364,7 +1369,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = await ensureBackendSession();
+      const session = await ensureBackendSession("preferences");
       const link = await startTelegramLink(envPublic.BACKEND_BASE_URL, session);
       setTelegramLink(link);
       setNotificationPreferenceNotice("Telegram opened with a one-time connection code. Tap Start, then return here.");
@@ -1377,6 +1382,7 @@ export default function Page() {
       setNotificationPreferenceError(normalizeWalletError(e));
     } finally {
       setTelegramLinkLoading(false);
+      setPreferencesAuthNotice("");
     }
   }
 
@@ -1385,7 +1391,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = await ensureBackendSession();
+      const session = await ensureBackendSession("preferences");
       const preference = await completeTelegramLink(envPublic.BACKEND_BASE_URL, session);
       applyNotificationPreference(preference);
       setNotificationPreferenceNotice("Telegram connected. Alerts are enabled for this wallet.");
@@ -1397,6 +1403,7 @@ export default function Page() {
       setNotificationPreferenceError(normalizeWalletError(e));
     } finally {
       setTelegramLinkChecking(false);
+      setPreferencesAuthNotice("");
     }
   }
 
@@ -1407,15 +1414,17 @@ export default function Page() {
     try {
       const supportMessage = getPushSupportMessage();
       setPushSupportMessage(supportMessage);
-      if (supportMessage) throw new Error(supportMessage);
+      if (supportMessage && supportMessage !== "Browser alerts are blocked in this browser. You can turn them on in site settings.") {
+        throw new Error(supportMessage);
+      }
 
-      const session = await ensureBackendSession();
       const registration = await ensureServiceWorkerRegistration();
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         throw new Error("Browser alerts were not enabled. You can allow them from your browser settings.");
       }
 
+      const session = await ensureBackendSession("preferences");
       const existingSubscription = await registration.pushManager.getSubscription();
       const subscription = existingSubscription ?? await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -1436,6 +1445,7 @@ export default function Page() {
       setNotificationPreferenceError(normalizeWalletError(e));
     } finally {
       setPushPreferenceLoading(false);
+      setPreferencesAuthNotice("");
     }
   }
 
@@ -1444,7 +1454,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = await ensureBackendSession();
+      const session = await ensureBackendSession("preferences");
       if ("serviceWorker" in navigator) {
         const registration = await navigator.serviceWorker.getRegistration("/");
         const subscription = await registration?.pushManager.getSubscription();
@@ -1461,6 +1471,7 @@ export default function Page() {
       setNotificationPreferenceError(normalizeWalletError(e));
     } finally {
       setPushPreferenceLoading(false);
+      setPreferencesAuthNotice("");
     }
   }
 
@@ -2129,6 +2140,15 @@ export default function Page() {
   const historySignWalletName = connectedWalletName || connectedWalletDisplay.primary || "your wallet";
   const historySignNotice =
     historyNotice || buildWalletApprovalNotice(historySignWalletName, "signIn");
+  const preferencesBusy =
+    notificationPreferenceLoading ||
+    notificationPreferenceSaving ||
+    telegramLinkLoading ||
+    telegramLinkChecking ||
+    pushPreferenceLoading;
+  const preferencesSigning = preferencesBusy && !backendSession && Boolean(preferencesAuthNotice);
+  const preferencesSignNotice =
+    preferencesAuthNotice || buildWalletApprovalNotice(historySignWalletName, "signIn");
   const swapBusy = swapStatus === "pending" || swapStatus === "submitted" || Boolean(walletRequestNotice);
 
   return (
@@ -3056,7 +3076,7 @@ export default function Page() {
                   : "Alerts off"}
             </span>
           </div>
-        <div className="settingsContent">
+          <div className="settingsContent">
           <div className="quoteHeader">
             <div className="subtle">
               {walletAddress
@@ -3074,6 +3094,15 @@ export default function Page() {
               {notificationPreferenceLoading ? "Loading..." : notificationPreferenceLoaded ? "Refresh" : "Load Settings"}
             </button>
           </div>
+          {preferencesSigning ? (
+            <div className="walletSignNotice preferencesWalletNotice" role="status" aria-live="polite">
+              <span className="walletSignPulse" aria-hidden="true" />
+              <span className="walletSignCopy">
+                <span className="walletSignTitle">Waiting for wallet approval</span>
+                <span className="walletSignText">{preferencesSignNotice}</span>
+              </span>
+            </div>
+          ) : null}
 
           <div className="settingsGrid">
             <label className="toggleRow">
@@ -3149,7 +3178,7 @@ export default function Page() {
                     className="btn btnPrimary"
                     type="button"
                     onClick={enablePushNotifications}
-                    disabled={!walletAddress || Boolean(pushSupportMessage) || pushPreferenceLoading}
+                    disabled={!walletAddress || pushPreferenceLoading}
                   >
                     {pushPreferenceLoading ? "Enabling..." : "Enable Browser Alerts"}
                   </button>
@@ -3713,7 +3742,7 @@ function SwapTour({
           }}
         />
       ) : null}
-      <div className="tourCard" style={cardStyle}>
+      <div className="tourCard" style={cardStyle} key={currentStep}>
         <div className="tourProgress">
           Step {currentStep + 1} of {steps.length}
         </div>
@@ -3742,9 +3771,21 @@ function tourCardStyle(anchor: TourAnchor | null): CSSProperties {
 
   const margin = 14;
   const width = Math.min(360, window.innerWidth - margin * 2);
+  const estimatedHeight = 240;
+  const sideGap = 18;
+  const canFitRight = anchor.left + anchor.width + sideGap + width + margin <= window.innerWidth;
+  const canFitLeft = anchor.left - sideGap - width >= margin;
+  if (window.innerWidth >= 900 && (canFitRight || canFitLeft)) {
+    return {
+      left: canFitRight ? anchor.left + anchor.width + sideGap : anchor.left - width - sideGap,
+      top: Math.max(margin, Math.min(anchor.top, window.innerHeight - estimatedHeight - margin)),
+      width
+    };
+  }
+
   const below = anchor.top + anchor.height + 14;
-  const above = anchor.top - 230;
-  const top = below + 220 <= window.innerHeight ? below : Math.max(margin, above);
+  const above = anchor.top - estimatedHeight - 14;
+  const top = below + estimatedHeight <= window.innerHeight ? below : Math.max(margin, above);
   const left = Math.max(margin, Math.min(anchor.left, window.innerWidth - width - margin));
   return {
     left,
@@ -4209,11 +4250,11 @@ function prefersReducedMotion(): boolean {
 function getPushSupportMessage(): string {
   if (typeof window === "undefined") return "";
   if (!envPublic.VAPID_PUBLIC_KEY) return "Browser alerts are not available right now.";
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-    return "This browser does not support browser alerts.";
-  }
   if (!window.isSecureContext && window.location.hostname !== "localhost") {
     return "Browser alerts need a secure connection.";
+  }
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+    return "This browser does not support browser alerts.";
   }
   if (Notification.permission === "denied") {
     return "Browser alerts are blocked in this browser. You can turn them on in site settings.";
