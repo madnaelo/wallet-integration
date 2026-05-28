@@ -19,8 +19,21 @@
 
   <properties>
     <java.version>17</java.version>
+    <bouncycastle.version>1.84</bouncycastle.version>
+    <postgresql.version>42.7.11</postgresql.version>
+    <tomcat.version>10.1.55</tomcat.version>
     <web3j.version>4.12.3</web3j.version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
