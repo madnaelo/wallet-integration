@@ -99,8 +99,9 @@ requires a separate read token.
 
 `OCI_BACKEND_ENV` is the full contents of `infra/oci-backend.env.example` with
 real production values. Keep `API_RATE_LIMIT_KEY_PEPPER` as a long random
-secret, keep `AUTH_SESSION_COOKIE_SECURE=true` with `SameSite=None` for the
-cross-origin production frontend/backend setup, and do not commit the real file.
+secret, keep `AUTH_SESSION_COOKIE_SECURE=true` with `SameSite=None`, and keep
+`AUTH_EXPOSE_ACCESS_TOKEN=true` for the cross-origin production
+frontend/backend setup. Do not commit the real file.
 
 `OCI_SSH_KNOWN_HOSTS` must contain the OCI host key line for
 `OCI_SSH_HOST`/`OCI_SSH_PORT`. Generate it once from a trusted machine with

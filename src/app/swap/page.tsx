@@ -2177,6 +2177,11 @@ export default function Page() {
         <nav className="appNav" aria-label="Main navigation">
           <ul className="appMenu">
             <li>
+              <Link className="appMenuLink" href="/">
+                Intro
+              </Link>
+            </li>
+            <li>
               <a
                 className={`appMenuLink${activeView === "swap" ? " appMenuLinkActive" : ""}`}
                 href="/swap"
