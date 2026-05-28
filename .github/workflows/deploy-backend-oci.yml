@@ -30,7 +30,7 @@ jobs:
       image: ${{ steps.image.outputs.image }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -119,7 +119,7 @@ jobs:
       OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH || '/home/opc/wallet' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate deployment secrets
         shell: bash
