@@ -34,6 +34,10 @@ public final class NotificationModels {
       int reverseLossThresholdBps,
       int cooldownMinutes) {}
 
+  public record PushNotificationConfigResponse(
+      boolean enabled,
+      String vapidPublicKey) {}
+
   public record PushSubscriptionRequest(
       @NotBlank @Size(max = 2048) String endpoint,
       @Valid @NotNull

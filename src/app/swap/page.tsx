@@ -44,6 +44,7 @@ import {
   disablePushSubscriptions,
   getFeatureFlags,
   getNotificationPreferences,
+  getPushNotificationConfig,
   listAutoSwapRules,
   listFavoritePairs,
   listSwapHistory,
@@ -67,6 +68,8 @@ const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
 const ACTIVE_VIEWS: ActiveView[] = ["swap", "auto-swap", "favorites", "preferences"];
 const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
 const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
+const PUSH_DENIED_MESSAGE =
+  "Push notifications are blocked for this site. Open your browser site settings, allow notifications, then try again.";
 
 type DisplayToken = { address: string; symbol: string; decimals: number };
 type QuoteValidationErrors = {
@@ -249,6 +252,7 @@ export default function Page() {
   const [telegramEnabledDraft, setTelegramEnabledDraft] = useState<boolean>(false);
   const [pushEnabledDraft, setPushEnabledDraft] = useState<boolean>(false);
   const [pushPreferenceLoading, setPushPreferenceLoading] = useState<boolean>(false);
+  const [pushPublicKey, setPushPublicKey] = useState<string>(() => envPublic.VAPID_PUBLIC_KEY);
   const [pushSupportMessage, setPushSupportMessage] = useState<string>("");
   const [reverseProfitThresholdPctDraft, setReverseProfitThresholdPctDraft] = useState<string>("1");
   const [reverseLossEnabledDraft, setReverseLossEnabledDraft] = useState<boolean>(false);
@@ -507,7 +511,12 @@ export default function Page() {
         return;
       }
 
-      element.scrollIntoView({ block: "center", inline: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+      const isMobileTour = window.matchMedia("(max-width: 699px)").matches;
+      element.scrollIntoView({
+        block: isMobileTour ? "start" : "center",
+        inline: "nearest",
+        behavior: prefersReducedMotion() ? "auto" : "smooth"
+      });
       window.setTimeout(() => {
         const rect = element.getBoundingClientRect();
         setTourAnchor({
@@ -540,7 +549,26 @@ export default function Page() {
 
   useEffect(() => {
     if (activeView !== "preferences") return;
-    setPushSupportMessage(getPushSupportMessage());
+    let cancelled = false;
+
+    async function loadPushConfig() {
+      try {
+        const config = await getPushNotificationConfig(envPublic.BACKEND_BASE_URL);
+        const publicKey = config.enabled ? config.vapidPublicKey.trim() : "";
+        if (cancelled) return;
+        setPushPublicKey(publicKey);
+        setPushSupportMessage(getPushSupportMessage(publicKey));
+      } catch {
+        if (cancelled) return;
+        setPushPublicKey(envPublic.VAPID_PUBLIC_KEY);
+        setPushSupportMessage(getPushSupportMessage(envPublic.VAPID_PUBLIC_KEY));
+      }
+    }
+
+    void loadPushConfig();
+    return () => {
+      cancelled = true;
+    };
   }, [activeView]);
 
   useEffect(() => {
@@ -549,7 +577,7 @@ export default function Page() {
     if (stored && isSessionForWallet(stored, walletAddress)) {
       void refreshAutoSwapRules();
     }
-    // Load exactly when the Auto Swap view becomes active with an existing session.
+    // Load exactly when the Set Alerts view becomes active with an existing session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, autoSwapRulesLoaded, backendSession, featureFlags.autoSwapEnabled, walletAddress]);
 
@@ -1333,7 +1361,7 @@ export default function Page() {
         throw new Error("Connect Telegram before enabling Telegram alerts.");
       }
       if (pushEnabledDraft && !notificationPreference?.pushSubscriptionCount) {
-        throw new Error("Enable browser alerts on this device first.");
+        throw new Error("Enable push notifications on this device first.");
       }
       const profitThresholdBps = parseThresholdPctToBps(reverseProfitThresholdPctDraft);
       if (profitThresholdBps === null) throw new Error("Enter a profit alert threshold from 0% to 1000%.");
@@ -1407,42 +1435,53 @@ export default function Page() {
     }
   }
 
+  async function getEffectivePushPublicKey(): Promise<string> {
+    if (pushPublicKey.trim()) return pushPublicKey.trim();
+    let publicKey = envPublic.VAPID_PUBLIC_KEY;
+    try {
+      const config = await getPushNotificationConfig(envPublic.BACKEND_BASE_URL);
+      publicKey = config.enabled ? config.vapidPublicKey.trim() : "";
+    } catch {
+      publicKey = envPublic.VAPID_PUBLIC_KEY;
+    }
+    setPushPublicKey(publicKey);
+    setPushSupportMessage(getPushSupportMessage(publicKey));
+    return publicKey;
+  }
+
   async function enablePushNotifications() {
     setPushPreferenceLoading(true);
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const supportMessage = getPushSupportMessage();
+      const publicKey = await getEffectivePushPublicKey();
+      const supportMessage = getPushSupportMessage(publicKey);
       setPushSupportMessage(supportMessage);
-      if (supportMessage && supportMessage !== "Browser alerts are blocked in this browser. You can turn them on in site settings.") {
+      if (supportMessage && supportMessage !== PUSH_DENIED_MESSAGE) {
         throw new Error(supportMessage);
       }
 
       const registration = await ensureServiceWorkerRegistration();
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        throw new Error("Browser alerts were not enabled. You can allow them from your browser settings.");
+        throw new Error(PUSH_DENIED_MESSAGE);
       }
 
       const session = await ensureBackendSession("preferences");
-      const existingSubscription = await registration.pushManager.getSubscription();
-      const subscription = existingSubscription ?? await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToArrayBuffer(envPublic.VAPID_PUBLIC_KEY)
-      });
+      const subscription = await getOrCreatePushSubscription(registration, publicKey);
       const preference = await savePushSubscription(
         envPublic.BACKEND_BASE_URL,
         session,
         pushSubscriptionToPayload(subscription)
       );
       applyNotificationPreference(preference);
-      setNotificationPreferenceNotice("Browser alerts enabled on this device.");
+      setNotificationPreferenceNotice("Push notifications enabled on this device.");
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
         setBackendSession(null);
       }
-      setNotificationPreferenceError(normalizeWalletError(e));
+      setNotificationPreferenceError(normalizePushNotificationError(e));
     } finally {
       setPushPreferenceLoading(false);
       setPreferencesAuthNotice("");
@@ -1462,7 +1501,7 @@ export default function Page() {
       }
       const preference = await disablePushSubscriptions(envPublic.BACKEND_BASE_URL, session);
       applyNotificationPreference(preference);
-      setNotificationPreferenceNotice("Browser alerts disabled on this device.");
+      setNotificationPreferenceNotice("Push notifications disabled on this device.");
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
@@ -1508,7 +1547,7 @@ export default function Page() {
       const saved = await saveAutoSwapRule(envPublic.BACKEND_BASE_URL, session, request);
       setAutoSwapRules((rules) => [saved, ...rules.filter((rule) => rule.id !== saved.id)]);
       setAutoSwapRulesLoaded(true);
-      setAutoSwapRuleNotice(`${saved.sellTokenSymbol} to ${saved.buyTokenSymbol} Auto Swap saved.`);
+      setAutoSwapRuleNotice(`${saved.sellTokenSymbol} to ${saved.buyTokenSymbol} alert saved.`);
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
@@ -1528,7 +1567,7 @@ export default function Page() {
       const session = await ensureBackendSession();
       await deleteAutoSwapRule(envPublic.BACKEND_BASE_URL, session, rule.id);
       setAutoSwapRules((rules) => rules.filter((item) => item.id !== rule.id));
-      setAutoSwapRuleNotice(`${rule.sellTokenSymbol} to ${rule.buyTokenSymbol} Auto Swap removed.`);
+      setAutoSwapRuleNotice(`${rule.sellTokenSymbol} to ${rule.buyTokenSymbol} alert removed.`);
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
@@ -1541,16 +1580,16 @@ export default function Page() {
   }
 
   function buildAutoSwapRuleRequest(): SaveAutoSwapRuleRequest {
-    if (!featureFlags.autoSwapEnabled) throw new Error("Auto Swap is not available.");
-    if (!sellTokenInfo || !buyTokenInfo) throw new Error("Select a pair before saving Auto Swap.");
+    if (!featureFlags.autoSwapEnabled) throw new Error("Set Alerts is not available.");
+    if (!sellTokenInfo || !buyTokenInfo) throw new Error("Select a pair before saving an alert.");
     if (normalizeTokenKey(sellTokenInfo.address) === normalizeTokenKey(buyTokenInfo.address)) {
-      throw new Error("Choose two different tokens before saving Auto Swap.");
+      throw new Error("Choose two different tokens before saving an alert.");
     }
 
     const sellAmountRaw = parseUnitsSafe(amountHuman, sellTokenInfo.decimals);
-    if (!sellAmountRaw) throw new Error("Enter an amount before saving Auto Swap.");
+    if (!sellAmountRaw) throw new Error("Enter an amount before saving an alert.");
     const thresholdRate = normalizePositiveDecimal(autoSwapThresholdRateDraft);
-    if (!thresholdRate) throw new Error("Set a target rate before saving Auto Swap.");
+    if (!thresholdRate) throw new Error("Set a target rate before saving an alert.");
     const autoSlippageBps = parseSlippagePctToBps(autoSwapSlippagePctDraft);
     if (autoSlippageBps === null) throw new Error("Enter a slippage tolerance from 0% to 10%.");
     const recipientAddressConfig = getAddressFamilyConfig(buyTokenInfo);
@@ -2229,7 +2268,7 @@ export default function Page() {
                   aria-current={activeView === "auto-swap" ? "page" : undefined}
                   onClick={() => setActiveView("auto-swap")}
                 >
-                  Auto Swap
+                  Set Alerts
                 </a>
               </li>
             ) : null}
@@ -2713,8 +2752,8 @@ export default function Page() {
           ) : null}
         </div>
 
-        <div className="panel" ref={quoteDetailsRef} data-tour="summary">
-          <div className="quoteHeader">
+        <div className="panel" ref={quoteDetailsRef}>
+          <div className="quoteHeader" data-tour="summary">
             <div className="label">Trade Summary</div>
             {quote ? (
               <span className={isQuoteExpired ? "quoteExpired" : "quoteTimer"}>
@@ -2909,14 +2948,14 @@ export default function Page() {
         <section className="panel pagePanel autoSwapPanel" aria-labelledby="auto-swap-title">
           <div className="pageHeader">
             <div>
-              <h2 id="auto-swap-title">Auto Swap</h2>
+              <h2 id="auto-swap-title">Set Alerts</h2>
               <div className="subtle">
                 {walletAddress
-                  ? "Set target-rate rules for the pair selected on the swap page."
-                  : "Connect your wallet to create Auto Swap rules."}
+                  ? "Set target-rate alerts for the pair selected on the swap page."
+                  : "Connect your wallet to create price alerts."}
               </div>
             </div>
-            <span className="badge">{autoSwapRulesLoading ? "Loading rules" : "Auto Swap"}</span>
+            <span className="badge">{autoSwapRulesLoading ? "Loading alerts" : "Alerts"}</span>
           </div>
 
           <div className="settingsContent">
@@ -2924,10 +2963,10 @@ export default function Page() {
               <div className="subtle">
                 {sellTokenInfo && buyTokenInfo
                   ? `${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}${autoSwapCurrentAmount ? ` - ${autoSwapCurrentAmount}` : ""}`
-                  : "Select a pair in the swap form, then save an Auto Swap rule here."}
+                  : "Select a pair in the swap form, then save an alert here."}
               </div>
               <button className="btn" type="button" onClick={refreshAutoSwapRules} disabled={!walletAddress || autoSwapRulesLoading}>
-                {autoSwapRulesLoading ? "Loading..." : autoSwapRulesLoaded ? "Refresh" : "Load Rules"}
+                {autoSwapRulesLoading ? "Loading..." : autoSwapRulesLoaded ? "Refresh" : "Load Alerts"}
               </button>
             </div>
 
@@ -3001,7 +3040,7 @@ export default function Page() {
                   }}
                   disabled={!walletAddress || !sellTokenInfo || !buyTokenInfo || autoSwapRuleSaving}
                 >
-                  {autoSwapRuleSaving ? "Saving..." : "Save Auto Swap Alert"}
+                  {autoSwapRuleSaving ? "Saving..." : "Save Alert"}
                 </button>
               </div>
             </div>
@@ -3010,9 +3049,9 @@ export default function Page() {
             {autoSwapRuleError ? <div className="error" style={{ marginTop: 10 }}>{autoSwapRuleError}</div> : null}
 
             {!autoSwapRulesLoaded && autoSwapRules.length === 0 ? (
-              <div className="small">Auto Swap rules have not been loaded yet.</div>
+              <div className="small">Alerts have not been loaded yet.</div>
             ) : autoSwapRules.length === 0 ? (
-              <div className="small">No Auto Swap rules yet.</div>
+              <div className="small">No alerts yet.</div>
             ) : (
               <div className="historyTableWrap">
                 <table className="historyTable">
@@ -3154,14 +3193,14 @@ export default function Page() {
             </div>
 
             <div className="settingsCard pushSettingsCard">
-              <div className="label">Browser alerts</div>
+              <div className="label">Push notifications</div>
               <strong>Push notifications on this device</strong>
               <div className="subtle">
                 {pushSupportMessage
                   ? pushSupportMessage
                   : notificationPreference?.pushEnabled
                     ? `${notificationPreference.pushSubscriptionCount || 1} device${(notificationPreference.pushSubscriptionCount || 1) === 1 ? "" : "s"} connected.`
-                    : "Receive the same alerts from your browser or installed app."}
+                    : "Receive the same alerts as push notifications on this device."}
               </div>
               <div className="pushActions">
                 {notificationPreference?.pushEnabled ? (
@@ -3171,7 +3210,7 @@ export default function Page() {
                     onClick={disablePushNotifications}
                     disabled={!walletAddress || pushPreferenceLoading}
                   >
-                    {pushPreferenceLoading ? "Updating..." : "Disable Browser Alerts"}
+                    {pushPreferenceLoading ? "Updating..." : "Disable Push Notifications"}
                   </button>
                 ) : (
                   <button
@@ -3180,7 +3219,7 @@ export default function Page() {
                     onClick={enablePushNotifications}
                     disabled={!walletAddress || pushPreferenceLoading}
                   >
-                    {pushPreferenceLoading ? "Enabling..." : "Enable Browser Alerts"}
+                    {pushPreferenceLoading ? "Enabling..." : "Enable Push Notifications"}
                   </button>
                 )}
               </div>
@@ -3771,7 +3810,8 @@ function tourCardStyle(anchor: TourAnchor | null): CSSProperties {
 
   const margin = 14;
   const width = Math.min(360, window.innerWidth - margin * 2);
-  const estimatedHeight = 240;
+  const measuredHeight = document.querySelector<HTMLElement>(".tourCard")?.getBoundingClientRect().height;
+  const estimatedHeight = Math.ceil(measuredHeight || (window.innerWidth < 700 ? 292 : 240));
   const sideGap = 18;
   const canFitRight = anchor.left + anchor.width + sideGap + width + margin <= window.innerWidth;
   const canFitLeft = anchor.left - sideGap - width >= margin;
@@ -3783,9 +3823,18 @@ function tourCardStyle(anchor: TourAnchor | null): CSSProperties {
     };
   }
 
-  const below = anchor.top + anchor.height + 14;
-  const above = anchor.top - estimatedHeight - 14;
-  const top = below + estimatedHeight <= window.innerHeight ? below : Math.max(margin, above);
+  const gap = window.innerWidth < 700 ? 18 : 14;
+  const below = anchor.top + anchor.height + gap;
+  const above = anchor.top - estimatedHeight - gap;
+  const fitsBelow = below + estimatedHeight <= window.innerHeight - margin;
+  const fitsAbove = above >= margin;
+  const top = fitsBelow
+    ? below
+    : fitsAbove
+      ? above
+      : anchor.top > window.innerHeight / 2
+        ? margin
+        : Math.max(margin, window.innerHeight - estimatedHeight - margin);
   const left = Math.max(margin, Math.min(anchor.left, window.innerWidth - width - margin));
   return {
     left,
@@ -4247,29 +4296,65 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function getPushSupportMessage(): string {
+function getPushSupportMessage(vapidPublicKey: string): string {
   if (typeof window === "undefined") return "";
-  if (!envPublic.VAPID_PUBLIC_KEY) return "Browser alerts are not available right now.";
+  if (!vapidPublicKey.trim()) return "Push notifications are not available right now.";
   if (!window.isSecureContext && window.location.hostname !== "localhost") {
-    return "Browser alerts need a secure connection.";
+    return "Push notifications need a secure connection.";
   }
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-    return "This browser does not support browser alerts.";
+    return "This browser does not support push notifications.";
   }
   if (Notification.permission === "denied") {
-    return "Browser alerts are blocked in this browser. You can turn them on in site settings.";
+    return PUSH_DENIED_MESSAGE;
   }
   return "";
 }
 
 async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
   if (!("serviceWorker" in navigator)) {
-    throw new Error("This browser does not support browser alerts.");
+    throw new Error("This browser does not support push notifications.");
   }
   const existingRegistration = await navigator.serviceWorker.getRegistration("/");
   if (existingRegistration) return existingRegistration;
   await navigator.serviceWorker.register("/sw.js", { scope: "/" });
   return navigator.serviceWorker.ready;
+}
+
+async function getOrCreatePushSubscription(
+  registration: ServiceWorkerRegistration,
+  vapidPublicKey: string
+): Promise<PushSubscription> {
+  const applicationServerKey = urlBase64ToArrayBuffer(vapidPublicKey);
+  const existingSubscription = await registration.pushManager.getSubscription();
+  if (existingSubscription) {
+    const existingKey = existingSubscription.options.applicationServerKey;
+    if (!existingKey || arrayBufferToBase64Url(existingKey) === arrayBufferToBase64Url(applicationServerKey)) {
+      return existingSubscription;
+    }
+    await existingSubscription.unsubscribe().catch(() => false);
+  }
+
+  try {
+    return await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey
+    });
+  } catch (firstError) {
+    const staleSubscription = await registration.pushManager.getSubscription();
+    if (staleSubscription) {
+      await staleSubscription.unsubscribe().catch(() => false);
+      try {
+        return await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey
+        });
+      } catch {
+        throw firstError;
+      }
+    }
+    throw firstError;
+  }
 }
 
 function pushSubscriptionToPayload(subscription: PushSubscription): PushSubscriptionPayload {
@@ -4282,7 +4367,7 @@ function pushSubscriptionToPayload(subscription: PushSubscription): PushSubscrip
   const auth = json.keys?.auth ?? arrayBufferToBase64Url(subscription.getKey("auth"));
 
   if (!json.endpoint || !p256dh || !auth) {
-    throw new Error("Browser alert setup was incomplete. Please try again.");
+    throw new Error("Push notification setup was incomplete. Please try again.");
   }
 
   return {
@@ -4661,6 +4746,17 @@ function normalizeRecipientImportError(e: any): string {
     return "Could not complete wallet import. Try again, or paste the address.";
   }
   return message || "Could not import the wallet address.";
+}
+
+function normalizePushNotificationError(e: any): string {
+  const message = normalizeWalletError(e);
+  if (/push service|registration failed|aborterror/i.test(message)) {
+    return "Push notification setup could not reach your browser's push service. Refresh and try again, or try from Chrome, Edge, or the installed app.";
+  }
+  if (/permission|blocked|denied|not enabled/i.test(message)) return PUSH_DENIED_MESSAGE;
+  if (/not available/i.test(message)) return "Push notifications are not available right now.";
+  if (/not support/i.test(message)) return "This browser does not support push notifications.";
+  return message || "Push notifications could not be enabled. Please try again.";
 }
 
 function normalizeWalletError(e: any): string {

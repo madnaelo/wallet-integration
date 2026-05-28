@@ -44,10 +44,10 @@ public class PushNotificationSender {
   }
 
   public void send(String walletAddress, PushNotificationPayload payload) {
-    if (!isEnabled()) throw new IllegalStateException("Browser notifications are disabled.");
+    if (!isEnabled()) throw new IllegalStateException("Push notifications are disabled.");
 
     List<PushSubscriptionRecord> subscriptions = pushSubscriptionRepository.findActiveForWallet(walletAddress);
-    if (subscriptions.isEmpty()) throw new IllegalStateException("No browser notification subscription is active.");
+    if (subscriptions.isEmpty()) throw new IllegalStateException("No push notification subscription is active.");
 
     PushService pushService = buildPushService();
     String payloadJson = toJson(payload);
@@ -68,13 +68,13 @@ public class PushNotificationSender {
           failures.add("Delivery failed with status " + status);
         }
       } catch (Exception exception) {
-        log.warn("Browser notification delivery failed for wallet {}.", walletAddress, exception);
+        log.warn("Push notification delivery failed for wallet {}.", walletAddress, exception);
         failures.add(exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage());
       }
     }
 
     if (failures.size() == subscriptions.size()) {
-      throw new IllegalStateException("Browser notification could not be delivered.");
+      throw new IllegalStateException("Push notification could not be delivered.");
     }
   }
 
@@ -85,7 +85,7 @@ public class PushNotificationSender {
           properties.getPush().getVapidPrivateKey().trim(),
           properties.getPush().getVapidSubject().trim());
     } catch (Exception exception) {
-      throw new IllegalStateException("Browser notifications are not configured correctly.", exception);
+      throw new IllegalStateException("Push notifications are not configured correctly.", exception);
     }
   }
 
@@ -93,7 +93,7 @@ public class PushNotificationSender {
     try {
       return objectMapper.writeValueAsString(payload);
     } catch (JsonProcessingException exception) {
-      throw new IllegalArgumentException("Browser notification could not be prepared.", exception);
+      throw new IllegalArgumentException("Push notification could not be prepared.", exception);
     }
   }
 

@@ -58,7 +58,7 @@ export function PwaClient() {
     <div className="installPrompt" role="region" aria-label="Install The Wallet">
       <div>
         <strong>Install The Wallet</strong>
-        <span>Open faster and receive browser alerts on this device.</span>
+        <span>Open faster and receive push notifications on this device.</span>
       </div>
       <button className="installPromptAction" type="button" onClick={install}>
         Install

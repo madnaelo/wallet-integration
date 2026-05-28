@@ -1,8 +1,10 @@
 package com.wallet.swap.notification;
 
 import com.wallet.swap.auth.AuthService;
+import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
+import com.wallet.swap.notification.NotificationModels.PushNotificationConfigResponse;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
 import com.wallet.swap.notification.TelegramLinkModels.TelegramLinkStartResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,19 +22,30 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/notifications/preferences")
 public class NotificationPreferenceController {
   private final AuthService authService;
+  private final NotificationProperties notificationProperties;
   private final NotificationPreferenceService preferenceService;
   private final TelegramLinkService telegramLinkService;
   private final PushSubscriptionService pushSubscriptionService;
 
   public NotificationPreferenceController(
       AuthService authService,
+      NotificationProperties notificationProperties,
       NotificationPreferenceService preferenceService,
       TelegramLinkService telegramLinkService,
       PushSubscriptionService pushSubscriptionService) {
     this.authService = authService;
+    this.notificationProperties = notificationProperties;
     this.preferenceService = preferenceService;
     this.telegramLinkService = telegramLinkService;
     this.pushSubscriptionService = pushSubscriptionService;
+  }
+
+  @GetMapping("/push-config")
+  public PushNotificationConfigResponse pushConfig() {
+    boolean enabled = pushSubscriptionService.isAvailable();
+    return new PushNotificationConfigResponse(
+        enabled,
+        enabled ? notificationProperties.getPush().getVapidPublicKey().trim() : "");
   }
 
   @GetMapping

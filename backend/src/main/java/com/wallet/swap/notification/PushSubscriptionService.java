@@ -35,7 +35,7 @@ public class PushSubscriptionService {
       PushSubscriptionRequest request,
       String userAgent) {
     if (!isAvailable()) {
-      throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "Browser notifications are not available right now.");
+      throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "Push notifications are not available right now.");
     }
     validate(request);
     pushSubscriptionRepository.upsert(walletAddress, request, userAgent);
@@ -49,15 +49,15 @@ public class PushSubscriptionService {
 
   private void validate(PushSubscriptionRequest request) {
     if (request.keys() == null) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Browser notification setup was incomplete. Please try again.");
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Push notification setup was incomplete. Please try again.");
     }
     try {
       URI endpoint = URI.create(request.endpoint().trim());
       if (!"https".equalsIgnoreCase(endpoint.getScheme())) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "Browser notification setup was incomplete. Please try again.");
+        throw new ApiException(HttpStatus.BAD_REQUEST, "Push notification setup was incomplete. Please try again.");
       }
     } catch (IllegalArgumentException exception) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Browser notification setup was incomplete. Please try again.");
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Push notification setup was incomplete. Please try again.");
     }
   }
 

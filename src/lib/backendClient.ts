@@ -63,6 +63,11 @@ export type SaveNotificationPreferenceRequest = {
   cooldownMinutes?: number;
 };
 
+export type PushNotificationConfig = {
+  enabled: boolean;
+  vapidPublicKey: string;
+};
+
 export type TelegramLinkStart = {
   code: string;
   botUsername: string;
@@ -225,6 +230,12 @@ export async function getNotificationPreferences(
   return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences", {
     method: "GET",
     headers: authHeaders(session)
+  });
+}
+
+export async function getPushNotificationConfig(backendBaseUrl: string): Promise<PushNotificationConfig> {
+  return backendFetch<PushNotificationConfig>(backendBaseUrl, "/api/notifications/preferences/push-config", {
+    method: "GET"
   });
 }
 

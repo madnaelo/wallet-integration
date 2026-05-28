@@ -101,7 +101,9 @@ requires a separate read token.
 real production values. Keep `API_RATE_LIMIT_KEY_PEPPER` as a long random
 secret, keep `AUTH_SESSION_COOKIE_SECURE=true` with `SameSite=None`, and keep
 `AUTH_EXPOSE_ACCESS_TOKEN=true` for the cross-origin production
-frontend/backend setup. Do not commit the real file.
+frontend/backend setup. For push notifications, set
+`PUSH_NOTIFICATIONS_ENABLED=true`, `PUSH_VAPID_PUBLIC_KEY`,
+`PUSH_VAPID_PRIVATE_KEY`, and `PUSH_VAPID_SUBJECT`. Do not commit the real file.
 
 `OCI_SSH_KNOWN_HOSTS` must contain the OCI host key line for
 `OCI_SSH_HOST`/`OCI_SSH_PORT`. Generate it once from a trusted machine with
