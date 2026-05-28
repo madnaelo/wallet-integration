@@ -34,7 +34,7 @@ const safetyPoints = [
   "Connecting a wallet lets The Wallet read your public wallet address.",
   "Signing in only proves that the wallet is yours, so your history and alerts can be saved for that wallet.",
   "The Wallet never asks for your seed phrase or private key.",
-  "The Wallet cannot move funds by itself. Your wallet still shows every approval and transaction before anything is signed.",
+  "The Wallet cannot move your funds. Funds move only after you approve the transaction inside your wallet app.",
   "You can review tokens, amounts, recipient, fees, slippage, and network cost before confirming."
 ];
 
@@ -58,7 +58,8 @@ export default function IntroPage() {
           <h1 id="intro-title">The Wallet</h1>
           <p className="introLead">
             Your personal swap aggregator. Compare prices, review costs, save useful history, and receive price alerts
-            while staying in control of every wallet approval.
+            while staying in control. The Wallet cannot move funds by itself; every swap still needs your approval inside
+            your wallet app.
           </p>
           <div className="introActions">
             <Link className="btn btnPrimary introPrimaryAction" href="/swap">
@@ -74,7 +75,10 @@ export default function IntroPage() {
       <section className="introSafetyBand" aria-labelledby="safety-title">
         <div className="introSectionHeader introSafetyHeader">
           <h2 id="safety-title">Designed For Wallet Safety</h2>
-          <p>Your wallet stays in control. The Wallet helps you compare and remember, not hand over custody.</p>
+          <p>
+            Your wallet stays in control. The Wallet helps you compare and remember, but only your wallet can approve
+            movement of funds.
+          </p>
         </div>
         <ul className="introSafetyList">
           {safetyPoints.map((point) => (

@@ -121,6 +121,11 @@ type TourStep = {
 
 const SWAP_TOUR_STEPS: TourStep[] = [
   {
+    target: "wallet",
+    title: "Connect Wallet",
+    body: "Connect your wallet so The Wallet can read your public address, prepare quotes, and save history for you. This is harmless: funds cannot move until you approve a later transaction inside your wallet app."
+  },
+  {
     target: "amount",
     title: "Start with the amount",
     body: "Enter how much you want to sell. The Wallet formats the amount for the selected token."
@@ -2134,7 +2139,7 @@ export default function Page() {
             <h1 className="h1">The Wallet</h1>
             <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
           </div>
-          <div className="walletActions">
+          <div className="walletActions" data-tour="wallet">
             {walletAddress ? (
               <div className="connectedWalletShell">
                 <button
