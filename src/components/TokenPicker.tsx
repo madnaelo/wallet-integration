@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TokenInfo } from "@/lib/tokens";
 
 const MAX_VISIBLE_TOKENS = 100;
@@ -44,6 +44,7 @@ export function TokenPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [networkFilter, setNetworkFilter] = useState<string | "all">(selectedNetworkId);
+  const [panelPosition, setPanelPosition] = useState<{ left: number; top: number; width: number; maxHeight: number } | null>(null);
   const selectedToken = useMemo(() => findToken(tokens, value, selectedNetworkId), [tokens, value, selectedNetworkId]);
   const filteredTokens = useMemo(
     () => tokens.filter((token) => networkFilter === "all" || token.networkId === networkFilter),
@@ -55,6 +56,9 @@ export function TokenPicker({
   useEffect(() => {
     if (!open) return;
 
+    const updatePanelPosition = () => setPanelPosition(calculatePanelPosition(rootRef.current));
+    updatePanelPosition();
+
     const onPointerDown = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -64,11 +68,24 @@ export function TokenPicker({
 
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", updatePanelPosition);
+    window.addEventListener("scroll", updatePanelPosition, true);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", updatePanelPosition);
+      window.removeEventListener("scroll", updatePanelPosition, true);
     };
   }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelPosition(null);
+      return;
+    }
+
+    setPanelPosition(calculatePanelPosition(rootRef.current));
+  }, [open, filteredTokens.length, query]);
 
   useEffect(() => {
     if (!open) setNetworkFilter(selectedNetworkId);
@@ -96,7 +113,15 @@ export function TokenPicker({
         <span className="tokenPickerChevron" aria-hidden="true" />
       </button>
       {open ? (
-        <div className="tokenPickerPanel">
+        <div
+          className="tokenPickerPanel"
+          style={panelPosition ? {
+            left: panelPosition.left,
+            top: panelPosition.top,
+            width: panelPosition.width,
+            maxHeight: panelPosition.maxHeight
+          } : undefined}
+        >
           <div className="tokenNetworkTabs" role="group" aria-label={`${label} networks`}>
             <button
               className={`tokenNetworkTab${networkFilter === "all" ? " tokenNetworkTabActive" : ""}`}
@@ -152,6 +177,39 @@ export function TokenPicker({
       ) : null}
     </div>
   );
+}
+
+function calculatePanelPosition(root: HTMLDivElement | null) {
+  const viewportMargin = 12;
+  const gap = 8;
+  const fallbackWidth = 320;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const width = Math.max(240, Math.min(360, viewportWidth - viewportMargin * 2));
+
+  if (!root) {
+    return {
+      left: viewportMargin,
+      top: viewportMargin,
+      width: Math.max(240, Math.min(fallbackWidth, viewportWidth - viewportMargin * 2)),
+      maxHeight: viewportHeight - viewportMargin * 2
+    };
+  }
+
+  const rect = root.getBoundingClientRect();
+  const left = Math.max(
+    viewportMargin,
+    Math.min(rect.left, viewportWidth - width - viewportMargin)
+  );
+  const availableBelow = viewportHeight - rect.bottom - gap - viewportMargin;
+  const availableAbove = rect.top - gap - viewportMargin;
+  const openAbove = availableBelow < 280 && availableAbove > availableBelow;
+  const top = openAbove
+    ? Math.max(viewportMargin, rect.top - gap - Math.min(420, availableAbove))
+    : Math.min(rect.bottom + gap, viewportHeight - viewportMargin);
+  const maxHeight = Math.max(220, Math.min(420, openAbove ? availableAbove : availableBelow));
+
+  return { left, top, width, maxHeight };
 }
 
 function searchTokens(tokens: TokenPickerOption[], query: string): TokenPickerOption[] {

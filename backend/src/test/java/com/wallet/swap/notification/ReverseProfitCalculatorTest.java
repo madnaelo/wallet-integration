@@ -82,6 +82,9 @@ class ReverseProfitCalculatorTest {
         true,
         null,
         null,
+        false,
+        null,
+        null,
         Instant.now());
   }
 }

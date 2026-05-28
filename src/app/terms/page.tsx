@@ -10,7 +10,7 @@ export default function TermsPage() {
   return (
     <main className="legalPage">
       <div className="legalShell">
-        <Link className="legalBackLink" href="/">
+        <Link className="legalBackLink" href="/swap">
           Back to swap
         </Link>
         <h1>Terms</h1>

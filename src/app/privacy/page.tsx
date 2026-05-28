@@ -10,12 +10,12 @@ export default function PrivacyPage() {
   return (
     <main className="legalPage">
       <div className="legalShell">
-        <Link className="legalBackLink" href="/">
+        <Link className="legalBackLink" href="/swap">
           Back to swap
         </Link>
         <h1>Privacy</h1>
         <p>
-          The Wallet stores the minimum product data needed for wallet-owned
+          The Wallet stores the minimum product data needed for your swap
           history, favorites, alerts, and notification preferences.
         </p>
 
@@ -40,21 +40,20 @@ export default function PrivacyPage() {
         <section>
           <h2>Third Parties</h2>
           <p>
-            The app may interact with wallet connection providers, swap
-            aggregators, blockchain RPC services, price data providers,
-            Telegram, email delivery providers, hosting platforms, and monitoring
-            services. These providers can receive technical request data needed
-            to process quotes, transactions, alerts, or service health checks.
+            The app may interact with wallet connection services, swap routes,
+            blockchain services, price data services, Telegram, email delivery,
+            hosting, and monitoring tools. These services can receive basic
+            request data needed to process quotes, transactions, alerts, or
+            service health checks.
           </p>
         </section>
 
         <section>
           <h2>Security</h2>
           <p>
-            Provider keys and backend credentials are kept server-side. Public
-            wallet addresses and onchain transaction data may still be visible
-            on public block explorers because blockchain activity is public by
-            design.
+            Service credentials are kept private. Public wallet addresses and
+            onchain transaction data may still be visible on public block
+            explorers because blockchain activity is public by design.
           </p>
         </section>
       </div>

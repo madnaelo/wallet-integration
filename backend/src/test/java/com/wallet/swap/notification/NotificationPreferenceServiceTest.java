@@ -3,6 +3,7 @@ package com.wallet.swap.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -43,7 +44,7 @@ class NotificationPreferenceServiceTest {
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("Connect Telegram");
-    verify(repository, never()).upsert(any(), any(), any(), eq(true), anyInt(), anyInt(), anyInt());
+    verify(repository, never()).upsert(any(), any(), any(), eq(true), anyBoolean(), anyInt(), anyInt(), anyInt());
   }
 
   @Test
@@ -51,7 +52,7 @@ class NotificationPreferenceServiceTest {
     NotificationPreferenceRequest request = request(true);
     NotificationPreferenceResponse saved = response("12345", true);
     when(repository.find(WALLET)).thenReturn(Optional.of(response("12345", false)));
-    when(repository.upsert(eq(WALLET), eq(request), eq("12345"), eq(true), anyInt(), anyInt(), anyInt()))
+    when(repository.upsert(eq(WALLET), eq(request), eq("12345"), eq(true), eq(false), anyInt(), anyInt(), anyInt()))
         .thenReturn(saved);
 
     NotificationPreferenceResponse result = service.save(WALLET, request);
@@ -63,7 +64,7 @@ class NotificationPreferenceServiceTest {
   @Test
   void linksTelegramOnlyThroughConnectFlow() {
     when(repository.find(WALLET)).thenReturn(Optional.empty());
-    when(repository.upsert(eq(WALLET), any(), eq("77777"), eq(true), anyInt(), anyInt(), anyInt()))
+    when(repository.upsert(eq(WALLET), any(), eq("77777"), eq(true), eq(false), anyInt(), anyInt(), anyInt()))
         .thenReturn(response("77777", true));
 
     NotificationPreferenceResponse result = service.connectTelegram(WALLET, "77777");
@@ -77,6 +78,7 @@ class NotificationPreferenceServiceTest {
         null,
         false,
         telegramEnabled,
+        false,
         100,
         false,
         500,
@@ -90,6 +92,8 @@ class NotificationPreferenceServiceTest {
         false,
         telegramChatId,
         telegramEnabled,
+        false,
+        0,
         100,
         false,
         500,

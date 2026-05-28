@@ -37,12 +37,16 @@ Implemented:
 - Collapsed swap history panel that loads authenticated history on demand and
   stores dry-run, submitted cross-chain, or confirmed swaps.
 - Backend notification preferences, scheduled reverse-swap profit/loss scanning,
-  and email/Telegram delivery adapters. The scanner batches market price reads
-  before evaluating historical swaps to reduce provider pressure.
-- Wallet-owned favorite pairs with optional target-rate Telegram/email alerts
+  and email, Telegram, and browser push delivery adapters. Alert checks batch
+  market price reads before evaluating historical swaps.
+- Wallet-owned favorite pairs with optional target-rate Telegram/email/push alerts
   using above/below thresholds.
 - Page-like navigation for Swap, Favorites, and Preferences. Telegram is linked
   through the bot flow instead of asking users for a chat ID.
+- Installable PWA shell with a service worker, offline fallback, and device-level
+  browser alerts from the Preferences page.
+- Intro/trust page and first-time Swap guide that explain wallet connection,
+  sign-in, quote review, and transaction approval in user-friendly terms.
 - Favorite pairs can be added from the Swap or Favorites pages, including
   laddered target alerts for the same pair when prices are at least 1% apart.
 - Favorite pairs can be opened or reversed from the Favorites page using the
@@ -55,7 +59,7 @@ Not implemented yet:
 
 - General price alert workflows beyond favorite-pair target rates and
   reverse-swap profit/loss alerts.
-- Push or in-app notification delivery.
+- In-app notification inbox.
 - Guarded import-by-address flow and token risk signals.
 - Native BTC sell execution and cross-chain destination status tracking.
 - Signed-order submission for automatic Auto Swap execution.
@@ -87,7 +91,7 @@ High-level flow:
    PostgreSQL history is saved or read.
 6. The backend scheduler batches token USD prices, evaluates eligible historical
    swaps and favorite pairs for alert opportunities, and sends enabled
-   email/Telegram alerts after cooldown checks.
+   email/Telegram/browser alerts after cooldown checks.
 7. Auto Swap rules are hidden behind a backend feature switch. Saving a rule
    stores the exact threshold/slippage preference for later signed-order or
    confirmation-based execution without giving the backend private keys.
@@ -187,6 +191,18 @@ Important backend variables:
 - `EMAIL_NOTIFICATIONS_ENABLED`, `EMAIL_FROM`, `SMTP_HOST`, `SMTP_USERNAME`,
   `SMTP_PASSWORD`
 - `TELEGRAM_NOTIFICATIONS_ENABLED`, `TELEGRAM_BOT_TOKEN`
+- `PUSH_NOTIFICATIONS_ENABLED`, `PUSH_VAPID_PUBLIC_KEY`,
+  `PUSH_VAPID_PRIVATE_KEY`, `PUSH_VAPID_SUBJECT`
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+
+Generate VAPID keys for browser push notifications with:
+
+```powershell
+npm.cmd run generate:vapid
+```
+
+Set the same generated public key in `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and
+`PUSH_VAPID_PUBLIC_KEY`. Keep `PUSH_VAPID_PRIVATE_KEY` server-side only.
 
 Do not commit real provider keys, production database passwords, or a live fee
 recipient secret bundle. Public `NEXT_PUBLIC_*` values are shipped to the

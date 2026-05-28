@@ -114,11 +114,19 @@ public class AutoSwapRuleRepository {
           p.email_enabled,
           p.telegram_chat_id,
           p.telegram_enabled,
+          (p.push_enabled AND COALESCE(active_push.subscription_count, 0) > 0) AS push_enabled,
           p.cooldown_minutes,
           email_alert.last_sent_at AS last_email_alert_at,
-          telegram_alert.last_sent_at AS last_telegram_alert_at
+          telegram_alert.last_sent_at AS last_telegram_alert_at,
+          push_alert.last_sent_at AS last_push_alert_at
         FROM auto_swap_rules r
         JOIN notification_preferences p ON p.wallet_address = r.wallet_address
+        LEFT JOIN LATERAL (
+          SELECT count(*)::int AS subscription_count
+          FROM push_subscriptions ps
+          WHERE ps.wallet_address = p.wallet_address
+            AND ps.disabled_at IS NULL
+        ) active_push ON true
         LEFT JOIN LATERAL (
           SELECT max(sent_at) AS last_sent_at
           FROM auto_swap_alerts a
@@ -133,8 +141,15 @@ public class AutoSwapRuleRepository {
             AND a.channel = 'telegram'
             AND a.delivery_status = 'sent'
         ) telegram_alert ON true
+        LEFT JOIN LATERAL (
+          SELECT max(sent_at) AS last_sent_at
+          FROM auto_swap_alerts a
+          WHERE a.auto_swap_rule_id = r.id
+            AND a.channel = 'push'
+            AND a.delivery_status = 'sent'
+        ) push_alert ON true
         WHERE r.status = 'active'
-          AND (p.email_enabled OR p.telegram_enabled)
+          AND (p.email_enabled OR p.telegram_enabled OR (p.push_enabled AND COALESCE(active_push.subscription_count, 0) > 0))
         ORDER BY r.updated_at DESC
         LIMIT ?
         """,
@@ -215,6 +230,8 @@ public class AutoSwapRuleRepository {
         rs.getString("telegram_chat_id"),
         rs.getBoolean("telegram_enabled"),
         timestampToInstant(rs.getTimestamp("last_telegram_alert_at")),
+        rs.getBoolean("push_enabled"),
+        timestampToInstant(rs.getTimestamp("last_push_alert_at")),
         rs.getInt("cooldown_minutes"));
   }
 

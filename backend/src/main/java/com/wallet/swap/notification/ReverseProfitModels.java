@@ -52,6 +52,9 @@ public final class ReverseProfitModels {
       boolean telegramEnabled,
       Instant lastTelegramProfitAlertAt,
       Instant lastTelegramLossAlertAt,
+      boolean pushEnabled,
+      Instant lastPushProfitAlertAt,
+      Instant lastPushLossAlertAt,
       Instant createdAt) {
     public TokenRef sellToken() {
       return new TokenRef(chainId, sellTokenAddress, sellTokenSymbol, sellTokenDecimals);
@@ -82,6 +85,12 @@ public final class ReverseProfitModels {
       return alertType == ReverseAlertType.LOSS
           ? candidate.lastTelegramLossAlertAt()
           : candidate.lastTelegramProfitAlertAt();
+    }
+
+    public Instant lastPushAlertAt() {
+      return alertType == ReverseAlertType.LOSS
+          ? candidate.lastPushLossAlertAt()
+          : candidate.lastPushProfitAlertAt();
     }
   }
 }

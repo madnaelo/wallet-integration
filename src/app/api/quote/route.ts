@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
 
   if (!/^\d+$/.test(sellAmount)) {
     return withCors(
-      NextResponse.json({ error: "sellAmount must be a positive integer string (base units)." }, { status: 400 }),
+      NextResponse.json({ error: "Enter a valid amount." }, { status: 400 }),
       corsOrigin
     );
   }

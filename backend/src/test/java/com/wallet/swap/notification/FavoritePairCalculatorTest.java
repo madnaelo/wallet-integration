@@ -59,6 +59,8 @@ class FavoritePairCalculatorTest {
         "12345",
         true,
         null,
+        false,
+        null,
         360);
   }
 }

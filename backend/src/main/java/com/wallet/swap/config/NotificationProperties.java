@@ -22,6 +22,7 @@ public class NotificationProperties {
   private Price price = new Price();
   private Email email = new Email();
   private Telegram telegram = new Telegram();
+  private Push push = new Push();
 
   public boolean isMonitorEnabled() {
     return monitorEnabled;
@@ -159,6 +160,14 @@ public class NotificationProperties {
     this.telegram = telegram;
   }
 
+  public Push getPush() {
+    return push;
+  }
+
+  public void setPush(Push push) {
+    this.push = push;
+  }
+
   public static class Price {
     private String coingeckoBaseUrl = "https://api.coingecko.com/api/v3";
     private String coingeckoApiKey = "";
@@ -264,6 +273,45 @@ public class NotificationProperties {
 
     public void setBaseUrl(String baseUrl) {
       this.baseUrl = baseUrl;
+    }
+  }
+
+  public static class Push {
+    private boolean enabled = false;
+    private String vapidPublicKey = "";
+    private String vapidPrivateKey = "";
+    private String vapidSubject = "mailto:alerts@thewallet.app";
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public String getVapidPublicKey() {
+      return vapidPublicKey;
+    }
+
+    public void setVapidPublicKey(String vapidPublicKey) {
+      this.vapidPublicKey = vapidPublicKey;
+    }
+
+    public String getVapidPrivateKey() {
+      return vapidPrivateKey;
+    }
+
+    public void setVapidPrivateKey(String vapidPrivateKey) {
+      this.vapidPrivateKey = vapidPrivateKey;
+    }
+
+    public String getVapidSubject() {
+      return vapidSubject;
+    }
+
+    public void setVapidSubject(String vapidSubject) {
+      this.vapidSubject = vapidSubject;
     }
   }
 }

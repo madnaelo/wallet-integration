@@ -44,6 +44,8 @@ export type NotificationPreference = {
   emailEnabled: boolean;
   telegramChatId?: string | null;
   telegramEnabled: boolean;
+  pushEnabled: boolean;
+  pushSubscriptionCount: number;
   reverseProfitThresholdBps: number;
   reverseLossEnabled: boolean;
   reverseLossThresholdBps: number;
@@ -54,6 +56,7 @@ export type SaveNotificationPreferenceRequest = {
   emailAddress?: string | null;
   emailEnabled?: boolean;
   telegramEnabled?: boolean;
+  pushEnabled?: boolean;
   reverseProfitThresholdBps?: number;
   reverseLossEnabled?: boolean;
   reverseLossThresholdBps?: number;
@@ -65,6 +68,15 @@ export type TelegramLinkStart = {
   botUsername: string;
   deepLink: string;
   expiresAt: string;
+};
+
+export type PushSubscriptionPayload = {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  expirationTime?: number | null;
 };
 
 export type FeatureFlags = {
@@ -248,6 +260,28 @@ export async function completeTelegramLink(
   });
 }
 
+export async function savePushSubscription(
+  backendBaseUrl: string,
+  session: BackendSession,
+  subscription: PushSubscriptionPayload
+): Promise<NotificationPreference> {
+  return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences/push-subscriptions", {
+    method: "POST",
+    headers: authHeaders(session),
+    body: JSON.stringify(subscription)
+  });
+}
+
+export async function disablePushSubscriptions(
+  backendBaseUrl: string,
+  session: BackendSession
+): Promise<NotificationPreference> {
+  return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences/push-subscriptions", {
+    method: "DELETE",
+    headers: authHeaders(session)
+  });
+}
+
 export async function listFavoritePairs(
   backendBaseUrl: string,
   session: BackendSession
@@ -325,7 +359,7 @@ async function backendFetch<T>(backendBaseUrl: string, path: string, init: Reque
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message = body?.error ?? body?.message ?? `Backend request failed with status ${res.status}`;
+    const message = body?.error ?? body?.message ?? `The request could not be completed. Please try again. (${res.status})`;
     throw new BackendClientError(message, res.status, body);
   }
   return body as T;

@@ -10,7 +10,7 @@ export default function FeesPage() {
   return (
     <main className="legalPage">
       <div className="legalShell">
-        <Link className="legalBackLink" href="/">
+        <Link className="legalBackLink" href="/swap">
           Back to swap
         </Link>
         <h1>Fees & Risks</h1>

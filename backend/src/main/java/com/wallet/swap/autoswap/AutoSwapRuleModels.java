@@ -77,6 +77,8 @@ public final class AutoSwapRuleModels {
       String telegramChatId,
       boolean telegramEnabled,
       Instant lastTelegramAlertAt,
+      boolean pushEnabled,
+      Instant lastPushAlertAt,
       int cooldownMinutes) {
     public TokenRef sellToken() {
       return new TokenRef(chainId, sellTokenAddress, sellTokenSymbol, sellTokenDecimals);

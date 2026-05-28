@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "generate:vapid": "node scripts/generate-vapid-keys.mjs"
   },
   "dependencies": {
     "@base-org/account": "^2.5.6",

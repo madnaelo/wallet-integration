@@ -31,10 +31,10 @@ class NotificationMessageFormatterTest {
         200,
         ReverseAlertType.PROFIT));
 
-    assertThat(body).contains("Open prefilled swap:");
+    assertThat(body).contains("Review this swap:");
     assertThat(body).contains(
-        "https://wallet.example?chainId=1&sellToken=0xdAC17F958D2ee523a2206206994597C13D831ec7"
-            + "&buyToken=ETH&sellAmountRaw=2286868739#swap");
+        "https://wallet.example/swap?chainId=1&sellToken=0xdAC17F958D2ee523a2206206994597C13D831ec7"
+            + "&buyToken=ETH&sellAmountRaw=2286868739");
   }
 
   @Test
@@ -54,8 +54,8 @@ class NotificationMessageFormatterTest {
         ReverseAlertType.LOSS);
 
     assertThat(formatter.subject(opportunity)).startsWith("Loss protection alert");
-    assertThat(formatter.body(opportunity)).contains("Loss protection alert triggered.");
-    assertThat(formatter.body(opportunity)).contains("Current movement: -5%");
+    assertThat(formatter.body(opportunity)).contains("Loss protection alert");
+    assertThat(formatter.body(opportunity)).contains("Price movement: -5%");
   }
 
   @Test
@@ -69,11 +69,29 @@ class NotificationMessageFormatterTest {
         new BigDecimal("2501"),
         BigDecimal.ONE));
 
-    assertThat(body).contains("Open prefilled swap:");
+    assertThat(body).contains("Review this swap:");
     assertThat(body).contains(
-        "https://wallet.example?chainId=1&sellToken=ETH"
-            + "&buyToken=0xdAC17F958D2ee523a2206206994597C13D831ec7#swap");
+        "https://wallet.example/swap?chainId=1&sellToken=ETH"
+            + "&buyToken=0xdAC17F958D2ee523a2206206994597C13D831ec7");
     assertThat(body).doesNotContain("sellAmountRaw=");
+  }
+
+  @Test
+  void pushPayloadUsesPrefilledSwapLink() {
+    NotificationMessageFormatter formatter = formatter("https://wallet.example");
+    FavoritePairCandidate candidate = favoriteCandidate();
+
+    NotificationMessageFormatter.PushNotificationPayload payload = formatter.pushPayload(new FavoritePairOpportunity(
+        candidate,
+        new BigDecimal("2501"),
+        new BigDecimal("2501"),
+        BigDecimal.ONE));
+
+    assertThat(payload.title()).contains("Favorite pair alert");
+    assertThat(payload.body()).contains("reached your target");
+    assertThat(payload.url()).isEqualTo(
+        "https://wallet.example/swap?chainId=1&sellToken=ETH"
+            + "&buyToken=0xdAC17F958D2ee523a2206206994597C13D831ec7");
   }
 
   @Test
@@ -87,10 +105,10 @@ class NotificationMessageFormatterTest {
         new BigDecimal("2501"),
         BigDecimal.ONE));
 
-    assertThat(body).contains("Wallet cannot sign transactions for you");
+    assertThat(body).contains("The Wallet cannot move funds on its own");
     assertThat(body).contains(
-        "https://wallet.example?chainId=1&sellToken=ETH"
-            + "&buyToken=0xdAC17F958D2ee523a2206206994597C13D831ec7&sellAmountRaw=1000000000000000000#swap");
+        "https://wallet.example/swap?chainId=1&sellToken=ETH"
+            + "&buyToken=0xdAC17F958D2ee523a2206206994597C13D831ec7&sellAmountRaw=1000000000000000000");
   }
 
   private NotificationMessageFormatter formatter(String appUrl) {
@@ -124,6 +142,9 @@ class NotificationMessageFormatterTest {
         true,
         null,
         null,
+        false,
+        null,
+        null,
         null);
   }
 
@@ -145,6 +166,8 @@ class NotificationMessageFormatterTest {
         null,
         "12345",
         true,
+        null,
+        false,
         null,
         360);
   }
@@ -172,6 +195,8 @@ class NotificationMessageFormatterTest {
         null,
         "12345",
         true,
+        null,
+        false,
         null,
         360);
   }

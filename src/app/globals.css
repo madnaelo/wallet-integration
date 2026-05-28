@@ -80,16 +80,25 @@ body {
 }
 
 .appMenuLink {
+  appearance: none;
+  background: transparent;
+  border: 0;
   color: var(--text);
+  cursor: pointer;
   display: inline-flex;
   font-size: 13px;
   font-weight: 700;
+  font-family: inherit;
   opacity: 0.72;
   padding: 9px 0 10px;
   position: relative;
   text-decoration: none;
   transition: color 160ms ease, opacity 160ms ease;
   white-space: nowrap;
+}
+
+.appMenuButton {
+  line-height: inherit;
 }
 
 .appMenuLink::after {
@@ -220,6 +229,270 @@ body {
   margin: 0 0 12px;
 }
 
+.introPage {
+  margin: 0 auto;
+  max-width: 1220px;
+  padding: 20px 18px 70px;
+}
+
+.introHero {
+  align-items: center;
+  border-radius: 0;
+  display: grid;
+  min-height: clamp(520px, 68svh, 720px);
+  overflow: hidden;
+  position: relative;
+}
+
+.introHeroCopy {
+  align-content: center;
+  display: grid;
+  gap: 18px;
+  max-width: 720px;
+  padding: 64px 0;
+  position: relative;
+  z-index: 2;
+}
+
+.introHeroMedia {
+  inset: 0;
+  margin-left: auto;
+  max-width: 860px;
+  opacity: 0.78;
+  position: absolute;
+  width: 78%;
+}
+
+.introHeroImage {
+  object-fit: cover;
+  object-position: center;
+}
+
+.introHeroShade {
+  background:
+    linear-gradient(90deg, rgba(7, 12, 22, 0.98) 0%, rgba(7, 12, 22, 0.82) 42%, rgba(7, 12, 22, 0.10) 100%),
+    linear-gradient(0deg, rgba(7, 12, 22, 0.74), rgba(7, 12, 22, 0.02) 48%, rgba(7, 12, 22, 0.72));
+  inset: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.introEyebrow {
+  color: #8bd5ff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.introHero h1 {
+  font-size: clamp(42px, 7vw, 76px);
+  line-height: 0.95;
+  margin: 0;
+}
+
+.introLead {
+  color: #c7d3ea;
+  font-size: 18px;
+  line-height: 1.55;
+  margin: 0;
+  max-width: 680px;
+}
+
+.introActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.installPrompt {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(420px, calc(100vw - 28px));
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(16, 24, 39, 0.94);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  color: #f8fafc;
+  backdrop-filter: blur(14px);
+}
+
+.installPrompt strong,
+.installPrompt span {
+  display: block;
+}
+
+.installPrompt span {
+  margin-top: 2px;
+  color: rgba(248, 250, 252, 0.78);
+  font-size: 0.84rem;
+}
+
+.installPromptAction,
+.installPromptClose {
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 800;
+}
+
+.installPromptAction {
+  margin-left: auto;
+  padding: 9px 12px;
+  background: #f8fafc;
+  color: #101827;
+}
+
+.installPromptClose {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+}
+
+.introPrimaryAction,
+.introSecondaryAction {
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.introFeature,
+.introComingSoon {
+  background: rgba(18, 26, 42, 0.84);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+}
+
+.introSafetyBand {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 16px;
+  padding: 28px 0 6px;
+}
+
+.introSafetyHeader {
+  margin-bottom: 0;
+}
+
+.introSafetyHeader h2 {
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+
+.introSafetyList {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.introSafetyList li {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  padding-left: 20px;
+  position: relative;
+}
+
+.introSafetyList li::before {
+  background: var(--ok);
+  border-radius: 999px;
+  content: "";
+  height: 8px;
+  left: 0;
+  position: absolute;
+  top: 7px;
+  width: 8px;
+}
+
+.introSection {
+  margin-top: 24px;
+}
+
+.introSectionHeader {
+  margin-bottom: 14px;
+}
+
+.introSection h2 {
+  font-size: 24px;
+  margin: 0 0 8px;
+}
+
+.introSectionHeader p,
+.introComingSoon p,
+.introFeature p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.introFeatureGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.introFeature {
+  padding: 16px;
+}
+
+.introFeature h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.introComingSoon {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.introComingSoon h2 {
+  margin-top: 0;
+}
+
+.introComingSoon a {
+  justify-self: start;
+  text-decoration: none;
+}
+
+@media (min-width: 760px) {
+  .introSafetyBand {
+    grid-template-columns: minmax(240px, 0.6fr) minmax(0, 1fr);
+  }
+
+  .introSafetyList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .introFeatureGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .introComingSoon {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .introComingSoon a {
+    justify-self: end;
+  }
+}
+
 .grid > .panel:first-child {
   position: relative;
   z-index: 3;
@@ -324,12 +597,12 @@ body {
   border: 1px solid rgba(110, 168, 254, 0.32);
   border-radius: 10px;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
-  left: 0;
-  min-width: min(360px, calc(100vw - 36px));
+  max-width: calc(100vw - 24px);
+  min-width: 240px;
+  overflow: hidden;
   padding: 10px;
-  position: absolute;
-  top: calc(100% + 8px);
-  z-index: 21;
+  position: fixed;
+  z-index: 70;
 }
 
 .tokenSearch {
@@ -366,7 +639,7 @@ body {
 }
 
 .tokenPickerList {
-  max-height: min(360px, 45vh);
+  max-height: min(320px, 46vh);
   overflow-y: auto;
 }
 
@@ -917,6 +1190,12 @@ body {
 }
 
 @media (max-width: 640px) {
+  .installPrompt {
+    right: 14px;
+    bottom: 14px;
+    align-items: flex-start;
+  }
+
   .subtle {
     font-size: 12px;
   }
@@ -1348,6 +1627,88 @@ body {
   padding: 9px 11px;
 }
 
+.tourLayer {
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 120;
+}
+
+.tourBackdrop {
+  background: rgba(3, 7, 18, 0.58);
+  border: 0;
+  cursor: pointer;
+  inset: 0;
+  pointer-events: auto;
+  position: absolute;
+}
+
+.tourSpotlight {
+  border: 2px solid rgba(110, 168, 254, 0.92);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(3, 7, 18, 0.38), 0 14px 44px rgba(0, 0, 0, 0.34);
+  pointer-events: none;
+  position: fixed;
+  transition: left 180ms ease, top 180ms ease, width 180ms ease, height 180ms ease;
+}
+
+.tourCard {
+  animation: favoritePopoverIn 180ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  background: rgba(12, 19, 32, 0.98);
+  border: 1px solid rgba(207, 224, 255, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.44);
+  display: grid;
+  gap: 10px;
+  left: 14px;
+  max-width: calc(100vw - 28px);
+  padding: 16px;
+  pointer-events: auto;
+  position: fixed;
+  top: auto;
+  bottom: 14px;
+  width: min(360px, calc(100vw - 28px));
+}
+
+.tourProgress {
+  color: #8bd5ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tourCard h2 {
+  font-size: 17px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.tourCard p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.tourActions,
+.tourActionGroup {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.tourActions {
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tourCard,
+  .tourSpotlight {
+    animation: none;
+    transition: none;
+  }
+}
+
 .walletSignPulse {
   background: var(--accent);
   border-radius: 999px;
@@ -1469,6 +1830,17 @@ body {
 .settingsCard strong {
   color: var(--text);
   font-size: 13px;
+}
+
+.pushSettingsCard {
+  align-content: start;
+}
+
+.pushActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .inlineCheck {

@@ -19,9 +19,16 @@ public class NotificationPreferenceRepository {
   public Optional<NotificationPreferenceResponse> find(String walletAddress) {
     return jdbcTemplate.query(
             """
-            SELECT *
-            FROM notification_preferences
-            WHERE wallet_address = ?
+            SELECT p.*,
+              COALESCE(active_push.subscription_count, 0) AS push_subscription_count
+            FROM notification_preferences p
+            LEFT JOIN LATERAL (
+              SELECT count(*)::int AS subscription_count
+              FROM push_subscriptions ps
+              WHERE ps.wallet_address = p.wallet_address
+                AND ps.disabled_at IS NULL
+            ) active_push ON true
+            WHERE p.wallet_address = ?
             """,
             (rs, rowNum) -> mapRow(rs),
             walletAddress)
@@ -34,6 +41,7 @@ public class NotificationPreferenceRepository {
       NotificationPreferenceRequest request,
       String telegramChatId,
       boolean telegramEnabled,
+      boolean pushEnabled,
       int defaultThresholdBps,
       int defaultLossThresholdBps,
       int defaultCooldownMinutes) {
@@ -41,14 +49,15 @@ public class NotificationPreferenceRepository {
         """
         INSERT INTO notification_preferences (
           wallet_address, email_address, email_enabled, telegram_chat_id, telegram_enabled,
-          reverse_profit_threshold_bps, reverse_loss_enabled, reverse_loss_threshold_bps, cooldown_minutes
+          push_enabled, reverse_profit_threshold_bps, reverse_loss_enabled, reverse_loss_threshold_bps, cooldown_minutes
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (wallet_address) DO UPDATE SET
           email_address = EXCLUDED.email_address,
           email_enabled = EXCLUDED.email_enabled,
           telegram_chat_id = EXCLUDED.telegram_chat_id,
           telegram_enabled = EXCLUDED.telegram_enabled,
+          push_enabled = EXCLUDED.push_enabled,
           reverse_profit_threshold_bps = EXCLUDED.reverse_profit_threshold_bps,
           reverse_loss_enabled = EXCLUDED.reverse_loss_enabled,
           reverse_loss_threshold_bps = EXCLUDED.reverse_loss_threshold_bps,
@@ -60,11 +69,37 @@ public class NotificationPreferenceRepository {
         Boolean.TRUE.equals(request.emailEnabled()),
         blankToNull(telegramChatId),
         telegramEnabled,
+        pushEnabled,
         request.reverseProfitThresholdBps() == null ? defaultThresholdBps : request.reverseProfitThresholdBps(),
         Boolean.TRUE.equals(request.reverseLossEnabled()),
         request.reverseLossThresholdBps() == null ? defaultLossThresholdBps : request.reverseLossThresholdBps(),
         request.cooldownMinutes() == null ? defaultCooldownMinutes : request.cooldownMinutes());
 
+    return find(walletAddress).orElseThrow();
+  }
+
+  public NotificationPreferenceResponse setPushEnabled(
+      String walletAddress,
+      boolean pushEnabled,
+      int defaultThresholdBps,
+      int defaultLossThresholdBps,
+      int defaultCooldownMinutes) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO notification_preferences (
+          wallet_address, push_enabled, reverse_profit_threshold_bps,
+          reverse_loss_threshold_bps, cooldown_minutes
+        )
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT (wallet_address) DO UPDATE SET
+          push_enabled = EXCLUDED.push_enabled,
+          updated_at = now()
+        """,
+        walletAddress,
+        pushEnabled,
+        defaultThresholdBps,
+        defaultLossThresholdBps,
+        defaultCooldownMinutes);
     return find(walletAddress).orElseThrow();
   }
 
@@ -75,6 +110,8 @@ public class NotificationPreferenceRepository {
         rs.getBoolean("email_enabled"),
         rs.getString("telegram_chat_id"),
         rs.getBoolean("telegram_enabled"),
+        rs.getBoolean("push_enabled"),
+        rs.getInt("push_subscription_count"),
         rs.getInt("reverse_profit_threshold_bps"),
         rs.getBoolean("reverse_loss_enabled"),
         rs.getInt("reverse_loss_threshold_bps"),

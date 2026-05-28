@@ -16,16 +16,19 @@ public class NotificationDeliveryService {
 
   private final EmailNotificationSender emailSender;
   private final TelegramNotificationSender telegramSender;
+  private final PushNotificationSender pushSender;
   private final NotificationMessageFormatter messageFormatter;
   private final NotificationOutboxRepository outboxRepository;
 
   public NotificationDeliveryService(
       EmailNotificationSender emailSender,
       TelegramNotificationSender telegramSender,
+      PushNotificationSender pushSender,
       NotificationMessageFormatter messageFormatter,
       NotificationOutboxRepository outboxRepository) {
     this.emailSender = emailSender;
     this.telegramSender = telegramSender;
+    this.pushSender = pushSender;
     this.messageFormatter = messageFormatter;
     this.outboxRepository = outboxRepository;
   }
@@ -40,6 +43,11 @@ public class NotificationDeliveryService {
         && isCooldownElapsed(opportunity.lastTelegramAlertAt(), opportunity.candidate().cooldownMinutes())) {
       deliverTelegram(opportunity);
     }
+
+    if (opportunity.candidate().pushEnabled() && pushSender.isEnabled()
+        && isCooldownElapsed(opportunity.lastPushAlertAt(), opportunity.candidate().cooldownMinutes())) {
+      deliverPush(opportunity);
+    }
   }
 
   public void deliver(FavoritePairOpportunity opportunity) {
@@ -52,6 +60,11 @@ public class NotificationDeliveryService {
         && isCooldownElapsed(opportunity.candidate().lastTelegramAlertAt(), opportunity.candidate().cooldownMinutes())) {
       deliverFavoritePairTelegram(opportunity);
     }
+
+    if (opportunity.candidate().pushEnabled() && pushSender.isEnabled()
+        && isCooldownElapsed(opportunity.candidate().lastPushAlertAt(), opportunity.candidate().cooldownMinutes())) {
+      deliverFavoritePairPush(opportunity);
+    }
   }
 
   public void deliver(AutoSwapOpportunity opportunity) {
@@ -63,6 +76,11 @@ public class NotificationDeliveryService {
     if (opportunity.candidate().telegramEnabled() && telegramSender.isEnabled()
         && isCooldownElapsed(opportunity.candidate().lastTelegramAlertAt(), opportunity.candidate().cooldownMinutes())) {
       deliverAutoSwapTelegram(opportunity);
+    }
+
+    if (opportunity.candidate().pushEnabled() && pushSender.isEnabled()
+        && isCooldownElapsed(opportunity.candidate().lastPushAlertAt(), opportunity.candidate().cooldownMinutes())) {
+      deliverAutoSwapPush(opportunity);
     }
   }
 
@@ -90,6 +108,19 @@ public class NotificationDeliveryService {
         target,
         messageFormatter.subject(opportunity),
         messageFormatter.body(opportunity),
+        opportunity,
+        opportunity.candidate().cooldownMinutes());
+  }
+
+  private void deliverPush(ReverseProfitOpportunity opportunity) {
+    enqueue(
+        "reverse_profit",
+        opportunity.candidate().swapHistoryId(),
+        opportunity.alertType().value(),
+        "push",
+        opportunity.candidate().walletAddress(),
+        messageFormatter.subject(opportunity),
+        messageFormatter.pushPayload(opportunity).body(),
         opportunity,
         opportunity.candidate().cooldownMinutes());
   }
@@ -122,6 +153,19 @@ public class NotificationDeliveryService {
         opportunity.candidate().cooldownMinutes());
   }
 
+  private void deliverFavoritePairPush(FavoritePairOpportunity opportunity) {
+    enqueue(
+        "favorite_pair",
+        opportunity.candidate().id(),
+        opportunity.candidate().alertDirection(),
+        "push",
+        opportunity.candidate().walletAddress(),
+        messageFormatter.subject(opportunity),
+        messageFormatter.pushPayload(opportunity).body(),
+        opportunity,
+        opportunity.candidate().cooldownMinutes());
+  }
+
   private void deliverAutoSwapEmail(AutoSwapOpportunity opportunity) {
     String target = opportunity.candidate().emailAddress();
     enqueue(
@@ -146,6 +190,19 @@ public class NotificationDeliveryService {
         target,
         messageFormatter.subject(opportunity),
         messageFormatter.body(opportunity),
+        opportunity,
+        opportunity.candidate().cooldownMinutes());
+  }
+
+  private void deliverAutoSwapPush(AutoSwapOpportunity opportunity) {
+    enqueue(
+        "auto_swap",
+        opportunity.candidate().id(),
+        opportunity.candidate().alertDirection(),
+        "push",
+        opportunity.candidate().walletAddress(),
+        messageFormatter.subject(opportunity),
+        messageFormatter.pushPayload(opportunity).body(),
         opportunity,
         opportunity.candidate().cooldownMinutes());
   }

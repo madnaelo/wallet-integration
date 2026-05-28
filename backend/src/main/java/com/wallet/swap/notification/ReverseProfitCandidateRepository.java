@@ -44,6 +44,7 @@ public class ReverseProfitCandidateRepository {
           p.email_enabled,
           p.telegram_chat_id,
           p.telegram_enabled,
+          (p.push_enabled AND COALESCE(active_push.subscription_count, 0) > 0) AS push_enabled,
           p.reverse_profit_threshold_bps,
           p.reverse_loss_enabled,
           p.reverse_loss_threshold_bps,
@@ -51,9 +52,17 @@ public class ReverseProfitCandidateRepository {
           email_profit_alert.last_sent_at AS last_email_profit_alert_at,
           email_loss_alert.last_sent_at AS last_email_loss_alert_at,
           telegram_profit_alert.last_sent_at AS last_telegram_profit_alert_at,
-          telegram_loss_alert.last_sent_at AS last_telegram_loss_alert_at
+          telegram_loss_alert.last_sent_at AS last_telegram_loss_alert_at,
+          push_profit_alert.last_sent_at AS last_push_profit_alert_at,
+          push_loss_alert.last_sent_at AS last_push_loss_alert_at
         FROM notification_preferences p
         JOIN swap_history h ON h.wallet_address = p.wallet_address
+        LEFT JOIN LATERAL (
+          SELECT count(*)::int AS subscription_count
+          FROM push_subscriptions ps
+          WHERE ps.wallet_address = p.wallet_address
+            AND ps.disabled_at IS NULL
+        ) active_push ON true
         LEFT JOIN LATERAL (
           SELECT max(sent_at) AS last_sent_at
           FROM reverse_profit_alerts a
@@ -86,7 +95,23 @@ public class ReverseProfitCandidateRepository {
             AND a.alert_type = 'loss'
             AND a.delivery_status = 'sent'
         ) telegram_loss_alert ON true
-        WHERE (p.email_enabled OR p.telegram_enabled)
+        LEFT JOIN LATERAL (
+          SELECT max(sent_at) AS last_sent_at
+          FROM reverse_profit_alerts a
+          WHERE a.original_swap_history_id = h.id
+            AND a.channel = 'push'
+            AND a.alert_type = 'profit'
+            AND a.delivery_status = 'sent'
+        ) push_profit_alert ON true
+        LEFT JOIN LATERAL (
+          SELECT max(sent_at) AS last_sent_at
+          FROM reverse_profit_alerts a
+          WHERE a.original_swap_history_id = h.id
+            AND a.channel = 'push'
+            AND a.alert_type = 'loss'
+            AND a.delivery_status = 'sent'
+        ) push_loss_alert ON true
+        WHERE (p.email_enabled OR p.telegram_enabled OR (p.push_enabled AND COALESCE(active_push.subscription_count, 0) > 0))
           AND h.status IN (%s)
           AND h.created_at >= now() - (? * interval '1 day')
         ORDER BY h.created_at DESC
@@ -121,6 +146,9 @@ public class ReverseProfitCandidateRepository {
         rs.getBoolean("telegram_enabled"),
         timestampToInstant(rs.getTimestamp("last_telegram_profit_alert_at")),
         timestampToInstant(rs.getTimestamp("last_telegram_loss_alert_at")),
+        rs.getBoolean("push_enabled"),
+        timestampToInstant(rs.getTimestamp("last_push_profit_alert_at")),
+        timestampToInstant(rs.getTimestamp("last_push_loss_alert_at")),
         timestampToInstant(rs.getTimestamp("created_at")));
   }
 

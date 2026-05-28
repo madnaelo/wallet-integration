@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { PwaClient } from "@/components/PwaClient";
 import "./globals.css";
 
 const siteUrl = getSiteUrl();
@@ -61,6 +62,7 @@ export const metadata: Metadata = {
       "max-video-preview": -1
     }
   },
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -100,6 +102,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
         />
+        <PwaClient />
         {children}
       </body>
     </html>

@@ -53,15 +53,15 @@ public class NotificationMessageFormatter {
         %s
 
         Original swap: %s %s to %s %s
-        Estimated reverse now: %s %s
-        Current movement: %s
+        Estimated return now: %s %s
+        Price movement: %s
 
-        This estimate uses batched USD market prices to avoid excessive quote API calls. Check a live quote before swapping.
+        This is an estimate based on current market prices. Open The Wallet to review a fresh quote before swapping.
 
-        Open prefilled swap:
+        Review this swap:
         %s
         """.formatted(
-        lossAlert ? "Loss protection alert triggered." : "Reverse swap opportunity detected.",
+        lossAlert ? "Loss protection alert" : "Reverse swap opportunity",
         amount(opportunity.originalSellAmount()),
         opportunity.candidate().sellTokenSymbol(),
         amount(opportunity.receivedBuyAmount()),
@@ -77,15 +77,15 @@ public class NotificationMessageFormatter {
     String direction = "below".equals(opportunity.candidate().alertDirection()) ? "at or below" : "at or above";
 
     return """
-        Favorite pair alert triggered.
+        Favorite pair alert
 
         Pair: %s to %s
         Current rate: 1 %s = %s %s
         Target: %s %s %s
 
-        This estimate uses batched USD market prices to avoid excessive quote API calls. Check a live quote before swapping.
+        This is an estimate based on current market prices. Open The Wallet to review a fresh quote before swapping.
 
-        Open prefilled swap:
+        Review this swap:
         %s
         """.formatted(
         opportunity.candidate().sellTokenSymbol(),
@@ -112,9 +112,9 @@ public class NotificationMessageFormatter {
         Target: %s %s %s
         Slippage tolerance: %s%%
 
-        The Wallet cannot sign transactions for you. Open the prefilled swap, review the live quote, and confirm from your wallet.
+        The Wallet cannot move funds on its own. Open the prefilled swap, review the live quote, and confirm from your wallet.
 
-        Open prefilled swap:
+        Review this swap:
         %s
         """.formatted(
         opportunity.candidate().sellTokenSymbol(),
@@ -129,6 +129,45 @@ public class NotificationMessageFormatter {
         opportunity.candidate().buyTokenSymbol(),
         percent(opportunity.candidate().slippageBps()),
         swapUrl);
+  }
+
+  public PushNotificationPayload pushPayload(ReverseProfitOpportunity opportunity) {
+    boolean lossAlert = opportunity.alertType().value().equals("loss");
+    String body = lossAlert
+        ? "%s to %s moved %s. Review a fresh quote before swapping.".formatted(
+            opportunity.candidate().buyTokenSymbol(),
+            opportunity.candidate().sellTokenSymbol(),
+            movementLabel(opportunity.profitBps()))
+        : "%s to %s may now return %s %s. Review a fresh quote before swapping.".formatted(
+            opportunity.candidate().buyTokenSymbol(),
+            opportunity.candidate().sellTokenSymbol(),
+            amount(opportunity.estimatedReverseSellAmount()),
+            opportunity.candidate().sellTokenSymbol());
+    return new PushNotificationPayload(
+        subject(opportunity),
+        body,
+        reverseSwapUrl(opportunity),
+        "reverse-%s-%s".formatted(opportunity.candidate().swapHistoryId(), opportunity.alertType().value()));
+  }
+
+  public PushNotificationPayload pushPayload(FavoritePairOpportunity opportunity) {
+    return new PushNotificationPayload(
+        subject(opportunity),
+        "%s to %s reached your target. Review a fresh quote before swapping.".formatted(
+            opportunity.candidate().sellTokenSymbol(),
+            opportunity.candidate().buyTokenSymbol()),
+        favoritePairSwapUrl(opportunity),
+        "favorite-%s-%s".formatted(opportunity.candidate().id(), opportunity.candidate().alertDirection()));
+  }
+
+  public PushNotificationPayload pushPayload(AutoSwapOpportunity opportunity) {
+    return new PushNotificationPayload(
+        subject(opportunity),
+        "%s to %s reached your target. The Wallet will wait for your wallet approval.".formatted(
+            opportunity.candidate().sellTokenSymbol(),
+            opportunity.candidate().buyTokenSymbol()),
+        autoSwapUrl(opportunity),
+        "auto-swap-%s-%s".formatted(opportunity.candidate().id(), opportunity.candidate().alertDirection()));
   }
 
   private String reverseSwapUrl(ReverseProfitOpportunity opportunity) {
@@ -157,8 +196,9 @@ public class NotificationMessageFormatter {
 
   private String swapUrl(long chainId, String sellToken, String buyToken, String sellAmountRaw) {
     UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(appBaseUrl())
+        .replacePath("/swap")
         .replaceQuery(null)
-        .fragment("swap")
+        .fragment(null)
         .queryParam("chainId", chainId)
         .queryParam("sellToken", sellToken)
         .queryParam("buyToken", buyToken);
@@ -253,4 +293,6 @@ public class NotificationMessageFormatter {
     String prefix = bps > 0 ? "+" : "";
     return "%s%s%%".formatted(prefix, percent(bps));
   }
+
+  public record PushNotificationPayload(String title, String body, String url, String tag) {}
 }

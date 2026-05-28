@@ -23,6 +23,8 @@ public class NotificationOutboxWorker {
   private final NotificationOutboxRepository outboxRepository;
   private final EmailNotificationSender emailSender;
   private final TelegramNotificationSender telegramSender;
+  private final PushNotificationSender pushSender;
+  private final NotificationMessageFormatter messageFormatter;
   private final ReverseProfitAlertRepository reverseProfitAlertRepository;
   private final FavoritePairAlertRepository favoritePairAlertRepository;
   private final AutoSwapAlertRepository autoSwapAlertRepository;
@@ -35,6 +37,8 @@ public class NotificationOutboxWorker {
       NotificationOutboxRepository outboxRepository,
       EmailNotificationSender emailSender,
       TelegramNotificationSender telegramSender,
+      PushNotificationSender pushSender,
+      NotificationMessageFormatter messageFormatter,
       ReverseProfitAlertRepository reverseProfitAlertRepository,
       FavoritePairAlertRepository favoritePairAlertRepository,
       AutoSwapAlertRepository autoSwapAlertRepository,
@@ -44,6 +48,8 @@ public class NotificationOutboxWorker {
     this.outboxRepository = outboxRepository;
     this.emailSender = emailSender;
     this.telegramSender = telegramSender;
+    this.pushSender = pushSender;
+    this.messageFormatter = messageFormatter;
     this.reverseProfitAlertRepository = reverseProfitAlertRepository;
     this.favoritePairAlertRepository = favoritePairAlertRepository;
     this.autoSwapAlertRepository = autoSwapAlertRepository;
@@ -88,11 +94,27 @@ public class NotificationOutboxWorker {
     }
   }
 
-  private void send(NotificationOutboxItem item) {
+  private void send(NotificationOutboxItem item) throws Exception {
     switch (item.channel()) {
       case "email" -> emailSender.send(item.target(), item.subject(), item.body());
       case "telegram" -> telegramSender.send(item.target(), item.body());
+      case "push" -> sendPush(item);
       default -> throw new IllegalArgumentException("Unsupported notification channel: " + item.channel());
+    }
+  }
+
+  private void sendPush(NotificationOutboxItem item) throws Exception {
+    switch (item.notificationKind()) {
+      case "reverse_profit" -> pushSender.send(
+          item.target(),
+          messageFormatter.pushPayload(objectMapper.readValue(item.payloadJson(), ReverseProfitOpportunity.class)));
+      case "favorite_pair" -> pushSender.send(
+          item.target(),
+          messageFormatter.pushPayload(objectMapper.readValue(item.payloadJson(), FavoritePairOpportunity.class)));
+      case "auto_swap" -> pushSender.send(
+          item.target(),
+          messageFormatter.pushPayload(objectMapper.readValue(item.payloadJson(), AutoSwapOpportunity.class)));
+      default -> throw new IllegalArgumentException("Unsupported notification kind: " + item.notificationKind());
     }
   }
 

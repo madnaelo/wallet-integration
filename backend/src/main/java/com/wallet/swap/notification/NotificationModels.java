@@ -1,8 +1,11 @@
 package com.wallet.swap.notification;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public final class NotificationModels {
@@ -12,6 +15,7 @@ public final class NotificationModels {
       @Email @Size(max = 254) String emailAddress,
       Boolean emailEnabled,
       Boolean telegramEnabled,
+      Boolean pushEnabled,
       @Min(0) @Max(100000) Integer reverseProfitThresholdBps,
       Boolean reverseLossEnabled,
       @Min(0) @Max(100000) Integer reverseLossThresholdBps,
@@ -23,8 +27,20 @@ public final class NotificationModels {
       boolean emailEnabled,
       String telegramChatId,
       boolean telegramEnabled,
+      boolean pushEnabled,
+      int pushSubscriptionCount,
       int reverseProfitThresholdBps,
       boolean reverseLossEnabled,
       int reverseLossThresholdBps,
       int cooldownMinutes) {}
+
+  public record PushSubscriptionRequest(
+      @NotBlank @Size(max = 2048) String endpoint,
+      @Valid @NotNull
+      PushSubscriptionKeys keys,
+      Long expirationTime) {}
+
+  public record PushSubscriptionKeys(
+      @NotBlank @Size(max = 512) String p256dh,
+      @NotBlank @Size(max = 256) String auth) {}
 }

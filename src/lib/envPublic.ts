@@ -11,5 +11,6 @@ export const envPublic = {
     process.env.NEXT_PUBLIC_APP_VERSION ??
     process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
     "local"
-  ).trim()
+  ).trim(),
+  VAPID_PUBLIC_KEY: (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "").trim()
 };

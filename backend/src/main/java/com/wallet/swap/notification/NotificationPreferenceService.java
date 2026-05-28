@@ -28,6 +28,8 @@ public class NotificationPreferenceService {
             false,
             null,
             false,
+            false,
+            0,
             properties.getDefaultProfitThresholdBps(),
             false,
             properties.getDefaultLossThresholdBps(),
@@ -42,6 +44,7 @@ public class NotificationPreferenceService {
         request,
         current.telegramChatId(),
         Boolean.TRUE.equals(request.telegramEnabled()),
+        Boolean.TRUE.equals(request.pushEnabled()),
         properties.getDefaultProfitThresholdBps(),
         properties.getDefaultLossThresholdBps(),
         properties.getDefaultCooldownMinutes());
@@ -53,6 +56,7 @@ public class NotificationPreferenceService {
         current.emailAddress(),
         current.emailEnabled(),
         true,
+        current.pushEnabled(),
         current.reverseProfitThresholdBps(),
         current.reverseLossEnabled(),
         current.reverseLossThresholdBps(),
@@ -63,6 +67,16 @@ public class NotificationPreferenceService {
         request,
         telegramChatId,
         true,
+        current.pushEnabled(),
+        properties.getDefaultProfitThresholdBps(),
+        properties.getDefaultLossThresholdBps(),
+        properties.getDefaultCooldownMinutes());
+  }
+
+  public NotificationPreferenceResponse setPushEnabled(String walletAddress, boolean pushEnabled) {
+    return repository.setPushEnabled(
+        walletAddress,
+        pushEnabled,
         properties.getDefaultProfitThresholdBps(),
         properties.getDefaultLossThresholdBps(),
         properties.getDefaultCooldownMinutes());

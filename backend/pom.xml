@@ -21,8 +21,10 @@
     <java.version>17</java.version>
     <bouncycastle.version>1.84</bouncycastle.version>
     <postgresql.version>42.7.11</postgresql.version>
+    <httpclient.version>4.5.14</httpclient.version>
     <tomcat.version>10.1.55</tomcat.version>
     <web3j.version>4.12.3</web3j.version>
+    <webpush.version>5.1.2</webpush.version>
   </properties>
 
   <dependencyManagement>
@@ -31,6 +33,11 @@
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>${httpclient.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -69,6 +76,15 @@
       <groupId>org.web3j</groupId>
       <artifactId>crypto</artifactId>
       <version>${web3j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>nl.martijndwars</groupId>
+      <artifactId>web-push</artifactId>
+      <version>${webpush.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
