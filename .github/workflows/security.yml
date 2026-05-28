@@ -96,16 +96,29 @@ jobs:
           scan-type: fs
           scan-ref: .
           scanners: vuln
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          timeout: 10m
+
+      - name: Build Trivy SARIF
+        if: ${{ !github.event.repository.private || vars.CODEQL_ENABLED == 'true' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
-          exit-code: "1"
+          exit-code: "0"
           ignore-unfixed: true
           timeout: 10m
           limit-severities-for-sarif: true
 
       - name: Upload Trivy SARIF
-        if: always()
+        if: ${{ !github.event.repository.private || vars.CODEQL_ENABLED == 'true' }}
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:

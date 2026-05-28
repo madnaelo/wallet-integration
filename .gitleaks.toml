@@ -1,0 +1,5 @@
+[allowlist]
+description = "Public blockchain identifiers used in test fixtures and token metadata"
+regexes = [
+  '''0xdAC17F958D2ee523a2206206994597C13D831ec7''',
+]
