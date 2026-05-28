@@ -48,7 +48,7 @@ provider/earning checklist.
 
 - Added Windows-first local scripts for database, backend, frontend, full-stack
   startup, shutdown, and verification.
-- Moved local PostgreSQL to port `55434` to avoid common conflicts.
+- Moved local PostgreSQL to port `56434` to avoid common conflicts.
 - Added split production deployment: Vercel for frontend/quote route, OCI for
   backend/PostgreSQL/Caddy.
 - Added GitHub Actions CI and automatic deployments for frontend and backend on

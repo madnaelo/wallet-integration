@@ -9,7 +9,7 @@ spring:
   application:
     name: swap-backend
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:55434/wallet}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:56434/wallet}
     username: ${DATABASE_USERNAME:wallet}
     password: ${DATABASE_PASSWORD:wallet}
   flyway:

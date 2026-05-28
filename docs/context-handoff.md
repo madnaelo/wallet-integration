@@ -64,7 +64,7 @@ Default local endpoints:
 
 - Frontend: `http://localhost:3000`
 - Backend health: `http://localhost:8080/api/health`
-- PostgreSQL: `localhost:55434`
+- PostgreSQL: `localhost:56434`
 
 ## Verification Habit
 
