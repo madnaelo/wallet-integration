@@ -58,7 +58,7 @@ class AutoSwapRuleServiceTest {
 
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
-        .hasMessageContaining("Invalid Auto Swap execution mode");
+        .hasMessageContaining("Invalid alert mode");
   }
 
   private AutoSwapRuleRequest evmRequest(String thresholdRate, String direction, String executionMode) {

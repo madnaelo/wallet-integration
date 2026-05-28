@@ -37,7 +37,7 @@ public class FeatureFlagService {
 
   public void requireAutoSwapEnabled() {
     if (!isAutoSwapEnabled()) {
-      throw new ApiException(HttpStatus.NOT_FOUND, "Auto Swap is not available.");
+      throw new ApiException(HttpStatus.NOT_FOUND, "Set Alerts is not available.");
     }
   }
 

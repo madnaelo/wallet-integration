@@ -40,7 +40,7 @@ public class NotificationMessageFormatter {
   }
 
   public String subject(AutoSwapOpportunity opportunity) {
-    return "Auto Swap alert: %s to %s".formatted(
+    return "Swap alert: %s to %s".formatted(
         opportunity.candidate().sellTokenSymbol(),
         opportunity.candidate().buyTokenSymbol());
   }
@@ -104,7 +104,7 @@ public class NotificationMessageFormatter {
     String direction = "below".equals(opportunity.candidate().alertDirection()) ? "at or below" : "at or above";
 
     return """
-        Auto Swap target reached.
+        Swap target reached.
 
         Pair: %s to %s
         Amount: %s %s
@@ -112,7 +112,7 @@ public class NotificationMessageFormatter {
         Target: %s %s %s
         Slippage tolerance: %s%%
 
-        The Wallet cannot move funds on its own. Open the prefilled swap, review the live quote, and confirm from your wallet.
+        The Wallet cannot move funds on its own. Open the prefilled swap, review the live quote, and approve from your wallet.
 
         Review this swap:
         %s
@@ -163,7 +163,7 @@ public class NotificationMessageFormatter {
   public PushNotificationPayload pushPayload(AutoSwapOpportunity opportunity) {
     return new PushNotificationPayload(
         subject(opportunity),
-        "%s to %s reached your target. The Wallet will wait for your wallet approval.".formatted(
+        "%s to %s reached your target. Open The Wallet to review and approve from your wallet.".formatted(
             opportunity.candidate().sellTokenSymbol(),
             opportunity.candidate().buyTokenSymbol()),
         autoSwapUrl(opportunity),

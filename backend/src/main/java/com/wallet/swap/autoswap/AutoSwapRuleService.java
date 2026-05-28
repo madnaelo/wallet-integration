@@ -71,7 +71,7 @@ public class AutoSwapRuleService {
 
     String direction = normalizeDirection(request.alertDirection());
     if (!ALERT_DIRECTIONS.contains(direction)) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Auto Swap direction must be above or below.");
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Alert direction must be above or below.");
     }
     if (request.thresholdRate() == null || request.thresholdRate().signum() <= 0) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Target rate must be greater than zero.");
@@ -81,7 +81,7 @@ public class AutoSwapRuleService {
     }
     String executionMode = normalizeBlank(request.executionMode(), NOTIFY_TO_CONFIRM);
     if (!EXECUTION_MODES.contains(executionMode)) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid Auto Swap execution mode.");
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid alert mode.");
     }
     if (request.recipientAddress() == null || request.recipientAddress().isBlank()) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Recipient address is required.");
@@ -99,7 +99,7 @@ public class AutoSwapRuleService {
       if (actualGap.compareTo(minimumGap) < 0) {
         throw new ApiException(
             HttpStatus.CONFLICT,
-            "Use a target at least 1% away from another Auto Swap rule for this pair and direction.");
+            "Use a target at least 1% away from another alert for this pair and direction.");
       }
     }
   }
