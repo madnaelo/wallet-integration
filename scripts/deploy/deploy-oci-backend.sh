@@ -25,6 +25,11 @@ if [ ! -f "$env_file" ]; then
   exit 1
 fi
 
+sed -i \
+  -e 's|^PUSH_VAPID_SUBJECT=mailto:alerts@thewallet\.app$|PUSH_VAPID_SUBJECT=mailto:alerts@swapassistant.app|' \
+  -e 's|^PARASWAP_PARTNER=thewallet$|PARASWAP_PARTNER=swapassistant|' \
+  "$env_file"
+
 set -a
 # shellcheck disable=SC1090
 . "$env_file"
