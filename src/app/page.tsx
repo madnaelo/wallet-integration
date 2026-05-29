@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "The Wallet | Personal Swap Aggregator",
+  title: "Swap Assistant | Personal Swap Aggregator",
   description:
     "Compare crypto swap routes, review quotes safely, save swap history, and receive price alerts without giving up custody of your wallet.",
   alternates: {
@@ -35,10 +35,10 @@ const features = [
 ];
 
 const safetyPoints = [
-  "Connecting a wallet lets The Wallet read your public wallet address.",
+  "Connecting a wallet lets Swap Assistant read your public wallet address.",
   "Signing in only proves that the wallet is yours, so your history and alerts can be saved for that wallet.",
-  "The Wallet never asks for your seed phrase or private key.",
-  "The Wallet cannot move your funds. Funds move only after you approve the transaction inside your wallet app.",
+  "Swap Assistant never asks for your seed phrase or private key.",
+  "Swap Assistant cannot move your funds. Funds move only after you approve the transaction inside your wallet app.",
   "You can review tokens, amounts, recipient, fees, slippage, and network cost before confirming."
 ];
 
@@ -59,10 +59,10 @@ export default function IntroPage() {
         <div className="introHeroShade" aria-hidden="true" />
         <div className="introHeroCopy">
           <p className="introEyebrow">Non-custodial swap assistant</p>
-          <h1 id="intro-title">The Wallet</h1>
+          <h1 id="intro-title">Swap Assistant</h1>
           <p className="introLead">
-            Your personal swap aggregator. Compare prices, review costs, save useful history, and receive price alerts
-            while staying in control. The Wallet cannot move funds by itself; every swap still needs your approval inside
+            Your personal swap assistant. Compare prices, review costs, save useful history, and receive price alerts
+            while staying in control. Swap Assistant cannot move funds by itself; every swap still needs your approval inside
             your wallet app.
           </p>
           <div className="introActions">
@@ -80,7 +80,7 @@ export default function IntroPage() {
         <div className="introSectionHeader introSafetyHeader">
           <h2 id="safety-title">Designed For Wallet Safety</h2>
           <p>
-            Your wallet stays in control. The Wallet helps you compare and remember, but only your wallet can approve
+            Your wallet stays in control. Swap Assistant helps you compare and remember, but only your wallet can approve
             movement of funds.
           </p>
         </div>
@@ -93,7 +93,7 @@ export default function IntroPage() {
 
       <section className="introSection" aria-labelledby="features-title">
         <div className="introSectionHeader">
-          <h2 id="features-title">What The Wallet Helps You Do</h2>
+          <h2 id="features-title">What Swap Assistant Helps You Do</h2>
           <p>
             Built for people who want simple swap decisions without handing control to an app.
           </p>

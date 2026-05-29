@@ -2,7 +2,7 @@
 
 Last reviewed: May 27, 2026
 
-This checklist tracks what is required before The Wallet can reliably collect
+This checklist tracks what is required before Swap Assistant can reliably collect
 platform fees in production.
 
 ## Current Status
@@ -96,7 +96,7 @@ Action remaining:
 - Confirm our 1inch API account is allowed for commercial/fee-collecting use.
   Gmail shows a KYC/KYB approval email from May 8, 2026, but also a
   Non-Commercial API Customer Security Due Diligence email from May 15, 2026.
-  Because The Wallet intends to collect fees, do not certify the usage as
+  Because Swap Assistant intends to collect fees, do not certify the usage as
   personal/non-commercial unless 1inch explicitly confirms that this is correct.
 - Complete 1inch due diligence truthfully. Do not submit as personal
   non-commercial if the app is taking platform fees.
@@ -126,7 +126,7 @@ The Velora/ParaSwap client sends:
 Action remaining:
 
 - Wait for Velora's response to the May 27, 2026, Pro API/rate-limit request.
-  Submitted values were: project name `The Wallet`, website
+  Submitted values were: project name `Swap Assistant`, website
   `https://wallet-integration-theta.vercel.app`, GitHub profile
   `https://github.com/madnaelo`, initial target `5 requests per second`, and
   contact `madnaelo@yahoo.com`.
@@ -233,7 +233,7 @@ Steps:
 1. Open Telegram.
 2. Search for `BotFather`.
 3. Send `/mybots`.
-4. Select the bot used for The Wallet.
+4. Select the bot used for Swap Assistant.
 5. Choose API Token.
 6. Revoke or regenerate the token.
 7. Update production OCI and local development env files with the new token.

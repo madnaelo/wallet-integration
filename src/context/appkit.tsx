@@ -49,7 +49,7 @@ const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
   bitcoin
 ];
 const appUrl = typeof window === "undefined"
-  ? (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://thewallet.local")
+  ? (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://swapassistant.local")
   : window.location.origin;
 type AppKitMetadataWithRedirect = {
   name: string;
@@ -61,8 +61,8 @@ type AppKitMetadataWithRedirect = {
   };
 };
 const metadata: AppKitMetadataWithRedirect = {
-  name: "The Wallet",
-  description: "Your Personal Swap Aggregator",
+  name: "Swap Assistant",
+  description: "Your Personal Swap Assistant",
   url: appUrl,
   icons: [],
   redirect: {

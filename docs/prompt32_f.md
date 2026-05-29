@@ -13,11 +13,11 @@ Improve the mobile signing experience without changing wallet security:
 - Show wallet-aware signing guidance when history sign-in, token approval, or
   swap signing is waiting for the wallet.
 - Keep the return guidance generic for all wallets: approve or sign in the
-  wallet, then return to The Wallet.
+  wallet, then return to Swap Assistant.
 - Keep the safety reassurance for sign-in messages because they prove wallet
   ownership and cannot move funds.
 - Add WalletConnect/Reown redirect metadata so wallets that honor the metadata
-  can return to the current The Wallet URL after an approval.
+  can return to the current Swap Assistant URL after an approval.
 
 ## Technical Guidance
 

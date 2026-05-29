@@ -105,7 +105,7 @@ class NotificationMessageFormatterTest {
         new BigDecimal("2501"),
         BigDecimal.ONE));
 
-    assertThat(body).contains("The Wallet cannot move funds on its own");
+    assertThat(body).contains("Swap Assistant cannot move funds on its own");
     assertThat(body).contains(
         "https://wallet.example/swap?chainId=1&sellToken=ETH"
             + "&buyToken=0xdAC17F958D2ee523a2206206994597C13D831ec7&sellAmountRaw=1000000000000000000");

@@ -128,12 +128,12 @@ const SWAP_TOUR_STEPS: TourStep[] = [
   {
     target: "wallet",
     title: "Connect Wallet",
-    body: "Connect your wallet so The Wallet can read your public address, prepare quotes, and save history for you. This is harmless: funds cannot move until you approve a later transaction inside your wallet app."
+    body: "Connect your wallet so Swap Assistant can read your public address, prepare quotes, and save history for you. This is harmless: funds cannot move until you approve a later transaction inside your wallet app."
   },
   {
     target: "amount",
     title: "Start with the amount",
-    body: "Enter how much you want to sell. The Wallet formats the amount for the selected token."
+    body: "Enter how much you want to sell. Swap Assistant formats the amount for the selected token."
   },
   {
     target: "tokens",
@@ -149,7 +149,7 @@ const SWAP_TOUR_STEPS: TourStep[] = [
   {
     target: "quote",
     title: "Get a quote",
-    body: "The Wallet compares available routes and shows the best quote it can find. This does not move funds."
+    body: "Swap Assistant compares available routes and shows the best quote it can find. This does not move funds."
   },
   {
     target: "summary",
@@ -1210,7 +1210,7 @@ export default function Page() {
 
     const p = getProviderOrThrow();
     const setAuthNotice = noticeTarget === "preferences" ? setPreferencesAuthNotice : setHistoryNotice;
-    setAuthNotice("Open your wallet and approve the sign-in message. This only lets The Wallet save your history and preferences.");
+    setAuthNotice("Open your wallet and approve the sign-in message. This only lets Swap Assistant save your history and preferences.");
     const nonce = await requestAuthNonce(envPublic.BACKEND_BASE_URL, walletAddress);
     const signature = await signMessageWithProvider(
       p,
@@ -2196,8 +2196,8 @@ export default function Page() {
       <div className="header">
         <div className="headerTop">
           <div className="headerCopy">
-            <h1 className="h1">The Wallet</h1>
-            <div className="subtle">Your Personal Swap Aggregator. Get the best price for your swaps.</div>
+            <h1 className="h1">Swap Assistant</h1>
+            <div className="subtle">Your Personal Swap Assistant. Get the best price for your swaps.</div>
           </div>
           <div className="walletActions" data-tour="wallet">
             {walletAddress ? (
@@ -3434,7 +3434,7 @@ export default function Page() {
       ) : null}
 
       <footer className="siteFooter">
-        <span>The Wallet is non-custodial. Review every wallet request before signing.</span>
+        <span>Swap Assistant is non-custodial. Review every wallet request before signing.</span>
         <div className="footerMeta">
           <span className="versionLabel" title={`Build ${envPublic.APP_VERSION}`}>
             Build {formatBuildVersion(envPublic.APP_VERSION)}
@@ -3509,7 +3509,7 @@ function buildWalletApprovalNotice(walletName: string, action: WalletApprovalAct
   const actionText = getWalletApprovalActionText(action);
   const safetyHint = action === "signIn" ? " This cannot move funds." : "";
 
-  return `${actionText} in ${walletLabel}, then return to The Wallet.${safetyHint}`;
+  return `${actionText} in ${walletLabel}, then return to Swap Assistant.${safetyHint}`;
 }
 
 function normalizeWalletApprovalName(walletName: string): string {
@@ -4338,11 +4338,11 @@ function getMobilePushSupportMessage(): string {
     Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
   const isIos = /iPhone|iPad|iPod/i.test(userAgent);
   if (isIos && !isStandalone) {
-    return "Install The Wallet on this device first, then enable push notifications from the installed app.";
+    return "Install Swap Assistant on this device first, then enable push notifications from the installed app.";
   }
 
   if (isLikelyEmbeddedMobileBrowser(userAgent)) {
-    return "Push notifications usually do not work inside wallet app web views. Open The Wallet in Chrome, Edge, Safari, or the installed app, then enable push notifications.";
+    return "Push notifications usually do not work inside wallet app web views. Open Swap Assistant in Chrome, Edge, Safari, or the installed app, then enable push notifications.";
   }
 
   return "";
@@ -4792,7 +4792,7 @@ function normalizeRecipientImportError(e: any): string {
 function normalizePushNotificationError(e: any): string {
   const message = normalizeWalletError(e);
   if (/push service|registration failed|aborterror/i.test(message)) {
-    return "Push notification setup could not reach this device's push service. Open The Wallet in Chrome, Edge, Safari, or the installed app, then try again.";
+    return "Push notification setup could not reach this device's push service. Open Swap Assistant in Chrome, Edge, Safari, or the installed app, then try again.";
   }
   if (/permission|blocked|denied|not enabled/i.test(message)) return PUSH_DENIED_MESSAGE;
   if (/not available/i.test(message)) return "Push notifications are not available right now.";

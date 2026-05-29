@@ -1,5 +1,5 @@
 [Unit]
-Description=The Wallet PostgreSQL backup
+Description=Swap Assistant PostgreSQL backup
 After=docker.service podman.service network-online.target
 Wants=network-online.target
 

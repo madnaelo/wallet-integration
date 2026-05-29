@@ -3,7 +3,7 @@
 ## Product Context
 
 Telegram alerts should not merely tell the user that a price condition was met.
-They should return the user to The Wallet with the relevant swap already set up
+They should return the user to Swap Assistant with the relevant swap already set up
 so the user can immediately refresh the live quote and decide whether to trade.
 
 ## Requirement

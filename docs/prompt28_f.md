@@ -2,7 +2,7 @@
 
 ## Product Context
 
-The Wallet is evolving from manual swap aggregation into a personal swap
+Swap Assistant is evolving from manual swap aggregation into a personal swap
 assistant. Users should eventually be able to define target-rate swap rules that
 the backend can act on when safe non-custodial execution is available.
 

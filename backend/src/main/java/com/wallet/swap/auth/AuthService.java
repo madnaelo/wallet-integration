@@ -152,7 +152,7 @@ public class AuthService {
 
   private String buildSignInMessage(String walletAddress, String nonce, Instant expiresAt) {
     return """
-        Sign in to The Wallet.
+        Sign in to Swap Assistant.
 
         This proves ownership of wallet %s.
         It does not grant custody or permission to move funds.

@@ -2,7 +2,7 @@
 
 ## Product Context
 
-The Wallet asks users to approve wallet signatures for history sync and wallet
+Swap Assistant asks users to approve wallet signatures for history sync and wallet
 transactions for swaps. Button labels such as `Open wallet to sign` and generic
 statuses such as `Pending` can make users think the web app will open their
 mobile wallet automatically.

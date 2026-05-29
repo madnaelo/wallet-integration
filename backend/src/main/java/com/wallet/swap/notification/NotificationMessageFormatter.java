@@ -56,7 +56,7 @@ public class NotificationMessageFormatter {
         Estimated return now: %s %s
         Price movement: %s
 
-        This is an estimate based on current market prices. Open The Wallet to review a fresh quote before swapping.
+        This is an estimate based on current market prices. Open Swap Assistant to review a fresh quote before swapping.
 
         Review this swap:
         %s
@@ -83,7 +83,7 @@ public class NotificationMessageFormatter {
         Current rate: 1 %s = %s %s
         Target: %s %s %s
 
-        This is an estimate based on current market prices. Open The Wallet to review a fresh quote before swapping.
+        This is an estimate based on current market prices. Open Swap Assistant to review a fresh quote before swapping.
 
         Review this swap:
         %s
@@ -112,7 +112,7 @@ public class NotificationMessageFormatter {
         Target: %s %s %s
         Slippage tolerance: %s%%
 
-        The Wallet cannot move funds on its own. Open the prefilled swap, review the live quote, and approve from your wallet.
+        Swap Assistant cannot move funds on its own. Open the prefilled swap, review the live quote, and approve from your wallet.
 
         Review this swap:
         %s
@@ -163,7 +163,7 @@ public class NotificationMessageFormatter {
   public PushNotificationPayload pushPayload(AutoSwapOpportunity opportunity) {
     return new PushNotificationPayload(
         subject(opportunity),
-        "%s to %s reached your target. Open The Wallet to review and approve from your wallet.".formatted(
+        "%s to %s reached your target. Open Swap Assistant to review and approve from your wallet.".formatted(
             opportunity.candidate().sellTokenSymbol(),
             opportunity.candidate().buyTokenSymbol()),
         autoSwapUrl(opportunity),

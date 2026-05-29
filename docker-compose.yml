@@ -91,7 +91,7 @@ services:
       PARASWAP_BASE_URL: ${PARASWAP_BASE_URL:-https://api.paraswap.io}
       PARASWAP_API_KEY: ${PARASWAP_API_KEY:-}
       PARASWAP_API_KEY_HEADER: ${PARASWAP_API_KEY_HEADER:-X-API-Key}
-      PARASWAP_PARTNER: ${PARASWAP_PARTNER:-thewallet}
+      PARASWAP_PARTNER: ${PARASWAP_PARTNER:-swapassistant}
       ODOS_BASE_URL: ${ODOS_BASE_URL:-https://api.odos.xyz}
       ODOS_API_KEY: ${ODOS_API_KEY:-}
       LIFI_BASE_URL: ${LIFI_BASE_URL:-https://li.quest}

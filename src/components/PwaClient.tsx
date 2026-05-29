@@ -55,9 +55,9 @@ export function PwaClient() {
   }
 
   return (
-    <div className="installPrompt" role="region" aria-label="Install The Wallet">
+    <div className="installPrompt" role="region" aria-label="Install Swap Assistant">
       <div>
-        <strong>Install The Wallet</strong>
+        <strong>Install Swap Assistant</strong>
         <span>Open faster and receive push notifications on this device.</span>
       </div>
       <button className="installPromptAction" type="button" onClick={install}>

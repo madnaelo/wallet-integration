@@ -17,7 +17,7 @@ BRD are the current product/architecture summary.
 
 ## Current Product Direction
 
-The Wallet is a non-custodial swap assistant:
+Swap Assistant is a non-custodial swap assistant:
 
 - compare quotes across configured providers,
 - let the user's wallet execute swaps,
@@ -80,7 +80,7 @@ For documentation-only changes, `git diff --check` is usually enough.
 ## Restart Prompt
 
 ```text
-We are continuing work on The Wallet in E:\assignments\wallet.
+We are continuing work on Swap Assistant in E:\assignments\wallet.
 Please first read README.md, docs/BRD.md, docs/context-handoff.md, and any
 prompt files relevant to the task. Then inspect git status/diff before making
 changes.

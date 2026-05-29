@@ -10,7 +10,7 @@ console.log(`NEXT_PUBLIC_VAPID_PUBLIC_KEY=${publicKey}`);
 console.log(`PUSH_NOTIFICATIONS_ENABLED=true`);
 console.log(`PUSH_VAPID_PUBLIC_KEY=${publicKey}`);
 console.log(`PUSH_VAPID_PRIVATE_KEY=${privateKey}`);
-console.log(`PUSH_VAPID_SUBJECT=mailto:alerts@thewallet.app`);
+console.log(`PUSH_VAPID_SUBJECT=mailto:alerts@swapassistant.app`);
 
 function base64Url(buffer) {
   return buffer

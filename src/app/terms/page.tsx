@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Terms",
-  description: "Terms of use for The Wallet."
+  description: "Terms of use for Swap Assistant."
 };
 
 export default function TermsPage() {
@@ -15,7 +15,7 @@ export default function TermsPage() {
         </Link>
         <h1>Terms</h1>
         <p>
-          These terms describe the expected use of The Wallet. By using the
+          These terms describe the expected use of Swap Assistant. By using the
           app, you agree to use it only where lawful and to review every wallet
           request before signing.
         </p>
@@ -23,7 +23,7 @@ export default function TermsPage() {
         <section>
           <h2>Non-Custodial Service</h2>
           <p>
-            The Wallet provides quote comparison, saved history, favorites,
+            Swap Assistant provides quote comparison, saved history, favorites,
             alerts, and wallet-assisted swap execution. It does not custody
             funds, store private keys, or sign transactions for you.
           </p>
@@ -35,14 +35,14 @@ export default function TermsPage() {
             Quotes, routes, token lists, wallet connection, notifications, and
             blockchain data can depend on third-party providers. Their
             availability, terms, security controls, rate limits, and output can
-            change independently of The Wallet.
+            change independently of Swap Assistant.
           </p>
         </section>
 
         <section>
           <h2>No Financial Advice</h2>
           <p>
-            The Wallet does not provide investment, tax, legal, accounting, or
+            Swap Assistant does not provide investment, tax, legal, accounting, or
             financial advice. Alerts and quote comparisons are tools for your
             own review.
           </p>
@@ -61,7 +61,7 @@ export default function TermsPage() {
         <section>
           <h2>Availability</h2>
           <p>
-            The Wallet may be updated, paused, rate limited, or unavailable at
+            Swap Assistant may be updated, paused, rate limited, or unavailable at
             any time. We may disable providers, chains, tokens, alerts, or
             features when needed for security, compliance, reliability, or
             provider availability.

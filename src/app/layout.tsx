@@ -3,8 +3,8 @@ import { PwaClient } from "@/components/PwaClient";
 import "./globals.css";
 
 const siteUrl = getSiteUrl();
-const title = "The Wallet";
-const description = "Your Personal Swap Aggregator. Get the best price for your swaps.";
+const title = "Swap Assistant";
+const description = "Your Personal Swap Assistant. Get the best price for your swaps.";
 const ogImage = "/og-image.svg";
 
 export const metadata: Metadata = {
@@ -110,10 +110,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 
 function getSiteUrl(): URL {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://thewallet.app";
+  const raw = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://swapassistant.app";
   try {
     return new URL(raw);
   } catch {
-    return new URL("https://thewallet.app");
+    return new URL("https://swapassistant.app");
   }
 }

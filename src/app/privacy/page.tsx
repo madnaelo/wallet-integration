@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Privacy",
-  description: "Privacy summary for The Wallet."
+  description: "Privacy summary for Swap Assistant."
 };
 
 export default function PrivacyPage() {
@@ -15,7 +15,7 @@ export default function PrivacyPage() {
         </Link>
         <h1>Privacy</h1>
         <p>
-          The Wallet stores the minimum product data needed for your swap
+          Swap Assistant stores the minimum product data needed for your swap
           history, favorites, alerts, and notification preferences.
         </p>
 

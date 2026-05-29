@@ -126,7 +126,7 @@ send_telegram_alert() {
 
 if [ "${#failures[@]}" -gt 0 ]; then
   {
-    echo "The Wallet production monitor failed."
+    echo "Swap Assistant production monitor failed."
     echo
     printf -- '- %s\n' "${failures[@]}"
     echo

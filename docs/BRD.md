@@ -2,7 +2,7 @@
 
 ## Product
 
-The Wallet is a non-custodial personal swap aggregator and swap assistant.
+Swap Assistant is a non-custodial personal swap assistant.
 Users connect wallets, compare quotes from supported swap aggregators, execute
 swaps from their own wallet, save favorite pairs, and receive alerts when saved
 pairs or reverse-swap profit/loss conditions become important.

@@ -2,7 +2,7 @@
 
 ## Product Need
 
-The Wallet is moving toward a production MVP, so we need basic operational
+Swap Assistant is moving toward a production MVP, so we need basic operational
 visibility before more user-facing alert workflows are added.
 
 ## Prompt

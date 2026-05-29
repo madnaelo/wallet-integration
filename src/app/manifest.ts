@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "The Wallet",
-    short_name: "The Wallet",
-    description: "Your Personal Swap Aggregator. Get the best price for your swaps.",
+    name: "Swap Assistant",
+    short_name: "Swap Assistant",
+    description: "Your Personal Swap Assistant. Get the best price for your swaps.",
     id: "/swap",
     start_url: "/swap",
     scope: "/",

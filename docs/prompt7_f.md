@@ -44,7 +44,7 @@ Implement these two related slices:
 - Keep long native-token and destination-token fee values readable on narrow
   widths.
 - Keep the main header and summary aligned with the product name:
-  "The Wallet" and "Your Personal Swap Aggregator."
+  "Swap Assistant" and "Your Personal Swap Assistant."
 
 ## Out Of Scope
 

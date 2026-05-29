@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Fees & Risks",
-  description: "Fee, quote, execution, and alert disclosures for The Wallet."
+  description: "Fee, quote, execution, and alert disclosures for Swap Assistant."
 };
 
 export default function FeesPage() {
@@ -15,8 +15,8 @@ export default function FeesPage() {
         </Link>
         <h1>Fees & Risks</h1>
         <p>
-          The Wallet is a non-custodial swap assistant. Your wallet signs and
-          submits transactions. The Wallet does not hold private keys, seed
+          Swap Assistant is a non-custodial swap assistant. Your wallet signs and
+          submits transactions. Swap Assistant does not hold private keys, seed
           phrases, or user funds.
         </p>
 
@@ -38,7 +38,7 @@ export default function FeesPage() {
         <section>
           <h2>Platform Fees</h2>
           <p>
-            The Wallet may receive an integrator, affiliate, or platform fee
+            Swap Assistant may receive an integrator, affiliate, or platform fee
             from supported swap providers. Where possible, this fee is included
             in the provider quote and sent to a configured treasury address by
             the provider or protocol route.

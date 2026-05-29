@@ -92,8 +92,8 @@ function getRecipientImportClient(projectId: string, origin: string): Promise<Re
     clientPromise = import("@walletconnect/sign-client").then(({ default: SignClient }) => SignClient.init({
       projectId,
       metadata: {
-        name: "The Wallet",
-        description: "Your Personal Swap Aggregator",
+        name: "Swap Assistant",
+        description: "Your Personal Swap Assistant",
         url: origin,
         icons: []
       }

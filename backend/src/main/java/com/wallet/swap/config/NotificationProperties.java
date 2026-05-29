@@ -280,7 +280,7 @@ public class NotificationProperties {
     private boolean enabled = false;
     private String vapidPublicKey = "";
     private String vapidPrivateKey = "";
-    private String vapidSubject = "mailto:alerts@thewallet.app";
+    private String vapidSubject = "mailto:alerts@swapassistant.app";
 
     public boolean isEnabled() {
       return enabled;

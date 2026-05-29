@@ -1,5 +1,5 @@
 [Unit]
-Description=Run The Wallet PostgreSQL backup daily
+Description=Run Swap Assistant PostgreSQL backup daily
 
 [Timer]
 OnCalendar=*-*-* 03:15:00 UTC

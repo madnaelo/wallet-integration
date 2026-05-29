@@ -1,4 +1,4 @@
-const CACHE_NAME = "the-wallet-pwa-v1";
+const CACHE_NAME = "swap-assistant-pwa-v1";
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = [OFFLINE_URL, "/favicon.svg", "/apple-touch-icon.svg"];
 
@@ -37,12 +37,12 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("push", (event) => {
   const payload = readPushPayload(event);
-  const title = payload.title || "The Wallet";
+  const title = payload.title || "Swap Assistant";
   const options = {
-    body: payload.body || "Open The Wallet to review your alert.",
+    body: payload.body || "Open Swap Assistant to review your alert.",
     icon: "/favicon.svg",
     badge: "/favicon.svg",
-    tag: payload.tag || "the-wallet-alert",
+    tag: payload.tag || "swap-assistant-alert",
     renotify: false,
     data: {
       url: sanitizeNotificationUrl(payload.url)

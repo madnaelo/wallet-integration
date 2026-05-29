@@ -23,7 +23,7 @@ export function createPlatformFeeConfig(): PlatformFeeConfig {
     feeBps,
     feePercent: formatFeePercent(feeBps),
     feeFraction: feeBps / 10_000,
-    paraswapPartner: env.PARASWAP_PARTNER.trim() || "thewallet"
+    paraswapPartner: env.PARASWAP_PARTNER.trim() || "swapassistant"
   };
 }
 
