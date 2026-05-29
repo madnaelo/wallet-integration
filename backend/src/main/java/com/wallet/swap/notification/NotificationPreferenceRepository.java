@@ -112,7 +112,7 @@ public class NotificationPreferenceRepository {
         rs.getBoolean("email_enabled"),
         rs.getString("telegram_chat_id"),
         rs.getBoolean("telegram_enabled"),
-        rs.getBoolean("push_enabled"),
+        rs.getBoolean("push_enabled") && rs.getInt("push_subscription_count") > 0,
         rs.getInt("push_subscription_count"),
         rs.getInt("reverse_profit_threshold_bps"),
         rs.getBoolean("reverse_loss_enabled"),
