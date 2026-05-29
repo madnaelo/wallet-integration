@@ -59,8 +59,10 @@ public class ReverseProfitCandidateRepository {
         JOIN swap_history h ON h.wallet_address = p.wallet_address
         LEFT JOIN LATERAL (
           SELECT count(*)::int AS subscription_count
-          FROM push_subscriptions ps
-          WHERE ps.wallet_address = p.wallet_address
+          FROM push_subscription_wallets psw
+          JOIN push_subscriptions ps ON ps.id = psw.push_subscription_id
+          WHERE psw.wallet_address = p.wallet_address
+            AND psw.disabled_at IS NULL
             AND ps.disabled_at IS NULL
         ) active_push ON true
         LEFT JOIN LATERAL (

@@ -5,6 +5,7 @@ import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
 import com.wallet.swap.notification.NotificationModels.PushNotificationConfigResponse;
+import com.wallet.swap.notification.NotificationModels.PushSubscriptionDisableRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
 import com.wallet.swap.notification.TelegramLinkModels.TelegramLinkStartResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -94,8 +95,9 @@ public class NotificationPreferenceController {
   @DeleteMapping("/push-subscriptions")
   public NotificationPreferenceResponse disablePushSubscriptions(
       @RequestHeader(name = "Authorization", required = false) String authorization,
-      HttpServletRequest httpRequest) {
+      HttpServletRequest httpRequest,
+      @RequestBody(required = false) PushSubscriptionDisableRequest request) {
     String walletAddress = authService.authenticateRequest(authorization, httpRequest);
-    return pushSubscriptionService.disable(walletAddress);
+    return pushSubscriptionService.disable(walletAddress, request);
   }
 }

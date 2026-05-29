@@ -285,11 +285,13 @@ export async function savePushSubscription(
 
 export async function disablePushSubscriptions(
   backendBaseUrl: string,
-  session: BackendSession
+  session: BackendSession,
+  endpoint?: string
 ): Promise<NotificationPreference> {
   return backendFetch<NotificationPreference>(backendBaseUrl, "/api/notifications/preferences/push-subscriptions", {
     method: "DELETE",
-    headers: authHeaders(session)
+    headers: authHeaders(session),
+    body: endpoint ? JSON.stringify({ endpoint }) : undefined
   });
 }
 

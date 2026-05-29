@@ -44,6 +44,9 @@ public final class NotificationModels {
       PushSubscriptionKeys keys,
       Long expirationTime) {}
 
+  public record PushSubscriptionDisableRequest(
+      @Size(max = 2048) String endpoint) {}
+
   public record PushSubscriptionKeys(
       @NotBlank @Size(max = 512) String p256dh,
       @NotBlank @Size(max = 256) String auth) {}

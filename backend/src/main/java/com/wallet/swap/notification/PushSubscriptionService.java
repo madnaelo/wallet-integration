@@ -2,6 +2,7 @@ package com.wallet.swap.notification;
 
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.config.NotificationProperties;
+import com.wallet.swap.notification.NotificationModels.PushSubscriptionDisableRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
 import java.net.URI;
@@ -42,17 +43,27 @@ public class PushSubscriptionService {
     return preferenceService.setPushEnabled(walletAddress, true);
   }
 
-  public NotificationPreferenceResponse disable(String walletAddress) {
-    pushSubscriptionRepository.disableForWallet(walletAddress);
-    return preferenceService.setPushEnabled(walletAddress, false);
+  public NotificationPreferenceResponse disable(String walletAddress, PushSubscriptionDisableRequest request) {
+    String endpoint = request == null ? null : request.endpoint();
+    if (hasText(endpoint)) {
+      validateEndpoint(endpoint);
+      pushSubscriptionRepository.disableForWalletEndpoint(walletAddress, endpoint);
+    } else {
+      pushSubscriptionRepository.disableForWallet(walletAddress);
+    }
+    return preferenceService.setPushEnabled(walletAddress, pushSubscriptionRepository.countActive(walletAddress) > 0);
   }
 
   private void validate(PushSubscriptionRequest request) {
     if (request.keys() == null) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Push notification setup was incomplete. Please try again.");
     }
+    validateEndpoint(request.endpoint());
+  }
+
+  private void validateEndpoint(String endpointValue) {
     try {
-      URI endpoint = URI.create(request.endpoint().trim());
+      URI endpoint = URI.create(endpointValue.trim());
       if (!"https".equalsIgnoreCase(endpoint.getScheme())) {
         throw new ApiException(HttpStatus.BAD_REQUEST, "Push notification setup was incomplete. Please try again.");
       }

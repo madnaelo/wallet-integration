@@ -7,7 +7,9 @@ import com.wallet.swap.notification.NotificationMessageFormatter.PushNotificatio
 import com.wallet.swap.notification.PushSubscriptionRepository.PushSubscriptionRecord;
 import java.security.Security;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import org.apache.http.HttpResponse;
@@ -65,16 +67,36 @@ public class PushNotificationSender {
           pushSubscriptionRepository.disableEndpoint(subscription.endpoint());
         }
         if (status >= 400) {
-          failures.add("Delivery failed with status " + status);
+          String failure = "push service returned HTTP " + status;
+          log.warn(
+              "Push notification delivery failed for wallet {} subscription {}: {}.",
+              maskWallet(walletAddress),
+              subscription.id(),
+              failure);
+          failures.add(failure);
         }
       } catch (Exception exception) {
-        log.warn("Push notification delivery failed for wallet {}.", walletAddress, exception);
-        failures.add(exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage());
+        String failure = safeFailure(exception);
+        log.warn(
+            "Push notification delivery failed for wallet {} subscription {}: {}.",
+            maskWallet(walletAddress),
+            subscription.id(),
+            failure,
+            exception);
+        failures.add(failure);
       }
     }
 
     if (failures.size() == subscriptions.size()) {
-      throw new IllegalStateException("Push notification could not be delivered.");
+      throw new IllegalStateException("Push notification could not be delivered: " + summarizeFailures(failures));
+    }
+    if (!failures.isEmpty()) {
+      log.warn(
+          "Push notification reached at least one device for wallet {}, but {} of {} device(s) failed: {}.",
+          maskWallet(walletAddress),
+          failures.size(),
+          subscriptions.size(),
+          summarizeFailures(failures));
     }
   }
 
@@ -99,5 +121,33 @@ public class PushNotificationSender {
 
   private boolean hasText(String value) {
     return value != null && !value.isBlank();
+  }
+
+  private String safeFailure(Exception exception) {
+    String message = exception.getMessage();
+    if (message == null || message.isBlank()) return exception.getClass().getSimpleName();
+    String sanitized = message.replaceAll("https?://\\S+", "[push endpoint]").replaceAll("\\s+", " ").trim();
+    if (sanitized.length() > 240) sanitized = sanitized.substring(0, 240) + "...";
+    return exception.getClass().getSimpleName() + ": " + sanitized;
+  }
+
+  private String summarizeFailures(List<String> failures) {
+    Set<String> uniqueFailures = new LinkedHashSet<>(failures);
+    List<String> summary = new ArrayList<>();
+    int remaining = 0;
+    for (String failure : uniqueFailures) {
+      if (summary.size() < 3) {
+        summary.add(failure);
+      } else {
+        remaining++;
+      }
+    }
+    String joined = String.join("; ", summary);
+    return remaining > 0 ? joined + "; +" + remaining + " more" : joined;
+  }
+
+  private String maskWallet(String walletAddress) {
+    if (walletAddress == null || walletAddress.length() <= 12) return "unknown";
+    return walletAddress.substring(0, 6) + "..." + walletAddress.substring(walletAddress.length() - 4);
   }
 }

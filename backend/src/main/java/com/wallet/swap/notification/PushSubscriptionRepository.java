@@ -18,7 +18,7 @@ public class PushSubscriptionRepository {
   }
 
   public void upsert(String walletAddress, PushSubscriptionRequest request, String userAgent) {
-    jdbcTemplate.update(
+    UUID subscriptionId = jdbcTemplate.queryForObject(
         """
         INSERT INTO push_subscriptions (
           id, wallet_address, endpoint, p256dh, auth_secret, user_agent, disabled_at
@@ -32,22 +32,40 @@ public class PushSubscriptionRepository {
           disabled_at = NULL,
           updated_at = now(),
           last_seen_at = now()
+        RETURNING id
         """,
+        UUID.class,
         UUID.randomUUID(),
         walletAddress,
         request.endpoint().trim(),
         request.keys().p256dh().trim(),
         request.keys().auth().trim(),
         truncate(userAgent, 500));
+
+    jdbcTemplate.update(
+        """
+        INSERT INTO push_subscription_wallets (
+          push_subscription_id, wallet_address, disabled_at
+        )
+        VALUES (?, ?, NULL)
+        ON CONFLICT (push_subscription_id, wallet_address) DO UPDATE SET
+          disabled_at = NULL,
+          updated_at = now(),
+          last_seen_at = now()
+        """,
+        subscriptionId,
+        walletAddress);
   }
 
   public int countActive(String walletAddress) {
     Integer count = jdbcTemplate.queryForObject(
         """
         SELECT count(*)::int
-        FROM push_subscriptions
-        WHERE wallet_address = ?
-          AND disabled_at IS NULL
+        FROM push_subscription_wallets psw
+        JOIN push_subscriptions ps ON ps.id = psw.push_subscription_id
+        WHERE psw.wallet_address = ?
+          AND psw.disabled_at IS NULL
+          AND ps.disabled_at IS NULL
         """,
         Integer.class,
         walletAddress);
@@ -57,11 +75,21 @@ public class PushSubscriptionRepository {
   public List<PushSubscriptionRecord> findActiveForWallet(String walletAddress) {
     return jdbcTemplate.query(
         """
-        SELECT id, wallet_address, endpoint, p256dh, auth_secret, created_at, updated_at, last_seen_at
-        FROM push_subscriptions
-        WHERE wallet_address = ?
-          AND disabled_at IS NULL
-        ORDER BY updated_at DESC
+        SELECT
+          ps.id,
+          psw.wallet_address,
+          ps.endpoint,
+          ps.p256dh,
+          ps.auth_secret,
+          ps.created_at,
+          GREATEST(ps.updated_at, psw.updated_at) AS updated_at,
+          GREATEST(ps.last_seen_at, psw.last_seen_at) AS last_seen_at
+        FROM push_subscription_wallets psw
+        JOIN push_subscriptions ps ON ps.id = psw.push_subscription_id
+        WHERE psw.wallet_address = ?
+          AND psw.disabled_at IS NULL
+          AND ps.disabled_at IS NULL
+        ORDER BY GREATEST(ps.updated_at, psw.updated_at) DESC
         """,
         (rs, rowNum) -> mapRow(rs),
         walletAddress);
@@ -70,13 +98,30 @@ public class PushSubscriptionRepository {
   public int disableForWallet(String walletAddress) {
     return jdbcTemplate.update(
         """
-        UPDATE push_subscriptions
+        UPDATE push_subscription_wallets
         SET disabled_at = COALESCE(disabled_at, now()),
           updated_at = now()
         WHERE wallet_address = ?
           AND disabled_at IS NULL
         """,
         walletAddress);
+  }
+
+  public int disableForWalletEndpoint(String walletAddress, String endpoint) {
+    return jdbcTemplate.update(
+        """
+        UPDATE push_subscription_wallets psw
+        SET disabled_at = COALESCE(psw.disabled_at, now()),
+          updated_at = now()
+        FROM push_subscriptions ps
+        WHERE ps.id = psw.push_subscription_id
+          AND psw.wallet_address = ?
+          AND ps.endpoint = ?
+          AND psw.disabled_at IS NULL
+          AND ps.disabled_at IS NULL
+        """,
+        walletAddress,
+        endpoint.trim());
   }
 
   public void disableEndpoint(String endpoint) {
@@ -86,6 +131,16 @@ public class PushSubscriptionRepository {
         SET disabled_at = COALESCE(disabled_at, now()),
           updated_at = now()
         WHERE endpoint = ?
+        """,
+        endpoint);
+    jdbcTemplate.update(
+        """
+        UPDATE push_subscription_wallets psw
+        SET disabled_at = COALESCE(psw.disabled_at, now()),
+          updated_at = now()
+        FROM push_subscriptions ps
+        WHERE ps.id = psw.push_subscription_id
+          AND ps.endpoint = ?
         """,
         endpoint);
   }

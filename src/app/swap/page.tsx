@@ -1491,14 +1491,18 @@ export default function Page() {
     setNotificationPreferenceNotice("");
     try {
       const session = await ensureBackendSession("preferences");
+      let endpoint = "";
       if ("serviceWorker" in navigator) {
         const registration = await navigator.serviceWorker.getRegistration("/");
         const subscription = await registration?.pushManager.getSubscription();
-        await subscription?.unsubscribe().catch(() => false);
+        endpoint = subscription?.endpoint ?? "";
       }
-      const preference = await disablePushSubscriptions(envPublic.BACKEND_BASE_URL, session);
+      if (!endpoint) {
+        throw new Error("This device is not connected to push notifications for this wallet.");
+      }
+      const preference = await disablePushSubscriptions(envPublic.BACKEND_BASE_URL, session, endpoint);
       applyNotificationPreference(preference);
-      setNotificationPreferenceNotice("Push notifications disabled on this device.");
+      setNotificationPreferenceNotice("Push notifications disabled for this wallet on this device.");
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
@@ -3207,7 +3211,7 @@ export default function Page() {
                     onClick={disablePushNotifications}
                     disabled={!walletAddress || pushPreferenceLoading}
                   >
-                    {pushPreferenceLoading ? "Updating..." : "Disable Push Notifications"}
+                    {pushPreferenceLoading ? "Updating..." : "Disable This Device"}
                   </button>
                 ) : (
                   <button
