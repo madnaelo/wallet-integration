@@ -1670,6 +1670,10 @@ body {
   width: min(360px, calc(100vw - 28px));
 }
 
+.tourCardPositioned {
+  bottom: auto;
+}
+
 .tourProgress {
   color: #8bd5ff;
   font-size: 12px;

@@ -69,7 +69,7 @@ const ACTIVE_VIEWS: ActiveView[] = ["swap", "auto-swap", "favorites", "preferenc
 const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
 const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
 const PUSH_DENIED_MESSAGE =
-  "Push notifications are blocked for this site. Open your browser site settings, allow notifications, then try again.";
+  "Push notifications are blocked for this site. Open your device or site settings, allow notifications, then try again.";
 
 type DisplayToken = { address: string; symbol: string; decimals: number };
 type QuoteValidationErrors = {
@@ -121,6 +121,7 @@ type TourStep = {
   target: string;
   title: string;
   body: string;
+  mobileAnchor?: "tokenControls";
 };
 
 const SWAP_TOUR_STEPS: TourStep[] = [
@@ -137,7 +138,8 @@ const SWAP_TOUR_STEPS: TourStep[] = [
   {
     target: "tokens",
     title: "Choose the pair",
-    body: "Pick the token you sell and the token you receive. Each dropdown includes a network filter and search."
+    body: "Pick the token you sell and the token you receive. Each dropdown includes a network filter and search.",
+    mobileAnchor: "tokenControls"
   },
   {
     target: "recipient",
@@ -511,14 +513,9 @@ export default function Page() {
         return;
       }
 
-      const isMobileTour = window.matchMedia("(max-width: 699px)").matches;
-      element.scrollIntoView({
-        block: isMobileTour ? "start" : "center",
-        inline: "nearest",
-        behavior: prefersReducedMotion() ? "auto" : "smooth"
-      });
+      element.scrollIntoView({ block: "center", inline: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
       window.setTimeout(() => {
-        const rect = element.getBoundingClientRect();
+        const rect = getTourAnchorRect(element, step);
         setTourAnchor({
           left: Math.max(8, rect.left),
           top: Math.max(8, rect.top),
@@ -3781,7 +3778,7 @@ function SwapTour({
           }}
         />
       ) : null}
-      <div className="tourCard" style={cardStyle} key={currentStep}>
+      <div className={`tourCard${anchor ? " tourCardPositioned" : ""}`} style={cardStyle} key={currentStep}>
         <div className="tourProgress">
           Step {currentStep + 1} of {steps.length}
         </div>
@@ -3805,38 +3802,52 @@ function SwapTour({
   );
 }
 
+function getTourAnchorRect(element: HTMLElement, step: TourStep): DOMRect {
+  if (step.mobileAnchor === "tokenControls" && window.matchMedia("(max-width: 699px)").matches) {
+    const controlRects = Array.from(element.querySelectorAll<HTMLElement>(".tokenPickerButton, .tokenFlipButton"))
+      .map((control) => control.getBoundingClientRect())
+      .filter((rect) => rect.width > 0 && rect.height > 0);
+    const unionRect = unionClientRects(controlRects);
+    if (unionRect) return unionRect;
+  }
+
+  return element.getBoundingClientRect();
+}
+
+function unionClientRects(rects: DOMRect[]): DOMRect | null {
+  if (!rects.length) return null;
+
+  const left = Math.min(...rects.map((rect) => rect.left));
+  const top = Math.min(...rects.map((rect) => rect.top));
+  const right = Math.max(...rects.map((rect) => rect.right));
+  const bottom = Math.max(...rects.map((rect) => rect.bottom));
+  return new DOMRect(left, top, right - left, bottom - top);
+}
+
 function tourCardStyle(anchor: TourAnchor | null): CSSProperties {
   if (!anchor) return {};
 
   const margin = 14;
   const width = Math.min(360, window.innerWidth - margin * 2);
-  const measuredHeight = document.querySelector<HTMLElement>(".tourCard")?.getBoundingClientRect().height;
-  const estimatedHeight = Math.ceil(measuredHeight || (window.innerWidth < 700 ? 292 : 240));
+  const estimatedHeight = 240;
   const sideGap = 18;
   const canFitRight = anchor.left + anchor.width + sideGap + width + margin <= window.innerWidth;
   const canFitLeft = anchor.left - sideGap - width >= margin;
   if (window.innerWidth >= 900 && (canFitRight || canFitLeft)) {
     return {
+      bottom: "auto",
       left: canFitRight ? anchor.left + anchor.width + sideGap : anchor.left - width - sideGap,
       top: Math.max(margin, Math.min(anchor.top, window.innerHeight - estimatedHeight - margin)),
       width
     };
   }
 
-  const gap = window.innerWidth < 700 ? 18 : 14;
-  const below = anchor.top + anchor.height + gap;
-  const above = anchor.top - estimatedHeight - gap;
-  const fitsBelow = below + estimatedHeight <= window.innerHeight - margin;
-  const fitsAbove = above >= margin;
-  const top = fitsBelow
-    ? below
-    : fitsAbove
-      ? above
-      : anchor.top > window.innerHeight / 2
-        ? margin
-        : Math.max(margin, window.innerHeight - estimatedHeight - margin);
+  const below = anchor.top + anchor.height + 14;
+  const above = anchor.top - estimatedHeight - 14;
+  const top = below + estimatedHeight <= window.innerHeight ? below : Math.max(margin, above);
   const left = Math.max(margin, Math.min(anchor.left, window.innerWidth - width - margin));
   return {
+    bottom: "auto",
     left,
     top,
     width
@@ -4302,6 +4313,8 @@ function getPushSupportMessage(vapidPublicKey: string): string {
   if (!window.isSecureContext && window.location.hostname !== "localhost") {
     return "Push notifications need a secure connection.";
   }
+  const mobileSupportMessage = getMobilePushSupportMessage();
+  if (mobileSupportMessage) return mobileSupportMessage;
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
     return "This browser does not support push notifications.";
   }
@@ -4309,6 +4322,30 @@ function getPushSupportMessage(vapidPublicKey: string): string {
     return PUSH_DENIED_MESSAGE;
   }
   return "";
+}
+
+function getMobilePushSupportMessage(): string {
+  const userAgent = navigator.userAgent || "";
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(userAgent);
+  if (!isMobile) return "";
+
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+  const isIos = /iPhone|iPad|iPod/i.test(userAgent);
+  if (isIos && !isStandalone) {
+    return "Install The Wallet on this device first, then enable push notifications from the installed app.";
+  }
+
+  if (isLikelyEmbeddedMobileBrowser(userAgent)) {
+    return "Push notifications usually do not work inside wallet app web views. Open The Wallet in Chrome, Edge, Safari, or the installed app, then enable push notifications.";
+  }
+
+  return "";
+}
+
+function isLikelyEmbeddedMobileBrowser(userAgent: string): boolean {
+  return /; wv\)|\bwv\b|MetaMaskMobile|Binance|Trust|CoinbaseWallet|OKApp|Phantom|Rainbow|TokenPocket|imToken/i.test(userAgent);
 }
 
 async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
@@ -4751,7 +4788,7 @@ function normalizeRecipientImportError(e: any): string {
 function normalizePushNotificationError(e: any): string {
   const message = normalizeWalletError(e);
   if (/push service|registration failed|aborterror/i.test(message)) {
-    return "Push notification setup could not reach your browser's push service. Refresh and try again, or try from Chrome, Edge, or the installed app.";
+    return "Push notification setup could not reach this device's push service. Open The Wallet in Chrome, Edge, Safari, or the installed app, then try again.";
   }
   if (/permission|blocked|denied|not enabled/i.test(message)) return PUSH_DENIED_MESSAGE;
   if (/not available/i.test(message)) return "Push notifications are not available right now.";
