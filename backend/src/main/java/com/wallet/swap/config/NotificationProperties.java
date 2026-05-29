@@ -311,7 +311,10 @@ public class NotificationProperties {
     }
 
     public void setVapidSubject(String vapidSubject) {
-      this.vapidSubject = vapidSubject;
+      String normalized = vapidSubject == null ? "" : vapidSubject.trim();
+      this.vapidSubject = "mailto:alerts@thewallet.app".equalsIgnoreCase(normalized)
+          ? "mailto:alerts@swapassistant.app"
+          : normalized;
     }
   }
 }

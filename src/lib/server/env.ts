@@ -17,6 +17,10 @@ function optionalBoolean(name: string, fallback: boolean): boolean {
   return ["1", "true", "yes", "on"].includes(v.trim().toLowerCase());
 }
 
+function normalizeLegacyBrandValue(value: string): string {
+  return value.trim() === "thewallet" ? "swapassistant" : value;
+}
+
 export const env = {
   ZEROX_API_KEY: optional("ZEROX_API_KEY", ""),
   ONEINCH_API_KEY: optional("ONEINCH_API_KEY", ""),
@@ -24,7 +28,7 @@ export const env = {
   PARASWAP_BASE_URL: optional("PARASWAP_BASE_URL", "https://api.paraswap.io"),
   PARASWAP_API_KEY: optional("PARASWAP_API_KEY", ""),
   PARASWAP_API_KEY_HEADER: optional("PARASWAP_API_KEY_HEADER", "X-API-Key"),
-  PARASWAP_PARTNER: optional("PARASWAP_PARTNER", "swapassistant"),
+  PARASWAP_PARTNER: normalizeLegacyBrandValue(optional("PARASWAP_PARTNER", "swapassistant")),
   ODOS_BASE_URL: optional("ODOS_BASE_URL", "https://api.odos.xyz"),
   ODOS_API_KEY: optional("ODOS_API_KEY", ""),
   LIFI_BASE_URL: optional("LIFI_BASE_URL", "https://li.quest"),
