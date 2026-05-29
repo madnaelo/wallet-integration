@@ -98,7 +98,7 @@ type RecipientAddressMode = "connected" | "custom";
 type RecipientAddressSource = "connected" | "pasted" | "scanned" | "wallet_import";
 type RecipientDialogMode = "paste" | "scan" | "wallet";
 type WalletApprovalAction = "signIn" | "tokenApproval" | "swap";
-type WalletApprovalNoticeTarget = "history" | "preferences";
+type WalletApprovalNoticeTarget = "history" | "preferences" | "favorites";
 type WalletSignPromptState = {
   target: WalletApprovalNoticeTarget;
   walletName: string;
@@ -282,6 +282,7 @@ export default function Page() {
   const [favoritePairDeletingId, setFavoritePairDeletingId] = useState<string>("");
   const [favoritePairError, setFavoritePairError] = useState<string>("");
   const [favoritePairNotice, setFavoritePairNotice] = useState<string>("");
+  const [favoriteAuthNotice, setFavoriteAuthNotice] = useState<string>("");
   const [favoriteAlertEnabledDraft, setFavoriteAlertEnabledDraft] = useState<boolean>(true);
   const [favoriteAlertDirectionDraft, setFavoriteAlertDirectionDraft] = useState<"above" | "below">("above");
   const [favoriteTargetRateDraft, setFavoriteTargetRateDraft] = useState<string>("");
@@ -1251,24 +1252,27 @@ export default function Page() {
 
     const request = (async () => {
       const p = getProviderOrThrow();
-      const setAuthNotice = noticeTarget === "preferences" ? setPreferencesAuthNotice : setHistoryNotice;
-      await confirmWalletSignIn(noticeTarget);
-      setAuthNotice(buildWalletApprovalNotice(connectedWalletName, "signIn"));
+      const setAuthNotice = getBackendAuthNoticeSetter(noticeTarget);
       const nonce = await requestAuthNonce(envPublic.BACKEND_BASE_URL, walletAddress);
-      const signature = await signMessageWithProvider(
-        p,
-        walletAddress,
-        nonce.message,
-        walletKind,
-        setAuthNotice,
-        connectedWalletName
-      );
-      setAuthNotice("Thanks. Loading your saved data...");
-      const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, walletAddress, signature);
-      writeStoredBackendSession(session);
-      setBackendSession(session);
-      setAuthNotice("");
-      return session;
+      await confirmWalletSignIn(noticeTarget);
+      try {
+        setAuthNotice(buildWalletApprovalNotice(connectedWalletName, "signIn"));
+        const signature = await signMessageWithProvider(
+          p,
+          walletAddress,
+          nonce.message,
+          walletKind,
+          setAuthNotice,
+          connectedWalletName
+        );
+        setAuthNotice("Thanks. Loading your saved data...");
+        const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, walletAddress, signature);
+        writeStoredBackendSession(session);
+        setBackendSession(session);
+        return session;
+      } finally {
+        setAuthNotice("");
+      }
     })();
 
     backendSessionRequestRef.current = request;
@@ -1277,6 +1281,12 @@ export default function Page() {
     } finally {
       backendSessionRequestRef.current = null;
     }
+  }
+
+  function getBackendAuthNoticeSetter(target: WalletApprovalNoticeTarget): (message: string) => void {
+    if (target === "preferences") return setPreferencesAuthNotice;
+    if (target === "favorites") return setFavoriteAuthNotice;
+    return setHistoryNotice;
   }
 
   async function refreshBackendHistory() {
@@ -1349,6 +1359,7 @@ export default function Page() {
     setFavoritePairDeletingId("");
     setFavoritePairError("");
     setFavoritePairNotice("");
+    setFavoriteAuthNotice("");
     setFavoriteAlertEnabledDraft(true);
     setFavoriteAlertDirectionDraft("above");
     setFavoriteTargetRateDraft("");
@@ -1413,10 +1424,10 @@ export default function Page() {
     return session;
   }
 
-  function getPreferenceSessionOrThrow(): BackendSession {
+  function getSignedInBackendSessionOrThrow(): BackendSession {
     const session = getCurrentBackendSessionForWallet();
     if (!session) {
-      throw new Error("Sign in with your wallet before changing preferences.");
+      throw new Error("Sign in with your wallet before changing saved settings.");
     }
     return session;
   }
@@ -1477,7 +1488,7 @@ export default function Page() {
       if (profitThresholdBps === null) throw new Error("Enter a profit alert threshold from 0% to 1000%.");
       const lossThresholdBps = parseThresholdPctToBps(reverseLossThresholdPctDraft);
       if (lossThresholdBps === null) throw new Error("Enter a loss alert threshold from 0% to 1000%.");
-      const session = getPreferenceSessionOrThrow();
+      const session = getSignedInBackendSessionOrThrow();
       const preference = await saveNotificationPreferences(envPublic.BACKEND_BASE_URL, session, {
         emailAddress: notificationPreference?.emailAddress ?? null,
         emailEnabled: notificationPreference?.emailEnabled ?? false,
@@ -1507,7 +1518,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = getPreferenceSessionOrThrow();
+      const session = getSignedInBackendSessionOrThrow();
       const link = await startTelegramLink(envPublic.BACKEND_BASE_URL, session);
       setTelegramLink(link);
       setNotificationPreferenceNotice("Telegram opened with a one-time connection code. Tap Start, then return here.");
@@ -1529,7 +1540,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = getPreferenceSessionOrThrow();
+      const session = getSignedInBackendSessionOrThrow();
       const preference = await completeTelegramLink(envPublic.BACKEND_BASE_URL, session);
       applyNotificationPreference(preference);
       setNotificationPreferenceNotice("Telegram connected. Alerts are enabled for this wallet.");
@@ -1564,7 +1575,17 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = getPreferenceSessionOrThrow();
+      const session = getSignedInBackendSessionOrThrow();
+      const browserSupportMessage = getPushSupportMessage(pushPublicKey || envPublic.VAPID_PUBLIC_KEY || "configured");
+      setPushSupportMessage(browserSupportMessage);
+      if (browserSupportMessage && browserSupportMessage !== PUSH_DENIED_MESSAGE) {
+        throw new Error(browserSupportMessage);
+      }
+      const permission = await requestPushNotificationPermission();
+      if (permission !== "granted") {
+        throw new Error(PUSH_DENIED_MESSAGE);
+      }
+
       const publicKey = await getEffectivePushPublicKey();
       const supportMessage = getPushSupportMessage(publicKey);
       setPushSupportMessage(supportMessage);
@@ -1573,11 +1594,6 @@ export default function Page() {
       }
 
       const registration = await ensureServiceWorkerRegistration();
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        throw new Error(PUSH_DENIED_MESSAGE);
-      }
-
       const subscription = await getOrCreatePushSubscription(registration, publicKey);
       const preference = await savePushSubscription(
         envPublic.BACKEND_BASE_URL,
@@ -1606,7 +1622,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = getPreferenceSessionOrThrow();
+      const session = getSignedInBackendSessionOrThrow();
       const registration = "serviceWorker" in navigator
         ? await navigator.serviceWorker.getRegistration("/")
         : undefined;
@@ -1752,8 +1768,9 @@ export default function Page() {
     setFavoritePairsLoading(true);
     setFavoritePairError("");
     setFavoritePairNotice("");
+    setFavoriteAuthNotice("");
     try {
-      const session = await ensureBackendSession();
+      const session = getSignedInBackendSessionOrThrow();
       const pairs = await listFavoritePairs(envPublic.BACKEND_BASE_URL, session);
       setFavoritePairs(pairs);
       setFavoritePairsLoaded(true);
@@ -1769,13 +1786,38 @@ export default function Page() {
     }
   }
 
+  async function signInAndRefreshFavoritePairs() {
+    if (favoritePairsRequestInFlightRef.current) return;
+    favoritePairsRequestInFlightRef.current = true;
+    setFavoritePairsLoading(true);
+    setFavoritePairError("");
+    setFavoritePairNotice("");
+    setFavoriteAuthNotice("");
+    try {
+      const session = await ensureBackendSession("favorites");
+      const pairs = await listFavoritePairs(envPublic.BACKEND_BASE_URL, session);
+      setFavoritePairs(pairs);
+      setFavoritePairsLoaded(true);
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setFavoritePairError(normalizeWalletError(e));
+    } finally {
+      setFavoritePairsLoading(false);
+      setFavoriteAuthNotice("");
+      favoritePairsRequestInFlightRef.current = false;
+    }
+  }
+
   async function saveCurrentFavoritePair(): Promise<boolean> {
     setFavoritePairSaving(true);
     setFavoritePairError("");
     setFavoritePairNotice("");
     try {
       const request = buildFavoritePairRequest();
-      const session = await ensureBackendSession();
+      const session = await ensureBackendSession("favorites");
       const saved = await saveFavoritePair(envPublic.BACKEND_BASE_URL, session, request);
       setFavoritePairs((pairs) => [saved, ...pairs.filter((pair) => pair.id !== saved.id)]);
       setFavoritePairsLoaded(true);
@@ -1798,7 +1840,7 @@ export default function Page() {
     setFavoritePairError("");
     setFavoritePairNotice("");
     try {
-      const session = await ensureBackendSession();
+      const session = getSignedInBackendSessionOrThrow();
       await deleteFavoritePair(envPublic.BACKEND_BASE_URL, session, pair.id);
       setFavoritePairs((pairs) => pairs.filter((item) => item.id !== pair.id));
       setFavoritePairNotice(`${pair.sellTokenSymbol} to ${pair.buyTokenSymbol} removed.`);
@@ -2320,9 +2362,13 @@ export default function Page() {
   const signedInBackendSession =
     walletAddress && backendSession && isSessionForWallet(backendSession, walletAddress) ? backendSession : null;
   const preferencesSignedIn = Boolean(signedInBackendSession);
+  const favoritesSignedIn = Boolean(signedInBackendSession);
   const preferencesSigning = preferencesBusy && !preferencesSignedIn && Boolean(preferencesAuthNotice);
   const preferencesSignNotice =
     preferencesAuthNotice || buildWalletApprovalNotice(historySignWalletName, "signIn");
+  const favoriteBusy = favoritePairsLoading || favoritePairSaving || Boolean(favoritePairDeletingId);
+  const favoriteSigning = favoriteBusy && !favoritesSignedIn && Boolean(favoriteAuthNotice);
+  const favoriteSignNotice = favoriteAuthNotice || buildWalletApprovalNotice(historySignWalletName, "signIn");
   const pushWalletSubscriptionCount = notificationPreference?.pushSubscriptionCount ?? 0;
   const pushWalletEnabled = Boolean(notificationPreference?.pushEnabled && pushWalletSubscriptionCount > 0);
   const pushDeviceLinked = pushDeviceState === "linked";
@@ -3476,126 +3522,175 @@ export default function Page() {
                   : "Connect your wallet to save favorite pairs."}
               </div>
             </div>
-            <span className="badge">{favoritePairsLoading ? "Loading favorites" : "Favorites"}</span>
+            <span className="badge">
+              {!walletAddress
+                ? "Wallet needed"
+                : !favoritesSignedIn
+                  ? "Sign in needed"
+                  : favoritePairsLoading
+                    ? "Loading favorites"
+                    : "Favorites"}
+            </span>
           </div>
         <div className="settingsContent">
-          <div className="quoteHeader">
-            <div className="subtle">
-              {sellTokenInfo && buyTokenInfo
-                ? `Add new favorite: ${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}`
-                : "Select a pair in the swap form, then save it here."}
-            </div>
-            <button className="btn" type="button" onClick={refreshFavoritePairs} disabled={!walletAddress || favoritePairsLoading}>
-              {favoritePairsLoading ? "Loading..." : favoritePairsLoaded ? "Refresh" : "Load Favorites"}
-            </button>
-          </div>
-
-          <div className="favoriteComposer">
-            <div>
-              <label className="toggleRow">
-                <input
-                  type="checkbox"
-                  checked={favoriteAlertEnabledDraft}
-                  onChange={(event) => setFavoriteAlertEnabledDraft(event.target.checked)}
-                  disabled={!walletAddress}
-                />
-                <span>
-                  <strong>Alert on target rate</strong>
-                  <span className="subtle">Notify me when this pair reaches my target. Same-pair targets must be at least 1% apart.</span>
-                </span>
-              </label>
-            </div>
-
-            <div>
-              <div className="label">Target</div>
-              <div className="targetRateRow">
-                <select
-                  className="select"
-                  value={favoriteAlertDirectionDraft}
-                  onChange={(event) => setFavoriteAlertDirectionDraft(event.target.value as "above" | "below")}
-                  disabled={!walletAddress}
-                >
-                  <option value="above">At or above</option>
-                  <option value="below">At or below</option>
-                </select>
-                <input
-                  className="input"
-                  value={favoriteTargetRateDraft}
-                  onChange={(event) => setFavoriteTargetRateDraft(event.target.value)}
-                  placeholder={currentFavoriteRate || "2500"}
-                  inputMode="decimal"
-                  disabled={!walletAddress}
-                />
+          {!walletAddress ? (
+            <div className="preferencesAuthGate">
+              <div>
+                <strong>Connect your wallet to save favorite pairs</strong>
+                <p>
+                  Swap Assistant uses your public wallet address to keep your favorite pairs and alert targets private
+                  to this wallet. Connecting does not allow the app to move funds.
+                </p>
               </div>
-              {favoriteTargetHelper ? <div className="small" style={{ marginTop: 6 }}>{favoriteTargetHelper}</div> : null}
+              <button className="btn btnPrimary" type="button" onClick={openWalletChooser}>
+                Connect Wallet
+              </button>
             </div>
-
-            <div className="settingsActions">
+          ) : !favoritesSignedIn ? (
+            <div className="preferencesAuthGate">
+              <div>
+                <strong>Sign in to manage favorites</strong>
+                <p>
+                  Sign one message from your wallet so Swap Assistant can load favorites for this address. This is not a
+                  transaction and cannot move funds.
+                </p>
+              </div>
+              {favoriteSigning ? (
+                <div className="walletSignNotice preferencesWalletNotice" role="status" aria-live="polite">
+                  <span className="walletSignPulse" aria-hidden="true" />
+                  <span className="walletSignCopy">
+                    <span className="walletSignTitle">Waiting for wallet approval</span>
+                    <span className="walletSignText">{favoriteSignNotice}</span>
+                  </span>
+                </div>
+              ) : null}
               <button
                 className="btn btnPrimary"
                 type="button"
-                onClick={() => {
-                  void saveCurrentFavoritePair();
-                }}
-                disabled={!walletAddress || !sellTokenInfo || !buyTokenInfo || favoritePairSaving}
+                onClick={signInAndRefreshFavoritePairs}
+                disabled={favoritePairsLoading}
               >
-                {favoritePairSaving ? "Saving..." : "Add Favorite"}
+                {favoritePairsLoading ? "Waiting for Wallet..." : "Sign In With Wallet"}
               </button>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="quoteHeader">
+                <div className="subtle">
+                  {sellTokenInfo && buyTokenInfo
+                    ? `Add new favorite: ${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}`
+                    : "Select a pair in the swap form, then save it here."}
+                </div>
+                <button className="btn" type="button" onClick={refreshFavoritePairs} disabled={favoritePairsLoading}>
+                  {favoritePairsLoading ? "Loading..." : favoritePairsLoaded ? "Refresh" : "Load Favorites"}
+                </button>
+              </div>
+
+              <div className="favoriteComposer">
+                <div>
+                  <label className="toggleRow">
+                    <input
+                      type="checkbox"
+                      checked={favoriteAlertEnabledDraft}
+                      onChange={(event) => setFavoriteAlertEnabledDraft(event.target.checked)}
+                    />
+                    <span>
+                      <strong>Alert on target rate</strong>
+                      <span className="subtle">Notify me when this pair reaches my target. Same-pair targets must be at least 1% apart.</span>
+                    </span>
+                  </label>
+                </div>
+
+                <div>
+                  <div className="label">Target</div>
+                  <div className="targetRateRow">
+                    <select
+                      className="select"
+                      value={favoriteAlertDirectionDraft}
+                      onChange={(event) => setFavoriteAlertDirectionDraft(event.target.value as "above" | "below")}
+                    >
+                      <option value="above">At or above</option>
+                      <option value="below">At or below</option>
+                    </select>
+                    <input
+                      className="input"
+                      value={favoriteTargetRateDraft}
+                      onChange={(event) => setFavoriteTargetRateDraft(event.target.value)}
+                      placeholder={currentFavoriteRate || "2500"}
+                      inputMode="decimal"
+                    />
+                  </div>
+                  {favoriteTargetHelper ? <div className="small" style={{ marginTop: 6 }}>{favoriteTargetHelper}</div> : null}
+                </div>
+
+                <div className="settingsActions">
+                  <button
+                    className="btn btnPrimary"
+                    type="button"
+                    onClick={() => {
+                      void saveCurrentFavoritePair();
+                    }}
+                    disabled={!sellTokenInfo || !buyTokenInfo || favoritePairSaving}
+                  >
+                    {favoritePairSaving ? "Saving..." : "Add Favorite"}
+                  </button>
+                </div>
+              </div>
+
+              {!favoritePairsLoaded && favoritePairs.length === 0 ? (
+                <div className="small">Favorites have not been loaded yet.</div>
+              ) : favoritePairs.length === 0 ? (
+                <div className="small">No favorite pairs yet.</div>
+              ) : (
+                <div className="historyTableWrap">
+                  <table className="historyTable">
+                    <thead>
+                      <tr>
+                        <th>Pair</th>
+                        <th>Target</th>
+                        <th>Alerts</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {favoritePairs.map((pair) => (
+                        <tr key={pair.id}>
+                          <td>
+                            {pair.sellTokenSymbol} to {pair.buyTokenSymbol}
+                          </td>
+                          <td>{formatFavoriteTarget(pair)}</td>
+                          <td>{pair.alertsEnabled ? "On" : "Off"}</td>
+                          <td>
+                            <div className="tableActionGroup">
+                              <button className="tableActionButton" type="button" onClick={() => openFavoritePair(pair)}>
+                                Open
+                              </button>
+                              <button className="tableActionButton" type="button" onClick={() => openFavoritePair(pair, "reverse")}>
+                                Reverse
+                              </button>
+                              <button
+                                className="tableActionButton tableActionDanger"
+                                type="button"
+                                onClick={() => {
+                                  void removeFavoritePair(pair);
+                                }}
+                                disabled={favoritePairDeletingId === pair.id}
+                              >
+                                {favoritePairDeletingId === pair.id ? "Removing..." : "Remove"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
 
           {favoritePairNotice ? <div className="ok" style={{ marginTop: 10 }}>{favoritePairNotice}</div> : null}
           {favoritePairError ? <div className="error" style={{ marginTop: 10 }}>{favoritePairError}</div> : null}
-
-          {!favoritePairsLoaded && favoritePairs.length === 0 ? (
-            <div className="small">Favorites have not been loaded yet.</div>
-          ) : favoritePairs.length === 0 ? (
-            <div className="small">No favorite pairs yet.</div>
-          ) : (
-            <div className="historyTableWrap">
-              <table className="historyTable">
-                <thead>
-                  <tr>
-                    <th>Pair</th>
-                    <th>Target</th>
-                    <th>Alerts</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {favoritePairs.map((pair) => (
-                    <tr key={pair.id}>
-                      <td>
-                        {pair.sellTokenSymbol} to {pair.buyTokenSymbol}
-                      </td>
-                      <td>{formatFavoriteTarget(pair)}</td>
-                      <td>{pair.alertsEnabled ? "On" : "Off"}</td>
-                      <td>
-                        <div className="tableActionGroup">
-                          <button className="tableActionButton" type="button" onClick={() => openFavoritePair(pair)}>
-                            Open
-                          </button>
-                          <button className="tableActionButton" type="button" onClick={() => openFavoritePair(pair, "reverse")}>
-                            Reverse
-                          </button>
-                          <button
-                            className="tableActionButton tableActionDanger"
-                            type="button"
-                            onClick={() => {
-                              void removeFavoritePair(pair);
-                            }}
-                            disabled={favoritePairDeletingId === pair.id}
-                          >
-                            {favoritePairDeletingId === pair.id ? "Removing..." : "Remove"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
         </section>
       ) : null}
@@ -3628,8 +3723,8 @@ export default function Page() {
               <h2 id="wallet-sign-title">Approve a safe sign-in message</h2>
               <p>
                 Swap Assistant asks for a message signature to prove this wallet is yours, so it can load
-                {walletSignPrompt.target === "preferences" ? " alert settings" : " saved swap history"} for this
-                public address. This is not a transaction and cannot move funds.
+                {getWalletSignPromptResourceLabel(walletSignPrompt.target)} for this public address. This is not a
+                transaction and cannot move funds.
               </p>
               <div className="walletSignPromptInstruction">
                 {walletSignPrompt.isMobile
@@ -3726,6 +3821,18 @@ function buildWalletApprovalNotice(walletName: string, action: WalletApprovalAct
   const safetyHint = action === "signIn" ? " This cannot move funds." : "";
 
   return `${actionText} in ${walletLabel}, then return to Swap Assistant.${safetyHint}`;
+}
+
+function getWalletSignPromptResourceLabel(target: WalletApprovalNoticeTarget): string {
+  switch (target) {
+    case "preferences":
+      return " alert settings";
+    case "favorites":
+      return " favorite pairs";
+    case "history":
+    default:
+      return " saved swap history";
+  }
 }
 
 function normalizeWalletApprovalName(walletName: string): string {
@@ -4595,6 +4702,20 @@ function isLikelyEmbeddedMobileBrowser(userAgent: string): boolean {
   return /; wv\)|\bwv\b|MetaMaskMobile|Binance|Trust|CoinbaseWallet|OKApp|Phantom|Rainbow|TokenPocket|imToken/i.test(userAgent);
 }
 
+function requestPushNotificationPermission(): Promise<NotificationPermission> {
+  if (!("Notification" in window)) return Promise.resolve("denied");
+  if (Notification.permission !== "default") return Promise.resolve(Notification.permission);
+
+  return new Promise((resolve) => {
+    const requestPermission = Notification.requestPermission;
+    if (requestPermission.length > 0) {
+      requestPermission.call(Notification, resolve);
+      return;
+    }
+    requestPermission.call(Notification).then(resolve, () => resolve("denied"));
+  });
+}
+
 async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
   if (!("serviceWorker" in navigator)) {
     throw new Error("This browser does not support push notifications.");
@@ -4605,11 +4726,21 @@ async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistrat
   return navigator.serviceWorker.ready;
 }
 
+async function resetServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("This browser does not support push notifications.");
+  }
+  const existingRegistration = await navigator.serviceWorker.getRegistration("/");
+  await existingRegistration?.unregister().catch(() => false);
+  await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  return navigator.serviceWorker.ready;
+}
+
 async function getOrCreatePushSubscription(
   registration: ServiceWorkerRegistration,
   vapidPublicKey: string
 ): Promise<PushSubscription> {
-  const applicationServerKey = urlBase64ToArrayBuffer(vapidPublicKey);
+  const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
   const existingSubscription = await registration.pushManager.getSubscription();
   if (existingSubscription) {
     const existingKey = existingSubscription.options.applicationServerKey;
@@ -4620,25 +4751,35 @@ async function getOrCreatePushSubscription(
   }
 
   try {
-    return await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey
-    });
+    return await subscribeToPushManager(registration, applicationServerKey);
   } catch (firstError) {
     const staleSubscription = await registration.pushManager.getSubscription();
     if (staleSubscription) {
       await staleSubscription.unsubscribe().catch(() => false);
       try {
-        return await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey
-        });
+        return await subscribeToPushManager(registration, applicationServerKey);
       } catch {
-        throw firstError;
+        // Continue to the registration refresh below.
       }
     }
-    throw firstError;
+
+    try {
+      const refreshedRegistration = await resetServiceWorkerRegistration();
+      return await subscribeToPushManager(refreshedRegistration, applicationServerKey);
+    } catch {
+      throw firstError;
+    }
   }
+}
+
+function subscribeToPushManager(
+  registration: ServiceWorkerRegistration,
+  applicationServerKey: Uint8Array<ArrayBuffer>
+): Promise<PushSubscription> {
+  return registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey
+  });
 }
 
 function pushSubscriptionToPayload(subscription: PushSubscription): PushSubscriptionPayload {
@@ -4661,18 +4802,20 @@ function pushSubscriptionToPayload(subscription: PushSubscription): PushSubscrip
   };
 }
 
-function urlBase64ToArrayBuffer(value: string): ArrayBuffer {
+function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = `${value}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
-  const output = new Uint8Array(raw.length);
+  const output: Uint8Array<ArrayBuffer> = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
-  return output.buffer.slice(output.byteOffset, output.byteOffset + output.byteLength);
+  return output;
 }
 
-function arrayBufferToBase64Url(buffer: ArrayBuffer | null): string {
+function arrayBufferToBase64Url(buffer: ArrayBuffer | ArrayBufferView | null): string {
   if (!buffer) return "";
-  const bytes = new Uint8Array(buffer);
+  const bytes = ArrayBuffer.isView(buffer)
+    ? new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+    : new Uint8Array(buffer);
   let binary = "";
   const chunkSize = 0x8000;
   for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -5035,7 +5178,7 @@ function normalizeRecipientImportError(e: any): string {
 function normalizePushNotificationError(e: any): string {
   const message = normalizeWalletError(e);
   if (/push service|registration failed|aborterror/i.test(message)) {
-    return "Push notification setup could not reach this device's push service. Open Swap Assistant in Chrome, Edge, Safari, or the installed app, then try again.";
+    return "Push notifications were not enabled on this device. Open Swap Assistant directly in Chrome, Edge, Safari, or the installed app, refresh, and try again.";
   }
   if (/permission|blocked|denied|not enabled/i.test(message)) return PUSH_DENIED_MESSAGE;
   if (/not available/i.test(message)) return "Push notifications are not available right now.";
