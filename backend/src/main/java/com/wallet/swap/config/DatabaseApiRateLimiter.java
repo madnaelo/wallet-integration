@@ -1,5 +1,6 @@
 package com.wallet.swap.config;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -58,7 +59,7 @@ public class DatabaseApiRateLimiter implements ApiRateLimiter {
         DELETE FROM api_rate_limit_buckets
         WHERE reset_at <= ?
         """,
-        now);
+        Timestamp.from(now));
   }
 
   private record BucketState(int requestCount, Instant resetAt) {}
