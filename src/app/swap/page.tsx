@@ -42,6 +42,7 @@ import {
   deleteAutoSwapRule,
   deleteFavoritePair,
   disablePushSubscriptions,
+  getPushSubscriptionStatus,
   getFeatureFlags,
   getNotificationPreferences,
   getPushNotificationConfig,
@@ -98,6 +99,12 @@ type RecipientAddressSource = "connected" | "pasted" | "scanned" | "wallet_impor
 type RecipientDialogMode = "paste" | "scan" | "wallet";
 type WalletApprovalAction = "signIn" | "tokenApproval" | "swap";
 type WalletApprovalNoticeTarget = "history" | "preferences";
+type WalletSignPromptState = {
+  target: WalletApprovalNoticeTarget;
+  walletName: string;
+  isMobile: boolean;
+};
+type PushDeviceState = "unknown" | "checking" | "linked" | "not-linked" | "not-supported";
 type QrDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
 };
@@ -244,7 +251,10 @@ export default function Page() {
   const [historyError, setHistoryError] = useState<string>("");
   const [historyNotice, setHistoryNotice] = useState<string>("");
   const [preferencesAuthNotice, setPreferencesAuthNotice] = useState<string>("");
+  const [walletSignPrompt, setWalletSignPrompt] = useState<WalletSignPromptState | null>(null);
   const historyRequestInFlightRef = useRef<boolean>(false);
+  const backendSessionRequestRef = useRef<Promise<BackendSession> | null>(null);
+  const walletSignPromptResolverRef = useRef<((approved: boolean) => void) | null>(null);
   const [notificationPreference, setNotificationPreference] = useState<NotificationPreference | null>(null);
   const [notificationPreferenceLoaded, setNotificationPreferenceLoaded] = useState<boolean>(false);
   const [notificationPreferenceLoading, setNotificationPreferenceLoading] = useState<boolean>(false);
@@ -256,6 +266,8 @@ export default function Page() {
   const [pushPreferenceLoading, setPushPreferenceLoading] = useState<boolean>(false);
   const [pushPublicKey, setPushPublicKey] = useState<string>(() => envPublic.VAPID_PUBLIC_KEY);
   const [pushSupportMessage, setPushSupportMessage] = useState<string>("");
+  const [pushDeviceState, setPushDeviceState] = useState<PushDeviceState>("unknown");
+  const [currentPushEndpoint, setCurrentPushEndpoint] = useState<string>("");
   const [reverseProfitThresholdPctDraft, setReverseProfitThresholdPctDraft] = useState<string>("1");
   const [reverseLossEnabledDraft, setReverseLossEnabledDraft] = useState<boolean>(false);
   const [reverseLossThresholdPctDraft, setReverseLossThresholdPctDraft] = useState<string>("5");
@@ -1199,6 +1211,33 @@ export default function Page() {
     return p;
   }
 
+  async function confirmWalletSignIn(target: WalletApprovalNoticeTarget): Promise<void> {
+    if (walletSignPromptResolverRef.current) {
+      walletSignPromptResolverRef.current(false);
+    }
+
+    setWalletSignPrompt({
+      target,
+      walletName: connectedWalletName,
+      isMobile: isMobileBrowser()
+    });
+
+    const approved = await new Promise<boolean>((resolve) => {
+      walletSignPromptResolverRef.current = resolve;
+    });
+    walletSignPromptResolverRef.current = null;
+    setWalletSignPrompt(null);
+    if (!approved) throw new Error("Wallet sign-in was cancelled.");
+  }
+
+  function approveWalletSignPrompt() {
+    walletSignPromptResolverRef.current?.(true);
+  }
+
+  function cancelWalletSignPrompt() {
+    walletSignPromptResolverRef.current?.(false);
+  }
+
   async function ensureBackendSession(noticeTarget: WalletApprovalNoticeTarget = "history"): Promise<BackendSession> {
     if (!walletAddress) throw new Error("Connect your wallet before saving swap history.");
 
@@ -1208,24 +1247,36 @@ export default function Page() {
       return stored;
     }
 
-    const p = getProviderOrThrow();
-    const setAuthNotice = noticeTarget === "preferences" ? setPreferencesAuthNotice : setHistoryNotice;
-    setAuthNotice("Open your wallet and approve the sign-in message. This only lets Swap Assistant save your history and preferences.");
-    const nonce = await requestAuthNonce(envPublic.BACKEND_BASE_URL, walletAddress);
-    const signature = await signMessageWithProvider(
-      p,
-      walletAddress,
-      nonce.message,
-      walletKind,
-      setAuthNotice,
-      connectedWalletName
-    );
-    setAuthNotice("Thanks. Loading your saved data...");
-    const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, walletAddress, signature);
-    writeStoredBackendSession(session);
-    setBackendSession(session);
-    setAuthNotice("");
-    return session;
+    if (backendSessionRequestRef.current) return backendSessionRequestRef.current;
+
+    const request = (async () => {
+      const p = getProviderOrThrow();
+      const setAuthNotice = noticeTarget === "preferences" ? setPreferencesAuthNotice : setHistoryNotice;
+      await confirmWalletSignIn(noticeTarget);
+      setAuthNotice(buildWalletApprovalNotice(connectedWalletName, "signIn"));
+      const nonce = await requestAuthNonce(envPublic.BACKEND_BASE_URL, walletAddress);
+      const signature = await signMessageWithProvider(
+        p,
+        walletAddress,
+        nonce.message,
+        walletKind,
+        setAuthNotice,
+        connectedWalletName
+      );
+      setAuthNotice("Thanks. Loading your saved data...");
+      const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, walletAddress, signature);
+      writeStoredBackendSession(session);
+      setBackendSession(session);
+      setAuthNotice("");
+      return session;
+    })();
+
+    backendSessionRequestRef.current = request;
+    try {
+      return await request;
+    } finally {
+      backendSessionRequestRef.current = null;
+    }
   }
 
   async function refreshBackendHistory() {
@@ -1277,6 +1328,10 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     setTelegramEnabledDraft(false);
+    setPushEnabledDraft(false);
+    setPushPreferenceLoading(false);
+    setPushDeviceState("unknown");
+    setCurrentPushEndpoint("");
     setReverseProfitThresholdPctDraft("1");
     setReverseLossEnabledDraft(false);
     setReverseLossThresholdPctDraft("5");
@@ -1325,6 +1380,7 @@ export default function Page() {
       const session = await ensureBackendSession("preferences");
       const preference = await getNotificationPreferences(envPublic.BACKEND_BASE_URL, session);
       applyNotificationPreference(preference);
+      await refreshCurrentPushDeviceStatus(session);
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
@@ -1349,6 +1405,63 @@ export default function Page() {
     if (preference.telegramChatId) setTelegramLink(null);
   }
 
+  function getCurrentBackendSessionForWallet(): BackendSession | null {
+    if (!walletAddress) return null;
+    const session = backendSession ?? readStoredBackendSession();
+    if (!session || !isSessionForWallet(session, walletAddress)) return null;
+    if (!backendSession) setBackendSession(session);
+    return session;
+  }
+
+  function getPreferenceSessionOrThrow(): BackendSession {
+    const session = getCurrentBackendSessionForWallet();
+    if (!session) {
+      throw new Error("Sign in with your wallet before changing preferences.");
+    }
+    return session;
+  }
+
+  async function getCurrentPushSubscriptionEndpoint(): Promise<string> {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return "";
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    const subscription = await registration?.pushManager.getSubscription();
+    return subscription?.endpoint ?? "";
+  }
+
+  async function refreshCurrentPushDeviceStatus(session = getCurrentBackendSessionForWallet()) {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      setPushDeviceState("not-supported");
+      setCurrentPushEndpoint("");
+      return;
+    }
+
+    if (!session) {
+      setPushDeviceState("unknown");
+      setCurrentPushEndpoint("");
+      return;
+    }
+
+    setPushDeviceState("checking");
+    try {
+      const endpoint = await getCurrentPushSubscriptionEndpoint();
+      setCurrentPushEndpoint(endpoint);
+      const status = await getPushSubscriptionStatus(envPublic.BACKEND_BASE_URL, session, endpoint);
+      setPushDeviceState(endpoint && status.linked ? "linked" : "not-linked");
+      setNotificationPreference((current) =>
+        current
+          ? {
+              ...current,
+              pushEnabled: status.walletSubscriptionCount > 0,
+              pushSubscriptionCount: status.walletSubscriptionCount
+            }
+          : current
+      );
+      setPushEnabledDraft(status.walletSubscriptionCount > 0);
+    } catch {
+      setPushDeviceState("unknown");
+    }
+  }
+
   async function saveNotificationPreferenceSettings() {
     setNotificationPreferenceSaving(true);
     setNotificationPreferenceError("");
@@ -1364,7 +1477,7 @@ export default function Page() {
       if (profitThresholdBps === null) throw new Error("Enter a profit alert threshold from 0% to 1000%.");
       const lossThresholdBps = parseThresholdPctToBps(reverseLossThresholdPctDraft);
       if (lossThresholdBps === null) throw new Error("Enter a loss alert threshold from 0% to 1000%.");
-      const session = await ensureBackendSession("preferences");
+      const session = getPreferenceSessionOrThrow();
       const preference = await saveNotificationPreferences(envPublic.BACKEND_BASE_URL, session, {
         emailAddress: notificationPreference?.emailAddress ?? null,
         emailEnabled: notificationPreference?.emailEnabled ?? false,
@@ -1394,7 +1507,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = await ensureBackendSession("preferences");
+      const session = getPreferenceSessionOrThrow();
       const link = await startTelegramLink(envPublic.BACKEND_BASE_URL, session);
       setTelegramLink(link);
       setNotificationPreferenceNotice("Telegram opened with a one-time connection code. Tap Start, then return here.");
@@ -1416,7 +1529,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = await ensureBackendSession("preferences");
+      const session = getPreferenceSessionOrThrow();
       const preference = await completeTelegramLink(envPublic.BACKEND_BASE_URL, session);
       applyNotificationPreference(preference);
       setNotificationPreferenceNotice("Telegram connected. Alerts are enabled for this wallet.");
@@ -1451,6 +1564,7 @@ export default function Page() {
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
+      const session = getPreferenceSessionOrThrow();
       const publicKey = await getEffectivePushPublicKey();
       const supportMessage = getPushSupportMessage(publicKey);
       setPushSupportMessage(supportMessage);
@@ -1464,7 +1578,6 @@ export default function Page() {
         throw new Error(PUSH_DENIED_MESSAGE);
       }
 
-      const session = await ensureBackendSession("preferences");
       const subscription = await getOrCreatePushSubscription(registration, publicKey);
       const preference = await savePushSubscription(
         envPublic.BACKEND_BASE_URL,
@@ -1472,12 +1585,15 @@ export default function Page() {
         pushSubscriptionToPayload(subscription)
       );
       applyNotificationPreference(preference);
+      setCurrentPushEndpoint(subscription.endpoint);
+      setPushDeviceState("linked");
       setNotificationPreferenceNotice("Push notifications enabled on this device.");
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
         setBackendSession(null);
       }
+      await refreshCurrentPushDeviceStatus(getCurrentBackendSessionForWallet());
       setNotificationPreferenceError(normalizePushNotificationError(e));
     } finally {
       setPushPreferenceLoading(false);
@@ -1485,24 +1601,39 @@ export default function Page() {
     }
   }
 
-  async function disablePushNotifications() {
+  async function disablePushNotifications(scope: "device" | "all" = "device") {
     setPushPreferenceLoading(true);
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
     try {
-      const session = await ensureBackendSession("preferences");
-      let endpoint = "";
-      if ("serviceWorker" in navigator) {
-        const registration = await navigator.serviceWorker.getRegistration("/");
-        const subscription = await registration?.pushManager.getSubscription();
-        endpoint = subscription?.endpoint ?? "";
+      const session = getPreferenceSessionOrThrow();
+      const registration = "serviceWorker" in navigator
+        ? await navigator.serviceWorker.getRegistration("/")
+        : undefined;
+      const subscription = await registration?.pushManager.getSubscription();
+      const endpoint = subscription?.endpoint ?? currentPushEndpoint;
+      if (scope === "device" && !endpoint) {
+        await refreshCurrentPushDeviceStatus(session);
+        setNotificationPreferenceNotice(
+          "This device is not connected to push notifications for this wallet."
+        );
+        return;
       }
-      if (!endpoint) {
-        throw new Error("This device is not connected to push notifications for this wallet.");
+      const preference = await disablePushSubscriptions(
+        envPublic.BACKEND_BASE_URL,
+        session,
+        scope === "device" ? endpoint : undefined
+      );
+      if (scope === "all" || (scope === "device" && endpoint === subscription?.endpoint)) {
+        await subscription?.unsubscribe().catch(() => false);
       }
-      const preference = await disablePushSubscriptions(envPublic.BACKEND_BASE_URL, session, endpoint);
       applyNotificationPreference(preference);
-      setNotificationPreferenceNotice("Push notifications disabled for this wallet on this device.");
+      await refreshCurrentPushDeviceStatus(session);
+      setNotificationPreferenceNotice(
+        scope === "all"
+          ? "Push notifications disabled for this wallet on all devices."
+          : "Push notifications disabled on this device."
+      );
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
@@ -2186,9 +2317,16 @@ export default function Page() {
     telegramLinkLoading ||
     telegramLinkChecking ||
     pushPreferenceLoading;
-  const preferencesSigning = preferencesBusy && !backendSession && Boolean(preferencesAuthNotice);
+  const signedInBackendSession =
+    walletAddress && backendSession && isSessionForWallet(backendSession, walletAddress) ? backendSession : null;
+  const preferencesSignedIn = Boolean(signedInBackendSession);
+  const preferencesSigning = preferencesBusy && !preferencesSignedIn && Boolean(preferencesAuthNotice);
   const preferencesSignNotice =
     preferencesAuthNotice || buildWalletApprovalNotice(historySignWalletName, "signIn");
+  const pushWalletSubscriptionCount = notificationPreference?.pushSubscriptionCount ?? 0;
+  const pushWalletEnabled = Boolean(notificationPreference?.pushEnabled && pushWalletSubscriptionCount > 0);
+  const pushDeviceLinked = pushDeviceState === "linked";
+  const pushStatusText = getPushDeviceStatusText(pushSupportMessage, pushDeviceState, pushWalletSubscriptionCount);
   const swapBusy = swapStatus === "pending" || swapStatus === "submitted" || Boolean(walletRequestNotice);
 
   return (
@@ -3109,7 +3247,11 @@ export default function Page() {
               <div className="subtle">Telegram, alerts, and notification settings for this wallet.</div>
             </div>
             <span className="badge">
-              {notificationPreferenceLoading
+              {!walletAddress
+                ? "Wallet needed"
+                : !preferencesSignedIn
+                  ? "Sign in needed"
+                  : notificationPreferenceLoading
                 ? "Loading settings"
                 : notificationPreference?.telegramEnabled || notificationPreference?.pushEnabled
                   ? "Alerts on"
@@ -3117,171 +3259,207 @@ export default function Page() {
             </span>
           </div>
           <div className="settingsContent">
-          <div className="quoteHeader">
-            <div className="subtle">
-              {walletAddress
-                ? backendSession
-                  ? "Telegram can notify you when saved swaps or favorite pairs reach alert conditions."
-                  : "Sign once to manage alerts."
-                : "Connect your wallet to manage alerts."}
-            </div>
-            <button
-              className="btn"
-              type="button"
-              onClick={refreshNotificationPreferences}
-              disabled={!walletAddress || notificationPreferenceLoading}
-            >
-              {notificationPreferenceLoading ? "Loading..." : notificationPreferenceLoaded ? "Refresh" : "Load Settings"}
-            </button>
-          </div>
-          {preferencesSigning ? (
-            <div className="walletSignNotice preferencesWalletNotice" role="status" aria-live="polite">
-              <span className="walletSignPulse" aria-hidden="true" />
-              <span className="walletSignCopy">
-                <span className="walletSignTitle">Waiting for wallet approval</span>
-                <span className="walletSignText">{preferencesSignNotice}</span>
-              </span>
-            </div>
-          ) : null}
-
-          <div className="settingsGrid">
-            <label className="toggleRow">
-              <input
-                type="checkbox"
-                checked={telegramEnabledDraft}
-                onChange={(event) => setTelegramEnabledDraft(event.target.checked)}
-                disabled={!walletAddress}
-              />
-              <span>
-                <strong>Telegram alerts</strong>
-                <span className="subtle">
-                  {notificationPreference?.telegramChatId
-                    ? "Receive saved-swap and favorite-pair alerts in Telegram."
-                    : "Connect the Telegram bot once, then alerts can be delivered there."}
-                </span>
-              </span>
-            </label>
-
-            <div className="telegramConnectPanel">
-              <div className="label">Telegram</div>
-              <div className="telegramStatus">
-                {notificationPreference?.telegramChatId ? "Connected" : "Not connected"}
-              </div>
-              {telegramLink ? (
-                <div className="telegramCodeBox">
-                  <span className="subtle">Connection code</span>
-                  <strong>{telegramLink.code}</strong>
+            {!walletAddress ? (
+              <div className="preferencesAuthGate">
+                <div>
+                  <strong>Connect your wallet to manage alerts</strong>
+                  <p>
+                    Swap Assistant uses your public wallet address to keep your history, favorite pairs, and notification
+                    settings separate from other users. Connecting does not allow the app to move funds.
+                  </p>
                 </div>
-              ) : null}
-              <div className="telegramActions">
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={startTelegramConnection}
-                  disabled={!walletAddress || telegramLinkLoading}
-                >
-                  {telegramLinkLoading ? "Opening..." : notificationPreference?.telegramChatId ? "Reconnect Telegram" : "Connect Telegram"}
+                <button className="btn btnPrimary" type="button" onClick={openWalletChooser}>
+                  Connect Wallet
                 </button>
+              </div>
+            ) : !preferencesSignedIn ? (
+              <div className="preferencesAuthGate">
+                <div>
+                  <strong>Sign in to manage preferences</strong>
+                  <p>
+                    Sign one message from your wallet so Swap Assistant can load settings for this address. This is not
+                    a transaction and cannot move funds.
+                  </p>
+                </div>
+                {preferencesSigning ? (
+                  <div className="walletSignNotice preferencesWalletNotice" role="status" aria-live="polite">
+                    <span className="walletSignPulse" aria-hidden="true" />
+                    <span className="walletSignCopy">
+                      <span className="walletSignTitle">Waiting for wallet approval</span>
+                      <span className="walletSignText">{preferencesSignNotice}</span>
+                    </span>
+                  </div>
+                ) : null}
                 <button
                   className="btn btnPrimary"
                   type="button"
-                  onClick={checkTelegramConnection}
-                  disabled={!walletAddress || telegramLinkChecking || !telegramLink}
+                  onClick={refreshNotificationPreferences}
+                  disabled={notificationPreferenceLoading}
                 >
-                  {telegramLinkChecking ? "Checking..." : "Check Connection"}
+                  {notificationPreferenceLoading ? "Waiting for Wallet..." : "Sign In With Wallet"}
                 </button>
               </div>
-            </div>
-
-            <div className="settingsCard pushSettingsCard">
-              <div className="label">Push notifications</div>
-              <strong>Push notifications on this device</strong>
-              <div className="subtle">
-                {pushSupportMessage
-                  ? pushSupportMessage
-                  : notificationPreference?.pushEnabled
-                    ? `${notificationPreference.pushSubscriptionCount || 1} device${(notificationPreference.pushSubscriptionCount || 1) === 1 ? "" : "s"} connected.`
-                    : "Receive the same alerts as push notifications on this device."}
-              </div>
-              <div className="pushActions">
-                {notificationPreference?.pushEnabled ? (
+            ) : (
+              <>
+                <div className="quoteHeader">
+                  <div className="subtle">
+                    Telegram and push notifications can alert you when saved swaps or favorite pairs reach your targets.
+                  </div>
                   <button
                     className="btn"
                     type="button"
-                    onClick={disablePushNotifications}
-                    disabled={!walletAddress || pushPreferenceLoading}
+                    onClick={refreshNotificationPreferences}
+                    disabled={notificationPreferenceLoading}
                   >
-                    {pushPreferenceLoading ? "Updating..." : "Disable This Device"}
+                    {notificationPreferenceLoading ? "Refreshing..." : "Refresh Settings"}
                   </button>
-                ) : (
+                </div>
+
+                <div className="settingsGrid">
+                  <label className="toggleRow">
+                    <input
+                      type="checkbox"
+                      checked={telegramEnabledDraft}
+                      onChange={(event) => setTelegramEnabledDraft(event.target.checked)}
+                    />
+                    <span>
+                      <strong>Telegram alerts</strong>
+                      <span className="subtle">
+                        {notificationPreference?.telegramChatId
+                          ? "Receive saved-swap and favorite-pair alerts in Telegram."
+                          : "Connect the Telegram bot once, then alerts can be delivered there."}
+                      </span>
+                    </span>
+                  </label>
+
+                  <div className="telegramConnectPanel">
+                    <div className="label">Telegram</div>
+                    <div className="telegramStatus">
+                      {notificationPreference?.telegramChatId ? "Connected" : "Not connected"}
+                    </div>
+                    {telegramLink ? (
+                      <div className="telegramCodeBox">
+                        <span className="subtle">Connection code</span>
+                        <strong>{telegramLink.code}</strong>
+                      </div>
+                    ) : null}
+                    <div className="telegramActions">
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={startTelegramConnection}
+                        disabled={telegramLinkLoading}
+                      >
+                        {telegramLinkLoading ? "Opening..." : notificationPreference?.telegramChatId ? "Reconnect Telegram" : "Connect Telegram"}
+                      </button>
+                      <button
+                        className="btn btnPrimary"
+                        type="button"
+                        onClick={checkTelegramConnection}
+                        disabled={telegramLinkChecking || !telegramLink}
+                      >
+                        {telegramLinkChecking ? "Checking..." : "Check Connection"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="settingsCard pushSettingsCard">
+                    <div className="label">Push notifications</div>
+                    <strong>Push notifications on this device</strong>
+                    <div className="subtle">{pushStatusText}</div>
+                    <div className="pushActions">
+                      {pushDeviceLinked ? (
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={() => {
+                            void disablePushNotifications("device");
+                          }}
+                          disabled={pushPreferenceLoading}
+                        >
+                          {pushPreferenceLoading ? "Updating..." : "Disable This Device"}
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btnPrimary"
+                          type="button"
+                          onClick={enablePushNotifications}
+                          disabled={Boolean(pushSupportMessage) || pushPreferenceLoading || pushDeviceState === "checking"}
+                        >
+                          {pushPreferenceLoading ? "Enabling..." : "Enable Push Notifications"}
+                        </button>
+                      )}
+                      {pushWalletEnabled && !pushDeviceLinked ? (
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={() => {
+                            void disablePushNotifications("all");
+                          }}
+                          disabled={pushPreferenceLoading || pushDeviceState === "checking"}
+                        >
+                          Disable All Devices
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="settingsCard">
+                    <div className="label">Saved-swap profit alerts</div>
+                    <strong>Notify when a saved swap can reverse in profit</strong>
+                    <div className="subtle">Alert me when the estimated reverse move reaches this gain.</div>
+                    <div className="percentInputRow">
+                      <input
+                        className="input"
+                        inputMode="decimal"
+                        value={reverseProfitThresholdPctDraft}
+                        onChange={(event) => setReverseProfitThresholdPctDraft(event.target.value)}
+                        aria-label="Reverse profit alert threshold percent"
+                      />
+                      <span>%</span>
+                    </div>
+                  </div>
+
+                  <div className="settingsCard">
+                    <label className="inlineCheck">
+                      <input
+                        type="checkbox"
+                        checked={reverseLossEnabledDraft}
+                        onChange={(event) => setReverseLossEnabledDraft(event.target.checked)}
+                      />
+                      <span>Loss protection alerts</span>
+                    </label>
+                    <div className="subtle">Notify me when a saved swap has moved against me by this amount.</div>
+                    <div className="percentInputRow">
+                      <input
+                        className="input"
+                        inputMode="decimal"
+                        value={reverseLossThresholdPctDraft}
+                        onChange={(event) => setReverseLossThresholdPctDraft(event.target.value)}
+                        disabled={!reverseLossEnabledDraft}
+                        aria-label="Loss protection alert threshold percent"
+                      />
+                      <span>%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settingsActions">
                   <button
                     className="btn btnPrimary"
                     type="button"
-                    onClick={enablePushNotifications}
-                    disabled={!walletAddress || pushPreferenceLoading}
+                    onClick={saveNotificationPreferenceSettings}
+                    disabled={notificationPreferenceSaving}
                   >
-                    {pushPreferenceLoading ? "Enabling..." : "Enable Push Notifications"}
+                    {notificationPreferenceSaving ? "Saving..." : "Save Notifications"}
                   </button>
-                )}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
 
-            <div className="settingsCard">
-              <div className="label">Saved-swap profit alerts</div>
-              <strong>Notify when a saved swap can reverse in profit</strong>
-              <div className="subtle">Alert me when the estimated reverse move reaches this gain.</div>
-              <div className="percentInputRow">
-                <input
-                  className="input"
-                  inputMode="decimal"
-                  value={reverseProfitThresholdPctDraft}
-                  onChange={(event) => setReverseProfitThresholdPctDraft(event.target.value)}
-                  disabled={!walletAddress}
-                  aria-label="Reverse profit alert threshold percent"
-                />
-                <span>%</span>
-              </div>
-            </div>
-
-            <div className="settingsCard">
-              <label className="inlineCheck">
-                <input
-                  type="checkbox"
-                  checked={reverseLossEnabledDraft}
-                  onChange={(event) => setReverseLossEnabledDraft(event.target.checked)}
-                  disabled={!walletAddress}
-                />
-                <span>Loss protection alerts</span>
-              </label>
-              <div className="subtle">Notify me when a saved swap has moved against me by this amount.</div>
-              <div className="percentInputRow">
-                <input
-                  className="input"
-                  inputMode="decimal"
-                  value={reverseLossThresholdPctDraft}
-                  onChange={(event) => setReverseLossThresholdPctDraft(event.target.value)}
-                  disabled={!walletAddress || !reverseLossEnabledDraft}
-                  aria-label="Loss protection alert threshold percent"
-                />
-                <span>%</span>
-              </div>
-            </div>
+            {notificationPreferenceNotice ? <div className="ok" style={{ marginTop: 10 }}>{notificationPreferenceNotice}</div> : null}
+            {notificationPreferenceError ? <div className="error" style={{ marginTop: 10 }}>{notificationPreferenceError}</div> : null}
           </div>
-
-          {notificationPreferenceNotice ? <div className="ok" style={{ marginTop: 10 }}>{notificationPreferenceNotice}</div> : null}
-          {notificationPreferenceError ? <div className="error" style={{ marginTop: 10 }}>{notificationPreferenceError}</div> : null}
-
-          <div className="settingsActions">
-            <button
-              className="btn btnPrimary"
-              type="button"
-              onClick={saveNotificationPreferenceSettings}
-              disabled={!walletAddress || notificationPreferenceSaving}
-            >
-              {notificationPreferenceSaving ? "Saving..." : "Save Notifications"}
-            </button>
-          </div>
-        </div>
         </section>
       ) : null}
 
@@ -3431,6 +3609,44 @@ export default function Page() {
           onClose={() => closeSwapTour(true)}
           onNext={goToNextTourStep}
         />
+      ) : null}
+
+      {walletSignPrompt ? (
+        <div className="walletSignPromptLayer" role="dialog" aria-modal="true" aria-labelledby="wallet-sign-title">
+          <button
+            className="walletSignPromptBackdrop"
+            type="button"
+            aria-label="Cancel wallet sign-in"
+            onClick={cancelWalletSignPrompt}
+          />
+          <div className="walletSignPromptCard">
+            <div className="walletSignPromptIcon" aria-hidden="true">
+              <span className="walletStatusDot" />
+            </div>
+            <div className="walletSignPromptCopy">
+              <div className="label">Wallet sign-in</div>
+              <h2 id="wallet-sign-title">Approve a safe sign-in message</h2>
+              <p>
+                Swap Assistant asks for a message signature to prove this wallet is yours, so it can load
+                {walletSignPrompt.target === "preferences" ? " alert settings" : " saved swap history"} for this
+                public address. This is not a transaction and cannot move funds.
+              </p>
+              <div className="walletSignPromptInstruction">
+                {walletSignPrompt.isMobile
+                  ? `After you tap Continue, ${normalizeWalletApprovalName(walletSignPrompt.walletName)} may open. Approve the sign-in message there, then return to Swap Assistant.`
+                  : `After you click Continue, approve the message in ${normalizeWalletApprovalName(walletSignPrompt.walletName)}. If you connected from your phone, open that wallet app and approve it there.`}
+              </div>
+            </div>
+            <div className="walletSignPromptActions">
+              <button className="btn" type="button" onClick={cancelWalletSignPrompt}>
+                Cancel
+              </button>
+              <button className="btn btnPrimary" type="button" onClick={approveWalletSignPrompt}>
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       <footer className="siteFooter">
@@ -4309,6 +4525,33 @@ function waitMs(ms: number): Promise<void> {
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function isMobileBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "") || window.matchMedia("(max-width: 699px)").matches;
+}
+
+function getPushDeviceStatusText(
+  supportMessage: string,
+  deviceState: PushDeviceState,
+  walletSubscriptionCount: number
+): string {
+  if (supportMessage) return supportMessage;
+  if (deviceState === "checking") return "Checking push notifications on this device...";
+  if (deviceState === "linked") {
+    return `This device is connected. ${formatPushDeviceCount(walletSubscriptionCount)} will receive alerts for this wallet.`;
+  }
+  if (walletSubscriptionCount > 0) {
+    return `Push alerts are active on ${formatPushDeviceCount(walletSubscriptionCount)}. This device is not connected.`;
+  }
+  if (deviceState === "not-supported") return "This browser does not support push notifications.";
+  return "Receive the same alerts as push notifications on this device.";
+}
+
+function formatPushDeviceCount(count: number): string {
+  const safeCount = Math.max(0, count);
+  return `${safeCount} device${safeCount === 1 ? "" : "s"}`;
 }
 
 function getPushSupportMessage(vapidPublicKey: string): string {

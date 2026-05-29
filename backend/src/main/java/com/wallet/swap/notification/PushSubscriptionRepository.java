@@ -72,6 +72,25 @@ public class PushSubscriptionRepository {
     return count == null ? 0 : count;
   }
 
+  public boolean isActiveForWalletEndpoint(String walletAddress, String endpoint) {
+    Boolean linked = jdbcTemplate.queryForObject(
+        """
+        SELECT EXISTS (
+          SELECT 1
+          FROM push_subscription_wallets psw
+          JOIN push_subscriptions ps ON ps.id = psw.push_subscription_id
+          WHERE psw.wallet_address = ?
+            AND ps.endpoint = ?
+            AND psw.disabled_at IS NULL
+            AND ps.disabled_at IS NULL
+        )
+        """,
+        Boolean.class,
+        walletAddress,
+        endpoint.trim());
+    return Boolean.TRUE.equals(linked);
+  }
+
   public List<PushSubscriptionRecord> findActiveForWallet(String walletAddress) {
     return jdbcTemplate.query(
         """

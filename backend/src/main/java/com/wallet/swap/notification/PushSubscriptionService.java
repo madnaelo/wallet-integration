@@ -5,6 +5,8 @@ import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionDisableRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
+import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
+import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusResponse;
 import java.net.URI;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -52,6 +54,18 @@ public class PushSubscriptionService {
       pushSubscriptionRepository.disableForWallet(walletAddress);
     }
     return preferenceService.setPushEnabled(walletAddress, pushSubscriptionRepository.countActive(walletAddress) > 0);
+  }
+
+  public PushSubscriptionStatusResponse status(String walletAddress, PushSubscriptionStatusRequest request) {
+    String endpoint = request == null ? null : request.endpoint();
+    int walletSubscriptionCount = pushSubscriptionRepository.countActive(walletAddress);
+    if (!hasText(endpoint)) {
+      return new PushSubscriptionStatusResponse(false, walletSubscriptionCount);
+    }
+    validateEndpoint(endpoint);
+    return new PushSubscriptionStatusResponse(
+        pushSubscriptionRepository.isActiveForWalletEndpoint(walletAddress, endpoint),
+        walletSubscriptionCount);
   }
 
   private void validate(PushSubscriptionRequest request) {

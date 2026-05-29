@@ -1627,6 +1627,101 @@ body {
   padding: 9px 11px;
 }
 
+.walletSignPromptLayer {
+  align-items: center;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 140;
+}
+
+.walletSignPromptBackdrop {
+  background: rgba(3, 7, 18, 0.62);
+  border: 0;
+  cursor: pointer;
+  inset: 0;
+  position: absolute;
+}
+
+.walletSignPromptCard {
+  animation: walletSignNoticeIn 180ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  background: rgba(12, 19, 32, 0.98);
+  border: 1px solid rgba(207, 224, 255, 0.22);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+  display: grid;
+  gap: 14px;
+  max-width: min(430px, calc(100vw - 36px));
+  padding: 18px;
+  position: relative;
+  width: 100%;
+}
+
+.walletSignPromptIcon {
+  align-items: center;
+  background: rgba(110, 168, 254, 0.12);
+  border: 1px solid rgba(110, 168, 254, 0.28);
+  border-radius: 999px;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.walletSignPromptCopy {
+  display: grid;
+  gap: 8px;
+}
+
+.walletSignPromptCopy h2,
+.walletSignPromptCopy p {
+  margin: 0;
+}
+
+.walletSignPromptCopy h2 {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.walletSignPromptCopy p,
+.walletSignPromptInstruction {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.walletSignPromptInstruction {
+  background: rgba(110, 168, 254, 0.1);
+  border: 1px solid rgba(110, 168, 254, 0.2);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 10px 11px;
+}
+
+.walletSignPromptActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 520px) {
+  .walletSignPromptLayer {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .walletSignPromptCard {
+    max-width: 100%;
+  }
+
+  .walletSignPromptActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .tourLayer {
   inset: 0;
   pointer-events: none;
@@ -1774,6 +1869,47 @@ body {
 .settingsContent {
   display: grid;
   gap: 12px;
+}
+
+.preferencesAuthGate {
+  align-items: center;
+  background: rgba(6, 12, 24, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 14px;
+}
+
+.preferencesAuthGate strong {
+  color: var(--text);
+  display: block;
+  font-size: 15px;
+  margin-bottom: 5px;
+}
+
+.preferencesAuthGate p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.preferencesWalletNotice {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .preferencesAuthGate {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .preferencesAuthGate .btn {
+    justify-content: center;
+    width: 100%;
+  }
 }
 
 .settingsGrid {

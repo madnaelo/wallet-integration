@@ -68,6 +68,11 @@ export type PushNotificationConfig = {
   vapidPublicKey: string;
 };
 
+export type PushSubscriptionStatus = {
+  linked: boolean;
+  walletSubscriptionCount: number;
+};
+
 export type TelegramLinkStart = {
   code: string;
   botUsername: string;
@@ -280,6 +285,18 @@ export async function savePushSubscription(
     method: "POST",
     headers: authHeaders(session),
     body: JSON.stringify(subscription)
+  });
+}
+
+export async function getPushSubscriptionStatus(
+  backendBaseUrl: string,
+  session: BackendSession,
+  endpoint?: string
+): Promise<PushSubscriptionStatus> {
+  return backendFetch<PushSubscriptionStatus>(backendBaseUrl, "/api/notifications/preferences/push-subscriptions/status", {
+    method: "POST",
+    headers: authHeaders(session),
+    body: endpoint ? JSON.stringify({ endpoint }) : undefined
   });
 }
 
