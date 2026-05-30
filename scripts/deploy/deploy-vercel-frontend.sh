@@ -13,6 +13,8 @@ fi
 export NEXT_TELEMETRY_DISABLED=1
 export VERCEL_TELEMETRY_DISABLED=1
 export NEXT_PUBLIC_APP_VERSION="${NEXT_PUBLIC_APP_VERSION:-${GITHUB_SHA:-local}}"
+export NEXT_PUBLIC_APP_BRANCH="${NEXT_PUBLIC_APP_BRANCH:-${GITHUB_REF_NAME:-${VERCEL_GIT_COMMIT_REF:-local}}}"
+export NEXT_PUBLIC_DEPLOYED_AT="${NEXT_PUBLIC_DEPLOYED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
 if [ -n "${VERCEL_TOKEN:-}" ] && [ -n "${VERCEL_ORG_ID:-}" ] && [ -n "${VERCEL_PROJECT_ID:-}" ]; then
   npx --yes "vercel@$vercel_cli_version" pull --yes --environment="$environment" --token "$VERCEL_TOKEN"

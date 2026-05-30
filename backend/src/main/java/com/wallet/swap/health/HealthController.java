@@ -22,6 +22,7 @@ public class HealthController {
   private final OperationalMetricsService metricsService;
   private final String appVersion;
   private final String gitCommit;
+  private final String gitBranch;
   private final String deployedAt;
 
   public HealthController(
@@ -29,11 +30,13 @@ public class HealthController {
       OperationalMetricsService metricsService,
       @Value("${APP_VERSION:local}") String appVersion,
       @Value("${GIT_COMMIT:}") String gitCommit,
+      @Value("${GIT_BRANCH:local}") String gitBranch,
       @Value("${DEPLOYED_AT:}") String deployedAt) {
     this.dataSource = dataSource;
     this.metricsService = metricsService;
     this.appVersion = appVersion;
     this.gitCommit = gitCommit;
+    this.gitBranch = gitBranch;
     this.deployedAt = deployedAt;
   }
 
@@ -49,6 +52,7 @@ public class HealthController {
     response.put("build", Map.of(
         "version", blankToLocal(appVersion),
         "commit", nullToBlank(gitCommit),
+        "branch", blankToLocal(gitBranch),
         "deployedAt", nullToBlank(deployedAt)));
     response.put("uptimeSeconds", snapshot.uptimeSeconds());
     response.put("database", database);

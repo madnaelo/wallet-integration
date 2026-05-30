@@ -28,6 +28,7 @@ import { listTokens } from "@/lib/tokenClient";
 import { TokenPicker, type TokenPickerNetwork, type TokenPickerOption } from "@/components/TokenPicker";
 import {
   type AutoSwapRule,
+  type BuildMetadata,
   BackendClientError,
   type FavoritePair,
   type BackendSession,
@@ -42,6 +43,7 @@ import {
   deleteAutoSwapRule,
   deleteFavoritePair,
   disablePushSubscriptions,
+  getBackendHealth,
   getPushSubscriptionStatus,
   getFeatureFlags,
   getNotificationPreferences,
@@ -212,6 +214,7 @@ export default function Page() {
   const [activeView, setActiveView] = useState<ActiveView>("swap");
   const [featureFlags, setFeatureFlags] = useState({ autoSwapEnabled: false });
   const [featureFlagsLoaded, setFeatureFlagsLoaded] = useState<boolean>(false);
+  const [backendBuild, setBackendBuild] = useState<BuildMetadata | null>(null);
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
 
   const [provider, setProvider] = useState<Eip1193Provider | null>(null);
@@ -329,6 +332,15 @@ export default function Page() {
   );
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
+  const frontendBuild = useMemo<BuildMetadata>(
+    () => ({
+      version: envPublic.APP_VERSION,
+      commit: envPublic.APP_VERSION,
+      branch: envPublic.APP_BRANCH,
+      deployedAt: envPublic.APP_DEPLOYED_AT
+    }),
+    []
+  );
   const connectedWalletName = useMemo(
     () => getWalletDisplayName(walletInfo?.name, walletProviderType),
     [walletInfo?.name, walletProviderType]
@@ -490,6 +502,21 @@ export default function Page() {
       })
       .finally(() => {
         if (!cancelled) setFeatureFlagsLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getBackendHealth(envPublic.BACKEND_BASE_URL)
+      .then((health) => {
+        if (!cancelled) setBackendBuild(health.build ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setBackendBuild(null);
       });
 
     return () => {
@@ -3843,8 +3870,12 @@ export default function Page() {
       <footer className="siteFooter">
         <span>Swap Assistant is non-custodial. Review every wallet request before signing.</span>
         <div className="footerMeta">
-          <span className="versionLabel" title={`Build ${envPublic.APP_VERSION}`}>
-            Build {formatBuildVersion(envPublic.APP_VERSION)}
+          <span
+            className="versionLabel"
+            title={`Frontend ${formatBuildMetadataTitle(frontendBuild)} | Backend ${formatBuildMetadataTitle(backendBuild)}`}
+          >
+            <span>Frontend {formatBuildBadge(frontendBuild)}</span>
+            <span>Backend {formatBuildBadge(backendBuild)}</span>
           </span>
           <nav aria-label="Legal links">
             <Link href="/fees">Fees & Risks</Link>
@@ -3866,6 +3897,40 @@ function formatBuildVersion(version: string): string {
   const trimmed = version.trim();
   if (!trimmed || trimmed === "local") return "local";
   return trimmed.replace(/^sha-/, "").slice(0, 7);
+}
+
+function formatBuildBadge(build: BuildMetadata | null): string {
+  if (!build) return "unavailable";
+  const branch = formatBuildBranch(build.branch);
+  const hash = formatBuildVersion(build.commit || build.version || "");
+  const deployedAt = formatBuildTimestamp(build.deployedAt);
+  return `${branch} · ${hash} · ${deployedAt}`;
+}
+
+function formatBuildMetadataTitle(build: BuildMetadata | null): string {
+  if (!build) return "unavailable";
+  const branch = formatBuildBranch(build.branch);
+  const commit = (build.commit || build.version || "").trim() || "local";
+  const deployedAt = build.deployedAt?.trim() || "local";
+  return `${branch} ${commit} deployed ${deployedAt}`;
+}
+
+function formatBuildBranch(branch?: string | null): string {
+  const trimmed = branch?.trim();
+  return trimmed || "local";
+}
+
+function formatBuildTimestamp(value?: string | null): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return "local";
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return trimmed;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function parseSwapLinkParams(search: string): PendingSwapLink | null {
