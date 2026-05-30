@@ -57,6 +57,7 @@ import {
   savePushSubscription,
   saveSwapHistory,
   startTelegramLink,
+  submitPushDiagnostics,
   verifyAuthSignature
 } from "@/lib/backendClient";
 
@@ -105,6 +106,14 @@ type WalletSignPromptState = {
   isMobile: boolean;
 };
 type PushDeviceState = "unknown" | "checking" | "linked" | "not-linked" | "not-supported";
+type PushDiagnosticStatus = "info" | "success" | "error";
+type PushDiagnosticEntry = {
+  time: string;
+  stage: string;
+  status: PushDiagnosticStatus;
+  detail: string;
+};
+type PushDiagnosticRecorder = (stage: string, status: PushDiagnosticStatus, detail: unknown) => void;
 type QrDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
 };
@@ -268,6 +277,9 @@ export default function Page() {
   const [pushSupportMessage, setPushSupportMessage] = useState<string>("");
   const [pushDeviceState, setPushDeviceState] = useState<PushDeviceState>("unknown");
   const [currentPushEndpoint, setCurrentPushEndpoint] = useState<string>("");
+  const [pushDiagnostics, setPushDiagnostics] = useState<PushDiagnosticEntry[]>([]);
+  const pushDiagnosticEntriesRef = useRef<PushDiagnosticEntry[]>([]);
+  const pushDiagnosticAttemptIdRef = useRef<string>("");
   const [reverseProfitThresholdPctDraft, setReverseProfitThresholdPctDraft] = useState<string>("1");
   const [reverseLossEnabledDraft, setReverseLossEnabledDraft] = useState<boolean>(false);
   const [reverseLossThresholdPctDraft, setReverseLossThresholdPctDraft] = useState<string>("5");
@@ -1342,6 +1354,9 @@ export default function Page() {
     setPushPreferenceLoading(false);
     setPushDeviceState("unknown");
     setCurrentPushEndpoint("");
+    setPushDiagnostics([]);
+    pushDiagnosticEntriesRef.current = [];
+    pushDiagnosticAttemptIdRef.current = "";
     setReverseProfitThresholdPctDraft("1");
     setReverseLossEnabledDraft(false);
     setReverseLossThresholdPctDraft("5");
@@ -1570,42 +1585,91 @@ export default function Page() {
     return publicKey;
   }
 
+  function recordPushDiagnostic(stage: string, status: PushDiagnosticStatus, detail: unknown) {
+    const entry: PushDiagnosticEntry = {
+      time: new Date().toISOString(),
+      stage,
+      status,
+      detail: formatPushDiagnosticDetail(detail)
+    };
+    pushDiagnosticEntriesRef.current = [...pushDiagnosticEntriesRef.current.slice(-29), entry];
+    setPushDiagnostics(pushDiagnosticEntriesRef.current);
+    const log = status === "error" ? console.error : status === "success" ? console.info : console.debug;
+    log("[push-diagnostic]", entry);
+  }
+
   async function enablePushNotifications() {
     setPushPreferenceLoading(true);
     setNotificationPreferenceError("");
     setNotificationPreferenceNotice("");
+    pushDiagnosticAttemptIdRef.current = createPushDiagnosticAttemptId();
+    pushDiagnosticEntriesRef.current = [];
+    setPushDiagnostics([]);
+    let session: BackendSession | null = null;
+    let result = "started";
     try {
-      const session = getSignedInBackendSessionOrThrow();
+      session = getSignedInBackendSessionOrThrow();
+      recordPushDiagnostic("environment", "info", getPushEnvironmentDiagnostic(pushPublicKey || envPublic.VAPID_PUBLIC_KEY));
+      recordPushDiagnostic("session", "success", { wallet: shortAddr(session.walletAddress) });
+
       const browserSupportMessage = getPushSupportMessage(pushPublicKey || envPublic.VAPID_PUBLIC_KEY || "configured");
       setPushSupportMessage(browserSupportMessage);
       if (browserSupportMessage && browserSupportMessage !== PUSH_DENIED_MESSAGE) {
+        recordPushDiagnostic("support-check", "error", { message: browserSupportMessage });
         throw new Error(browserSupportMessage);
       }
+      recordPushDiagnostic("support-check", "success", { message: "Browser supports Push API" });
+
+      const permissionBefore = Notification.permission;
       const permission = await requestPushNotificationPermission();
+      recordPushDiagnostic("permission", permission === "granted" ? "success" : "error", {
+        before: permissionBefore,
+        after: permission
+      });
       if (permission !== "granted") {
         throw new Error(PUSH_DENIED_MESSAGE);
       }
 
       const publicKey = await getEffectivePushPublicKey();
+      recordPushDiagnostic("push-config", publicKey ? "success" : "error", {
+        vapidPublicKeyLength: publicKey.length,
+        backendBaseUrl: envPublic.BACKEND_BASE_URL
+      });
       const supportMessage = getPushSupportMessage(publicKey);
       setPushSupportMessage(supportMessage);
       if (supportMessage && supportMessage !== PUSH_DENIED_MESSAGE) {
+        recordPushDiagnostic("config-support-check", "error", { message: supportMessage });
         throw new Error(supportMessage);
       }
 
       const registration = await ensureServiceWorkerRegistration();
+      recordPushDiagnostic("service-worker", "success", await getServiceWorkerDiagnostic(registration));
       setNotificationPreferenceNotice("Push notifications are allowed. Connecting this device...");
-      const subscription = await getOrCreatePushSubscription(registration, publicKey);
+      const subscription = await getOrCreatePushSubscription(registration, publicKey, recordPushDiagnostic);
+      recordPushDiagnostic("subscription", "success", describePushSubscription(subscription));
+      const payload = pushSubscriptionToPayload(subscription);
+      recordPushDiagnostic("payload", "success", {
+        endpoint: maskPushEndpoint(payload.endpoint),
+        hasP256dh: Boolean(payload.keys.p256dh),
+        hasAuth: Boolean(payload.keys.auth)
+      });
       const preference = await savePushSubscription(
         envPublic.BACKEND_BASE_URL,
         session,
-        pushSubscriptionToPayload(subscription)
+        payload
       );
+      recordPushDiagnostic("backend-save", "success", {
+        pushEnabled: preference.pushEnabled,
+        pushSubscriptionCount: preference.pushSubscriptionCount
+      });
       applyNotificationPreference(preference);
       setCurrentPushEndpoint(subscription.endpoint);
       setPushDeviceState("linked");
       setNotificationPreferenceNotice("Push notifications enabled on this device.");
+      result = "success";
     } catch (e: any) {
+      result = "error";
+      recordPushDiagnostic("failed", "error", errorToPushDiagnostic(e));
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
         setBackendSession(null);
@@ -1613,8 +1677,26 @@ export default function Page() {
       await refreshCurrentPushDeviceStatus(getCurrentBackendSessionForWallet());
       setNotificationPreferenceError(normalizePushNotificationError(e));
     } finally {
+      if (session) {
+        await submitPushDiagnosticReport(session, result);
+      }
       setPushPreferenceLoading(false);
       setPreferencesAuthNotice("");
+    }
+  }
+
+  async function submitPushDiagnosticReport(session: BackendSession, result: string) {
+    const entries = pushDiagnosticEntriesRef.current;
+    if (!entries.length) return;
+    try {
+      await submitPushDiagnostics(envPublic.BACKEND_BASE_URL, session, {
+        attemptId: pushDiagnosticAttemptIdRef.current,
+        result,
+        location: window.location.href,
+        entries
+      });
+    } catch (e) {
+      recordPushDiagnostic("diagnostic-upload", "error", errorToPushDiagnostic(e));
     }
   }
 
@@ -3449,6 +3531,19 @@ export default function Page() {
                         </button>
                       ) : null}
                     </div>
+                    {pushDiagnostics.length > 0 ? (
+                      <details className="pushDiagnostics">
+                        <summary>Push setup diagnostics</summary>
+                        <div className="pushDiagnosticsList">
+                          {pushDiagnostics.map((entry, index) => (
+                            <div className={`pushDiagnosticItem pushDiagnostic${entry.status}`} key={`${entry.time}-${entry.stage}-${index}`}>
+                              <span>{entry.stage}</span>
+                              <code>{entry.detail}</code>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    ) : null}
                   </div>
 
                   <div className="settingsCard">
@@ -4703,6 +4798,93 @@ function isLikelyEmbeddedMobileBrowser(userAgent: string): boolean {
   return /; wv\)|\bwv\b|MetaMaskMobile|Binance|Trust|CoinbaseWallet|OKApp|Phantom|Rainbow|TokenPocket|imToken/i.test(userAgent);
 }
 
+function createPushDiagnosticAttemptId(): string {
+  const random = Math.random().toString(36).slice(2, 8);
+  return `${Date.now().toString(36)}-${random}`;
+}
+
+function formatPushDiagnosticDetail(detail: unknown): string {
+  if (detail == null) return "";
+  if (typeof detail === "string") return detail.slice(0, 2000);
+  try {
+    return JSON.stringify(detail, null, 2).slice(0, 2000);
+  } catch {
+    return String(detail).slice(0, 2000);
+  }
+}
+
+function getPushEnvironmentDiagnostic(vapidPublicKey: string): Record<string, unknown> {
+  const userAgent = navigator.userAgent || "";
+  return {
+    url: window.location.href,
+    protocol: window.location.protocol,
+    hostname: window.location.hostname,
+    isSecureContext: window.isSecureContext,
+    notificationPermission: "Notification" in window ? Notification.permission : "missing",
+    hasServiceWorker: "serviceWorker" in navigator,
+    hasPushManager: "PushManager" in window,
+    hasNotification: "Notification" in window,
+    displayMode: getDisplayMode(),
+    isMobile: isMobileBrowser(),
+    isEmbeddedMobileBrowser: isLikelyEmbeddedMobileBrowser(userAgent),
+    userAgent,
+    vapidPublicKeyLength: vapidPublicKey.trim().length
+  };
+}
+
+function getDisplayMode(): string {
+  if (window.matchMedia("(display-mode: standalone)").matches) return "standalone";
+  if (window.matchMedia("(display-mode: minimal-ui)").matches) return "minimal-ui";
+  if (window.matchMedia("(display-mode: fullscreen)").matches) return "fullscreen";
+  return "browser";
+}
+
+async function getServiceWorkerDiagnostic(registration: ServiceWorkerRegistration): Promise<Record<string, unknown>> {
+  const subscription = await registration.pushManager.getSubscription().catch(() => null);
+  return {
+    scope: registration.scope,
+    installing: registration.installing?.state ?? null,
+    waiting: registration.waiting?.state ?? null,
+    active: registration.active?.state ?? null,
+    controllerState: navigator.serviceWorker.controller?.state ?? null,
+    hasExistingSubscription: Boolean(subscription),
+    existingEndpoint: subscription ? maskPushEndpoint(subscription.endpoint) : ""
+  };
+}
+
+function describePushSubscription(subscription: PushSubscription): Record<string, unknown> {
+  return {
+    endpoint: maskPushEndpoint(subscription.endpoint),
+    expirationTime: subscription.expirationTime ?? null,
+    hasP256dh: Boolean(subscription.getKey("p256dh")),
+    hasAuth: Boolean(subscription.getKey("auth"))
+  };
+}
+
+function maskPushEndpoint(endpoint: string): string {
+  const trimmed = endpoint.trim();
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed);
+    const suffix = url.pathname.slice(-10);
+    return `${url.origin}/...${suffix}`;
+  } catch {
+    return `${trimmed.slice(0, 18)}...${trimmed.slice(-8)}`;
+  }
+}
+
+function errorToPushDiagnostic(e: unknown): Record<string, unknown> {
+  const error = e as any;
+  return {
+    name: error?.name ?? "",
+    code: error?.code ?? "",
+    message: normalizeWalletError(error),
+    causeName: error?.cause?.name ?? "",
+    causeCode: error?.cause?.code ?? "",
+    causeMessage: error?.cause ? normalizeWalletError(error.cause) : ""
+  };
+}
+
 function requestPushNotificationPermission(): Promise<NotificationPermission> {
   if (!("Notification" in window)) return Promise.resolve("denied");
   if (Notification.permission !== "default") return Promise.resolve(Notification.permission);
@@ -4742,43 +4924,56 @@ async function resetServiceWorkerRegistration(): Promise<ServiceWorkerRegistrati
 
 async function getOrCreatePushSubscription(
   registration: ServiceWorkerRegistration,
-  vapidPublicKey: string
+  vapidPublicKey: string,
+  recordDiagnostic?: PushDiagnosticRecorder
 ): Promise<PushSubscription> {
   const applicationServerKey = urlBase64ToArrayBuffer(vapidPublicKey);
   const existingSubscription = await registration.pushManager.getSubscription();
   if (existingSubscription) {
     const existingKey = existingSubscription.options.applicationServerKey;
     if (!existingKey || arrayBufferToBase64Url(existingKey) === arrayBufferToBase64Url(applicationServerKey)) {
+      recordDiagnostic?.("subscription-existing", "success", describePushSubscription(existingSubscription));
       return existingSubscription;
     }
+    recordDiagnostic?.("subscription-existing", "info", "Existing subscription uses a different VAPID key. Replacing it.");
     await existingSubscription.unsubscribe().catch(() => false);
   }
 
   try {
+    recordDiagnostic?.("subscribe-attempt-1", "info", "Calling pushManager.subscribe");
     return await subscribeToPushManager(registration, applicationServerKey);
   } catch (firstError) {
+    recordDiagnostic?.("subscribe-attempt-1", "error", errorToPushDiagnostic(firstError));
     await waitMs(700);
     try {
+      recordDiagnostic?.("subscribe-attempt-2", "info", "Retrying after short delay");
       return await subscribeToPushManager(registration, applicationServerKey);
-    } catch {
+    } catch (retryError) {
+      recordDiagnostic?.("subscribe-attempt-2", "error", errorToPushDiagnostic(retryError));
       // Continue to stale subscription cleanup and service worker refresh.
     }
 
     const staleSubscription = await registration.pushManager.getSubscription();
     if (staleSubscription) {
+      recordDiagnostic?.("stale-subscription", "info", describePushSubscription(staleSubscription));
       await staleSubscription.unsubscribe().catch(() => false);
       try {
+        recordDiagnostic?.("subscribe-attempt-3", "info", "Retrying after stale subscription cleanup");
         return await subscribeToPushManager(registration, applicationServerKey);
-      } catch {
+      } catch (cleanupRetryError) {
+        recordDiagnostic?.("subscribe-attempt-3", "error", errorToPushDiagnostic(cleanupRetryError));
         // Continue to the registration refresh below.
       }
     }
 
     try {
       const refreshedRegistration = await resetServiceWorkerRegistration();
+      recordDiagnostic?.("service-worker-reset", "success", await getServiceWorkerDiagnostic(refreshedRegistration));
       await waitMs(700);
+      recordDiagnostic?.("subscribe-attempt-4", "info", "Retrying after service worker reset");
       return await subscribeToPushManager(refreshedRegistration, applicationServerKey);
-    } catch {
+    } catch (resetRetryError) {
+      recordDiagnostic?.("subscribe-attempt-4", "error", errorToPushDiagnostic(resetRetryError));
       throw new PushSubscriptionSetupError(firstError);
     }
   }
