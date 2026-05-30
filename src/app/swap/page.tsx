@@ -4721,8 +4721,11 @@ async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistrat
     throw new Error("This browser does not support push notifications.");
   }
   const existingRegistration = await navigator.serviceWorker.getRegistration("/");
-  if (existingRegistration) return existingRegistration;
-  await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  if (!existingRegistration) {
+    await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  } else {
+    await existingRegistration.update().catch(() => undefined);
+  }
   return navigator.serviceWorker.ready;
 }
 
