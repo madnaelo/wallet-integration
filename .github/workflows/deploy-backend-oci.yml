@@ -135,11 +135,12 @@ jobs:
           OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
           OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
           OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
+          ONEINCH_API_KEY: ${{ secrets.ONEINCH_API_KEY }}
           WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
         run: |
           set -euo pipefail
           missing=()
-          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV WALLET_API_DOMAIN; do
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV ONEINCH_API_KEY WALLET_API_DOMAIN; do
             if [ -z "${!name:-}" ]; then
               missing+=("$name")
             fi
@@ -177,12 +178,20 @@ jobs:
             infra/systemd/wallet-postgres-backup.service \
             infra/systemd/wallet-postgres-backup.timer \
             "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/infra/systemd/"
-          printf '%s\n' "$OCI_BACKEND_ENV" | ssh $SSH_OPTS -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+          {
+            printf '%s\n' "$OCI_BACKEND_ENV"
+            printf '\nLIMIT_ORDERS_DEFAULT_ENABLED=true\n'
+            printf 'ONEINCH_API_KEY=%s\n' "$ONEINCH_API_KEY"
+            printf 'ONEINCH_ORDERBOOK_BASE_URL=https://api.1inch.dev/orderbook/v4.1\n'
+            printf 'LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED=true\n'
+            printf 'LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS=8\n'
+          } | ssh $SSH_OPTS -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
             "cat > '$OCI_DEPLOY_PATH/backend.env' && chmod 600 '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh' '$OCI_DEPLOY_PATH/scripts/deploy/backup-oci-postgres.sh'"
         env:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
           OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
+          ONEINCH_API_KEY: ${{ secrets.ONEINCH_API_KEY }}
 
       - name: Deploy backend
         shell: bash
