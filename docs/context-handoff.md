@@ -9,8 +9,9 @@ Use this file first when restarting in a fresh context.
 3. `docs/local-and-deployment.md`
 4. `docs/ci-cd.md`
 5. `docs/earning-setup-finalization.md`
-6. Recent `docs/prompt*_f.md` files relevant to the task
-7. Current git status/diff
+6. Known issue notes in `docs/known-issues/` when relevant
+7. Recent `docs/prompt*_f.md` files relevant to the task
+8. Current git status/diff
 
 The prompt files are the detailed AI pair-programming trail. The README and
 BRD are the current product/architecture summary.
@@ -38,6 +39,9 @@ preference/rule storage, not autonomous private-key signing.
 - Wallet connection: Reown AppKit plus provider-specific signing handling.
 - Backend: Spring Boot, Flyway, PostgreSQL.
 - Notifications: scheduled monitor with email and Telegram adapters.
+- Browser push notifications are implemented, but a mobile subscription issue
+  is paused and documented in
+  `docs/known-issues/mobile-push-subscription.md`.
 - Operations: health endpoint plus admin operations summary for monitor and
   notification counters.
 - Deployment: Vercel for frontend/quote route, OCI for backend/PostgreSQL/Caddy.
