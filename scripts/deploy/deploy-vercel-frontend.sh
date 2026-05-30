@@ -13,6 +13,10 @@ fi
 export NEXT_TELEMETRY_DISABLED=1
 export VERCEL_TELEMETRY_DISABLED=1
 export NEXT_PUBLIC_APP_VERSION="${NEXT_PUBLIC_APP_VERSION:-${GITHUB_SHA:-local}}"
+if [ -z "${NEXT_PUBLIC_COMMIT_TIMESTAMP:-}" ]; then
+  NEXT_PUBLIC_COMMIT_TIMESTAMP="$(git show -s --format=%cI HEAD 2>/dev/null || true)"
+fi
+export NEXT_PUBLIC_COMMIT_TIMESTAMP
 
 if [ -n "${VERCEL_TOKEN:-}" ] && [ -n "${VERCEL_ORG_ID:-}" ] && [ -n "${VERCEL_PROJECT_ID:-}" ]; then
   npx --yes "vercel@$vercel_cli_version" pull --yes --environment="$environment" --token "$VERCEL_TOKEN"

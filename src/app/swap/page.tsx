@@ -3845,6 +3845,7 @@ export default function Page() {
         <div className="footerMeta">
           <span className="versionLabel" title={`Build ${envPublic.APP_VERSION}`}>
             Build {formatBuildVersion(envPublic.APP_VERSION)}
+            {envPublic.COMMIT_TIMESTAMP ? ` · ${formatBuildTimestamp(envPublic.COMMIT_TIMESTAMP)}` : ""}
           </span>
           <nav aria-label="Legal links">
             <Link href="/fees">Fees & Risks</Link>
@@ -3866,6 +3867,19 @@ function formatBuildVersion(version: string): string {
   const trimmed = version.trim();
   if (!trimmed || trimmed === "local") return "local";
   return trimmed.replace(/^sha-/, "").slice(0, 7);
+}
+
+function formatBuildTimestamp(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return trimmed;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function parseSwapLinkParams(search: string): PendingSwapLink | null {
