@@ -6,7 +6,7 @@ import java.time.Instant;
 public final class FeatureModels {
   private FeatureModels() {}
 
-  public record FeatureFlagsResponse(boolean autoSwapEnabled) {}
+  public record FeatureFlagsResponse(boolean autoSwapEnabled, boolean limitOrdersEnabled) {}
 
   public record FeatureFlagUpdateRequest(@NotNull Boolean enabled) {}
 

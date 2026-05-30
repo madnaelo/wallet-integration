@@ -39,6 +39,8 @@ Fee collection must be transparent in product/legal copy before public launch.
 - Favorite pairs with target-rate alerts.
 - Reverse-swap profit and loss-protection monitoring.
 - Telegram/email notification plumbing.
+- Limit Orders for supported EVM contract-token pairs using protocol-verifiable
+  signed terms and backend submission through a supported orderbook adapter.
 - Trade-summary risk cues for high slippage, large fee ratio, and partial route
   outages.
 - Admin-gated Auto Swap preference storage, without backend custody of keys.
@@ -71,6 +73,8 @@ Fee collection must be transparent in product/legal copy before public launch.
 - Favorite pair alert rules.
 - Alert delivery/cooldown records.
 - Auto Swap preference rules.
+- Limit Orders with signed payload hashes, order hashes, execution provider,
+  status, expiry, and audit metadata.
 
 ## Launch Readiness
 

@@ -105,6 +105,7 @@ export type PushDiagnosticReportPayload = {
 
 export type FeatureFlags = {
   autoSwapEnabled: boolean;
+  limitOrdersEnabled: boolean;
 };
 
 export type FavoritePair = {
@@ -174,6 +175,66 @@ export type SaveAutoSwapRuleRequest = {
   slippageBps: number;
   recipientAddress: string;
   executionMode?: "notify_to_confirm";
+};
+
+export type LimitOrderCapabilityRequest = {
+  chainId: number;
+  sellTokenAddress: string;
+  sellTokenSymbol: string;
+  sellTokenDecimals: number;
+  buyTokenAddress: string;
+  buyTokenSymbol: string;
+  buyTokenDecimals: number;
+};
+
+export type LimitOrderCapability = {
+  automaticExecutionSupported: boolean;
+  executionProvider: string;
+  executionSupport: "supported" | "unsupported";
+  reason: string;
+  requiredSignature: string;
+  riskLevel: string;
+};
+
+export type LimitOrder = {
+  id: string;
+  walletAddress: string;
+  chainId: number;
+  sellTokenAddress: string;
+  sellTokenSymbol: string;
+  sellTokenDecimals: number;
+  buyTokenAddress: string;
+  buyTokenSymbol: string;
+  buyTokenDecimals: number;
+  sellAmountRaw: string;
+  minBuyAmountRaw: string;
+  targetRate: string;
+  expiresAt: string;
+  recipientAddress: string;
+  executionProvider: string;
+  executionSupport: "supported" | "unsupported";
+  executionStatus: string;
+  signedPayloadHash: string;
+  orderHash: string;
+  termsAcceptedAt: string;
+  executionError?: string | null;
+  submittedAt?: string | null;
+  executedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SaveLimitOrderRequest = LimitOrderCapabilityRequest & {
+  sellAmountRaw: string;
+  minBuyAmountRaw: string;
+  targetRate: string;
+  expiresAt: string;
+  recipientAddress: string;
+  executionProvider: string;
+  orderHash: string;
+  signature: string;
+  signedPayloadJson: string;
+  termsAccepted: boolean;
 };
 
 export class BackendClientError extends Error {
@@ -401,6 +462,38 @@ export async function deleteAutoSwapRule(
   await backendFetch<Record<string, never>>(backendBaseUrl, `/api/auto-swap/rules/${id}`, {
     method: "DELETE",
     headers: authHeaders(session)
+  });
+}
+
+export async function checkLimitOrderCapability(
+  backendBaseUrl: string,
+  request: LimitOrderCapabilityRequest
+): Promise<LimitOrderCapability> {
+  return backendFetch<LimitOrderCapability>(backendBaseUrl, "/api/limit-orders/capability", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+export async function listLimitOrders(
+  backendBaseUrl: string,
+  session: BackendSession
+): Promise<LimitOrder[]> {
+  return backendFetch<LimitOrder[]>(backendBaseUrl, "/api/limit-orders", {
+    method: "GET",
+    headers: authHeaders(session)
+  });
+}
+
+export async function saveLimitOrder(
+  backendBaseUrl: string,
+  session: BackendSession,
+  request: SaveLimitOrderRequest
+): Promise<LimitOrder> {
+  return backendFetch<LimitOrder>(backendBaseUrl, "/api/limit-orders", {
+    method: "POST",
+    headers: authHeaders(session),
+    body: JSON.stringify(request)
   });
 }
 

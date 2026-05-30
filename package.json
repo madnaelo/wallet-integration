@@ -11,6 +11,7 @@
     "generate:vapid": "node scripts/generate-vapid-keys.mjs"
   },
   "dependencies": {
+    "@1inch/limit-order-sdk": "^5.3.0",
     "@base-org/account": "^2.5.6",
     "@reown/appkit": "^1.8.20",
     "@reown/appkit-adapter-bitcoin": "^1.8.20",

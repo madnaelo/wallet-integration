@@ -199,6 +199,117 @@ body {
   text-decoration: underline;
 }
 
+.limitOrderPage {
+  max-width: 1040px;
+}
+
+.walletActions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.limitOrderWarning h2,
+.limitOrderAudit h2 {
+  margin-top: 0;
+}
+
+.limitOrderWarning ul {
+  color: var(--muted);
+  display: grid;
+  gap: 8px;
+  line-height: 1.5;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.limitOrderGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 14px;
+}
+
+.limitOrderWide {
+  grid-column: 1 / -1;
+}
+
+.limitOrderCapability {
+  border: 1px solid rgba(255, 212, 59, 0.36);
+  border-radius: 10px;
+  color: #f8fafc;
+  padding: 12px;
+}
+
+.limitOrderCapability p,
+.limitOrderAudit p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+
+.limitOrderCapabilityReady {
+  border-color: rgba(81, 207, 102, 0.42);
+}
+
+.limitOrderTerms {
+  align-items: flex-start;
+  color: var(--muted);
+  display: flex;
+  gap: 10px;
+  line-height: 1.5;
+}
+
+.limitOrderTerms input {
+  margin-top: 4px;
+}
+
+.limitOrderActionRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.limitOrderMessage {
+  margin: 0;
+}
+
+.limitOrderAudit {
+  margin-top: 14px;
+}
+
+.limitOrderList {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.limitOrderItem {
+  align-items: center;
+  background: rgba(6, 12, 24, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.limitOrderItem > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+@media (min-width: 760px) {
+  .limitOrderGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .legalPage {
   margin: 0 auto;
   max-width: 820px;

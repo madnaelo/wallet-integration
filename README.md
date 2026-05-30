@@ -54,6 +54,10 @@ Implemented:
 - Admin-gated Auto Swap rule storage for selected pairs, including amount,
   target rate, slippage tolerance, recipient address, and whether the pair is
   automatic-ready or needs user confirmation.
+- Separate Limit Orders page for supported EVM contract-token pairs. The
+  frontend builds a 1inch EIP-712 order, the user signs exact terms in their
+  wallet, and the backend validates the payload against the authenticated wallet
+  before submitting it to the configured 1inch Orderbook API.
 
 Not implemented yet:
 
@@ -62,9 +66,11 @@ Not implemented yet:
 - In-app notification inbox.
 - Guarded import-by-address flow and token risk signals.
 - Native BTC sell execution and cross-chain destination status tracking.
-- Signed/delegated-order submission for automatic Auto Swap execution. This is
-  intentionally blocked until a non-custodial execution authorization model is
-  selected; see `docs/architecture-decisions/backend-auto-swap-execution.md`.
+- Native asset, native BTC, cross-chain, and non-EVM automatic limit-order
+  execution. These stay blocked until each path has a provider-verifiable
+  signed-intent adapter.
+- Limit-order cancellation/status sync UI beyond the local submitted/stored
+  record.
 
 ## Architecture
 
@@ -97,6 +103,10 @@ High-level flow:
 7. Auto Swap rules are hidden behind a backend feature switch. Saving a rule
    stores the exact threshold/slippage preference for later signed-order or
    confirmation-based execution without giving the backend private keys.
+8. Limit Orders use a provider-verifiable signed-order path. For supported EVM
+   contract-token pairs, the wallet signs a 1inch EIP-712 order and the backend
+   submits only the signed payload whose maker, assets, amounts, recipient, and
+   chain match the authenticated request.
 
 Native BTC swaps use the same form model: the source wallet pays, the receive
 wallet/address receives, and the connected destination wallet pre-fills the
@@ -182,7 +192,9 @@ Important backend variables:
 - `API_RATE_LIMIT_KEY_PEPPER`
 - `SESSION_TTL_HOURS`, `NONCE_TTL_MINUTES`, `AUTH_SESSION_COOKIE_SAME_SITE`,
   `AUTH_SESSION_COOKIE_SECURE`, `AUTH_EXPOSE_ACCESS_TOKEN`
-- `AUTO_SWAP_DEFAULT_ENABLED`, `ADMIN_API_KEY`
+- `AUTO_SWAP_DEFAULT_ENABLED`, `LIMIT_ORDERS_DEFAULT_ENABLED`, `ADMIN_API_KEY`
+- `LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED`, `ONEINCH_ORDERBOOK_BASE_URL`,
+  `LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS`
 - `MAINTENANCE_CLEANUP_FIXED_DELAY_MS`, `DRY_RUN_HISTORY_RETENTION_DAYS`,
   `ALERT_RETENTION_DAYS`, `NOTIFICATION_OUTBOX_RETENTION_DAYS`
 - `NOTIFICATIONS_MONITOR_ENABLED`, `NOTIFICATIONS_MONITOR_FIXED_DELAY_MS`
@@ -263,3 +275,5 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
   protection alerts, trade risk cues, actionable favorite-pair links, PWA
   installability, browser push alerts, onboarding, mobile polish, and CI/CD
   deployment gate hardening.
+- Prompt 39: production-grade Limit Orders with protocol-verifiable signed terms
+  and backend submission only for supported non-custodial adapters.

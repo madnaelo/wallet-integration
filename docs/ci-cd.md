@@ -103,7 +103,10 @@ secret, keep `AUTH_SESSION_COOKIE_SECURE=true` with `SameSite=None`, and keep
 `AUTH_EXPOSE_ACCESS_TOKEN=true` for the cross-origin production
 frontend/backend setup. For push notifications, set
 `PUSH_NOTIFICATIONS_ENABLED=true`, `PUSH_VAPID_PUBLIC_KEY`,
-`PUSH_VAPID_PRIVATE_KEY`, and `PUSH_VAPID_SUBJECT`. Do not commit the real file.
+`PUSH_VAPID_PRIVATE_KEY`, and `PUSH_VAPID_SUBJECT`. For Limit Orders, also set
+`LIMIT_ORDERS_DEFAULT_ENABLED=true`, `ONEINCH_API_KEY`, `ONEINCH_ORDERBOOK_BASE_URL`, and
+`LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED=true` in the backend environment. Do
+not commit the real file.
 
 `OCI_SSH_KNOWN_HOSTS` must contain the OCI host key line for
 `OCI_SSH_HOST`/`OCI_SSH_PORT`. Generate it once from a trusted machine with

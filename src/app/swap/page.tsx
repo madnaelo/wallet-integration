@@ -210,7 +210,7 @@ export default function Page() {
   const { disconnect: disconnectAppKit } = useDisconnect();
   const isDryRun = envPublic.DISALLOW_MAINNET;
   const [activeView, setActiveView] = useState<ActiveView>("swap");
-  const [featureFlags, setFeatureFlags] = useState({ autoSwapEnabled: false });
+  const [featureFlags, setFeatureFlags] = useState({ autoSwapEnabled: false, limitOrdersEnabled: false });
   const [featureFlagsLoaded, setFeatureFlagsLoaded] = useState<boolean>(false);
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
 
@@ -486,7 +486,7 @@ export default function Page() {
         if (!cancelled) setFeatureFlags(flags);
       })
       .catch(() => {
-        if (!cancelled) setFeatureFlags({ autoSwapEnabled: false });
+        if (!cancelled) setFeatureFlags({ autoSwapEnabled: false, limitOrdersEnabled: false });
       })
       .finally(() => {
         if (!cancelled) setFeatureFlagsLoaded(true);
@@ -2527,6 +2527,13 @@ export default function Page() {
               >
                 Favorites
               </a>
+            </li>
+            <li>
+              {featureFlags.limitOrdersEnabled ? (
+                <Link className="appMenuLink" href="/limit-orders">
+                  Limit Orders
+                </Link>
+              ) : null}
             </li>
             {featureFlags.autoSwapEnabled ? (
               <li>

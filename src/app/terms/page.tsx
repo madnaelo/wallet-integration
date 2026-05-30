@@ -59,6 +59,18 @@ export default function TermsPage() {
         </section>
 
         <section>
+          <h2>Limit Orders</h2>
+          <p>
+            Limit orders are executed only when a supported protocol can verify
+            the exact signed order terms. Execution is not guaranteed and can
+            fail because of liquidity, gas costs, wallet balance, token allowance,
+            expiry, network issues, or provider availability. You remain
+            responsible for the terms you sign and for cancelling any order
+            through supported wallet or protocol tools when needed.
+          </p>
+        </section>
+
+        <section>
           <h2>Availability</h2>
           <p>
             Swap Assistant may be updated, paused, rate limited, or unavailable at

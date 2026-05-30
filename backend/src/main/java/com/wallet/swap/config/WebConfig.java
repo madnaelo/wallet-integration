@@ -12,6 +12,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
     ApiProperties.class,
     AuthProperties.class,
     FeatureProperties.class,
+    LimitOrderProperties.class,
     MaintenanceProperties.class,
     NotificationProperties.class
 })

@@ -48,7 +48,13 @@ wallet:
     expose-access-token: ${AUTH_EXPOSE_ACCESS_TOKEN:false}
   features:
     auto-swap-default-enabled: ${AUTO_SWAP_DEFAULT_ENABLED:false}
+    limit-orders-default-enabled: ${LIMIT_ORDERS_DEFAULT_ENABLED:true}
     admin-api-key: ${ADMIN_API_KEY:}
+  limit-orders:
+    orderbook-submission-enabled: ${LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED:true}
+    oneinch-api-key: ${ONEINCH_API_KEY:}
+    oneinch-orderbook-base-url: ${ONEINCH_ORDERBOOK_BASE_URL:https://api.1inch.dev/orderbook/v4.1}
+    request-timeout-seconds: ${LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS:8}
   maintenance:
     cleanup-fixed-delay-ms: ${MAINTENANCE_CLEANUP_FIXED_DELAY_MS:3600000}
     dry-run-history-retention-days: ${DRY_RUN_HISTORY_RETENTION_DAYS:180}

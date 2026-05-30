@@ -1,6 +1,6 @@
 # Backend Auto Swap Execution
 
-Status: decision recorded on 2026-05-30.
+Status: decision updated on 2026-05-30.
 
 ## Decision
 
@@ -11,6 +11,12 @@ private keys, raw wallet signing material, or broadly reusable wallet
 authorizations. Backend Auto Swap can only execute without opening the user's
 wallet when the user has first created a narrow, revocable, auditable execution
 authorization.
+
+The first implementation path is a dedicated Limit Orders module for supported
+EVM contract-token pairs. The frontend builds a 1inch EIP-712 limit order, the
+user signs the exact terms in their wallet, and the backend submits only that
+signed payload to the configured 1inch Orderbook API after validating maker,
+chain, assets, amounts, recipient, and payload hash.
 
 ## Why This Is Blocked For The Current Wallet Model
 
@@ -52,13 +58,19 @@ their wallet.
 This is intentionally `notify_to_confirm` with `confirmation_required` execution
 readiness.
 
+The Limit Orders module is separate from the alert-to-confirm Auto Swap rule
+storage. Limit Orders can submit signed EVM contract-token orders through the
+first supported adapter. Native BTC, native assets, cross-chain routes, and
+non-EVM pairs remain blocked from automatic execution until a matching
+provider-verifiable adapter exists.
+
 ## Production-Grade Path To Real Auto Swap
 
 Implement real backend execution in phases:
 
-1. Keep the current alert-to-confirm flow as the default for all pairs.
-2. Add a provider-specific signed-order adapter for a narrow first surface,
-   likely EVM ERC20-to-ERC20 only.
+1. Keep the current alert-to-confirm flow as the default for all unsupported
+   pairs.
+2. Add provider-specific signed-order adapters one surface at a time.
 3. Require the frontend to collect an explicit wallet signature for that exact
    order/intent, including:
    - chain,

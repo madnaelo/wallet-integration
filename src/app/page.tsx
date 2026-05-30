@@ -29,10 +29,10 @@ const features = [
     body: "Get notified when a past swap may be worth reviewing in the reverse direction, including loss-protection alerts."
   },
   {
-    title: "Set target alerts",
-    body: "Create pair alerts with a target rate and slippage tolerance. When a target is reached, you get a prefilled swap link and still approve in your wallet.",
-    ctaHref: "/swap#preferences",
-    ctaLabel: "Set Alerts"
+    title: "Limit orders",
+    body: "Set exact signed order terms for supported pairs. Automatic execution is allowed only when a protocol can verify your signature and limits.",
+    ctaHref: "/limit-orders",
+    ctaLabel: "Open Limit Orders"
   }
 ];
 
@@ -117,10 +117,10 @@ export default function IntroPage() {
 
       <section className="introSection introComingSoon" aria-labelledby="coming-soon-title">
         <div>
-          <h2 id="coming-soon-title">Coming Soon: Signed Auto Swap</h2>
+          <h2 id="coming-soon-title">Limit Orders With Guardrails</h2>
           <p>
-            Target alerts are available today. The next step is signed Auto Swap: you approve a narrow execution
-            instruction first, then the backend can act only within those saved limits when supported.
+            Limit Orders use explicit risk acceptance and signed terms. Unsupported pairs stay on alerts until a safe
+            protocol-specific execution adapter exists.
           </p>
         </div>
       </section>
