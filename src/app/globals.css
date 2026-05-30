@@ -455,6 +455,12 @@ body {
   margin: 0 0 8px;
 }
 
+.introFeatureAction {
+  margin-top: 14px;
+  min-height: 40px;
+  text-decoration: none;
+}
+
 .introComingSoon {
   align-items: center;
   display: grid;
@@ -484,13 +490,6 @@ body {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .introComingSoon {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .introComingSoon a {
-    justify-self: end;
-  }
 }
 
 .grid > .panel:first-child {

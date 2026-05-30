@@ -30,7 +30,9 @@ const features = [
   },
   {
     title: "Set target alerts",
-    body: "Create pair alerts with a target rate and slippage tolerance. When a target is reached, you get a prefilled swap link and still approve in your wallet."
+    body: "Create pair alerts with a target rate and slippage tolerance. When a target is reached, you get a prefilled swap link and still approve in your wallet.",
+    ctaHref: "/swap#preferences",
+    ctaLabel: "Set Alerts"
   }
 ];
 
@@ -103,6 +105,11 @@ export default function IntroPage() {
             <article className="introFeature" key={feature.title}>
               <h3>{feature.title}</h3>
               <p>{feature.body}</p>
+              {feature.ctaHref ? (
+                <Link className="btn introFeatureAction" href={feature.ctaHref}>
+                  {feature.ctaLabel}
+                </Link>
+              ) : null}
             </article>
           ))}
         </div>
@@ -117,9 +124,6 @@ export default function IntroPage() {
             limits.
           </p>
         </div>
-        <Link className="btn" href="/swap#preferences">
-          Set Alerts
-        </Link>
       </section>
     </main>
   );
