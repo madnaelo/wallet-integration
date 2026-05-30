@@ -137,8 +137,6 @@ Set these in the Vercel project for Production:
 NEXT_PUBLIC_BACKEND_BASE_URL=https://wallet-api.84-235-254-97.sslip.io
 NEXT_PUBLIC_SITE_URL=https://wallet-integration-theta.vercel.app
 NEXT_PUBLIC_APP_VERSION=<set automatically to GitHub SHA by CI>
-NEXT_PUBLIC_APP_BRANCH=<set automatically to GitHub branch by CI>
-NEXT_PUBLIC_DEPLOYED_AT=<set automatically by deployment script>
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
 NEXT_PUBLIC_ALLOWED_CHAIN_IDS=1,42161,10,8453,137,56,43114
 NEXT_PUBLIC_DISALLOW_MAINNET=false

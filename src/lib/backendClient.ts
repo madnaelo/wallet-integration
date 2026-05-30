@@ -107,18 +107,6 @@ export type FeatureFlags = {
   autoSwapEnabled: boolean;
 };
 
-export type BuildMetadata = {
-  version?: string | null;
-  commit?: string | null;
-  branch?: string | null;
-  deployedAt?: string | null;
-};
-
-export type BackendHealth = {
-  status: string;
-  build?: BuildMetadata;
-};
-
 export type FavoritePair = {
   id: string;
   walletAddress: string;
@@ -202,12 +190,6 @@ export class BackendClientError extends Error {
 
 export async function getFeatureFlags(backendBaseUrl: string): Promise<FeatureFlags> {
   return backendFetch<FeatureFlags>(backendBaseUrl, "/api/features", {
-    method: "GET"
-  });
-}
-
-export async function getBackendHealth(backendBaseUrl: string): Promise<BackendHealth> {
-  return backendFetch<BackendHealth>(backendBaseUrl, "/api/health", {
     method: "GET"
   });
 }
