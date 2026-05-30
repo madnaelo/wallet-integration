@@ -20,6 +20,12 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/wallet-backend
+  SSH_OPTS: >-
+    -o ServerAliveInterval=30
+    -o ServerAliveCountMax=20
+    -o TCPKeepAlive=yes
+    -o ConnectTimeout=30
+    -o StrictHostKeyChecking=yes
 
 jobs:
   build:
@@ -161,17 +167,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+          ssh $SSH_OPTS -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
             "mkdir -p '$OCI_DEPLOY_PATH/scripts/deploy' '$OCI_DEPLOY_PATH/infra/systemd'"
-          scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+          scp $SSH_OPTS -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             scripts/deploy/deploy-oci-backend.sh \
             scripts/deploy/backup-oci-postgres.sh \
             "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/scripts/deploy/"
-          scp -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+          scp $SSH_OPTS -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             infra/systemd/wallet-postgres-backup.service \
             infra/systemd/wallet-postgres-backup.timer \
             "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/infra/systemd/"
-          printf '%s\n' "$OCI_BACKEND_ENV" | ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+          printf '%s\n' "$OCI_BACKEND_ENV" | ssh $SSH_OPTS -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
             "cat > '$OCI_DEPLOY_PATH/backend.env' && chmod 600 '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh' '$OCI_DEPLOY_PATH/scripts/deploy/backup-oci-postgres.sh'"
         env:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
@@ -182,7 +188,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+          ssh $SSH_OPTS -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
             "cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' APP_VERSION='$APP_VERSION' GIT_COMMIT='$GIT_COMMIT' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' WALLET_API_DOMAIN='$WALLET_API_DOMAIN' OCI_CONTAINER_NETWORK='$OCI_CONTAINER_NETWORK' OCI_CADDYFILE_PATH='$OCI_CADDYFILE_PATH' OCI_CADDY_CONTAINER='$OCI_CADDY_CONTAINER' ./scripts/deploy/deploy-oci-backend.sh"
         env:
           BACKEND_IMAGE: ${{ needs.build.outputs.image }}
