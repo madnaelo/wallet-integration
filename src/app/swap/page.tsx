@@ -1594,6 +1594,7 @@ export default function Page() {
       }
 
       const registration = await ensureServiceWorkerRegistration();
+      setNotificationPreferenceNotice("Push notifications are allowed. Connecting this device...");
       const subscription = await getOrCreatePushSubscription(registration, publicKey);
       const preference = await savePushSubscription(
         envPublic.BACKEND_BASE_URL,
@@ -4743,7 +4744,7 @@ async function getOrCreatePushSubscription(
   registration: ServiceWorkerRegistration,
   vapidPublicKey: string
 ): Promise<PushSubscription> {
-  const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+  const applicationServerKey = urlBase64ToArrayBuffer(vapidPublicKey);
   const existingSubscription = await registration.pushManager.getSubscription();
   if (existingSubscription) {
     const existingKey = existingSubscription.options.applicationServerKey;
@@ -4756,6 +4757,13 @@ async function getOrCreatePushSubscription(
   try {
     return await subscribeToPushManager(registration, applicationServerKey);
   } catch (firstError) {
+    await waitMs(700);
+    try {
+      return await subscribeToPushManager(registration, applicationServerKey);
+    } catch {
+      // Continue to stale subscription cleanup and service worker refresh.
+    }
+
     const staleSubscription = await registration.pushManager.getSubscription();
     if (staleSubscription) {
       await staleSubscription.unsubscribe().catch(() => false);
@@ -4768,21 +4776,30 @@ async function getOrCreatePushSubscription(
 
     try {
       const refreshedRegistration = await resetServiceWorkerRegistration();
+      await waitMs(700);
       return await subscribeToPushManager(refreshedRegistration, applicationServerKey);
     } catch {
-      throw firstError;
+      throw new PushSubscriptionSetupError(firstError);
     }
   }
 }
 
 function subscribeToPushManager(
   registration: ServiceWorkerRegistration,
-  applicationServerKey: Uint8Array<ArrayBuffer>
+  applicationServerKey: ArrayBuffer
 ): Promise<PushSubscription> {
   return registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey
   });
+}
+
+class PushSubscriptionSetupError extends Error {
+  constructor(cause: unknown) {
+    super(normalizeWalletError(cause));
+    this.name = "PushSubscriptionSetupError";
+    this.cause = cause;
+  }
 }
 
 function pushSubscriptionToPayload(subscription: PushSubscription): PushSubscriptionPayload {
@@ -4805,13 +4822,13 @@ function pushSubscriptionToPayload(subscription: PushSubscription): PushSubscrip
   };
 }
 
-function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
+function urlBase64ToArrayBuffer(value: string): ArrayBuffer {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = `${value}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
   const output: Uint8Array<ArrayBuffer> = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
-  return output;
+  return output.buffer;
 }
 
 function arrayBufferToBase64Url(buffer: ArrayBuffer | ArrayBufferView | null): string {
@@ -5180,8 +5197,11 @@ function normalizeRecipientImportError(e: any): string {
 
 function normalizePushNotificationError(e: any): string {
   const message = normalizeWalletError(e);
+  if (e?.name === "PushSubscriptionSetupError") {
+    return "Chrome allowed notifications, but this phone did not finish connecting to push alerts. Open Swap Assistant directly in Chrome or the installed app, keep it in the foreground, and tap Enable again. If it still fails, update Chrome and Google Play Services, then restart the phone.";
+  }
   if (/push service|registration failed|aborterror/i.test(message)) {
-    return "Push notifications were not enabled on this device. Open Swap Assistant directly in Chrome, Edge, Safari, or the installed app, refresh, and try again.";
+    return "Chrome allowed notifications, but this phone did not finish connecting to push alerts. Open Swap Assistant directly in Chrome or the installed app, keep it in the foreground, and tap Enable again.";
   }
   if (/permission|blocked|denied|not enabled/i.test(message)) return PUSH_DENIED_MESSAGE;
   if (/not available/i.test(message)) return "Push notifications are not available right now.";
