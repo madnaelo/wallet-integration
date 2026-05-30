@@ -4927,7 +4927,7 @@ async function getOrCreatePushSubscription(
   vapidPublicKey: string,
   recordDiagnostic?: PushDiagnosticRecorder
 ): Promise<PushSubscription> {
-  const applicationServerKey = urlBase64ToArrayBuffer(vapidPublicKey);
+  const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
   const existingSubscription = await registration.pushManager.getSubscription();
   if (existingSubscription) {
     const existingKey = existingSubscription.options.applicationServerKey;
@@ -4981,12 +4981,24 @@ async function getOrCreatePushSubscription(
 
 function subscribeToPushManager(
   registration: ServiceWorkerRegistration,
-  applicationServerKey: ArrayBuffer
+  applicationServerKey: Uint8Array<ArrayBuffer>
 ): Promise<PushSubscription> {
   return registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey
+  }).then(async (subscription) => {
+    if (subscription) return subscription;
+    const existingSubscription = await registration.pushManager.getSubscription().catch(() => null);
+    if (existingSubscription) return existingSubscription;
+    throw new PushSubscriptionUnavailableError();
   });
+}
+
+class PushSubscriptionUnavailableError extends Error {
+  constructor() {
+    super("The browser did not return a push subscription endpoint.");
+    this.name = "PushSubscriptionUnavailableError";
+  }
 }
 
 class PushSubscriptionSetupError extends Error {
@@ -5017,13 +5029,13 @@ function pushSubscriptionToPayload(subscription: PushSubscription): PushSubscrip
   };
 }
 
-function urlBase64ToArrayBuffer(value: string): ArrayBuffer {
+function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = `${value}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
   const output: Uint8Array<ArrayBuffer> = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
-  return output.buffer;
+  return output;
 }
 
 function arrayBufferToBase64Url(buffer: ArrayBuffer | ArrayBufferView | null): string {
@@ -5392,6 +5404,9 @@ function normalizeRecipientImportError(e: any): string {
 
 function normalizePushNotificationError(e: any): string {
   const message = normalizeWalletError(e);
+  if (e?.name === "PushSubscriptionUnavailableError" || e?.cause?.name === "PushSubscriptionUnavailableError") {
+    return "Your browser allowed notifications, but did not create a push endpoint for this device. Try the installed app or another browser; Telegram alerts will keep working meanwhile.";
+  }
   if (e?.name === "PushSubscriptionSetupError") {
     return "Chrome allowed notifications, but this phone did not finish connecting to push alerts. Open Swap Assistant directly in Chrome or the installed app, keep it in the foreground, and tap Enable again. If it still fails, update Chrome and Google Play Services, then restart the phone.";
   }
