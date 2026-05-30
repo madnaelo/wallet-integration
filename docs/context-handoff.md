@@ -42,6 +42,9 @@ preference/rule storage, not autonomous private-key signing.
 - Browser push notifications are implemented, but a mobile subscription issue
   is paused and documented in
   `docs/known-issues/mobile-push-subscription.md`.
+- Backend Auto Swap is currently alert-to-confirm only. True autonomous
+  execution is blocked on a signed/delegated authorization model; see
+  `docs/architecture-decisions/backend-auto-swap-execution.md`.
 - Operations: health endpoint plus admin operations summary for monitor and
   notification counters.
 - Deployment: Vercel for frontend/quote route, OCI for backend/PostgreSQL/Caddy.

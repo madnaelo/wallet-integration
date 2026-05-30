@@ -62,7 +62,9 @@ Not implemented yet:
 - In-app notification inbox.
 - Guarded import-by-address flow and token risk signals.
 - Native BTC sell execution and cross-chain destination status tracking.
-- Signed-order submission for automatic Auto Swap execution.
+- Signed/delegated-order submission for automatic Auto Swap execution. This is
+  intentionally blocked until a non-custodial execution authorization model is
+  selected; see `docs/architecture-decisions/backend-auto-swap-execution.md`.
 
 ## Architecture
 

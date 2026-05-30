@@ -117,11 +117,10 @@ export default function IntroPage() {
 
       <section className="introSection introComingSoon" aria-labelledby="coming-soon-title">
         <div>
-          <h2 id="coming-soon-title">Coming Soon: Backend Auto Swap</h2>
+          <h2 id="coming-soon-title">Coming Soon: Signed Auto Swap</h2>
           <p>
-            Target alerts are available today. The next step is backend Auto Swap: you set the price, amount, and
-            slippage rules, then the backend watches for the best available moment and executes only within your saved
-            limits.
+            Target alerts are available today. The next step is signed Auto Swap: you approve a narrow execution
+            instruction first, then the backend can act only within those saved limits when supported.
           </p>
         </div>
       </section>
