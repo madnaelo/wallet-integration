@@ -304,9 +304,257 @@ body {
   min-width: 0;
 }
 
+.limitOrderHero {
+  align-items: end;
+  border: 1px solid rgba(110, 168, 254, 0.22);
+  display: grid;
+  gap: 18px;
+  margin-bottom: 14px;
+  padding: 18px 0 8px;
+}
+
+.limitOrderHero h2 {
+  font-size: clamp(26px, 4vw, 42px);
+  line-height: 1.04;
+  margin: 0 0 10px;
+}
+
+.limitOrderHero p {
+  color: #c7d3ea;
+  line-height: 1.55;
+  margin: 0;
+  max-width: 760px;
+}
+
+.limitOrderHeroFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.limitOrderHeroFacts span {
+  background: rgba(81, 207, 102, 0.1);
+  border: 1px solid rgba(81, 207, 102, 0.26);
+  border-radius: 999px;
+  color: #d9ffe2;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.limitOrderTokenNotice {
+  margin: 0 0 12px;
+}
+
+.limitOrderShell {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.limitOrderFormPanel,
+.limitOrderSummaryPanel {
+  display: grid;
+  gap: 14px;
+}
+
+.limitOrderFormHeader,
+.limitOrderSectionHeader {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.limitOrderFormHeader h2,
+.limitOrderSectionHeader h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.limitOrderFormHeader p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+
+.limitAmountBlock {
+  background: rgba(6, 12, 24, 0.5);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.limitAmountInput {
+  font-size: 20px;
+  font-weight: 800;
+  min-height: 50px;
+}
+
+.limitOrderTokenRow {
+  margin-top: 0;
+}
+
+.limitTargetGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.limitRateChart {
+  background: rgba(6, 12, 24, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.limitRateChartHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.limitRateChartHeader strong,
+.limitRateChartHeader span {
+  display: block;
+}
+
+.limitRateChartHeader > div > span {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.limitRateChartPlot {
+  align-items: end;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 100% 34px, calc(100% / 6) 100%;
+  border-radius: 10px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-height: 150px;
+  padding: 18px 10px 8px;
+}
+
+.limitRatePoint {
+  align-items: center;
+  align-self: end;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 6px;
+  justify-items: center;
+  min-width: 0;
+  padding: 0;
+}
+
+.limitRateStem {
+  background: linear-gradient(180deg, rgba(110, 168, 254, 0.88), rgba(52, 211, 153, 0.74));
+  border-radius: 999px;
+  height: var(--point-height);
+  width: 4px;
+}
+
+.limitRateDot {
+  background: #e8eefc;
+  border: 3px solid rgba(110, 168, 254, 0.82);
+  border-radius: 999px;
+  height: 14px;
+  margin-top: calc(var(--point-height) * -1 - 7px);
+  width: 14px;
+}
+
+.limitRateLabel {
+  font-size: 11px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.limitRatePoint:hover,
+.limitRatePoint:focus-visible,
+.limitRatePointActive {
+  color: #ffffff;
+  outline: none;
+}
+
+.limitRatePoint:hover .limitRateDot,
+.limitRatePoint:focus-visible .limitRateDot,
+.limitRatePointActive .limitRateDot {
+  border-color: #34d399;
+  box-shadow: 0 0 0 5px rgba(52, 211, 153, 0.14);
+}
+
+.limitOrderSummaryPanel {
+  position: sticky;
+  top: 12px;
+}
+
+.limitOrderSummaryList {
+  border-top: 1px solid var(--border);
+  display: grid;
+}
+
+.limitOrderSummaryRow {
+  align-items: start;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(100px, 0.62fr) minmax(0, 1fr);
+  padding: 11px 0;
+}
+
+.limitOrderSummaryRow span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.limitOrderSummaryRow strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.limitOrderActionStack {
+  display: grid;
+  gap: 10px;
+}
+
+.limitOrderActionStack .btn {
+  width: 100%;
+}
+
 @media (min-width: 760px) {
   .limitOrderGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .limitOrderHero {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .limitTargetGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 0.35fr);
+  }
+}
+
+@media (min-width: 920px) {
+  .limitOrderShell {
+    grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
   }
 }
 

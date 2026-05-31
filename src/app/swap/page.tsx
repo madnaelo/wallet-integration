@@ -25,7 +25,12 @@ import { buildQuoteUrl } from "@/lib/quoteClient";
 import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import { swapLog } from "@/lib/swapLog";
 import { listTokens } from "@/lib/tokenClient";
-import { TokenPicker, type TokenPickerNetwork, type TokenPickerOption } from "@/components/TokenPicker";
+import { TokenPicker, type TokenPickerOption } from "@/components/TokenPicker";
+import {
+  buildFallbackTokensByChain,
+  buildTokenPickerNetworks,
+  buildTokenPickerOptions
+} from "@/lib/tokenPickerOptions";
 import {
   type AutoSwapRule,
   BackendClientError,
@@ -4044,69 +4049,6 @@ function getRecipientAddressSourceLabel(source: RecipientAddressSource): string 
     default:
       return "Recipient";
   }
-}
-
-function buildFallbackTokensByChain(chainIds: number[]): Record<number, TokenInfo[]> {
-  return Object.fromEntries(chainIds.map((chainId) => [chainId, DEFAULT_TOKENS_BY_CHAIN[chainId] ?? []]));
-}
-
-function buildTokenPickerOptions(
-  chains: Array<{ chainId: number; name: string }>,
-  tokensByChain: Record<number, TokenInfo[]>
-): TokenPickerOption[] {
-  const optionsByKey = new Map<string, TokenPickerOption>();
-
-  for (const chain of chains) {
-    const chainTokens = tokensByChain[chain.chainId] ?? DEFAULT_TOKENS_BY_CHAIN[chain.chainId] ?? [];
-    for (const token of chainTokens) {
-      const networkId = getTokenNetworkId(token, chain.chainId);
-      const key = `${networkId}:${normalizeTokenKey(token.address)}`;
-      const existing = optionsByKey.get(key);
-      if (existing) {
-        const currentSupportedChainIds = existing.supportedQuoteChainIds ?? [];
-        if (!currentSupportedChainIds.includes(chain.chainId)) {
-          existing.supportedQuoteChainIds = [...currentSupportedChainIds, chain.chainId];
-        }
-        continue;
-      }
-
-      const walletNamespace = getTokenWalletNamespace(token);
-      optionsByKey.set(key, {
-        ...token,
-        networkId,
-        networkName: getTokenNetworkName(token, chain.name),
-        quoteChainId: walletNamespace === "eip155" ? chain.chainId : undefined,
-        supportedQuoteChainIds: [chain.chainId]
-      });
-    }
-  }
-
-  return [...optionsByKey.values()];
-}
-
-function buildTokenPickerNetworks(
-  chains: Array<{ chainId: number; name: string }>,
-  tokens: TokenPickerOption[]
-): TokenPickerNetwork[] {
-  const networks = new Map<string, TokenPickerNetwork>();
-
-  for (const chain of chains) {
-    networks.set(getEvmNetworkId(chain.chainId), {
-      id: getEvmNetworkId(chain.chainId),
-      name: chain.name
-    });
-  }
-
-  for (const token of tokens) {
-    if (!networks.has(token.networkId)) {
-      networks.set(token.networkId, {
-        id: token.networkId,
-        name: token.networkName
-      });
-    }
-  }
-
-  return [...networks.values()];
 }
 
 function getEvmNetworkId(chainId: number): string {
