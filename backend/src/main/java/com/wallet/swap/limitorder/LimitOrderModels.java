@@ -14,6 +14,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 public final class LimitOrderModels {
+  private static final String EVM_ADDRESS_PATTERN = "(?i)^0x[0-9a-f]{40}$";
+  private static final String HEX_BYTES_PATTERN = "(?i)^0x(?:[0-9a-f]{2}){32,255}$";
+  private static final String ORDER_HASH_PATTERN = "(?i)^0x[0-9a-f]{64}$";
+
   private LimitOrderModels() {}
 
   public record LimitOrderCapabilityRequest(
@@ -35,20 +39,35 @@ public final class LimitOrderModels {
 
   public record LimitOrderRequest(
       @NotNull @Min(1) Long chainId,
-      @NotBlank @Size(max = 128) String sellTokenAddress,
+      @NotBlank
+          @Size(max = 128)
+          @Pattern(regexp = EVM_ADDRESS_PATTERN, message = "must be an EVM token address")
+          String sellTokenAddress,
       @NotBlank @Size(max = 32) String sellTokenSymbol,
       @Min(0) @Max(30) Integer sellTokenDecimals,
-      @NotBlank @Size(max = 128) String buyTokenAddress,
+      @NotBlank
+          @Size(max = 128)
+          @Pattern(regexp = EVM_ADDRESS_PATTERN, message = "must be an EVM token address")
+          String buyTokenAddress,
       @NotBlank @Size(max = 32) String buyTokenSymbol,
       @Min(0) @Max(30) Integer buyTokenDecimals,
       @NotBlank @Size(max = 78) @Pattern(regexp = "^[0-9]+$") String sellAmountRaw,
       @NotBlank @Size(max = 78) @Pattern(regexp = "^[0-9]+$") String minBuyAmountRaw,
       @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 20, fraction = 18) BigDecimal targetRate,
       @NotNull Instant expiresAt,
-      @NotBlank @Size(max = 256) String recipientAddress,
+      @NotBlank
+          @Size(max = 128)
+          @Pattern(regexp = EVM_ADDRESS_PATTERN, message = "must be an EVM address")
+          String recipientAddress,
       @NotBlank @Size(max = 32) String executionProvider,
-      @NotBlank @Size(max = 128) String orderHash,
-      @NotBlank @Size(max = 512) String signature,
+      @NotBlank
+          @Size(max = 128)
+          @Pattern(regexp = ORDER_HASH_PATTERN, message = "must be a 32-byte hex hash")
+          String orderHash,
+      @NotBlank
+          @Size(max = 512)
+          @Pattern(regexp = HEX_BYTES_PATTERN, message = "must be a hex signature")
+          String signature,
       @NotBlank @Size(max = 20000) String signedPayloadJson,
       @AssertTrue boolean termsAccepted) {}
 

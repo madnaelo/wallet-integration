@@ -967,7 +967,7 @@ function limitOrderStatusMessage(order: LimitOrderRecord): string {
     return "Your signed limit order was submitted. Execution depends on liquidity, allowance, balance, gas, and expiry.";
   }
   if (order.executionStatus === "failed") {
-    return order.executionError || "The signed order could not be submitted. Review the details and try again.";
+    return "Your signed order was saved, but the execution provider could not accept it right now. Review the details and try again later.";
   }
   return "Your signed order was saved, but provider submission is not enabled right now.";
 }

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -20,12 +21,11 @@ public class TelegramNotificationSender {
 
   public TelegramNotificationSender(NotificationProperties properties, RestClient.Builder restClientBuilder) {
     this.properties = properties;
+    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+    requestFactory.setConnectTimeout(Duration.ofSeconds(8));
+    requestFactory.setReadTimeout(Duration.ofSeconds(8));
     this.restClient = restClientBuilder
-        .requestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-          int timeoutMs = (int) Duration.ofSeconds(8).toMillis();
-          setConnectTimeout(timeoutMs);
-          setReadTimeout(timeoutMs);
-        }})
+        .requestFactory(requestFactory)
         .build();
   }
 
@@ -40,7 +40,7 @@ public class TelegramNotificationSender {
     if (chatId == null || chatId.isBlank()) throw new IllegalArgumentException("Telegram chat ID is missing.");
 
     URI uri = UriComponentsBuilder
-        .fromHttpUrl(properties.getTelegram().getBaseUrl())
+        .fromUriString(properties.getTelegram().getBaseUrl())
         .path("/bot{token}/sendMessage")
         .build(properties.getTelegram().getBotToken().trim());
 
@@ -62,7 +62,7 @@ public class TelegramNotificationSender {
     if (!isEnabled()) return Optional.empty();
 
     URI uri = UriComponentsBuilder
-        .fromHttpUrl(properties.getTelegram().getBaseUrl())
+        .fromUriString(properties.getTelegram().getBaseUrl())
         .path("/bot{token}/getMe")
         .build(properties.getTelegram().getBotToken().trim());
 
@@ -79,7 +79,7 @@ public class TelegramNotificationSender {
     if (!isEnabled()) throw new IllegalStateException("Telegram notifications are disabled.");
 
     URI uri = UriComponentsBuilder
-        .fromHttpUrl(properties.getTelegram().getBaseUrl())
+        .fromUriString(properties.getTelegram().getBaseUrl())
         .path("/bot{token}/getUpdates")
         .queryParam("timeout", 0)
         .queryParam("limit", 100)

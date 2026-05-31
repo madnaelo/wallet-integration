@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -36,6 +37,10 @@ public class CoinGeckoPriceClient {
 
   public CoinGeckoPriceClient(NotificationProperties properties, RestClient.Builder restClientBuilder) {
     this.properties = properties;
+    Duration timeout = Duration.ofSeconds(Math.max(1, properties.getPrice().getRequestTimeoutSeconds()));
+    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+    requestFactory.setConnectTimeout(timeout);
+    requestFactory.setReadTimeout(timeout);
     RestClient.Builder builder = restClientBuilder
         .baseUrl(properties.getPrice().getCoingeckoBaseUrl())
         .requestInterceptor((request, body, execution) -> {
@@ -49,11 +54,7 @@ public class CoinGeckoPriceClient {
           }
           return execution.execute(request, body);
         })
-        .requestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-          int timeoutMs = (int) Duration.ofSeconds(Math.max(1, properties.getPrice().getRequestTimeoutSeconds())).toMillis();
-          setConnectTimeout(timeoutMs);
-          setReadTimeout(timeoutMs);
-        }});
+        .requestFactory(requestFactory);
     this.restClient = builder.build();
   }
 
@@ -187,7 +188,7 @@ public class CoinGeckoPriceClient {
   }
 
   private UriComponentsBuilder baseUriBuilder() {
-    return UriComponentsBuilder.fromHttpUrl(properties.getPrice().getCoingeckoBaseUrl());
+    return UriComponentsBuilder.fromUriString(properties.getPrice().getCoingeckoBaseUrl());
   }
 
   private record TokenKey(long chainId, String address) {

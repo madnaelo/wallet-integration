@@ -6,6 +6,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -18,12 +19,12 @@ public class LimitOrderSubmissionClient {
 
   public LimitOrderSubmissionClient(LimitOrderProperties properties, RestClient.Builder restClientBuilder) {
     this.properties = properties;
+    Duration timeout = Duration.ofSeconds(Math.max(1, properties.getRequestTimeoutSeconds()));
+    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+    requestFactory.setConnectTimeout(timeout);
+    requestFactory.setReadTimeout(timeout);
     this.restClient = restClientBuilder
-        .requestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-          int timeoutMs = (int) Duration.ofSeconds(Math.max(1, properties.getRequestTimeoutSeconds())).toMillis();
-          setConnectTimeout(timeoutMs);
-          setReadTimeout(timeoutMs);
-        }})
+        .requestFactory(requestFactory)
         .build();
   }
 
@@ -36,7 +37,7 @@ public class LimitOrderSubmissionClient {
     }
 
     URI uri = UriComponentsBuilder
-        .fromHttpUrl(properties.getOneinchOrderbookBaseUrl())
+        .fromUriString(properties.getOneinchOrderbookBaseUrl())
         .path("/{chainId}/")
         .build(chainId);
 
