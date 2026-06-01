@@ -7,26 +7,43 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class LimitOrderCapabilityService {
+  static final String COW_PROTOCOL_PROVIDER = "cow_protocol";
+  static final String ONEINCH_PROVIDER = "1inch_orderbook";
+
+  private static final Set<Long> COW_ORDERBOOK_CHAINS =
+      Set.of(1L, 56L, 100L, 137L, 8453L, 42161L, 43114L, 57073L, 59144L, 9745L);
   private static final Set<Long> ONEINCH_ORDERBOOK_CHAINS = Set.of(1L, 56L, 137L, 10L, 42161L, 43114L, 8453L);
-  private static final String ONEINCH_PROVIDER = "1inch_orderbook";
 
   public LimitOrderCapabilityResponse check(LimitOrderCapabilityRequest request) {
     if (request == null || request.chainId() == null) return unsupported("Choose a network.");
-    if (!ONEINCH_ORDERBOOK_CHAINS.contains(request.chainId())) {
-      return unsupported("Automatic execution is not available on this network yet.");
-    }
     if (!isEvmContract(request.sellTokenAddress()) || !isEvmContract(request.buyTokenAddress())) {
       return unsupported("Automatic execution currently requires EVM contract tokens. Native assets and native BTC stay on alerts until a safe signed-intent adapter is available.");
     }
     if (sameToken(request.sellTokenAddress(), request.buyTokenAddress())) {
       return unsupported("Choose two different tokens.");
     }
+    if (COW_ORDERBOOK_CHAINS.contains(request.chainId())) {
+      return supported(
+          COW_PROTOCOL_PROVIDER,
+          "This pair can use a CoW Protocol signed limit order. Solvers can execute only inside the exact terms you sign.",
+          "EIP-712 CoW Protocol order signature");
+    }
+    if (ONEINCH_ORDERBOOK_CHAINS.contains(request.chainId())) {
+      return supported(
+          ONEINCH_PROVIDER,
+          "This pair can use a 1inch signed limit order. The protocol can execute only inside the exact terms you sign.",
+          "EIP-712 1inch limit order signature");
+    }
+    return unsupported("Automatic execution is not available on this network yet.");
+  }
+
+  private LimitOrderCapabilityResponse supported(String provider, String reason, String requiredSignature) {
     return new LimitOrderCapabilityResponse(
         true,
-        ONEINCH_PROVIDER,
+        provider,
         "supported",
-        "This pair can use a protocol-verifiable signed EVM limit order when the wallet supports EIP-712 typed-data signing.",
-        "EIP-712 limit order signature",
+        reason,
+        requiredSignature,
         "High");
   }
 

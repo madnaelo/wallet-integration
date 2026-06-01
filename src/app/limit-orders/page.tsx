@@ -35,8 +35,19 @@ const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
 const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
 const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
 const UINT_40_MAX = (1n << 40n) - 1n;
+const COW_PROTOCOL_PROVIDER = "cow_protocol";
+const ONEINCH_PROVIDER = "1inch_orderbook";
+const COW_SETTLEMENT_CONTRACT = "0x9008D19f58AAbD9eD0D60971565AA8510560ab41";
+const COW_EMPTY_APP_DATA = `0x${"0".repeat(64)}`;
 
 type ProviderKind = "injected" | "walletconnect" | null;
+type PreparedLimitOrder = {
+  executionProvider: string;
+  expiresAt: Date;
+  orderHash: string;
+  signedPayloadJson: string;
+  typedData: unknown;
+};
 
 export default function LimitOrdersPage() {
   const chains = useMemo(() => getAllowedChains(), []);
@@ -386,8 +397,10 @@ export default function LimitOrdersPage() {
       await ensureCorrectNetwork(walletProvider, executionChainId);
       const session = await ensureBackendSession();
 
-      const expiresAt = new Date(Date.now() + Number(expiryHours) * 60 * 60 * 1000);
-      const order = buildOneInchOrder({
+      const expiresAtSeconds = Math.floor((Date.now() + Number(expiryHours) * 60 * 60 * 1000) / 1000);
+      const expiresAt = new Date(expiresAtSeconds * 1000);
+      const preparedOrder = await prepareLimitOrder({
+        executionProvider: capability.executionProvider,
         chainId: executionChainId,
         maker: address,
         recipient: recipientAddress,
@@ -397,21 +410,8 @@ export default function LimitOrdersPage() {
         minBuyAmountRaw,
         expiresAt
       });
-      const typedData = order.getTypedData(executionChainId);
-      setOrderNotice(`Open ${walletName} and sign the limit order terms. This signature is not a fund transfer.`);
-      const signature = await signTypedData(walletProvider, address, typedData, providerKind);
-      const orderHash = order.getOrderHash(executionChainId);
-      const signedPayloadJson = JSON.stringify(
-        {
-          version: "1inch-limit-order-v4",
-          provider: "1inch_orderbook",
-          chainId: executionChainId,
-          data: { ...order.build(), extension: order.extension.encode() },
-          typedData,
-          createdAt: new Date().toISOString()
-        },
-        jsonBigIntReplacer
-      );
+      setOrderNotice(`Open ${walletName} and sign the ${formatExecutionProvider(preparedOrder.executionProvider)} terms. This signature is not a fund transfer.`);
+      const signature = await signTypedData(walletProvider, address, preparedOrder.typedData, providerKind);
 
       setOrderNotice("Submitting your signed limit order...");
       const saved = await saveLimitOrder(envPublic.BACKEND_BASE_URL, session, {
@@ -425,12 +425,12 @@ export default function LimitOrdersPage() {
         sellAmountRaw,
         minBuyAmountRaw,
         targetRate,
-        expiresAt: expiresAt.toISOString(),
+        expiresAt: preparedOrder.expiresAt.toISOString(),
         recipientAddress: recipientAddress.trim(),
-        executionProvider: "1inch_orderbook",
-        orderHash,
+        executionProvider: preparedOrder.executionProvider,
+        orderHash: preparedOrder.orderHash,
         signature,
-        signedPayloadJson,
+        signedPayloadJson: preparedOrder.signedPayloadJson,
         termsAccepted
       });
       setOrders((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
@@ -595,7 +595,7 @@ export default function LimitOrdersPage() {
           <div className={`limitOrderCapability ${capability?.automaticExecutionSupported ? "limitOrderCapabilityReady" : ""}`}>
             <strong>{capabilityTitle}</strong>
             <p>{capabilityBody}</p>
-            {capability && capability.executionProvider !== "none" ? <span className="badge">{capability.executionProvider}</span> : null}
+            {capability && capability.executionProvider !== "none" ? <span className="badge">{formatExecutionProvider(capability.executionProvider)}</span> : null}
           </div>
 
           <div className="limitOrderSummaryList">
@@ -628,7 +628,7 @@ export default function LimitOrdersPage() {
           <li>Limit orders are not guaranteed to execute, even when your target price appears to be reached.</li>
           <li>Orders can fail because of liquidity, gas costs, allowance, wallet balance, expiry, or provider downtime.</li>
           <li>Automatic execution is enabled only when a supported protocol can verify the signed order terms.</li>
-          <li>Native BTC, native assets, and unsupported routes stay blocked until a safe signed-order adapter exists.</li>
+          <li>Native BTC, native assets, and unsupported routes stay on alerts until a safe signed-order adapter exists.</li>
         </ul>
       </section>
 
@@ -639,7 +639,7 @@ export default function LimitOrdersPage() {
           the protocol signature no longer matches and the order must not execute.
         </p>
         <p className="small">
-          Current safe adapter: 1inch Orderbook / Limit Order Protocol for EVM contract-token pairs that support EIP-712
+          Current safe adapters: CoW Protocol and 1inch Orderbook for EVM contract-token pairs that support EIP-712
           signing. Unsupported pairs stay as alerts until a matching signed-intent adapter exists.
         </p>
       </section>
@@ -771,6 +771,44 @@ function formatCompactNumber(value: string): string {
   return numeric.toLocaleString(undefined, { maximumSignificantDigits: 6 });
 }
 
+async function prepareLimitOrder(params: {
+  executionProvider: string;
+  chainId: number;
+  maker: string;
+  recipient: string;
+  sellToken: TokenInfo;
+  buyToken: TokenInfo;
+  sellAmountRaw: string;
+  minBuyAmountRaw: string;
+  expiresAt: Date;
+}): Promise<PreparedLimitOrder> {
+  if (params.executionProvider === COW_PROTOCOL_PROVIDER) {
+    return buildCowOrder(params);
+  }
+  if (params.executionProvider === ONEINCH_PROVIDER) {
+    const order = buildOneInchOrder(params);
+    const typedData = order.getTypedData(params.chainId);
+    return {
+      executionProvider: ONEINCH_PROVIDER,
+      expiresAt: params.expiresAt,
+      orderHash: order.getOrderHash(params.chainId),
+      typedData,
+      signedPayloadJson: JSON.stringify(
+        {
+          version: "1inch-limit-order-v4",
+          provider: ONEINCH_PROVIDER,
+          chainId: params.chainId,
+          data: { ...order.build(), extension: order.extension.encode() },
+          typedData,
+          createdAt: new Date().toISOString()
+        },
+        jsonBigIntReplacer
+      )
+    };
+  }
+  throw new Error("This limit order provider is not supported yet.");
+}
+
 function buildOneInchOrder(params: {
   chainId: number;
   maker: string;
@@ -796,6 +834,92 @@ function buildOneInchOrder(params: {
     orderInfo.receiver = new Address(params.recipient);
   }
   return new OneInchLimitOrder(orderInfo, makerTraits);
+}
+
+async function buildCowOrder(params: {
+  chainId: number;
+  maker: string;
+  recipient: string;
+  sellToken: TokenInfo;
+  buyToken: TokenInfo;
+  sellAmountRaw: string;
+  minBuyAmountRaw: string;
+  expiresAt: Date;
+}): Promise<PreparedLimitOrder> {
+  const { TypedDataEncoder } = await import("ethers");
+  const validTo = Math.floor(params.expiresAt.getTime() / 1000);
+  const message = {
+    sellToken: params.sellToken.address,
+    buyToken: params.buyToken.address,
+    receiver: params.recipient.trim(),
+    sellAmount: params.sellAmountRaw,
+    buyAmount: params.minBuyAmountRaw,
+    validTo,
+    appData: COW_EMPTY_APP_DATA,
+    feeAmount: "0",
+    kind: "sell",
+    partiallyFillable: false,
+    sellTokenBalance: "erc20",
+    buyTokenBalance: "erc20"
+  };
+  const domain = {
+    name: "Gnosis Protocol",
+    version: "v2",
+    chainId: params.chainId,
+    verifyingContract: COW_SETTLEMENT_CONTRACT
+  };
+  const orderTypes = [
+    { name: "sellToken", type: "address" },
+    { name: "buyToken", type: "address" },
+    { name: "receiver", type: "address" },
+    { name: "sellAmount", type: "uint256" },
+    { name: "buyAmount", type: "uint256" },
+    { name: "validTo", type: "uint32" },
+    { name: "appData", type: "bytes32" },
+    { name: "feeAmount", type: "uint256" },
+    { name: "kind", type: "string" },
+    { name: "partiallyFillable", type: "bool" },
+    { name: "sellTokenBalance", type: "string" },
+    { name: "buyTokenBalance", type: "string" }
+  ];
+  const typedData = {
+    types: {
+      EIP712Domain: [
+        { name: "name", type: "string" },
+        { name: "version", type: "string" },
+        { name: "chainId", type: "uint256" },
+        { name: "verifyingContract", type: "address" }
+      ],
+      Order: orderTypes
+    },
+    primaryType: "Order",
+    domain,
+    message
+  };
+  const orderHash = TypedDataEncoder.hash(domain, { Order: orderTypes }, message);
+  const data = {
+    ...message,
+    from: params.maker,
+    signingScheme: "eip712"
+  };
+
+  return {
+    executionProvider: COW_PROTOCOL_PROVIDER,
+    expiresAt: params.expiresAt,
+    orderHash,
+    typedData,
+    signedPayloadJson: JSON.stringify(
+      {
+        version: "cow-protocol-order-v1",
+        provider: COW_PROTOCOL_PROVIDER,
+        chainId: params.chainId,
+        data,
+        typedData,
+        createdAt: new Date().toISOString()
+      },
+      jsonBigIntReplacer
+    )
+  };
 }
 
 async function ensureCorrectNetwork(provider: Eip1193Provider, chainId: number) {
@@ -978,6 +1102,12 @@ function formatOrderTarget(order: LimitOrderRecord): string {
 
 function formatOrderStatus(status: string): string {
   return status.replaceAll("_", " ");
+}
+
+function formatExecutionProvider(provider: string): string {
+  if (provider === COW_PROTOCOL_PROVIDER) return "CoW Protocol";
+  if (provider === ONEINCH_PROVIDER) return "1inch Limit Orders";
+  return provider.replaceAll("_", " ");
 }
 
 function formatDate(value: string): string {

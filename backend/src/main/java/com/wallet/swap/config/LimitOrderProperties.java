@@ -7,6 +7,9 @@ public class LimitOrderProperties {
   private boolean orderbookSubmissionEnabled = true;
   private String oneinchApiKey = "";
   private String oneinchOrderbookBaseUrl = "https://api.1inch.dev/orderbook/v4.1";
+  private String cowApiKey = "";
+  private String cowOrderbookBaseUrl = "https://api.cow.fi";
+  private String cowPartnerOrderbookBaseUrl = "https://partners.cow.fi";
   private int requestTimeoutSeconds = 8;
 
   public boolean isOrderbookSubmissionEnabled() {
@@ -31,6 +34,30 @@ public class LimitOrderProperties {
 
   public void setOneinchOrderbookBaseUrl(String oneinchOrderbookBaseUrl) {
     this.oneinchOrderbookBaseUrl = oneinchOrderbookBaseUrl;
+  }
+
+  public String getCowApiKey() {
+    return cowApiKey;
+  }
+
+  public void setCowApiKey(String cowApiKey) {
+    this.cowApiKey = cowApiKey;
+  }
+
+  public String getCowOrderbookBaseUrl() {
+    return cowOrderbookBaseUrl;
+  }
+
+  public void setCowOrderbookBaseUrl(String cowOrderbookBaseUrl) {
+    this.cowOrderbookBaseUrl = cowOrderbookBaseUrl;
+  }
+
+  public String getCowPartnerOrderbookBaseUrl() {
+    return cowPartnerOrderbookBaseUrl;
+  }
+
+  public void setCowPartnerOrderbookBaseUrl(String cowPartnerOrderbookBaseUrl) {
+    this.cowPartnerOrderbookBaseUrl = cowPartnerOrderbookBaseUrl;
   }
 
   public int getRequestTimeoutSeconds() {

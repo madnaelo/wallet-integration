@@ -54,6 +54,9 @@ wallet:
     orderbook-submission-enabled: ${LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED:true}
     oneinch-api-key: ${ONEINCH_API_KEY:}
     oneinch-orderbook-base-url: ${ONEINCH_ORDERBOOK_BASE_URL:https://api.1inch.dev/orderbook/v4.1}
+    cow-api-key: ${COW_API_KEY:}
+    cow-orderbook-base-url: ${COW_ORDERBOOK_BASE_URL:https://api.cow.fi}
+    cow-partner-orderbook-base-url: ${COW_PARTNER_ORDERBOOK_BASE_URL:https://partners.cow.fi}
     request-timeout-seconds: ${LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS:8}
   maintenance:
     cleanup-fixed-delay-ms: ${MAINTENANCE_CLEANUP_FIXED_DELAY_MS:3600000}

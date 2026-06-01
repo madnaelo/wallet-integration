@@ -14,6 +14,7 @@ export function PwaClient() {
   const [dismissed, setDismissed] = useState<boolean>(true);
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
     if (!isServiceWorkerSupported()) return;
     void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
   }, []);

@@ -74,12 +74,17 @@ public class LimitOrderRepository {
         request.signedPayloadJson().trim());
   }
 
-  public LimitOrderResponse updateSubmissionStatus(UUID id, String executionStatus, String executionError) {
+  public LimitOrderResponse updateSubmissionStatus(
+      UUID id,
+      String executionStatus,
+      String executionError,
+      String providerOrderId) {
     return jdbcTemplate.queryForObject(
         """
         UPDATE limit_orders
         SET execution_status = ?,
             execution_error = ?,
+            provider_order_id = COALESCE(?, provider_order_id),
             submitted_at = CASE WHEN ? = 'submitted' THEN now() ELSE submitted_at END,
             updated_at = now()
         WHERE id = ?
@@ -88,6 +93,7 @@ public class LimitOrderRepository {
         (rs, rowNum) -> mapRow(rs),
         executionStatus,
         executionError,
+        providerOrderId,
         executionStatus,
         id);
   }
@@ -113,6 +119,7 @@ public class LimitOrderRepository {
         rs.getString("execution_status"),
         rs.getString("signed_payload_hash"),
         rs.getString("order_hash"),
+        readOptionalColumn(rs, "provider_order_id"),
         timestampToInstant(rs.getTimestamp("terms_accepted_at")),
         rs.getString("execution_error"),
         timestampToInstant(rs.getTimestamp("submitted_at")),
@@ -123,5 +130,14 @@ public class LimitOrderRepository {
 
   private Instant timestampToInstant(Timestamp timestamp) {
     return timestamp == null ? null : timestamp.toInstant();
+  }
+
+  private String readOptionalColumn(ResultSet rs, String columnName) throws SQLException {
+    try {
+      return rs.getString(columnName);
+    } catch (SQLException exception) {
+      if ("42703".equals(exception.getSQLState())) return null;
+      throw exception;
+    }
   }
 }
