@@ -1,12 +1,15 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Address, LimitOrder as OneInchLimitOrder, MakerTraits, randBigInt } from "@1inch/limit-order-sdk";
 import { useAppKit, useAppKitAccount, useAppKitProvider, useWalletInfo } from "@reown/appkit/react";
 import { isAppKitConfigured } from "@/context/appkit";
 import { CHAINS, getAllowedChains } from "@/lib/chains";
 import { envPublic } from "@/lib/envPublic";
+import { buildQuoteUrl } from "@/lib/quoteClient";
+import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import type { BackendSession, LimitOrder as LimitOrderRecord, LimitOrderCapability } from "@/lib/backendClient";
 import {
   BackendClientError,
@@ -39,14 +42,134 @@ const COW_PROTOCOL_PROVIDER = "cow_protocol";
 const ONEINCH_PROVIDER = "1inch_orderbook";
 const COW_SETTLEMENT_CONTRACT = "0x9008D19f58AAbD9eD0D60971565AA8510560ab41";
 const COW_EMPTY_APP_DATA = `0x${"0".repeat(64)}`;
+const RATE_SAMPLE_INTERVAL_MS = 45_000;
+const MAX_RATE_SAMPLES = 7;
 
 type ProviderKind = "injected" | "walletconnect" | null;
+type LimitOrderLanguage = "simple" | "crypto" | "expert";
+type RecipientAddressSource = "connected" | "pasted" | "scanned" | "wallet_import";
+type RecipientDialogMode = "paste" | "scan" | "wallet";
+type QrDetector = {
+  detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
+};
+type QrDetectorConstructor = new (options?: { formats?: string[] }) => QrDetector;
+type RateSample = {
+  id: string;
+  rate: string;
+  numericRate: number;
+  providerName: string;
+  sampledAt: string;
+};
 type PreparedLimitOrder = {
   executionProvider: string;
   expiresAt: Date;
   orderHash: string;
   signedPayloadJson: string;
   typedData: unknown;
+};
+
+const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
+  label: string;
+  heroBody: string;
+  formSubheading: string;
+  capabilityChecking: string;
+  capabilityReady: string;
+  capabilityAlertsOnly: string;
+  capabilityDefault: string;
+  readyBody: (provider: string) => string;
+  warningTitle: string;
+  warnings: string[];
+  securityTitle: string;
+  securityBody: string;
+  securityFootnote: string;
+  terms: string;
+}> = {
+  simple: {
+    label: "Simple",
+    heroBody:
+      "Pick the tokens, choose the price you want, and approve one safe wallet message. Your funds stay in your wallet unless the order can be filled at your price.",
+    formSubheading: "Like a normal swap, but it waits for your price.",
+    capabilityChecking: "Checking this pair...",
+    capabilityReady: "This pair can be ordered",
+    capabilityAlertsOnly: "Alert only for now",
+    capabilityDefault: "Choose two tokens on the same network to see if this can be placed as an order.",
+    readyBody: (provider) => `${provider} can watch this order and fill it only at the price you approve.`,
+    warningTitle: "Before You Create An Order",
+    warnings: [
+      "The order may not fill, even if the market briefly touches your price.",
+      "It needs enough token balance and approval in your wallet when execution happens.",
+      "You can review the exact terms before signing. This signature is not a transfer.",
+      "If a pair cannot be safely ordered yet, Swap Assistant keeps it as an alert instead."
+    ],
+    securityTitle: "How We Keep It Safe",
+    securityBody:
+      "Your wallet signs the exact tokens, amount, price, recipient, and expiry. If anyone changes those terms, the signature no longer works.",
+    securityFootnote:
+      "Swap Assistant does not hold your funds or private keys. Supported pairs use trusted signed-order protocols.",
+    terms:
+      "I understand this order may not fill, and it needs enough balance and token approval in my wallet. Swap Assistant may submit only the exact terms I review and sign."
+  },
+  crypto: {
+    label: "Crypto",
+    heroBody:
+      "Create a non-custodial signed limit order. You sign fixed order terms once; a supported orderbook can execute only inside those terms.",
+    formSubheading: "Set the pair, target rate, recipient, and expiry.",
+    capabilityChecking: "Checking order support...",
+    capabilityReady: "Signed execution available",
+    capabilityAlertsOnly: "Signed execution unavailable",
+    capabilityDefault: "Choose a same-network token pair to check signed limit-order support.",
+    readyBody: (provider) => `${provider} can accept a wallet-signed order for this pair.`,
+    warningTitle: "Limit Order Risks",
+    warnings: [
+      "Execution is not guaranteed when the target price is reached.",
+      "Liquidity, solver availability, allowance, balance, gas, and expiry can prevent fills.",
+      "Native coins use their wrapped token form where the order protocol requires ERC-20 assets.",
+      "Unsupported routes remain notification-only until a safe signed-order adapter exists."
+    ],
+    securityTitle: "Signed-Order Security",
+    securityBody:
+      "Swap Assistant stores the signed payload and a hash of the terms. A changed order cannot pass provider verification.",
+    securityFootnote:
+      "Current adapters: CoW Protocol first, with 1inch Orderbook fallback where supported.",
+    terms:
+      "I understand execution is not guaranteed. Prices, liquidity, allowance, balance, gas cost, and expiry can stop execution. Swap Assistant may submit only the exact signed terms shown here."
+  },
+  expert: {
+    label: "Expert",
+    heroBody:
+      "Create EIP-712 signed limit orders through supported non-custodial orderbooks. The backend stores and submits signed intents, not keys.",
+    formSubheading: "Build and sign deterministic EIP-712 order terms.",
+    capabilityChecking: "Checking adapter capability...",
+    capabilityReady: "Order adapter available",
+    capabilityAlertsOnly: "No signed-order adapter",
+    capabilityDefault: "Select a same-chain contract-token pair to resolve adapter support.",
+    readyBody: (provider) => `${provider} is selected for this order.`,
+    warningTitle: "Execution Constraints",
+    warnings: [
+      "Solver/orderbook execution is best-effort and may fail despite a touched reference price.",
+      "ERC-20 allowance, balance, validTo, fee model, route liquidity, and gas economics affect fillability.",
+      "Native EVM assets are normalized to wrapped ERC-20 equivalents for signed order protocols.",
+      "Native BTC and unsupported ecosystems stay alerts-only until a verifiable signed-intent adapter is added."
+    ],
+    securityTitle: "Verification Model",
+    securityBody:
+      "The signed order payload is hashed and validated server-side against the requested fields before submission.",
+    securityFootnote:
+      "Adapters currently validate CoW Protocol GPv2 orders and 1inch Orderbook v4 payloads.",
+    terms:
+      "I accept signed-order execution risk. I reviewed pair, amounts, receiver, expiry, provider, and wrapped-asset behavior before signing."
+  }
+};
+
+const WRAPPED_NATIVE_BY_CHAIN: Record<number, TokenInfo> = {
+  1: { symbol: "WETH", address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", decimals: 18, name: "Wrapped Ether" },
+  11155111: { symbol: "WETH", address: "0x7b79995e5f793a07bc00c21412e50ecae098e7f9", decimals: 18, name: "Wrapped Ether" },
+  137: { symbol: "WMATIC", address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", decimals: 18, name: "Wrapped MATIC" },
+  8453: { symbol: "WETH", address: "0x4200000000000000000000000000000000000006", decimals: 18, name: "Wrapped Ether" },
+  42161: { symbol: "WETH", address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", decimals: 18, name: "Wrapped Ether" },
+  10: { symbol: "WETH", address: "0x4200000000000000000000000000000000000006", decimals: 18, name: "Wrapped Ether" },
+  56: { symbol: "WBNB", address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", decimals: 18, name: "Wrapped BNB" },
+  43114: { symbol: "WAVAX", address: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", decimals: 18, name: "Wrapped AVAX" }
 };
 
 export default function LimitOrdersPage() {
@@ -72,7 +195,22 @@ export default function LimitOrdersPage() {
   const [sellAmount, setSellAmount] = useState("");
   const [targetRate, setTargetRate] = useState("");
   const [expiryHours, setExpiryHours] = useState("24");
+  const [languageMode, setLanguageMode] = useState<LimitOrderLanguage>("simple");
   const [recipientAddress, setRecipientAddress] = useState("");
+  const [recipientAddressMode, setRecipientAddressMode] = useState<"connected" | "custom">("connected");
+  const [recipientAddressSource, setRecipientAddressSource] = useState<RecipientAddressSource>("connected");
+  const [recipientImportedWalletName, setRecipientImportedWalletName] = useState("");
+  const [recipientDialogOpen, setRecipientDialogOpen] = useState(false);
+  const [recipientDialogMode, setRecipientDialogMode] = useState<RecipientDialogMode>("paste");
+  const [recipientAddressDraft, setRecipientAddressDraft] = useState("");
+  const [recipientDialogError, setRecipientDialogError] = useState("");
+  const [recipientQrStatus, setRecipientQrStatus] = useState("");
+  const [recipientWalletImportQrDataUrl, setRecipientWalletImportQrDataUrl] = useState("");
+  const [recipientWalletImportStatus, setRecipientWalletImportStatus] = useState("");
+  const [recipientWalletImportLoading, setRecipientWalletImportLoading] = useState(false);
+  const [rateSamples, setRateSamples] = useState<RateSample[]>([]);
+  const [rateSampleStatus, setRateSampleStatus] = useState("");
+  const [rateSampleError, setRateSampleError] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [capability, setCapability] = useState<LimitOrderCapability | null>(null);
   const [capabilityLoading, setCapabilityLoading] = useState(false);
@@ -85,6 +223,13 @@ export default function LimitOrdersPage() {
   const [orderSaving, setOrderSaving] = useState(false);
   const [orderError, setOrderError] = useState("");
   const [orderNotice, setOrderNotice] = useState("");
+  const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
+  const recipientQrStreamRef = useRef<MediaStream | null>(null);
+  const recipientQrTimerRef = useRef<number | null>(null);
+  const recipientWalletImportRunRef = useRef(0);
+  const applyRecipientAddressRef = useRef<(rawValue: string, source?: RecipientAddressSource, walletName?: string) => void>(
+    () => undefined
+  );
 
   const tokenPickerTokens = useMemo(
     () => buildTokenPickerOptions(chains, tokensByChain),
@@ -106,17 +251,25 @@ export default function LimitOrdersPage() {
     () => findTokenPickerSelection(tokenPickerTokens, buyTokenAddress, buyTokenNetworkId),
     [buyTokenAddress, buyTokenNetworkId, tokenPickerTokens]
   );
+  const executionSellToken = useMemo(
+    () => toLimitOrderExecutionToken(sellToken, chainId),
+    [chainId, sellToken]
+  );
+  const executionBuyToken = useMemo(
+    () => toLimitOrderExecutionToken(buyToken, chainId),
+    [buyToken, chainId]
+  );
   const sameNetworkSelected = Boolean(sellToken && buyToken && sellToken.networkId === buyToken.networkId);
   const selectedChain = useMemo(() => chains.find((chain) => chain.chainId === chainId) ?? chains[0], [chainId, chains]);
   const sellAmountRaw = useMemo(() => {
-    if (!sellToken || !sellAmount.trim()) return "";
-    return parseUnitsSafe(sellAmount, sellToken.decimals) ?? "";
-  }, [sellAmount, sellToken]);
+    if (!executionSellToken || !sellAmount.trim()) return "";
+    return parseUnitsSafe(sellAmount, executionSellToken.decimals) ?? "";
+  }, [executionSellToken, sellAmount]);
   const minBuyAmountRaw = useMemo(() => {
-    if (!sellToken || !buyToken || !sellAmount.trim() || !targetRate.trim()) return "";
-    if (!parseUnitsSafe(sellAmount, sellToken.decimals)) return "";
-    return computeTakingAmountRaw(sellAmount, targetRate, buyToken.decimals) ?? "";
-  }, [buyToken, sellAmount, sellToken, targetRate]);
+    if (!executionSellToken || !executionBuyToken || !sellAmount.trim() || !targetRate.trim()) return "";
+    if (!parseUnitsSafe(sellAmount, executionSellToken.decimals)) return "";
+    return computeTakingAmountRaw(sellAmount, targetRate, executionBuyToken.decimals) ?? "";
+  }, [executionBuyToken, executionSellToken, sellAmount, targetRate]);
 
   useEffect(() => {
     const controllers: AbortController[] = [];
@@ -172,10 +325,6 @@ export default function LimitOrdersPage() {
   }, [chainId, tokenPickerTokens]);
 
   useEffect(() => {
-    if (address && !recipientAddress.trim()) setRecipientAddress(address);
-  }, [address, recipientAddress]);
-
-  useEffect(() => {
     if (!address) {
       setBackendSession(null);
       setOrders([]);
@@ -210,11 +359,11 @@ export default function LimitOrdersPage() {
   }, []);
 
   useEffect(() => {
-    if (!sellToken || !buyToken) {
+    if (!executionSellToken || !executionBuyToken) {
       setCapability(null);
       return;
     }
-    if (!sameNetworkSelected || typeof sellToken.quoteChainId !== "number") {
+    if (!sameNetworkSelected || typeof sellToken?.quoteChainId !== "number") {
       setCapability(null);
       setCapabilityLoading(false);
       setCapabilityError("Choose both tokens on the same supported EVM network.");
@@ -225,18 +374,18 @@ export default function LimitOrdersPage() {
     setCapabilityError("");
     checkLimitOrderCapability(envPublic.BACKEND_BASE_URL, {
       chainId: sellToken.quoteChainId,
-      sellTokenAddress: sellToken.address,
-      sellTokenSymbol: sellToken.symbol,
-      sellTokenDecimals: sellToken.decimals,
-      buyTokenAddress: buyToken.address,
-      buyTokenSymbol: buyToken.symbol,
-      buyTokenDecimals: buyToken.decimals
+      sellTokenAddress: executionSellToken.address,
+      sellTokenSymbol: executionSellToken.symbol,
+      sellTokenDecimals: executionSellToken.decimals,
+      buyTokenAddress: executionBuyToken.address,
+      buyTokenSymbol: executionBuyToken.symbol,
+      buyTokenDecimals: executionBuyToken.decimals
     })
       .then((result) => {
         if (!cancelled) setCapability(result);
       })
       .catch((error) => {
-        if (!cancelled) setCapabilityError(error?.message ?? "Limit order support could not be checked.");
+        if (!cancelled) setCapabilityError(formatCapabilityCheckError(error));
       })
       .finally(() => {
         if (!cancelled) setCapabilityLoading(false);
@@ -244,9 +393,185 @@ export default function LimitOrdersPage() {
     return () => {
       cancelled = true;
     };
-  }, [buyToken, sameNetworkSelected, sellToken]);
+  }, [executionBuyToken, executionSellToken, sameNetworkSelected, sellToken]);
+
+  const resetRecipientWalletImportState = useCallback(() => {
+    setRecipientWalletImportQrDataUrl("");
+    setRecipientWalletImportStatus("");
+    setRecipientWalletImportLoading(false);
+  }, []);
+  const cancelRecipientWalletImport = useCallback(() => {
+    recipientWalletImportRunRef.current += 1;
+    resetRecipientWalletImportState();
+  }, [resetRecipientWalletImportState]);
+
+  useEffect(() => {
+    applyRecipientAddressRef.current = applyRecipientAddress;
+  });
+
+  useEffect(() => {
+    if (recipientAddressMode === "connected") {
+      setRecipientAddress(address ?? "");
+      setRecipientAddressSource("connected");
+      setRecipientImportedWalletName("");
+    }
+  }, [address, recipientAddressMode]);
+
+  useEffect(() => {
+    if (!recipientDialogOpen || recipientDialogMode !== "scan") {
+      stopRecipientQrScanner();
+      return;
+    }
+
+    let cancelled = false;
+    const barcodeDetectorCtor = getQrDetectorConstructor();
+    if (!barcodeDetectorCtor) {
+      setRecipientQrStatus("QR scanning is not available in this browser. Paste the address instead.");
+      return () => {
+        cancelled = true;
+        stopRecipientQrScanner();
+      };
+    }
+    const BarcodeDetectorClass = barcodeDetectorCtor;
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setRecipientQrStatus("Camera scanning is not available in this browser. Paste the address instead.");
+      return () => {
+        cancelled = true;
+        stopRecipientQrScanner();
+      };
+    }
+
+    async function startRecipientQrScanner() {
+      try {
+        setRecipientQrStatus("Starting camera...");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        recipientQrStreamRef.current = stream;
+        if (recipientQrVideoRef.current) {
+          recipientQrVideoRef.current.srcObject = stream;
+          await recipientQrVideoRef.current.play();
+        }
+
+        const detector = new BarcodeDetectorClass({ formats: ["qr_code"] });
+        setRecipientQrStatus("Point your camera at the recipient QR code.");
+        recipientQrTimerRef.current = window.setInterval(async () => {
+          const video = recipientQrVideoRef.current;
+          if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+          try {
+            const codes = await detector.detect(video);
+            const rawValue = codes[0]?.rawValue?.trim();
+            if (rawValue) applyRecipientAddressRef.current(rawValue, "scanned");
+          } catch {
+            setRecipientQrStatus("Could not read that QR code yet.");
+          }
+        }, 600);
+      } catch {
+        setRecipientQrStatus("Camera permission was not granted. Paste the address instead.");
+      }
+    }
+
+    void startRecipientQrScanner();
+    return () => {
+      cancelled = true;
+      stopRecipientQrScanner();
+    };
+  }, [recipientDialogOpen, recipientDialogMode]);
+
+  useEffect(() => {
+    setRateSamples([]);
+    setRateSampleError("");
+  }, [address, chainId, executionBuyToken?.address, executionSellToken?.address]);
+
+  useEffect(() => {
+    if (!address) {
+      setRateSampleStatus("Connect your wallet to load live rates.");
+      return;
+    }
+    if (!executionSellToken || !executionBuyToken || !sameNetworkSelected || !isAddress(executionSellToken.address) || !isAddress(executionBuyToken.address)) {
+      setRateSampleStatus("Choose a supported same-network pair to load live rates.");
+      return;
+    }
+    const sampleAmountHuman = parsePositiveNumber(sellAmount) ? sellAmount : "1";
+    const sampleAmountRaw = parseUnitsSafe(sampleAmountHuman, executionSellToken.decimals);
+    if (!sampleAmountRaw) {
+      setRateSampleStatus("Enter a valid amount to load live rates.");
+      return;
+    }
+
+    const walletAddress = address;
+    let cancelled = false;
+    let timeoutId: number | null = null;
+    let controller: AbortController | null = null;
+
+    async function fetchRateSample() {
+      controller?.abort();
+      controller = new AbortController();
+      setRateSampleStatus("Loading live rate...");
+      setRateSampleError("");
+      try {
+        const url = buildQuoteUrl({
+          chainId,
+          sellToken: executionSellToken!.address,
+          buyToken: executionBuyToken!.address,
+          sellAmount: sampleAmountRaw!,
+          takerAddress: walletAddress,
+          toAddress: isAddress(recipientAddress) ? recipientAddress : walletAddress
+        });
+        const res = await fetch(url, { signal: controller.signal });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error || "Live rate is unavailable right now.");
+        const sample = quoteToRateSample(body, executionSellToken!, executionBuyToken!);
+        if (!sample || cancelled) return;
+        setRateSamples((current) => appendRateSample(current, sample));
+        setRateSampleStatus("Live rates updated.");
+      } catch (error: any) {
+        if (cancelled || error?.name === "AbortError") return;
+        setRateSampleError(formatRateSampleError(error));
+        setRateSampleStatus("");
+      } finally {
+        if (!cancelled) {
+          timeoutId = window.setTimeout(fetchRateSample, RATE_SAMPLE_INTERVAL_MS);
+        }
+      }
+    }
+
+    void fetchRateSample();
+    return () => {
+      cancelled = true;
+      controller?.abort();
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [
+    address,
+    chainId,
+    executionBuyToken,
+    executionSellToken,
+    recipientAddress,
+    sameNetworkSelected,
+    sellAmount
+  ]);
 
   const recipientValid = isAddress(recipientAddress);
+  const languageCopy = LIMIT_ORDER_LANGUAGE_COPY[languageMode];
+  const recipientAddressDisplay = useMemo(
+    () =>
+      buildRecipientAddressDisplay({
+        address: recipientAddress,
+        networkName: selectedChain?.name ?? "Network",
+        source: recipientAddressMode === "connected" ? "connected" : recipientAddressSource,
+        walletName: recipientAddressSource === "wallet_import" ? recipientImportedWalletName : walletName
+      }),
+    [recipientAddress, recipientAddressMode, recipientAddressSource, recipientImportedWalletName, selectedChain?.name, walletName]
+  );
+  const executionTokenNotice = buildExecutionTokenNotice(sellToken, buyToken, executionSellToken, executionBuyToken, languageMode);
   const canCreateLimitOrder = Boolean(
     walletProvider &&
     address &&
@@ -254,21 +579,25 @@ export default function LimitOrdersPage() {
     termsAccepted &&
     sellToken &&
     buyToken &&
+    executionSellToken &&
+    executionBuyToken &&
     sameNetworkSelected &&
     sellAmountRaw &&
     minBuyAmountRaw &&
     recipientValid
   );
-  const estimatedReceive = buyToken && minBuyAmountRaw ? formatCompactNumber(formatUnitsSafe(minBuyAmountRaw, buyToken.decimals)) : "";
+  const estimatedReceive = executionBuyToken && minBuyAmountRaw ? formatCompactNumber(formatUnitsSafe(minBuyAmountRaw, executionBuyToken.decimals)) : "";
   const targetRateLabel = sellToken && buyToken
     ? `1 ${sellToken.symbol} = ${targetRate.trim() || "-"} ${buyToken.symbol}`
     : "Choose a pair";
   const capabilityTitle = capabilityLoading
-    ? "Checking support..."
+    ? languageCopy.capabilityChecking
     : capability?.automaticExecutionSupported
-      ? "Ready for signed execution"
-      : "Alerts only for this pair";
-  const capabilityBody = capabilityError || capability?.reason || "Choose a same-network contract-token pair to check limit-order support.";
+      ? languageCopy.capabilityReady
+      : languageCopy.capabilityAlertsOnly;
+  const capabilityBody = capability?.automaticExecutionSupported
+    ? languageCopy.readyBody(formatExecutionProvider(capability.executionProvider))
+    : formatCapabilityReason(capabilityError || capability?.reason || languageCopy.capabilityDefault, languageMode);
 
   function selectTokenForSide(side: "sell" | "buy", token: TokenPickerOption) {
     const nextChainId = token.quoteChainId;
@@ -389,7 +718,9 @@ export default function LimitOrdersPage() {
     setOrderNotice("");
     try {
       if (!walletProvider || !address) throw new Error("Connect your wallet before creating a limit order.");
-      if (!sellToken || !buyToken || !sellAmountRaw || !minBuyAmountRaw) throw new Error("Complete the order details first.");
+      if (!sellToken || !buyToken || !executionSellToken || !executionBuyToken || !sellAmountRaw || !minBuyAmountRaw) {
+        throw new Error("Complete the order details first.");
+      }
       if (!sameNetworkSelected || typeof sellToken.quoteChainId !== "number") throw new Error("Choose both tokens on the same supported network.");
       if (!recipientValid) throw new Error("Enter a valid recipient address.");
       if (!capability?.automaticExecutionSupported) throw new Error(capability?.reason || "This pair is not available for limit orders.");
@@ -404,8 +735,8 @@ export default function LimitOrdersPage() {
         chainId: executionChainId,
         maker: address,
         recipient: recipientAddress,
-        sellToken,
-        buyToken,
+        sellToken: executionSellToken,
+        buyToken: executionBuyToken,
         sellAmountRaw,
         minBuyAmountRaw,
         expiresAt
@@ -416,12 +747,12 @@ export default function LimitOrdersPage() {
       setOrderNotice("Submitting your signed limit order...");
       const saved = await saveLimitOrder(envPublic.BACKEND_BASE_URL, session, {
         chainId: executionChainId,
-        sellTokenAddress: sellToken.address,
-        sellTokenSymbol: sellToken.symbol,
-        sellTokenDecimals: sellToken.decimals,
-        buyTokenAddress: buyToken.address,
-        buyTokenSymbol: buyToken.symbol,
-        buyTokenDecimals: buyToken.decimals,
+        sellTokenAddress: executionSellToken.address,
+        sellTokenSymbol: executionSellToken.symbol,
+        sellTokenDecimals: executionSellToken.decimals,
+        buyTokenAddress: executionBuyToken.address,
+        buyTokenSymbol: executionBuyToken.symbol,
+        buyTokenDecimals: executionBuyToken.decimals,
         sellAmountRaw,
         minBuyAmountRaw,
         targetRate,
@@ -447,6 +778,114 @@ export default function LimitOrdersPage() {
     }
   }
 
+  function openRecipientAddressDialog() {
+    setRecipientDialogMode("paste");
+    setRecipientAddressDraft(recipientAddress);
+    setRecipientDialogError("");
+    setRecipientQrStatus("");
+    resetRecipientWalletImportState();
+    setRecipientDialogOpen(true);
+  }
+
+  function closeRecipientAddressDialog() {
+    setRecipientDialogOpen(false);
+    setRecipientDialogError("");
+    setRecipientQrStatus("");
+    cancelRecipientWalletImport();
+    stopRecipientQrScanner();
+  }
+
+  function chooseRecipientDialogMode(mode: RecipientDialogMode) {
+    setRecipientDialogMode(mode);
+    setRecipientDialogError("");
+    setRecipientQrStatus("");
+    if (mode !== "wallet") cancelRecipientWalletImport();
+    if (mode !== "scan") stopRecipientQrScanner();
+  }
+
+  function useConnectedRecipientAddress() {
+    if (!address) {
+      setRecipientDialogError("Connect your wallet first, or paste a recipient address.");
+      return;
+    }
+
+    setRecipientAddress(address);
+    setRecipientAddressMode("connected");
+    setRecipientAddressSource("connected");
+    setRecipientImportedWalletName("");
+    closeRecipientAddressDialog();
+  }
+
+  async function startRecipientWalletImport() {
+    chooseRecipientDialogMode("wallet");
+    if (!envPublic.WALLETCONNECT_PROJECT_ID) {
+      setRecipientDialogError("Wallet import is unavailable right now. Paste or scan the address instead.");
+      return;
+    }
+
+    const runId = recipientWalletImportRunRef.current + 1;
+    recipientWalletImportRunRef.current = runId;
+    setRecipientWalletImportLoading(true);
+    setRecipientWalletImportQrDataUrl("");
+    setRecipientWalletImportStatus("Preparing wallet import...");
+
+    try {
+      const recipientImport = await createRecipientWalletImport({
+        projectId: envPublic.WALLETCONNECT_PROJECT_ID,
+        chainId,
+        origin: window.location.origin
+      });
+
+      if (recipientWalletImportRunRef.current !== runId) return;
+      setRecipientWalletImportQrDataUrl(recipientImport.qrDataUrl);
+      setRecipientWalletImportStatus("Scan with the recipient wallet, then approve address sharing.");
+
+      const imported = await recipientImport.waitForAddress();
+      if (recipientWalletImportRunRef.current !== runId) {
+        await recipientImport.disconnect(imported.topic).catch(() => undefined);
+        return;
+      }
+
+      await recipientImport.disconnect(imported.topic).catch(() => undefined);
+      applyRecipientAddress(imported.address, "wallet_import", imported.walletName);
+    } catch (error: any) {
+      if (recipientWalletImportRunRef.current !== runId) return;
+      setRecipientDialogError(normalizeRecipientImportError(error));
+      setRecipientWalletImportStatus("");
+    } finally {
+      if (recipientWalletImportRunRef.current === runId) setRecipientWalletImportLoading(false);
+    }
+  }
+
+  function applyRecipientAddress(rawValue: string, source: RecipientAddressSource = "pasted", walletName = "") {
+    const parsedAddress = parseEvmAddressInput(rawValue);
+    if (!isAddress(parsedAddress)) {
+      setRecipientDialogError("Enter a valid recipient address.");
+      if (source === "scanned") setRecipientQrStatus("QR code did not contain a valid recipient address.");
+      return;
+    }
+
+    setRecipientAddress(parsedAddress);
+    setRecipientAddressMode("custom");
+    setRecipientAddressSource(source);
+    setRecipientImportedWalletName(source === "wallet_import" ? walletName.trim() : "");
+    closeRecipientAddressDialog();
+  }
+
+  function stopRecipientQrScanner() {
+    if (recipientQrTimerRef.current) {
+      window.clearInterval(recipientQrTimerRef.current);
+      recipientQrTimerRef.current = null;
+    }
+    if (recipientQrStreamRef.current) {
+      recipientQrStreamRef.current.getTracks().forEach((track) => track.stop());
+      recipientQrStreamRef.current = null;
+    }
+    if (recipientQrVideoRef.current) {
+      recipientQrVideoRef.current.srcObject = null;
+    }
+  }
+
   if (featureFlagsLoaded && !featureFlags.limitOrdersEnabled) {
     return (
       <main className="container limitOrderPage">
@@ -469,15 +908,26 @@ export default function LimitOrdersPage() {
         <div>
           <p className="introEyebrow">Limit Orders</p>
           <h2 id="limit-order-title">Swap later at the price you choose.</h2>
-          <p>
-            Choose the same tokens as a normal swap, set your target rate, and sign exact order terms once. A supported
-            protocol can execute only within the limits you approved.
-          </p>
+          <p>{languageCopy.heroBody}</p>
         </div>
-        <div className="limitOrderHeroFacts" aria-label="Limit order safeguards">
-          <span>Wallet approval required</span>
-          <span>Exact signed terms</span>
-          <span>No custody of funds</span>
+        <div className="limitOrderHeroAside">
+          <div className="languageSwitch" role="group" aria-label="Limit order explanation level">
+            {(Object.keys(LIMIT_ORDER_LANGUAGE_COPY) as LimitOrderLanguage[]).map((mode) => (
+              <button
+                className={`languageSwitchOption${languageMode === mode ? " languageSwitchOptionActive" : ""}`}
+                type="button"
+                key={mode}
+                onClick={() => setLanguageMode(mode)}
+              >
+                {LIMIT_ORDER_LANGUAGE_COPY[mode].label}
+              </button>
+            ))}
+          </div>
+          <div className="limitOrderHeroFacts" aria-label="Limit order safeguards">
+            <span>Wallet approval required</span>
+            <span>Exact signed terms</span>
+            <span>No custody of funds</span>
+          </div>
         </div>
       </section>
 
@@ -488,7 +938,7 @@ export default function LimitOrdersPage() {
           <div className="limitOrderFormHeader">
             <div>
               <h2>Create Limit Order</h2>
-              <p>Same swap flow, with a target price and expiry.</p>
+              <p>{languageCopy.formSubheading}</p>
             </div>
             <span className="badge">{selectedChain?.name ?? "Network"}</span>
           </div>
@@ -566,25 +1016,178 @@ export default function LimitOrdersPage() {
             buySymbol={buyToken?.symbol ?? "buy token"}
             sellSymbol={sellToken?.symbol ?? "sell token"}
             value={targetRate}
+            samples={rateSamples}
+            status={rateSampleStatus}
+            error={rateSampleError}
             onChange={setTargetRate}
           />
 
-          <label className="field">
-            <span className="label">Recipient address</span>
-            <input
-              className="input"
-              value={recipientAddress}
-              onChange={(event) => setRecipientAddress(event.target.value)}
-              placeholder={address || "0x..."}
-            />
-          </label>
+          {executionTokenNotice ? <div className="walletSupportNotice">{executionTokenNotice}</div> : null}
+
+          <div className="recipientPanel">
+            <div className="recipientHeader">
+              <div className="label">Recipient address</div>
+              <div
+                className={`recipientSourcePill${recipientAddress.trim() ? "" : " recipientSourcePillEmpty"}`}
+                title={recipientAddressDisplay.title}
+                aria-label={recipientAddressDisplay.title}
+              >
+                <span className="recipientSourceDot" aria-hidden="true" />
+                <span className="recipientSourceLabel">{recipientAddressDisplay.label}</span>
+              </div>
+            </div>
+            <div className="recipientRow" title={recipientAddressDisplay.title} aria-label={recipientAddressDisplay.title}>
+              <input
+                className="input recipientAddressInput"
+                value={recipientAddress}
+                readOnly
+                placeholder={address || "0x..."}
+                spellCheck={false}
+                autoComplete="off"
+              />
+              <button
+                className="recipientEditButton"
+                type="button"
+                title="Edit recipient address"
+                aria-label="Edit recipient address"
+                onClick={openRecipientAddressDialog}
+              >
+                <span aria-hidden="true">&#9998;</span>
+              </button>
+            </div>
+            {!recipientValid && recipientAddress.trim() ? <div className="fieldError">Enter a valid recipient address.</div> : null}
+          </div>
+
+          {recipientDialogOpen ? (
+            <div className="recipientDialogOverlay" role="presentation">
+              <div className="recipientDialog" role="dialog" aria-modal="true" aria-labelledby="limit-recipient-dialog-title">
+                <div className="recipientDialogHeader">
+                  <h2 id="limit-recipient-dialog-title">Recipient address</h2>
+                  <button
+                    className="recipientDialogClose"
+                    type="button"
+                    aria-label="Close recipient address options"
+                    onClick={closeRecipientAddressDialog}
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className="recipientMethodGrid" role="group" aria-label="Recipient address options">
+                  <button
+                    className={`recipientMethodButton${recipientDialogMode === "paste" ? " recipientMethodButtonActive" : ""}`}
+                    type="button"
+                    onClick={() => chooseRecipientDialogMode("paste")}
+                  >
+                    Paste address
+                  </button>
+                  <button
+                    className={`recipientMethodButton${recipientDialogMode === "scan" ? " recipientMethodButtonActive" : ""}`}
+                    type="button"
+                    onClick={() => chooseRecipientDialogMode("scan")}
+                  >
+                    Scan QR
+                  </button>
+                  <button
+                    className={`recipientMethodButton${recipientDialogMode === "wallet" ? " recipientMethodButtonActive" : ""}`}
+                    type="button"
+                    onClick={() => {
+                      void startRecipientWalletImport();
+                    }}
+                  >
+                    Import wallet
+                  </button>
+                  <button className="recipientMethodButton" type="button" onClick={useConnectedRecipientAddress} disabled={!address}>
+                    Current wallet
+                  </button>
+                </div>
+
+                {recipientDialogMode === "paste" ? (
+                  <form
+                    className="recipientDialogBody"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      applyRecipientAddress(recipientAddressDraft);
+                    }}
+                  >
+                    <input
+                      className="input"
+                      value={recipientAddressDraft}
+                      onChange={(event) => {
+                        setRecipientAddressDraft(event.target.value);
+                        setRecipientDialogError("");
+                      }}
+                      placeholder="0x..."
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                    {recipientDialogError ? <div className="fieldError">{recipientDialogError}</div> : null}
+                    <div className="recipientDialogActions">
+                      <button className="btn" type="button" onClick={closeRecipientAddressDialog}>
+                        Cancel
+                      </button>
+                      <button className="btn btnPrimary" type="submit" disabled={!recipientAddressDraft.trim()}>
+                        Save
+                      </button>
+                    </div>
+                  </form>
+                ) : recipientDialogMode === "scan" ? (
+                  <div className="recipientDialogBody">
+                    <div className="qrScannerFrame">
+                      <video ref={recipientQrVideoRef} className="qrScannerVideo" muted playsInline />
+                    </div>
+                    {recipientQrStatus ? <div className="small">{recipientQrStatus}</div> : null}
+                    {recipientDialogError ? <div className="fieldError">{recipientDialogError}</div> : null}
+                    <div className="recipientDialogActions">
+                      <button className="btn" type="button" onClick={closeRecipientAddressDialog}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="recipientDialogBody">
+                    <div className="recipientWalletImportPanel">
+                      {recipientWalletImportQrDataUrl ? (
+                        <Image
+                          className="recipientWalletImportQr"
+                          src={recipientWalletImportQrDataUrl}
+                          alt="Recipient wallet import QR"
+                          width={260}
+                          height={260}
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="recipientWalletImportPlaceholder">
+                          {recipientWalletImportLoading ? "Preparing..." : "Ready"}
+                        </div>
+                      )}
+                    </div>
+                    {recipientWalletImportStatus ? <div className="small">{recipientWalletImportStatus}</div> : null}
+                    {recipientDialogError ? <div className="fieldError">{recipientDialogError}</div> : null}
+                    <div className="recipientDialogActions">
+                      <button className="btn" type="button" onClick={closeRecipientAddressDialog}>
+                        Cancel
+                      </button>
+                      <button
+                        className="btn btnPrimary"
+                        type="button"
+                        onClick={() => {
+                          void startRecipientWalletImport();
+                        }}
+                        disabled={recipientWalletImportLoading}
+                      >
+                        {recipientWalletImportQrDataUrl ? "Restart" : "Start"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
 
           <label className="limitOrderTerms">
             <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} />
-            <span>
-              I understand execution is not guaranteed. Prices, liquidity, allowance, wallet balance, gas cost, and expiry
-              can stop execution. Swap Assistant may submit only the exact signed order terms shown here.
-            </span>
+            <span>{languageCopy.terms}</span>
           </label>
 
           {orderNotice ? <div className="ok limitOrderMessage">{orderNotice}</div> : null}
@@ -601,7 +1204,10 @@ export default function LimitOrdersPage() {
           <div className="limitOrderSummaryList">
             <SummaryRow label="You sell" value={sellAmount && sellToken ? `${sellAmount} ${sellToken.symbol}` : "-"} />
             <SummaryRow label="Target" value={targetRateLabel} />
-            <SummaryRow label="Receive at target" value={estimatedReceive && buyToken ? `${estimatedReceive} ${buyToken.symbol}` : "-"} />
+            <SummaryRow
+              label="Receive at target"
+              value={estimatedReceive && executionBuyToken ? `${estimatedReceive} ${executionBuyToken.symbol}` : "-"}
+            />
             <SummaryRow label="Network" value={selectedChain?.name ?? "-"} />
             <SummaryRow label="Expiry" value={formatExpiryLabel(expiryHours)} />
           </div>
@@ -623,25 +1229,18 @@ export default function LimitOrdersPage() {
       </div>
 
       <section className="panel limitOrderWarning" aria-labelledby="limit-risk-title">
-        <h2 id="limit-risk-title">Read Before Creating A Limit Order</h2>
+        <h2 id="limit-risk-title">{languageCopy.warningTitle}</h2>
         <ul>
-          <li>Limit orders are not guaranteed to execute, even when your target price appears to be reached.</li>
-          <li>Orders can fail because of liquidity, gas costs, allowance, wallet balance, expiry, or provider downtime.</li>
-          <li>Automatic execution is enabled only when a supported protocol can verify the signed order terms.</li>
-          <li>Native BTC, native assets, and unsupported routes stay on alerts until a safe signed-order adapter exists.</li>
+          {languageCopy.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
         </ul>
       </section>
 
       <section className="panel limitOrderAudit">
-        <h2>Security Model</h2>
-        <p>
-          Swap Assistant stores the signed order payload and a hash of the signed terms. If any order parameter is changed,
-          the protocol signature no longer matches and the order must not execute.
-        </p>
-        <p className="small">
-          Current safe adapters: CoW Protocol and 1inch Orderbook for EVM contract-token pairs that support EIP-712
-          signing. Unsupported pairs stay as alerts until a matching signed-intent adapter exists.
-        </p>
+        <h2>{languageCopy.securityTitle}</h2>
+        <p>{languageCopy.securityBody}</p>
+        <p className="small">{languageCopy.securityFootnote}</p>
       </section>
 
       <section className="panel limitOrderAudit">
@@ -676,51 +1275,53 @@ export default function LimitOrdersPage() {
 function TargetRatePicker({
   buySymbol,
   sellSymbol,
+  samples,
+  status,
+  error,
   value,
   onChange
 }: {
   buySymbol: string;
   sellSymbol: string;
+  samples: RateSample[];
+  status: string;
+  error: string;
   value: string;
   onChange: (value: string) => void;
 }) {
-  const base = parsePositiveNumber(value) ?? 1;
-  const points = [-0.08, -0.045, -0.02, 0, 0.025, 0.055, 0.09].map((offset, index) => {
-    const rate = base * (1 + offset);
-    return {
-      id: `${offset}:${index}`,
-      label: `${offset >= 0 ? "+" : ""}${Math.round(offset * 100)}%`,
-      rate: formatRateInput(rate),
-      height: 34 + index * 6 + (offset > 0 ? 18 : 0)
-    };
-  });
+  const points = useMemo(() => buildRateSamplePoints(samples), [samples]);
 
   return (
     <div className="limitRateChart" aria-label="Target rate picker">
       <div className="limitRateChartHeader">
         <div>
-          <strong>Target rate picker</strong>
-          <span>Tap a point to fill your desired execution rate.</span>
+          <strong>Recent live rates</strong>
+          <span>Tap a point to use it as your target rate.</span>
         </div>
         <span className="badge">1 {sellSymbol} / {buySymbol}</span>
       </div>
       <div className="limitRateChartPlot">
-        {points.map((point) => (
-          <button
-            className={`limitRatePoint${point.rate === value.trim() ? " limitRatePointActive" : ""}`}
-            type="button"
-            key={point.id}
-            style={{ "--point-height": `${point.height}px` } as CSSProperties}
-            onClick={() => onChange(point.rate)}
-            title={`${point.rate} ${buySymbol}`}
-          >
-            <span className="limitRateStem" aria-hidden="true" />
-            <span className="limitRateDot" aria-hidden="true" />
-            <span className="limitRateLabel">{point.label}</span>
-          </button>
-        ))}
+        {points.length ? (
+          points.map((point) => (
+            <button
+              className={`limitRatePoint${point.rate === value.trim() ? " limitRatePointActive" : ""}`}
+              type="button"
+              key={point.id}
+              style={{ "--point-height": `${point.height}px` } as CSSProperties}
+              onClick={() => onChange(point.rate)}
+              title={`${point.rate} ${buySymbol} from ${point.providerName}`}
+            >
+              <span className="limitRateStem" aria-hidden="true" />
+              <span className="limitRateDot" aria-hidden="true" />
+              <span className="limitRateLabel">{point.label}</span>
+              <span className="limitRateValue">{point.rate}</span>
+            </button>
+          ))
+        ) : (
+          <div className="limitRateEmpty">Live rate points will appear here.</div>
+        )}
       </div>
-      <p className="small">This is a target selector, not historical market data.</p>
+      {error ? <p className="fieldError">{error}</p> : <p className="small">{status || "Recent quote samples appear after you connect a wallet."}</p>}
     </div>
   );
 }
@@ -732,6 +1333,165 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function toLimitOrderExecutionToken(token: TokenPickerOption | null, chainId: number): TokenInfo | null {
+  if (!token) return null;
+  if (!token.isNative || token.assetKind === "bitcoin" || token.addressFamily === "bitcoin") return token;
+  const wrapped = WRAPPED_NATIVE_BY_CHAIN[chainId];
+  if (!wrapped) return token;
+  return {
+    ...wrapped,
+    networkId: token.networkId,
+    networkName: token.networkName,
+    searchAliases: [...(wrapped.searchAliases ?? []), token.symbol, token.name ?? ""].filter(Boolean)
+  };
+}
+
+function buildExecutionTokenNotice(
+  sellToken: TokenPickerOption | null,
+  buyToken: TokenPickerOption | null,
+  executionSellToken: TokenInfo | null,
+  executionBuyToken: TokenInfo | null,
+  languageMode: LimitOrderLanguage
+): string {
+  const changes = [
+    sellToken?.isNative && executionSellToken && sellToken.symbol !== executionSellToken.symbol
+      ? `${sellToken.symbol} uses ${executionSellToken.symbol}`
+      : "",
+    buyToken?.isNative && executionBuyToken && buyToken.symbol !== executionBuyToken.symbol
+      ? `${buyToken.symbol} uses ${executionBuyToken.symbol}`
+      : ""
+  ].filter(Boolean);
+  if (!changes.length) return "";
+  if (languageMode === "simple") {
+    return `${changes.join(" and ")} for limit orders. You may need enough wrapped token and approval in your wallet before it can fill.`;
+  }
+  if (languageMode === "crypto") {
+    return `${changes.join(" and ")} because signed limit orders execute against wrapped ERC-20 tokens.`;
+  }
+  return `Native asset normalization: ${changes.join("; ")}. Signed orders use ERC-20 contract addresses.`;
+}
+
+function quoteToRateSample(body: any, sellToken: TokenInfo, buyToken: TokenInfo): RateSample | null {
+  const buyAmountRaw = stringValue(body?.netBuyAmount) || stringValue(body?.buyAmount);
+  const sellAmountRaw = stringValue(body?.sellAmount);
+  if (!buyAmountRaw || !sellAmountRaw) return null;
+  const buyAmount = Number(formatUnitsSafe(buyAmountRaw, buyToken.decimals));
+  const sellAmount = Number(formatUnitsSafe(sellAmountRaw, sellToken.decimals));
+  if (!Number.isFinite(buyAmount) || !Number.isFinite(sellAmount) || sellAmount <= 0 || buyAmount <= 0) return null;
+  const numericRate = buyAmount / sellAmount;
+  return {
+    id: `${Date.now()}:${numericRate}`,
+    rate: formatRateInput(numericRate),
+    numericRate,
+    providerName: stringValue(body?.providerName) || "Live quote",
+    sampledAt: new Date().toISOString()
+  };
+}
+
+function appendRateSample(current: RateSample[], sample: RateSample): RateSample[] {
+  const previous = current[current.length - 1];
+  const next = previous && previous.rate === sample.rate && previous.providerName === sample.providerName
+    ? [...current.slice(0, -1), sample]
+    : [...current, sample];
+  return next.slice(-MAX_RATE_SAMPLES);
+}
+
+function buildRateSamplePoints(samples: RateSample[]) {
+  if (!samples.length) return [];
+  const rates = samples.map((sample) => sample.numericRate);
+  const min = Math.min(...rates);
+  const max = Math.max(...rates);
+  const spread = max - min || Math.max(max * 0.01, 0.000001);
+  return samples.map((sample, index) => ({
+    ...sample,
+    label: formatSampleTime(sample.sampledAt, index === samples.length - 1),
+    height: 34 + ((sample.numericRate - min) / spread) * 82
+  }));
+}
+
+function formatSampleTime(value: string, isLatest: boolean): string {
+  if (isLatest) return "Now";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function parseEvmAddressInput(value: string): string {
+  const addressMatch = value.trim().match(/0x[a-fA-F0-9]{40}/);
+  return addressMatch?.[0] ?? value.trim();
+}
+
+function buildRecipientAddressDisplay(params: {
+  address: string;
+  networkName: string;
+  source: RecipientAddressSource;
+  walletName?: string;
+}): { label: string; title: string } {
+  if (!params.address.trim()) {
+    return {
+      label: "No wallet selected",
+      title: "No recipient address selected"
+    };
+  }
+  const sourceLabel = getRecipientAddressSourceLabel(params.source);
+  const label = [sourceLabel, params.walletName?.trim(), params.networkName].filter(Boolean).join(" - ");
+  return {
+    label,
+    title: `${label}: ${params.address}`
+  };
+}
+
+function getRecipientAddressSourceLabel(source: RecipientAddressSource): string {
+  switch (source) {
+    case "connected":
+      return "Current wallet";
+    case "pasted":
+      return "Pasted address";
+    case "scanned":
+      return "Scanned QR";
+    case "wallet_import":
+      return "Imported wallet";
+    default:
+      return "Recipient";
+  }
+}
+
+function getQrDetectorConstructor(): QrDetectorConstructor | null {
+  const barcodeWindow = window as Window & { BarcodeDetector?: QrDetectorConstructor };
+  return barcodeWindow.BarcodeDetector ?? null;
+}
+
+function formatCapabilityReason(reason: string, languageMode: LimitOrderLanguage): string {
+  if (languageMode !== "simple") return reason;
+  if (/native|contract|EVM/i.test(reason)) {
+    return "This pair can be saved as an alert, but safe automatic execution is not available for it yet.";
+  }
+  if (/network/i.test(reason)) {
+    return "Choose two tokens on the same supported network.";
+  }
+  return reason;
+}
+
+function formatCapabilityCheckError(error: unknown): string {
+  if (error instanceof BackendClientError && error.message) return error.message;
+  return "Could not check this pair right now. Try again in a moment.";
+}
+
+function formatRateSampleError(error: unknown): string {
+  const message = normalizeWalletError(error);
+  if (/failed to fetch|network|load failed/i.test(message)) {
+    return "Live rates are not available right now. Try again in a moment.";
+  }
+  if (/rate limit/i.test(message)) {
+    return "Live rates are busy right now. Try again shortly.";
+  }
+  return message || "Live rates are not available right now.";
 }
 
 function findTokenPickerSelection(tokens: TokenPickerOption[], address: string, networkId: string): TokenPickerOption | null {
@@ -1141,6 +1901,17 @@ function normalizeWalletError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (/reject|denied|cancel/i.test(message)) return "Request cancelled in wallet.";
   return message || "The request could not be completed. Please try again.";
+}
+
+function normalizeRecipientImportError(error: unknown): string {
+  if (isUserRejectedWalletRequest(error)) return "Wallet import was cancelled.";
+  const message = normalizeWalletError(error);
+  if (/wallet import is unavailable/i.test(message)) return message;
+  if (/valid address/i.test(message)) return message;
+  if (/proposal|pairing|session/i.test(message)) {
+    return "Could not complete wallet import. Try again, or paste the address.";
+  }
+  return message || "Could not import the wallet address.";
 }
 
 function isUserRejectedWalletRequest(error: unknown): boolean {
