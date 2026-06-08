@@ -136,6 +136,7 @@ type PendingSwapLink = {
   sellToken: string;
   buyToken: string;
   sellAmountRaw: string;
+  autoQuote: boolean;
 };
 type TourAnchor = { left: number; top: number; width: number; height: number };
 type TourStep = {
@@ -318,12 +319,14 @@ export default function Page() {
   const [autoSwapSlippagePctDraft, setAutoSwapSlippagePctDraft] = useState<string>("1");
   const autoSwapRulesRequestInFlightRef = useRef<boolean>(false);
   const [pendingSwapLink, setPendingSwapLink] = useState<PendingSwapLink | null>(null);
+  const [pendingAutoQuoteLink, setPendingAutoQuoteLink] = useState<PendingSwapLink | null>(null);
   const [tourOpen, setTourOpen] = useState<boolean>(false);
   const [tourStepIndex, setTourStepIndex] = useState<number>(0);
   const [tourAnchor, setTourAnchor] = useState<TourAnchor | null>(null);
   const quoteActionRef = useRef<HTMLDivElement>(null);
   const quoteDetailsRef = useRef<HTMLDivElement>(null);
   const quoteScrollPendingRef = useRef<boolean>(false);
+  const autoQuoteNoticeShownRef = useRef<boolean>(false);
   const previousBuyTokenAddressRef = useRef<string>("");
   const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
   const recipientQrStreamRef = useRef<MediaStream | null>(null);
@@ -417,6 +420,8 @@ export default function Page() {
     if (!swapLink || !allowedChains.some((allowedChain) => allowedChain.chainId === swapLink.chainId)) return;
 
     setPendingSwapLink(swapLink);
+    setPendingAutoQuoteLink(swapLink.autoQuote ? swapLink : null);
+    autoQuoteNoticeShownRef.current = false;
     setActiveView("swap");
     if (window.location.pathname !== "/swap") {
       window.history.replaceState(null, "", `/swap${window.location.search}`);
@@ -1948,10 +1953,13 @@ export default function Page() {
       chainId: pair.chainId,
       sellToken: direction === "reverse" ? pair.buyTokenAddress : pair.sellTokenAddress,
       buyToken: direction === "reverse" ? pair.sellTokenAddress : pair.buyTokenAddress,
-      sellAmountRaw: ""
+      sellAmountRaw: "",
+      autoQuote: false
     };
 
     setPendingSwapLink(swapLink);
+    setPendingAutoQuoteLink(null);
+    autoQuoteNoticeShownRef.current = false;
     setActiveView("swap");
     setSelectedChainId(swapLink.chainId);
     setSellToken(swapLink.sellToken);
@@ -2143,6 +2151,83 @@ export default function Page() {
       setQuoteLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!pendingAutoQuoteLink) return;
+    if (activeView !== "swap") {
+      setActiveView("swap");
+      return;
+    }
+    if (!pendingAutoQuoteLink.sellAmountRaw) {
+      setPendingAutoQuoteLink(null);
+      return;
+    }
+    if (selectedChainId !== pendingAutoQuoteLink.chainId) {
+      setSelectedChainId(pendingAutoQuoteLink.chainId);
+      return;
+    }
+    if (normalizeTokenKey(sellToken) !== normalizeTokenKey(pendingAutoQuoteLink.sellToken)) {
+      setSellToken(pendingAutoQuoteLink.sellToken);
+      return;
+    }
+    if (normalizeTokenKey(buyToken) !== normalizeTokenKey(pendingAutoQuoteLink.buyToken)) {
+      setBuyToken(pendingAutoQuoteLink.buyToken);
+      return;
+    }
+    if (!sellTokenInfo || !buyTokenInfo) return;
+
+    const linkedAmountHuman = formatUnitsSafe(pendingAutoQuoteLink.sellAmountRaw, sellTokenInfo.decimals);
+    if (linkedAmountHuman && amountHuman !== linkedAmountHuman) {
+      setAmountHuman(linkedAmountHuman);
+      return;
+    }
+
+    if (!sourceWalletAddress) {
+      if (!autoQuoteNoticeShownRef.current) {
+        if (getTokenWalletNamespace(sellTokenInfo) === "eip155") setConnectPromptVisible(true);
+        setQuoteValidationVisible(true);
+        setQuoteError("Connect your wallet to refresh this alert quote.");
+        autoQuoteNoticeShownRef.current = true;
+      }
+      return;
+    }
+
+    if (hasQuoteValidationErrors) {
+      if (!autoQuoteNoticeShownRef.current) {
+        setQuoteValidationVisible(true);
+        setQuoteError(
+          quoteValidationErrors.recipientAddress
+            ? "Add a recipient address to refresh this alert quote."
+            : "Review the highlighted fields to refresh this alert quote."
+        );
+        autoQuoteNoticeShownRef.current = true;
+      }
+      return;
+    }
+
+    if (!canQuote || quoteLoading) return;
+
+    autoQuoteNoticeShownRef.current = false;
+    setPendingAutoQuoteLink(null);
+    void fetchQuote();
+    // fetchQuote intentionally stays outside the dependency list; this effect is
+    // keyed by the alert-link state and should fire once when the form is ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeView,
+    amountHuman,
+    buyToken,
+    buyTokenInfo,
+    canQuote,
+    hasQuoteValidationErrors,
+    pendingAutoQuoteLink,
+    quoteLoading,
+    quoteValidationErrors.recipientAddress,
+    selectedChainId,
+    sellToken,
+    sellTokenInfo,
+    sourceWalletAddress
+  ]);
 
   function onSelectedQuoteChange(quoteId: string) {
     const next = availableQuotes.find((item) => item.quoteId === quoteId);
@@ -3900,6 +3985,7 @@ function parseSwapLinkParams(search: string): PendingSwapLink | null {
   const sellToken = sanitizeTokenQueryParam(params.get("sellToken"));
   const buyToken = sanitizeTokenQueryParam(params.get("buyToken"));
   const sellAmountRaw = sanitizeRawAmountQueryParam(params.get("sellAmountRaw") ?? params.get("sellAmount"));
+  const autoQuote = sellAmountRaw ? isTruthyQueryParam(params.get("autoQuote") ?? params.get("quote")) : false;
 
   if (!Number.isSafeInteger(chainId) || chainId <= 0 || !sellToken || !buyToken) return null;
 
@@ -3907,7 +3993,8 @@ function parseSwapLinkParams(search: string): PendingSwapLink | null {
     chainId,
     sellToken,
     buyToken,
-    sellAmountRaw
+    sellAmountRaw,
+    autoQuote
   };
 }
 
@@ -3920,6 +4007,9 @@ function buildSwapLinkHref(params: PendingSwapLink): string {
 
   if (params.sellAmountRaw) {
     searchParams.set("sellAmountRaw", params.sellAmountRaw);
+  }
+  if (params.autoQuote && params.sellAmountRaw) {
+    searchParams.set("autoQuote", "1");
   }
 
   return `/swap?${searchParams.toString()}`;
@@ -3935,6 +4025,11 @@ function sanitizeRawAmountQueryParam(value: string | null): string {
   const normalized = value?.trim() ?? "";
   if (!normalized || normalized.length > 80 || !/^\d+$/.test(normalized)) return "";
   return normalized;
+}
+
+function isTruthyQueryParam(value: string | null): boolean {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 function buildWalletApprovalNotice(walletName: string, action: WalletApprovalAction): string {

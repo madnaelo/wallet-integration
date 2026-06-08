@@ -205,6 +205,7 @@ public class NotificationMessageFormatter {
 
     if (sellAmountRaw != null && !sellAmountRaw.isBlank()) {
       builder.queryParam("sellAmountRaw", sellAmountRaw);
+      builder.queryParam("autoQuote", "1");
     }
 
     return builder.toUriString();
