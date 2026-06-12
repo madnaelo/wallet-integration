@@ -26,9 +26,9 @@ Swap Assistant is a non-custodial swap assistant:
 - save favorite pairs and target alerts,
 - detect reverse-swap profit and loss-protection opportunities,
 - notify users through configured channels,
-- store Auto Swap preferences only when the admin feature switch allows it.
+- store Set Alerts preferences only when the admin feature switch allows it.
 
-The backend still does not custody funds or private keys. Auto Swap storage is
+The backend still does not custody funds or private keys. Set Alerts storage is
 preference/rule storage, not autonomous private-key signing.
 
 ## Current Implementation
@@ -42,7 +42,7 @@ preference/rule storage, not autonomous private-key signing.
 - Browser push notifications are implemented, but a mobile subscription issue
   is paused and documented in
   `docs/known-issues/mobile-push-subscription.md`.
-- Backend Auto Swap is currently alert-to-confirm only. True autonomous
+- Set Alerts is currently alert-to-confirm only. True autonomous
   execution is blocked on a signed/delegated authorization model; see
   `docs/architecture-decisions/backend-auto-swap-execution.md`.
 - Operations: health endpoint plus admin operations summary for monitor and

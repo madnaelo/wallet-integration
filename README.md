@@ -51,13 +51,14 @@ Implemented:
   laddered target alerts for the same pair when prices are at least 1% apart.
 - Favorite pairs can be opened or reversed from the Favorites page using the
   same prefilled swap-link format used by Telegram alerts.
-- Admin-gated Auto Swap rule storage for selected pairs, including amount,
-  target rate, slippage tolerance, recipient address, and whether the pair is
-  automatic-ready or needs user confirmation.
+- Admin-gated Set Alerts rule storage for selected pairs, including amount,
+  target rate, slippage tolerance, and recipient address. These alerts always
+  bring the user back to review and approve in their wallet.
 - Separate Limit Orders page for supported EVM contract-token pairs. The
-  frontend builds a 1inch EIP-712 order, the user signs exact terms in their
-  wallet, and the backend validates the payload against the authenticated wallet
-  before submitting it to the configured 1inch Orderbook API.
+  frontend builds a provider-verifiable order, the user signs exact terms in
+  their wallet, and the backend validates the payload against the authenticated
+  wallet before submitting it through the configured CoW Protocol or 1inch
+  adapter.
 
 Not implemented yet:
 
@@ -100,11 +101,11 @@ High-level flow:
 6. The backend scheduler batches token USD prices, evaluates eligible historical
    swaps and favorite pairs for alert opportunities, and sends enabled
    email/Telegram/browser alerts after cooldown checks.
-7. Auto Swap rules are hidden behind a backend feature switch. Saving a rule
-   stores the exact threshold/slippage preference for later signed-order or
-   confirmation-based execution without giving the backend private keys.
+7. Set Alerts rules are hidden behind a backend feature switch. Saving a rule
+   stores the exact threshold/slippage preference for a later notification with
+   a prefilled swap link, without giving the backend private keys.
 8. Limit Orders use a provider-verifiable signed-order path. For supported EVM
-   contract-token pairs, the wallet signs a 1inch EIP-712 order and the backend
+   contract-token pairs, the wallet signs the exact order terms and the backend
    submits only the signed payload whose maker, assets, amounts, recipient, and
    chain match the authenticated request.
 
@@ -192,7 +193,8 @@ Important backend variables:
 - `API_RATE_LIMIT_KEY_PEPPER`
 - `SESSION_TTL_HOURS`, `NONCE_TTL_MINUTES`, `AUTH_SESSION_COOKIE_SAME_SITE`,
   `AUTH_SESSION_COOKIE_SECURE`, `AUTH_EXPOSE_ACCESS_TOKEN`
-- `AUTO_SWAP_DEFAULT_ENABLED`, `LIMIT_ORDERS_DEFAULT_ENABLED`, `ADMIN_API_KEY`
+- `PRICE_ALERTS_DEFAULT_ENABLED` (`AUTO_SWAP_DEFAULT_ENABLED` is still accepted as a legacy fallback),
+  `LIMIT_ORDERS_DEFAULT_ENABLED`, `ADMIN_API_KEY`
 - `LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED`, `ONEINCH_ORDERBOOK_BASE_URL`,
   `LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS`
 - `MAINTENANCE_CLEANUP_FIXED_DELAY_MS`, `DRY_RUN_HISTORY_RETENTION_DAYS`,
@@ -269,7 +271,7 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
   recipient wallet modeling, and generic recipient-address handling.
 - Prompts 20-27: wallet labels, Telegram settings/linking, favorite pairs,
   target ladders, and alert delivery fixes.
-- Prompts 28-32: admin-gated Auto Swap preferences, clearer signing/approval
+- Prompts 28-32: admin-gated Set Alerts preferences, clearer signing/approval
   guidance, Telegram deep links, and mobile quote/wallet-return UX.
 - Prompts 33-38: operations diagnostics, additional EVM networks, loss
   protection alerts, trade risk cues, actionable favorite-pair links, PWA

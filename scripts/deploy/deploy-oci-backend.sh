@@ -119,6 +119,14 @@ if [ -n "$api_domain" ] && [ -f "$caddyfile_path" ] && run_container container e
       echo "$marker"
       echo "$api_domain {"
       echo "  encode zstd gzip"
+      echo "  header {"
+      echo "    Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\""
+      echo "    X-Content-Type-Options \"nosniff\""
+      echo "    X-Frame-Options \"DENY\""
+      echo "    Referrer-Policy \"strict-origin-when-cross-origin\""
+      echo "    Permissions-Policy \"camera=(), microphone=(), geolocation=(), payment=(), usb=()\""
+      echo "    X-Permitted-Cross-Domain-Policies \"none\""
+      echo "  }"
       echo "  reverse_proxy $backend_container:8080"
       echo "}"
     } | sudo tee -a "$caddyfile_path" >/dev/null
@@ -156,7 +164,12 @@ fi
 
 if [ -n "$health_url" ] && command -v curl >/dev/null 2>&1; then
   for attempt in $(seq 1 30); do
-    if curl -fsS "$health_url" >/dev/null; then
+    if health_body="$(curl -fsS "$health_url")"; then
+      if [ -n "$git_commit" ] && ! printf '%s' "$health_body" | grep -qF "$git_commit"; then
+        echo "Backend health endpoint is reachable, but it is not serving the expected commit $git_commit." >&2
+        printf '%s\n' "$health_body" >&2
+        exit 1
+      fi
       echo "Backend is healthy: $health_url"
       exit 0
     fi

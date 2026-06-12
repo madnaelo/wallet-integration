@@ -22,7 +22,7 @@ class FeatureFlagServiceTest {
     properties.setAutoSwapDefaultEnabled(true);
     when(repository.find(FeatureFlagService.AUTO_SWAP_FEATURE_KEY)).thenReturn(Optional.empty());
 
-    assertThat(service.isAutoSwapEnabled()).isTrue();
+    assertThat(service.isPriceAlertsEnabled()).isTrue();
   }
 
   @Test
@@ -31,12 +31,12 @@ class FeatureFlagServiceTest {
     when(repository.find(FeatureFlagService.AUTO_SWAP_FEATURE_KEY))
         .thenReturn(Optional.of(new FeatureFlagResponse("auto_swap", false, Instant.now())));
 
-    assertThat(service.isAutoSwapEnabled()).isFalse();
+    assertThat(service.isPriceAlertsEnabled()).isFalse();
   }
 
   @Test
   void rejectsAdminUpdateWhenKeyIsNotConfigured() {
-    assertThatThrownBy(() -> service.setAutoSwapEnabled("anything", new FeatureModels.FeatureFlagUpdateRequest(true)))
+    assertThatThrownBy(() -> service.setPriceAlertsEnabled("anything", new FeatureModels.FeatureFlagUpdateRequest(true)))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("not configured");
   }

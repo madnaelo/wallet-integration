@@ -1,4 +1,4 @@
-# Backend Auto Swap Execution
+# Backend Execution, Price Alerts, And Limit Orders
 
 Status: decision updated on 2026-05-30.
 
@@ -8,15 +8,15 @@ Do not implement autonomous backend transaction signing or custody.
 
 Swap Assistant remains non-custodial: the backend must not store seed phrases,
 private keys, raw wallet signing material, or broadly reusable wallet
-authorizations. Backend Auto Swap can only execute without opening the user's
+authorizations. Backend execution can only happen without opening the user's
 wallet when the user has first created a narrow, revocable, auditable execution
 authorization.
 
 The first implementation path is a dedicated Limit Orders module for supported
-EVM contract-token pairs. The frontend builds a 1inch EIP-712 limit order, the
-user signs the exact terms in their wallet, and the backend submits only that
-signed payload to the configured 1inch Orderbook API after validating maker,
-chain, assets, amounts, recipient, and payload hash.
+EVM contract-token pairs. The frontend builds a provider-verifiable limit order,
+the user signs the exact terms in their wallet, and the backend submits only
+that signed payload through the configured CoW Protocol or 1inch adapter after
+validating maker, chain, assets, amounts, recipient, and payload hash.
 
 ## Why This Is Blocked For The Current Wallet Model
 
@@ -36,12 +36,12 @@ later without one of these authorization models:
 0x documentation confirms that Swap API quotes produce executable calldata that
 still needs a wallet transaction, while 0x protocol orders are signed by the
 maker and currently focus on ERC20-style order flows. That is useful for a
-future EVM-only signed-order adapter, but it is not a universal Auto Swap layer
+future EVM-only signed-order adapter, but it is not a universal execution layer
 for every pair we expose.
 
 ## Current Safe Product Behavior
 
-The existing backend Auto Swap feature stores:
+The existing Set Alerts feature stores:
 
 - pair,
 - sell amount,
@@ -58,13 +58,13 @@ their wallet.
 This is intentionally `notify_to_confirm` with `confirmation_required` execution
 readiness.
 
-The Limit Orders module is separate from the alert-to-confirm Auto Swap rule
+The Limit Orders module is separate from the alert-to-confirm Set Alerts rule
 storage. Limit Orders can submit signed EVM contract-token orders through the
-first supported adapter. Native BTC, native assets, cross-chain routes, and
+configured provider adapters. Native BTC, native assets, cross-chain routes, and
 non-EVM pairs remain blocked from automatic execution until a matching
 provider-verifiable adapter exists.
 
-## Production-Grade Path To Real Auto Swap
+## Production-Grade Path To Real Backend Execution
 
 Implement real backend execution in phases:
 

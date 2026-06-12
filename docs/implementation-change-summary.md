@@ -42,7 +42,7 @@ provider/earning checklist.
   thresholds.
 - Extended reverse-swap monitoring to support loss protection alerts with
   type-specific alert cooldowns.
-- Added Auto Swap preference/rule storage behind an admin feature switch.
+- Added Set Alerts preference/rule storage behind an admin feature switch.
 
 ## Deployment And Operations
 

@@ -3,7 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Address, LimitOrder as OneInchLimitOrder, MakerTraits, randBigInt } from "@1inch/limit-order-sdk";
 import { useAppKit, useAppKitAccount, useAppKitProvider, useWalletInfo } from "@reown/appkit/react";
 import { isAppKitConfigured } from "@/context/appkit";
 import { CHAINS, getAllowedChains } from "@/lib/chains";
@@ -215,7 +214,11 @@ export default function LimitOrdersPage() {
   const [capability, setCapability] = useState<LimitOrderCapability | null>(null);
   const [capabilityLoading, setCapabilityLoading] = useState(false);
   const [capabilityError, setCapabilityError] = useState("");
-  const [featureFlags, setFeatureFlags] = useState({ autoSwapEnabled: false, limitOrdersEnabled: true });
+  const [featureFlags, setFeatureFlags] = useState({
+    autoSwapEnabled: false,
+    priceAlertsEnabled: false,
+    limitOrdersEnabled: true
+  });
   const [featureFlagsLoaded, setFeatureFlagsLoaded] = useState(false);
   const [backendSession, setBackendSession] = useState<BackendSession | null>(null);
   const [orders, setOrders] = useState<LimitOrderRecord[]>([]);
@@ -348,7 +351,7 @@ export default function LimitOrdersPage() {
         if (!cancelled) setFeatureFlags(flags);
       })
       .catch(() => {
-        if (!cancelled) setFeatureFlags({ autoSwapEnabled: false, limitOrdersEnabled: true });
+        if (!cancelled) setFeatureFlags({ autoSwapEnabled: false, priceAlertsEnabled: false, limitOrdersEnabled: true });
       })
       .finally(() => {
         if (!cancelled) setFeatureFlagsLoaded(true);
@@ -660,7 +663,7 @@ export default function LimitOrdersPage() {
               Limit Orders
             </Link>
           </li>
-          {featureFlags.autoSwapEnabled ? <li><Link className="appMenuLink" href="/swap#auto-swap">Set Alerts</Link></li> : null}
+          {featureFlags.priceAlertsEnabled ? <li><Link className="appMenuLink" href="/swap#alerts">Set Alerts</Link></li> : null}
           <li><Link className="appMenuLink" href="/swap#preferences">Preferences</Link></li>
         </ul>
       </nav>
@@ -1546,7 +1549,7 @@ async function prepareLimitOrder(params: {
     return buildCowOrder(params);
   }
   if (params.executionProvider === ONEINCH_PROVIDER) {
-    const order = buildOneInchOrder(params);
+    const order = await buildOneInchOrder(params);
     const typedData = order.getTypedData(params.chainId);
     return {
       executionProvider: ONEINCH_PROVIDER,
@@ -1569,7 +1572,7 @@ async function prepareLimitOrder(params: {
   throw new Error("This limit order provider is not supported yet.");
 }
 
-function buildOneInchOrder(params: {
+async function buildOneInchOrder(params: {
   chainId: number;
   maker: string;
   recipient: string;
@@ -1578,7 +1581,8 @@ function buildOneInchOrder(params: {
   sellAmountRaw: string;
   minBuyAmountRaw: string;
   expiresAt: Date;
-}): OneInchLimitOrder {
+}) {
+  const { Address, LimitOrder: OneInchLimitOrder, MakerTraits, randBigInt } = await import("@1inch/limit-order-sdk");
   const expiration = BigInt(Math.floor(params.expiresAt.getTime() / 1000));
   const makerTraits = MakerTraits.default()
     .withExpiration(expiration)

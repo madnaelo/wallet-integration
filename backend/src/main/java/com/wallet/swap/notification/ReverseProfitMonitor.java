@@ -154,7 +154,7 @@ public class ReverseProfitMonitor {
           totalOpportunities);
       if (totalOpportunities > 0) {
         log.info(
-            "Notification monitor processed {} reverse candidates, {} favorite pairs, and {} Auto Swap rules; found {} opportunities.",
+            "Notification monitor processed {} reverse candidates, {} favorite pairs, and {} price-alert rules; found {} opportunities.",
             candidates.size(),
             favoritePairCandidates.size(),
             autoSwapCandidates.size(),

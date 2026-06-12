@@ -167,7 +167,7 @@ public class NotificationMessageFormatter {
             opportunity.candidate().sellTokenSymbol(),
             opportunity.candidate().buyTokenSymbol()),
         autoSwapUrl(opportunity),
-        "auto-swap-%s-%s".formatted(opportunity.candidate().id(), opportunity.candidate().alertDirection()));
+        "price-alert-%s-%s".formatted(opportunity.candidate().id(), opportunity.candidate().alertDirection()));
   }
 
   private String reverseSwapUrl(ReverseProfitOpportunity opportunity) {

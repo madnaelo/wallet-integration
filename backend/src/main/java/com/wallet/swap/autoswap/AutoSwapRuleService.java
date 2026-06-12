@@ -31,12 +31,12 @@ public class AutoSwapRuleService {
   }
 
   public List<AutoSwapRuleResponse> list(String walletAddress) {
-    featureFlagService.requireAutoSwapEnabled();
+    featureFlagService.requirePriceAlertsEnabled();
     return repository.listForWallet(walletAddress);
   }
 
   public AutoSwapRuleResponse save(String walletAddress, AutoSwapRuleRequest request) {
-    featureFlagService.requireAutoSwapEnabled();
+    featureFlagService.requirePriceAlertsEnabled();
     validate(request);
     AutoSwapRuleRequest normalized = normalized(request);
     validateTargetSpacing(walletAddress, normalized);
@@ -45,7 +45,7 @@ public class AutoSwapRuleService {
   }
 
   public void delete(String walletAddress, UUID id) {
-    featureFlagService.requireAutoSwapEnabled();
+    featureFlagService.requirePriceAlertsEnabled();
     repository.delete(walletAddress, id);
   }
 

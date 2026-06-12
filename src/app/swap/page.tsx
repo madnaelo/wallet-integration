@@ -67,12 +67,12 @@ import {
 } from "@/lib/backendClient";
 
 type TxStatus = "idle" | "pending" | "submitted" | "confirmed" | "failed";
-type ActiveView = "swap" | "auto-swap" | "favorites" | "preferences";
+type ActiveView = "swap" | "alerts" | "favorites" | "preferences";
 const QUOTE_TTL_SECONDS = 20;
 const BACKEND_SESSION_STORAGE_KEY = "wallet.swapAssistant.backendSession.v1";
 const SWAP_TOUR_STORAGE_KEY = "wallet.swapAssistant.swapTour.v1";
 const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
-const ACTIVE_VIEWS: ActiveView[] = ["swap", "auto-swap", "favorites", "preferences"];
+const ACTIVE_VIEWS: ActiveView[] = ["swap", "alerts", "favorites", "preferences"];
 const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
 const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
 const PUSH_DENIED_MESSAGE =
@@ -216,7 +216,11 @@ export default function Page() {
   const { disconnect: disconnectAppKit } = useDisconnect();
   const isDryRun = envPublic.DISALLOW_MAINNET;
   const [activeView, setActiveView] = useState<ActiveView>("swap");
-  const [featureFlags, setFeatureFlags] = useState({ autoSwapEnabled: false, limitOrdersEnabled: false });
+  const [featureFlags, setFeatureFlags] = useState({
+    autoSwapEnabled: false,
+    priceAlertsEnabled: false,
+    limitOrdersEnabled: false
+  });
   const [featureFlagsLoaded, setFeatureFlagsLoaded] = useState<boolean>(false);
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
 
@@ -496,7 +500,7 @@ export default function Page() {
         if (!cancelled) setFeatureFlags(flags);
       })
       .catch(() => {
-        if (!cancelled) setFeatureFlags({ autoSwapEnabled: false, limitOrdersEnabled: false });
+        if (!cancelled) setFeatureFlags({ autoSwapEnabled: false, priceAlertsEnabled: false, limitOrdersEnabled: false });
       })
       .finally(() => {
         if (!cancelled) setFeatureFlagsLoaded(true);
@@ -509,7 +513,8 @@ export default function Page() {
 
   useEffect(() => {
     function syncViewFromHash() {
-      const view = window.location.hash.replace("#", "") as ActiveView;
+      const hashView = window.location.hash.replace("#", "");
+      const view = (hashView === "auto-swap" ? "alerts" : hashView) as ActiveView;
       setActiveView(ACTIVE_VIEWS.includes(view) ? view : "swap");
     }
 
@@ -519,12 +524,12 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    if (!featureFlagsLoaded || featureFlags.autoSwapEnabled || activeView !== "auto-swap") return;
+    if (!featureFlagsLoaded || featureFlags.priceAlertsEnabled || activeView !== "alerts") return;
     setActiveView("swap");
-    if (window.location.hash === "#auto-swap") {
+    if (window.location.hash === "#auto-swap" || window.location.hash === "#alerts") {
       window.history.replaceState(null, "", "/swap");
     }
-  }, [activeView, featureFlags.autoSwapEnabled, featureFlagsLoaded]);
+  }, [activeView, featureFlags.priceAlertsEnabled, featureFlagsLoaded]);
 
   useEffect(() => {
     if (activeView !== "swap") return;
@@ -604,14 +609,14 @@ export default function Page() {
   }, [activeView]);
 
   useEffect(() => {
-    if (activeView !== "auto-swap" || !featureFlags.autoSwapEnabled || !walletAddress || autoSwapRulesLoaded) return;
+    if (activeView !== "alerts" || !featureFlags.priceAlertsEnabled || !walletAddress || autoSwapRulesLoaded) return;
     const stored = backendSession ?? readStoredBackendSession();
     if (stored && isSessionForWallet(stored, walletAddress)) {
       void refreshAutoSwapRules();
     }
     // Load exactly when the Set Alerts view becomes active with an existing session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeView, autoSwapRulesLoaded, backendSession, featureFlags.autoSwapEnabled, walletAddress]);
+  }, [activeView, autoSwapRulesLoaded, backendSession, featureFlags.priceAlertsEnabled, walletAddress]);
 
   useEffect(() => {
     if (activeView !== "favorites" || !walletAddress || favoritePairsLoaded) return;
@@ -1821,7 +1826,7 @@ export default function Page() {
   }
 
   function buildAutoSwapRuleRequest(): SaveAutoSwapRuleRequest {
-    if (!featureFlags.autoSwapEnabled) throw new Error("Set Alerts is not available.");
+    if (!featureFlags.priceAlertsEnabled) throw new Error("Set Alerts is not available.");
     if (!sellTokenInfo || !buyTokenInfo) throw new Error("Select a pair before saving an alert.");
     if (normalizeTokenKey(sellTokenInfo.address) === normalizeTokenKey(buyTokenInfo.address)) {
       throw new Error("Choose two different tokens before saving an alert.");
@@ -2625,13 +2630,13 @@ export default function Page() {
                 </Link>
               ) : null}
             </li>
-            {featureFlags.autoSwapEnabled ? (
+            {featureFlags.priceAlertsEnabled ? (
               <li>
                 <a
-                  className={`appMenuLink${activeView === "auto-swap" ? " appMenuLinkActive" : ""}`}
-                  href="#auto-swap"
-                  aria-current={activeView === "auto-swap" ? "page" : undefined}
-                  onClick={() => setActiveView("auto-swap")}
+                  className={`appMenuLink${activeView === "alerts" ? " appMenuLinkActive" : ""}`}
+                  href="#alerts"
+                  aria-current={activeView === "alerts" ? "page" : undefined}
+                  onClick={() => setActiveView("alerts")}
                 >
                   Set Alerts
                 </a>
@@ -3309,11 +3314,11 @@ export default function Page() {
         </>
       ) : null}
 
-      {activeView === "auto-swap" && featureFlags.autoSwapEnabled ? (
-        <section className="panel pagePanel autoSwapPanel" aria-labelledby="auto-swap-title">
+      {activeView === "alerts" && featureFlags.priceAlertsEnabled ? (
+        <section className="panel pagePanel autoSwapPanel" aria-labelledby="alerts-title">
           <div className="pageHeader">
             <div>
-              <h2 id="auto-swap-title">Set Alerts</h2>
+              <h2 id="alerts-title">Set Alerts</h2>
               <div className="subtle">
                 {walletAddress
                   ? "Set target-rate alerts for the pair selected on the swap page."

@@ -70,7 +70,7 @@ public class ExpiredDataCleanupJob {
     if (total > 0) {
       log.info(
           "Cleaned up {} expired rows: {} nonces, {} sessions, {} Telegram link codes, {} rate-limit buckets, "
-              + "{} dry-run swaps, {} reverse alerts, {} favorite alerts, {} Auto Swap alerts, {} outbox rows.",
+              + "{} dry-run swaps, {} reverse alerts, {} favorite alerts, {} price-alert deliveries, {} outbox rows.",
           total,
           nonces,
           sessions,

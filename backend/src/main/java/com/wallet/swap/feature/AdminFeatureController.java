@@ -18,6 +18,13 @@ public class AdminFeatureController {
     this.featureFlagService = featureFlagService;
   }
 
+  @PutMapping("/price-alerts")
+  public FeatureFlagResponse setPriceAlertsEnabled(
+      @RequestHeader(name = "X-Admin-Key", required = false) String adminApiKey,
+      @Valid @RequestBody FeatureFlagUpdateRequest request) {
+    return featureFlagService.setPriceAlertsEnabled(adminApiKey, request);
+  }
+
   @PutMapping("/auto-swap")
   public FeatureFlagResponse setAutoSwapEnabled(
       @RequestHeader(name = "X-Admin-Key", required = false) String adminApiKey,

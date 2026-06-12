@@ -29,7 +29,7 @@ class AutoSwapRuleServiceTest {
 
     service.save(WALLET, request);
 
-    verify(featureFlagService).requireAutoSwapEnabled();
+    verify(featureFlagService).requirePriceAlertsEnabled();
   }
 
   @Test

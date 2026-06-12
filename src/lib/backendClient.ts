@@ -105,6 +105,7 @@ export type PushDiagnosticReportPayload = {
 
 export type FeatureFlags = {
   autoSwapEnabled: boolean;
+  priceAlertsEnabled: boolean;
   limitOrdersEnabled: boolean;
 };
 
@@ -251,9 +252,15 @@ export class BackendClientError extends Error {
 }
 
 export async function getFeatureFlags(backendBaseUrl: string): Promise<FeatureFlags> {
-  return backendFetch<FeatureFlags>(backendBaseUrl, "/api/features", {
+  const flags = await backendFetch<Partial<FeatureFlags>>(backendBaseUrl, "/api/features", {
     method: "GET"
   });
+  const priceAlertsEnabled = Boolean(flags.priceAlertsEnabled ?? flags.autoSwapEnabled);
+  return {
+    autoSwapEnabled: priceAlertsEnabled,
+    priceAlertsEnabled,
+    limitOrdersEnabled: Boolean(flags.limitOrdersEnabled)
+  };
 }
 
 export async function requestAuthNonce(backendBaseUrl: string, walletAddress: string): Promise<AuthNonceResponse> {
@@ -437,7 +444,7 @@ export async function listAutoSwapRules(
   backendBaseUrl: string,
   session: BackendSession
 ): Promise<AutoSwapRule[]> {
-  return backendFetch<AutoSwapRule[]>(backendBaseUrl, "/api/auto-swap/rules", {
+  return backendFetch<AutoSwapRule[]>(backendBaseUrl, "/api/price-alerts/rules", {
     method: "GET",
     headers: authHeaders(session)
   });
@@ -448,7 +455,7 @@ export async function saveAutoSwapRule(
   session: BackendSession,
   request: SaveAutoSwapRuleRequest
 ): Promise<AutoSwapRule> {
-  return backendFetch<AutoSwapRule>(backendBaseUrl, "/api/auto-swap/rules", {
+  return backendFetch<AutoSwapRule>(backendBaseUrl, "/api/price-alerts/rules", {
     method: "POST",
     headers: authHeaders(session),
     body: JSON.stringify(request)
@@ -460,7 +467,7 @@ export async function deleteAutoSwapRule(
   session: BackendSession,
   id: string
 ): Promise<void> {
-  await backendFetch<Record<string, never>>(backendBaseUrl, `/api/auto-swap/rules/${id}`, {
+  await backendFetch<Record<string, never>>(backendBaseUrl, `/api/price-alerts/rules/${id}`, {
     method: "DELETE",
     headers: authHeaders(session)
   });

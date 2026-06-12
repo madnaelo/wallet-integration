@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class FeatureFlagService {
   public static final String AUTO_SWAP_FEATURE_KEY = "auto_swap";
+  public static final String PRICE_ALERTS_FEATURE_KEY = AUTO_SWAP_FEATURE_KEY;
   public static final String LIMIT_ORDERS_FEATURE_KEY = "limit_orders";
 
   private final FeatureProperties featureProperties;
@@ -27,13 +28,18 @@ public class FeatureFlagService {
   }
 
   public FeatureFlagsResponse publicFlags() {
-    return new FeatureFlagsResponse(isAutoSwapEnabled(), isLimitOrdersEnabled());
+    boolean priceAlertsEnabled = isPriceAlertsEnabled();
+    return new FeatureFlagsResponse(priceAlertsEnabled, priceAlertsEnabled, isLimitOrdersEnabled());
+  }
+
+  public boolean isPriceAlertsEnabled() {
+    return repository.find(PRICE_ALERTS_FEATURE_KEY)
+        .map(FeatureFlagResponse::enabled)
+        .orElse(featureProperties.isAutoSwapDefaultEnabled());
   }
 
   public boolean isAutoSwapEnabled() {
-    return repository.find(AUTO_SWAP_FEATURE_KEY)
-        .map(FeatureFlagResponse::enabled)
-        .orElse(featureProperties.isAutoSwapDefaultEnabled());
+    return isPriceAlertsEnabled();
   }
 
   public boolean isLimitOrdersEnabled() {
@@ -42,10 +48,14 @@ public class FeatureFlagService {
         .orElse(featureProperties.isLimitOrdersDefaultEnabled());
   }
 
-  public void requireAutoSwapEnabled() {
-    if (!isAutoSwapEnabled()) {
+  public void requirePriceAlertsEnabled() {
+    if (!isPriceAlertsEnabled()) {
       throw new ApiException(HttpStatus.NOT_FOUND, "Set Alerts is not available.");
     }
+  }
+
+  public void requireAutoSwapEnabled() {
+    requirePriceAlertsEnabled();
   }
 
   public void requireLimitOrdersEnabled() {
@@ -54,10 +64,14 @@ public class FeatureFlagService {
     }
   }
 
-  public FeatureFlagResponse setAutoSwapEnabled(String adminApiKey, FeatureFlagUpdateRequest request) {
+  public FeatureFlagResponse setPriceAlertsEnabled(String adminApiKey, FeatureFlagUpdateRequest request) {
     adminAuthService.requireAdminApiKey(adminApiKey);
     boolean enabled = Boolean.TRUE.equals(request.enabled());
-    return repository.upsert(AUTO_SWAP_FEATURE_KEY, enabled, "admin");
+    return repository.upsert(PRICE_ALERTS_FEATURE_KEY, enabled, "admin");
+  }
+
+  public FeatureFlagResponse setAutoSwapEnabled(String adminApiKey, FeatureFlagUpdateRequest request) {
+    return setPriceAlertsEnabled(adminApiKey, request);
   }
 
   public FeatureFlagResponse setLimitOrdersEnabled(String adminApiKey, FeatureFlagUpdateRequest request) {

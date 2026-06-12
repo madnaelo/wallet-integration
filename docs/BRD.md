@@ -43,7 +43,7 @@ Fee collection must be transparent in product/legal copy before public launch.
   signed terms and backend submission through a supported orderbook adapter.
 - Trade-summary risk cues for high slippage, large fee ratio, and partial route
   outages.
-- Admin-gated Auto Swap preference storage, without backend custody of keys.
+- Admin-gated Set Alerts preference storage, without backend custody of keys.
 
 ## Technical Shape
 
@@ -72,7 +72,7 @@ Fee collection must be transparent in product/legal copy before public launch.
 - Notification preferences and channel links.
 - Favorite pair alert rules.
 - Alert delivery/cooldown records.
-- Auto Swap preference rules.
+- Set Alerts preference rules.
 - Limit Orders with signed payload hashes, order hashes, execution provider,
   status, expiry, and audit metadata.
 
