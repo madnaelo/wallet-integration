@@ -200,8 +200,11 @@ fi
 
 network_exists "$proxy_network" || fail "The configured Caddy proxy network does not exist: $proxy_network"
 container_exists "$caddy_container" || fail "The configured Caddy container does not exist: $caddy_container"
+if ! container_has_network "$caddy_container" "$proxy_network"; then
+  run_container network connect "$proxy_network" "$caddy_container"
+fi
 container_has_network "$caddy_container" "$proxy_network" \
-  || fail "Caddy container $caddy_container is not connected to proxy network $proxy_network."
+  || fail "Caddy container $caddy_container could not join proxy network $proxy_network."
 [ -f "$caddyfile_path" ] || fail "Configured Caddyfile does not exist: $caddyfile_path"
 
 if ! network_exists "$internal_network"; then

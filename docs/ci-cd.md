@@ -155,7 +155,9 @@ WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
 ```
 
 The proxy network, Caddy process, and site block are shared infrastructure and
-must already exist. The deploy script validates but never edits them. PostgreSQL
+must already exist. The deploy script can reattach Caddy to the existing proxy
+network when another deployment recreated it, but never disconnects its other
+networks or edits its site configuration. PostgreSQL
 is attached only to the dedicated `wallet-database` network and never
 publishes a host port; the backend joins both the database and proxy networks.
 Docker uses an internal database network. Podman uses a dedicated DNS-enabled
