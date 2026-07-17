@@ -3,7 +3,15 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Terms",
-  description: "Terms of use for Swap Assistant."
+  description: "Terms of use for Swap Assistant.",
+  alternates: {
+    canonical: "/terms"
+  },
+  openGraph: {
+    title: "Swap Assistant Terms",
+    description: "Terms for non-custodial swaps, alerts, and wallet-signed limit orders.",
+    url: "/terms"
+  }
 };
 
 export default function TermsPage() {
@@ -33,6 +41,16 @@ export default function TermsPage() {
         </section>
 
         <section>
+          <h2>Eligibility And Lawful Use</h2>
+          <p>
+            You must have legal capacity to use the service and must comply
+            with the laws and restrictions that apply to you. Do not use Swap
+            Assistant for unlawful activity or to transact with sanctioned,
+            blocked, fraudulent, or illicit parties.
+          </p>
+        </section>
+
+        <section>
           <h2>Third-Party Providers</h2>
           <p>
             Quotes, routes, token lists, wallet connection, notifications, and
@@ -48,6 +66,16 @@ export default function TermsPage() {
             Swap Assistant does not provide investment, tax, legal, accounting, or
             financial advice. Alerts and quote comparisons are tools for your
             own review.
+          </p>
+        </section>
+
+        <section>
+          <h2>Fees</h2>
+          <p>
+            Quotes can include network costs, provider fees, and a disclosed
+            Swap Assistant platform fee on supported routes. Review the trade
+            summary and your wallet confirmation before signing. Fee behavior
+            can differ by provider and route.
           </p>
         </section>
 
@@ -94,6 +122,26 @@ export default function TermsPage() {
             any time. We may disable providers, chains, tokens, alerts, or
             features when needed for security, compliance, reliability, or
             provider availability.
+          </p>
+        </section>
+
+        <section>
+          <h2>No Guarantee</h2>
+          <p>
+            To the fullest extent permitted by law, Swap Assistant is provided
+            without a guarantee of availability, accuracy, security, execution,
+            price, profit, or fitness for a particular purpose. You control
+            whether to sign and bear the risks of the wallet, token, protocol,
+            network, and transaction you choose.
+          </p>
+        </section>
+
+        <section>
+          <h2>Changes</h2>
+          <p>
+            These terms can be updated as the service changes. When a limit
+            order requires new terms, the app will require you to review and
+            accept the new version before storing that order.
           </p>
         </section>
       </div>

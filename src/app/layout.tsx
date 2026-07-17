@@ -4,8 +4,8 @@ import "./globals.css";
 
 const siteUrl = getSiteUrl();
 const title = "Swap Assistant";
-const description = "Your Personal Swap Assistant. Get the best price for your swaps.";
-const ogImage = "/og-image.svg";
+const description = "Compare available crypto swap quotes, set price alerts, and create non-custodial limit orders while your wallet stays in control.";
+const ogImage = "/og-image.png";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
@@ -68,7 +68,7 @@ export const metadata: Metadata = {
       { url: "/favicon.ico", sizes: "any" },
       { url: "/favicon.svg", type: "image/svg+xml" }
     ],
-    apple: [{ url: "/apple-touch-icon.svg", type: "image/svg+xml" }]
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
   }
 };
 

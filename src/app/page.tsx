@@ -3,11 +3,17 @@ import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Swap Assistant | Personal Swap Aggregator",
+  title: "Personal Crypto Swap Aggregator",
   description:
     "Compare crypto swap routes, review quotes safely, save swap history, and receive price alerts without giving up custody of your wallet.",
   alternates: {
     canonical: "/"
+  },
+  openGraph: {
+    title: "Swap Assistant",
+    description:
+      "Compare crypto swap routes, save useful history, and receive price alerts while your wallet stays in control.",
+    url: "/"
   }
 };
 

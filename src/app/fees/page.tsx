@@ -3,10 +3,20 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Fees & Risks",
-  description: "Fee, quote, execution, and alert disclosures for Swap Assistant."
+  description: "Fee, quote, execution, and alert disclosures for Swap Assistant.",
+  alternates: {
+    canonical: "/fees"
+  },
+  openGraph: {
+    title: "Swap Fees & Risks",
+    description: "Understand platform fees, provider fees, network costs, price impact, and execution risks.",
+    url: "/fees"
+  }
 };
 
 export default function FeesPage() {
+  const platformFeePercent = configuredPlatformFeePercent();
+
   return (
     <main className="legalPage">
       <div className="legalShell">
@@ -14,6 +24,7 @@ export default function FeesPage() {
           Back to swap
         </Link>
         <h1>Fees & Risks</h1>
+        <p>Effective July 17, 2026.</p>
         <p>
           Swap Assistant is a non-custodial swap assistant. Your wallet signs and
           submits transactions. Swap Assistant does not hold private keys, seed
@@ -38,15 +49,22 @@ export default function FeesPage() {
         <section>
           <h2>Platform Fees</h2>
           <p>
-            Swap Assistant may receive an integrator, affiliate, or platform fee
-            from supported swap providers. Where possible, this fee is included
-            in the provider quote and sent to a configured treasury address by
-            the provider or protocol route.
+            Swap Assistant currently configures a platform fee of up to{" "}
+            <strong>{platformFeePercent}%</strong> on swap routes that support
+            integrator fees. The quote includes this fee before you choose a
+            route, and the trade summary shows it when the provider returns a
+            fee breakdown.
           </p>
           <p>
-            Some providers use their own revenue split or payout process. The
-            exact fee behavior can vary by provider, chain, token, route, and
-            provider account configuration.
+            A route that cannot apply the configured fee should not charge it.
+            Providers can also charge their own separate service fee or use
+            their own revenue split and payout process. Exact behavior varies
+            by provider, chain, token, route, and provider account.
+          </p>
+          <p>
+            Signed limit orders use third-party order protocols and do not
+            currently add this swap platform fee unless a fee is explicitly
+            displayed before signing.
           </p>
         </section>
 
@@ -71,4 +89,10 @@ export default function FeesPage() {
       </div>
     </main>
   );
+}
+
+function configuredPlatformFeePercent(): string {
+  const parsed = Number(process.env.PLATFORM_FEE_BPS ?? "20");
+  const basisPoints = Number.isFinite(parsed) && parsed >= 0 && parsed <= 300 ? parsed : 20;
+  return String(basisPoints / 100).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }

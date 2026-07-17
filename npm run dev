@@ -1,8 +1,0 @@
-
-Open http://localhost:3000
-
-## Notes
-
-- Non-custodial: no private keys stored, no backend signing.
-- Backend only returns quote/tx payload; wallet signs and submits.
-- In-memory rate limiting and caching are per-instance (fine for MVP). For multi-instance production, move to Redis/Upstash.
