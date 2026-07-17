@@ -198,6 +198,7 @@ public class LimitOrderRepository {
             provider_order_id = COALESCE(?, provider_order_id),
             submitted_at = CASE WHEN ? = 'submitted' THEN COALESCE(submitted_at, now()) ELSE submitted_at END,
             next_submission_at = ?,
+            next_status_check_at = CASE WHEN ? = 'submitted' THEN now() ELSE next_status_check_at END,
             signed_payload_hash = ?,
             signed_payload_hash_version = ?,
             submission_locked_until = NULL,
@@ -212,11 +213,85 @@ public class LimitOrderRepository {
         providerOrderId,
         executionStatus,
         nextSubmissionAt == null ? null : Timestamp.from(nextSubmissionAt),
+        executionStatus,
         verifiedPayloadHash,
         verifiedPayloadHashVersion,
         candidate.id(),
         candidate.lockToken());
     return rows.stream().findFirst();
+  }
+
+  public List<StatusCheckCandidate> claimDueStatusChecks(int limit, Duration lockTtl) {
+    UUID lockToken = UUID.randomUUID();
+    long lockTtlMs = Math.max(1_000, lockTtl.toMillis());
+    return jdbcTemplate.query(
+        """
+        WITH picked AS (
+          SELECT id
+          FROM limit_orders
+          WHERE execution_status IN ('submitted', 'open', 'partially_filled')
+            AND next_status_check_at <= now()
+            AND (status_check_locked_until IS NULL OR status_check_locked_until <= now())
+          ORDER BY next_status_check_at, updated_at
+          LIMIT ?
+          FOR UPDATE SKIP LOCKED
+        )
+        UPDATE limit_orders orders
+        SET status_check_attempts = orders.status_check_attempts + 1,
+            status_check_locked_until = now() + (? * interval '1 millisecond'),
+            status_check_lock_token = ?,
+            updated_at = now()
+        FROM picked
+        WHERE orders.id = picked.id
+        RETURNING orders.id, orders.chain_id, orders.execution_provider, orders.order_hash,
+          orders.provider_order_id, orders.execution_status, orders.expires_at, orders.status_check_attempts
+        """,
+        (rs, rowNum) -> new StatusCheckCandidate(
+            rs.getObject("id", UUID.class),
+            rs.getLong("chain_id"),
+            rs.getString("execution_provider"),
+            rs.getString("order_hash"),
+            rs.getString("provider_order_id"),
+            rs.getString("execution_status"),
+            timestampToInstant(rs.getTimestamp("expires_at")),
+            rs.getInt("status_check_attempts"),
+            lockToken),
+        Math.max(1, limit),
+        lockTtlMs,
+        lockToken);
+  }
+
+  public boolean completeStatusCheck(
+      StatusCheckCandidate candidate,
+      String executionStatus,
+      String statusCheckError,
+      String providerTransactionHash,
+      Instant nextStatusCheckAt,
+      boolean resetAttempts) {
+    int updated = jdbcTemplate.update(
+        """
+        UPDATE limit_orders
+        SET execution_status = ?,
+            provider_transaction_hash = COALESCE(?, provider_transaction_hash),
+            executed_at = CASE WHEN ? = 'filled' THEN COALESCE(executed_at, now()) ELSE executed_at END,
+            status_check_error = ?,
+            status_check_attempts = CASE WHEN ? THEN 0 ELSE status_check_attempts END,
+            last_status_checked_at = now(),
+            next_status_check_at = ?,
+            status_check_locked_until = NULL,
+            status_check_lock_token = NULL,
+            updated_at = now()
+        WHERE id = ? AND status_check_lock_token = ?
+        """,
+        executionStatus,
+        normalizeTransactionHash(providerTransactionHash),
+        executionStatus,
+        truncate(statusCheckError, 1_000),
+        resetAttempts,
+        nextStatusCheckAt == null ? null : Timestamp.from(nextStatusCheckAt),
+        candidate.id(),
+        candidate.lockToken());
+    return updated == 1;
   }
 
   public int markExpiredPending() {
@@ -277,6 +352,8 @@ public class LimitOrderRepository {
         rs.getString("signed_payload_hash"),
         rs.getString("order_hash"),
         rs.getString("provider_order_id"),
+        rs.getString("provider_transaction_hash"),
+        timestampToInstant(rs.getTimestamp("last_status_checked_at")),
         timestampToInstant(rs.getTimestamp("terms_accepted_at")),
         rs.getString("execution_error"),
         timestampToInstant(rs.getTimestamp("submitted_at")),
@@ -294,6 +371,12 @@ public class LimitOrderRepository {
     return value.length() <= maxLength ? value : value.substring(0, maxLength);
   }
 
+  private String normalizeTransactionHash(String value) {
+    if (value == null || value.isBlank()) return null;
+    String normalized = value.trim().toLowerCase();
+    return normalized.matches("^0x[0-9a-f]{64}$") ? normalized : null;
+  }
+
   public record SubmissionCandidate(
       UUID id,
       String walletAddress,
@@ -304,6 +387,17 @@ public class LimitOrderRepository {
       String signedPayloadHash,
       int signedPayloadHashVersion,
       String signedPayloadJson,
+      Instant expiresAt,
+      int attempts,
+      UUID lockToken) {}
+
+  public record StatusCheckCandidate(
+      UUID id,
+      long chainId,
+      String executionProvider,
+      String orderHash,
+      String providerOrderId,
+      String executionStatus,
       Instant expiresAt,
       int attempts,
       UUID lockToken) {}

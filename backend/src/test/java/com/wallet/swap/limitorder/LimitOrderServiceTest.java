@@ -244,6 +244,8 @@ class LimitOrderServiceTest {
         signedPayloadHash,
         "0x" + "a".repeat(64),
         null,
+        null,
+        null,
         now,
         null,
         "submitted".equals(status) ? now : null,

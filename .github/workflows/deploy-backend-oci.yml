@@ -197,12 +197,22 @@ jobs:
             printf '%s\n' "$OCI_BACKEND_ENV"
             printf '\nLIMIT_ORDERS_DEFAULT_ENABLED=true\n'
             printf 'ONEINCH_API_KEY=%s\n' "$ONEINCH_API_KEY"
-            printf 'ONEINCH_ORDERBOOK_BASE_URL=https://api.1inch.dev/orderbook/v4.1\n'
+            printf 'ONEINCH_ORDERBOOK_BASE_URL=https://api.1inch.com/orderbook/v4.1\n'
             printf 'COW_API_KEY=%s\n' "${COW_API_KEY:-}"
             printf 'COW_ORDERBOOK_BASE_URL=https://api.cow.fi\n'
             printf 'COW_PARTNER_ORDERBOOK_BASE_URL=https://partners.cow.fi\n'
             printf 'LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED=true\n'
             printf 'LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS=8\n'
+            printf 'LIMIT_ORDER_SUBMISSION_RETRY_FIXED_DELAY_MS=30000\n'
+            printf 'LIMIT_ORDER_SUBMISSION_BATCH_SIZE=25\n'
+            printf 'LIMIT_ORDER_SUBMISSION_MAX_ATTEMPTS=8\n'
+            printf 'LIMIT_ORDER_SUBMISSION_LOCK_TTL_SECONDS=60\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_FIXED_DELAY_MS=30000\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_BATCH_SIZE=50\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_LOCK_TTL_SECONDS=60\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_OPEN_INTERVAL_SECONDS=60\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_PARTIAL_INTERVAL_SECONDS=30\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_MAX_BACKOFF_SECONDS=1800\n'
           } > "$backend_env_file"
           scp $SSH_OPTS -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             "$backend_env_file" "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/backend.env.next"

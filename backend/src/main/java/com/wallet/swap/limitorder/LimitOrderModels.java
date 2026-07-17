@@ -92,6 +92,8 @@ public final class LimitOrderModels {
       String signedPayloadHash,
       String orderHash,
       String providerOrderId,
+      String providerTransactionHash,
+      Instant lastStatusCheckedAt,
       Instant termsAcceptedAt,
       String executionError,
       Instant submittedAt,

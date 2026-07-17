@@ -218,6 +218,8 @@ export type LimitOrder = {
   signedPayloadHash: string;
   orderHash: string;
   providerOrderId?: string | null;
+  providerTransactionHash?: string | null;
+  lastStatusCheckedAt?: string | null;
   termsAcceptedAt: string;
   executionError?: string | null;
   submittedAt?: string | null;

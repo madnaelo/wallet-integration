@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class LimitOrderProperties {
   private boolean orderbookSubmissionEnabled = true;
   private String oneinchApiKey = "";
-  private String oneinchOrderbookBaseUrl = "https://api.1inch.dev/orderbook/v4.1";
+  private String oneinchOrderbookBaseUrl = "https://api.1inch.com/orderbook/v4.1";
   private String cowApiKey = "";
   private String cowOrderbookBaseUrl = "https://api.cow.fi";
   private String cowPartnerOrderbookBaseUrl = "https://partners.cow.fi";
@@ -15,6 +15,12 @@ public class LimitOrderProperties {
   private int submissionBatchSize = 25;
   private int submissionMaxAttempts = 8;
   private int submissionLockTtlSeconds = 60;
+  private long statusCheckFixedDelayMs = 30_000;
+  private int statusCheckBatchSize = 50;
+  private int statusCheckLockTtlSeconds = 60;
+  private int statusCheckOpenIntervalSeconds = 60;
+  private int statusCheckPartialIntervalSeconds = 30;
+  private int statusCheckMaxBackoffSeconds = 1_800;
 
   public boolean isOrderbookSubmissionEnabled() {
     return orderbookSubmissionEnabled;
@@ -102,5 +108,53 @@ public class LimitOrderProperties {
 
   public void setSubmissionLockTtlSeconds(int submissionLockTtlSeconds) {
     this.submissionLockTtlSeconds = submissionLockTtlSeconds;
+  }
+
+  public long getStatusCheckFixedDelayMs() {
+    return statusCheckFixedDelayMs;
+  }
+
+  public void setStatusCheckFixedDelayMs(long statusCheckFixedDelayMs) {
+    this.statusCheckFixedDelayMs = statusCheckFixedDelayMs;
+  }
+
+  public int getStatusCheckBatchSize() {
+    return statusCheckBatchSize;
+  }
+
+  public void setStatusCheckBatchSize(int statusCheckBatchSize) {
+    this.statusCheckBatchSize = statusCheckBatchSize;
+  }
+
+  public int getStatusCheckLockTtlSeconds() {
+    return statusCheckLockTtlSeconds;
+  }
+
+  public void setStatusCheckLockTtlSeconds(int statusCheckLockTtlSeconds) {
+    this.statusCheckLockTtlSeconds = statusCheckLockTtlSeconds;
+  }
+
+  public int getStatusCheckOpenIntervalSeconds() {
+    return statusCheckOpenIntervalSeconds;
+  }
+
+  public void setStatusCheckOpenIntervalSeconds(int statusCheckOpenIntervalSeconds) {
+    this.statusCheckOpenIntervalSeconds = statusCheckOpenIntervalSeconds;
+  }
+
+  public int getStatusCheckPartialIntervalSeconds() {
+    return statusCheckPartialIntervalSeconds;
+  }
+
+  public void setStatusCheckPartialIntervalSeconds(int statusCheckPartialIntervalSeconds) {
+    this.statusCheckPartialIntervalSeconds = statusCheckPartialIntervalSeconds;
+  }
+
+  public int getStatusCheckMaxBackoffSeconds() {
+    return statusCheckMaxBackoffSeconds;
+  }
+
+  public void setStatusCheckMaxBackoffSeconds(int statusCheckMaxBackoffSeconds) {
+    this.statusCheckMaxBackoffSeconds = statusCheckMaxBackoffSeconds;
   }
 }
