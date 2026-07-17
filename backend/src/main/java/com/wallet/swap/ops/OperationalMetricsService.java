@@ -1,5 +1,6 @@
 package com.wallet.swap.ops;
 
+import com.wallet.swap.common.SafeErrorDetails;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
@@ -43,7 +44,7 @@ public class OperationalMetricsService {
   public void recordMonitorFailure(Exception exception) {
     monitorFailures.incrementAndGet();
     lastMonitorCompletedAt.set(Instant.now());
-    lastMonitorError.set(sanitizeError(exception));
+    lastMonitorError.set(SafeErrorDetails.summarize(exception));
   }
 
   public void recordDelivery(boolean sent, Exception exception) {
@@ -52,7 +53,7 @@ public class OperationalMetricsService {
       return;
     }
     notificationDeliveriesFailed.incrementAndGet();
-    lastDeliveryError.set(sanitizeError(exception));
+    lastDeliveryError.set(SafeErrorDetails.summarize(exception));
   }
 
   public OpsSnapshot snapshot() {
@@ -72,13 +73,6 @@ public class OperationalMetricsService {
         lastMonitorCompletedAt.get(),
         lastMonitorError.get(),
         lastDeliveryError.get());
-  }
-
-  private String sanitizeError(Exception exception) {
-    if (exception == null) return "";
-    String message = exception.getMessage();
-    if (message == null || message.isBlank()) return exception.getClass().getSimpleName();
-    return message.length() <= 500 ? message : message.substring(0, 500);
   }
 
   public record OpsSnapshot(

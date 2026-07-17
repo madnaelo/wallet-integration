@@ -99,10 +99,7 @@ public class LimitOrderCancellationClient {
   private CancellationResult providerFailure(RestClientResponseException exception) {
     HttpStatusCode statusCode = exception.getStatusCode();
     int status = statusCode.value();
-    log.warn(
-        "CoW Protocol rejected a cancellation with HTTP {}: {}",
-        status,
-        compactForLog(exception.getResponseBodyAsString()));
+    log.warn("CoW Protocol rejected a cancellation with HTTP {}.", status);
     boolean retryable = status == 408 || status == 425 || status == 429 || status >= 500;
     if (retryable) {
       return CancellationResult.failure(
@@ -112,12 +109,6 @@ public class LimitOrderCancellationClient {
     return CancellationResult.failure(
         "The order service could not accept this cancellation. Refresh the order to see its latest status.",
         false);
-  }
-
-  private String compactForLog(String value) {
-    if (value == null || value.isBlank()) return "no response body";
-    String compact = value.replaceAll("\\s+", " ").trim();
-    return compact.length() <= 500 ? compact : compact.substring(0, 500);
   }
 
   public record CancellationResult(boolean accepted, boolean retryable, String message) {

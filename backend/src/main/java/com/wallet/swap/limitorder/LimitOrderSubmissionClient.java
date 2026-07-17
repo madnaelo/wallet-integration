@@ -214,12 +214,7 @@ public class LimitOrderSubmissionClient {
 
   private LimitOrderSubmissionResult providerFailure(String providerName, RestClientResponseException exception) {
     int status = exception.getStatusCode().value();
-    String providerBody = exception.getResponseBodyAsString();
-    log.warn(
-        "{} rejected a limit order with HTTP {}: {}",
-        providerName,
-        status,
-        compactForLog(providerBody));
+    log.warn("{} rejected a limit order with HTTP {}.", providerName, status);
     boolean retryable = status == 404 || status == 408 || status == 425 || status == 429 || status >= 500;
     if (status == 429) {
       return LimitOrderSubmissionResult.failure(
@@ -234,12 +229,6 @@ public class LimitOrderSubmissionClient {
     return LimitOrderSubmissionResult.failure(
         "The order service could not accept these signed terms.",
         false);
-  }
-
-  private String compactForLog(String value) {
-    if (value == null || value.isBlank()) return "no response body";
-    String compact = value.replaceAll("\\s+", " ").trim();
-    return compact.length() <= 500 ? compact : compact.substring(0, 500);
   }
 
   public record LimitOrderSubmissionResult(

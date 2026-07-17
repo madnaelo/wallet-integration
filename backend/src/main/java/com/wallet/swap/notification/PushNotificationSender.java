@@ -2,6 +2,7 @@ package com.wallet.swap.notification;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wallet.swap.common.SafeErrorDetails;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.NotificationMessageFormatter.PushNotificationPayload;
 import com.wallet.swap.notification.PushSubscriptionRepository.PushSubscriptionRecord;
@@ -128,31 +129,13 @@ public class PushNotificationSender {
   }
 
   private String safeFailure(Exception exception) {
-    String message = exception.getMessage();
-    if (message == null || message.isBlank()) return exception.getClass().getSimpleName();
-    String sanitized = message.replaceAll("https?://\\S+", "[push endpoint]").replaceAll("\\s+", " ").trim();
-    if (sanitized.length() > 240) sanitized = sanitized.substring(0, 240) + "...";
-    return exception.getClass().getSimpleName() + ": " + sanitized;
+    return SafeErrorDetails.summarize(exception);
   }
 
   private String pushFailure(HttpResponse response) {
-    String reason = response.getStatusLine().getReasonPhrase();
     String failure = "push service returned HTTP " + response.getStatusLine().getStatusCode();
-    if (reason != null && !reason.isBlank()) failure += " " + reason.trim();
-    try {
-      if (response.getEntity() != null) {
-        String body = EntityUtils.toString(response.getEntity());
-        if (body != null && !body.isBlank()) failure += " (" + safeText(body) + ")";
-      }
-    } catch (Exception ignored) {
-      return failure;
-    }
+    EntityUtils.consumeQuietly(response.getEntity());
     return failure;
-  }
-
-  private String safeText(String value) {
-    String sanitized = value.replaceAll("https?://\\S+", "[push endpoint]").replaceAll("\\s+", " ").trim();
-    return sanitized.length() > 240 ? sanitized.substring(0, 240) + "..." : sanitized;
   }
 
   private String summarizeFailures(List<String> failures) {

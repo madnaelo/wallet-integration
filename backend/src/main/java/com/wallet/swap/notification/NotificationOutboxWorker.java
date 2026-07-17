@@ -3,6 +3,7 @@ package com.wallet.swap.notification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.autoswap.AutoSwapAlertRepository;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
+import com.wallet.swap.common.SafeErrorDetails;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
 import com.wallet.swap.notification.NotificationOutboxRepository.NotificationOutboxItem;
@@ -81,15 +82,16 @@ public class NotificationOutboxWorker {
       outboxRepository.markSent(item.id());
       metricsService.recordDelivery(true, null);
     } catch (Exception exception) {
+      String failureDetails = SafeErrorDetails.summarize(exception);
       log.warn(
           "Notification outbox delivery failed for {} {} item {}.",
           item.notificationKind(),
           item.channel(),
           item.id(),
           exception);
-      saveFailureBestEffort(item, exception);
+      saveFailureBestEffort(item, failureDetails);
       boolean retry = item.attempts() < maxAttempts;
-      outboxRepository.markFailed(item.id(), exception.getMessage(), retry, retryDelay(item.attempts()));
+      outboxRepository.markFailed(item.id(), failureDetails, retry, retryDelay(item.attempts()));
       metricsService.recordDelivery(false, exception);
     }
   }
@@ -142,9 +144,9 @@ public class NotificationOutboxWorker {
     }
   }
 
-  private void saveFailureBestEffort(NotificationOutboxItem item, Exception exception) {
+  private void saveFailureBestEffort(NotificationOutboxItem item, String failureDetails) {
     try {
-      saveDelivery(item, false, exception.getMessage());
+      saveDelivery(item, false, failureDetails);
     } catch (Exception persistenceException) {
       log.warn("Could not record failed notification delivery for outbox item {}.", item.id(), persistenceException);
     }
