@@ -9,6 +9,8 @@ const ONEINCH_BASE_URL = "https://api.1inch.dev";
 const TOKEN_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const FALLBACK_CACHE_TTL_MS = 5 * 60 * 1000;
 const TOKEN_REQUEST_TIMEOUT_MS = 8_000;
+const MAX_TOKEN_LIST_RESPONSE_BYTES = 8 * 1024 * 1024;
+const MAX_REMOTE_TOKENS_PER_SOURCE = 10_000;
 const NATIVE_TOKEN_SENTINELS = new Set([
   "0x0000000000000000000000000000000000000000",
   "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
@@ -20,11 +22,25 @@ type CachedTokens = {
 };
 
 const tokenCache = new Map<number, CachedTokens>();
+const tokenLoads = new Map<number, Promise<TokenInfo[]>>();
 
 export async function getTokensForChain(chainId: number): Promise<TokenInfo[]> {
   const cached = tokenCache.get(chainId);
   if (cached && cached.expiresAt > Date.now()) return cached.tokens;
 
+  const pending = tokenLoads.get(chainId);
+  if (pending) return pending;
+
+  const load = refreshTokensForChain(chainId);
+  tokenLoads.set(chainId, load);
+  try {
+    return await load;
+  } finally {
+    if (tokenLoads.get(chainId) === load) tokenLoads.delete(chainId);
+  }
+}
+
+async function refreshTokensForChain(chainId: number): Promise<TokenInfo[]> {
   const curated = DEFAULT_TOKENS_BY_CHAIN[chainId] ?? [];
   const remoteResults = await Promise.allSettled([
     loadUniswapTokens(chainId),
@@ -53,7 +69,9 @@ function mergeTokens(curated: TokenInfo[], remote: TokenInfo[]): TokenInfo[] {
 async function loadUniswapTokens(chainId: number): Promise<TokenInfo[]> {
   const body = await fetchJson(UNISWAP_TOKEN_LIST_URL);
   if (!isRecord(body) || !Array.isArray(body.tokens)) return [];
-  return body.tokens.flatMap((token) => toTokenInfo(token, chainId));
+  return body.tokens
+    .slice(0, MAX_REMOTE_TOKENS_PER_SOURCE)
+    .flatMap((token) => toTokenInfo(token, chainId));
 }
 
 async function loadOneInchTokens(chainId: number): Promise<TokenInfo[]> {
@@ -64,8 +82,11 @@ async function loadOneInchTokens(chainId: number): Promise<TokenInfo[]> {
     Authorization: `Bearer ${env.ONEINCH_API_KEY}`
   });
   if (!isRecord(body) || !isRecord(body.tokens)) return [];
+  const tokens = body.tokens;
 
-  return Object.values(body.tokens).flatMap((token) => toTokenInfo(token, chainId));
+  return Object.keys(tokens)
+    .slice(0, MAX_REMOTE_TOKENS_PER_SOURCE)
+    .flatMap((address) => toTokenInfo(tokens[address], chainId));
 }
 
 async function fetchJson(url: string, headers?: Record<string, string>): Promise<unknown> {
@@ -78,8 +99,38 @@ async function fetchJson(url: string, headers?: Record<string, string>): Promise
     cache: "no-store",
     signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS)
   });
+  const text = await readBoundedResponseText(res);
   if (!res.ok) throw new Error(`Token list request failed with status ${res.status}.`);
-  return res.json();
+  try {
+    return text ? JSON.parse(text) as unknown : {};
+  } catch {
+    throw new Error("Token list response was not valid JSON.");
+  }
+}
+
+async function readBoundedResponseText(res: Response): Promise<string> {
+  const declaredLength = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_TOKEN_LIST_RESPONSE_BYTES) {
+    throw new Error("Token list response exceeded the safe size limit.");
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) return "";
+
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytesRead = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytesRead += value.byteLength;
+    if (bytesRead > MAX_TOKEN_LIST_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error("Token list response exceeded the safe size limit.");
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
 }
 
 function toTokenInfo(value: unknown, chainId: number): TokenInfo[] {
