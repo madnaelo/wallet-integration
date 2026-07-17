@@ -1,5 +1,6 @@
 package com.wallet.swap.limitorder;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.common.ApiException;
@@ -181,7 +182,7 @@ public class LimitOrderService {
     JsonNode root;
     try {
       root = objectMapper.readTree(request.signedPayloadJson());
-    } catch (Exception exception) {
+    } catch (JsonProcessingException exception) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Signed order payload must be valid JSON.");
     }
 

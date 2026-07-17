@@ -8,6 +8,7 @@ import com.wallet.swap.feature.FeatureFlagService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -126,6 +127,6 @@ public class AutoSwapRuleService {
   }
 
   private String normalizeBlank(String value, String fallback) {
-    return value == null || value.isBlank() ? fallback : value.trim().toLowerCase();
+    return value == null || value.isBlank() ? fallback : value.trim().toLowerCase(Locale.ROOT);
   }
 }

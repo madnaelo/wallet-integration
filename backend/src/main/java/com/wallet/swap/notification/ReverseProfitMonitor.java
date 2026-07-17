@@ -160,7 +160,7 @@ public class ReverseProfitMonitor {
             autoSwapCandidates.size(),
             totalOpportunities);
       }
-    } catch (Exception exception) {
+    } catch (RuntimeException exception) {
       metricsService.recordMonitorFailure(exception);
       log.warn("Reverse profit monitor failed.", exception);
     }

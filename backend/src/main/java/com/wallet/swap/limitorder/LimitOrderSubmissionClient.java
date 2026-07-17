@@ -24,6 +24,7 @@ public class LimitOrderSubmissionClient {
   private static final Logger log = LoggerFactory.getLogger(LimitOrderSubmissionClient.class);
   private static final String COW_EMPTY_APP_DATA_HASH =
       "0xb48d38f93eaa084033fc5970bf96e559c33c4cdc07d889ab00b4d63f9590739d";
+  private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
   private final LimitOrderProperties properties;
   private final RestClient restClient;
@@ -119,8 +120,7 @@ public class LimitOrderSubmissionClient {
     String expectedUid = cowOrderUid(orderHash, data);
 
     try {
-      Map<String, Object> body = new LinkedHashMap<>(
-          objectMapper.convertValue(data, new TypeReference<Map<String, Object>>() {}));
+      Map<String, Object> body = new LinkedHashMap<>(objectMapper.convertValue(data, MAP_TYPE));
       if (COW_EMPTY_APP_DATA_HASH.equalsIgnoreCase(data.path("appData").asText(""))) {
         body.put("appData", "{}");
         body.put("appDataHash", COW_EMPTY_APP_DATA_HASH);

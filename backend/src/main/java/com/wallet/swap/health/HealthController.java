@@ -4,6 +4,7 @@ import com.wallet.swap.ops.OperationalMetricsService;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -65,7 +66,7 @@ public class HealthController {
         ResultSet resultSet = statement.executeQuery()) {
       boolean ok = resultSet.next() && resultSet.getInt(1) == 1;
       return Map.of("status", ok ? "ok" : "degraded");
-    } catch (Exception exception) {
+    } catch (SQLException exception) {
       return Map.of("status", "degraded", "error", "database check failed");
     }
   }

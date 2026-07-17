@@ -1,5 +1,6 @@
 package com.wallet.swap.notification;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.autoswap.AutoSwapAlertRepository;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
@@ -96,7 +97,7 @@ public class NotificationOutboxWorker {
     }
   }
 
-  private void send(NotificationOutboxItem item) throws Exception {
+  private void send(NotificationOutboxItem item) throws JsonProcessingException {
     switch (item.channel()) {
       case "email" -> emailSender.send(item.target(), item.subject(), item.body());
       case "telegram" -> telegramSender.send(item.target(), item.body());
@@ -105,7 +106,7 @@ public class NotificationOutboxWorker {
     }
   }
 
-  private void sendPush(NotificationOutboxItem item) throws Exception {
+  private void sendPush(NotificationOutboxItem item) throws JsonProcessingException {
     switch (item.notificationKind()) {
       case "reverse_profit" -> pushSender.send(
           item.target(),
@@ -120,7 +121,8 @@ public class NotificationOutboxWorker {
     }
   }
 
-  private void saveDelivery(NotificationOutboxItem item, boolean sent, String errorMessage) throws Exception {
+  private void saveDelivery(NotificationOutboxItem item, boolean sent, String errorMessage)
+      throws JsonProcessingException {
     switch (item.notificationKind()) {
       case "reverse_profit" -> reverseProfitAlertRepository.saveDelivery(
           objectMapper.readValue(item.payloadJson(), ReverseProfitOpportunity.class),

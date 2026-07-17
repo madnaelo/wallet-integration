@@ -12,6 +12,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URI;
 import java.util.Enumeration;
+import java.util.Locale;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -233,7 +234,7 @@ public class NotificationMessageFormatter {
 
   private boolean isLocalHost(String host) {
     if (host == null) return false;
-    String normalized = host.trim().toLowerCase();
+    String normalized = host.trim().toLowerCase(Locale.ROOT);
     return normalized.equals("localhost")
         || normalized.equals("127.0.0.1")
         || normalized.equals("0:0:0:0:0:0:0:1")

@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -205,7 +206,7 @@ public class AutoSwapRuleRepository {
   }
 
   private String normalizeDirection(String direction) {
-    return direction == null || direction.isBlank() ? "above" : direction.trim().toLowerCase();
+    return direction == null || direction.isBlank() ? "above" : direction.trim().toLowerCase(Locale.ROOT);
   }
 
   private AutoSwapRuleCandidate mapCandidateRow(ResultSet rs) throws SQLException {

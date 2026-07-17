@@ -1,5 +1,6 @@
 package com.wallet.swap.limitorder;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.config.LimitOrderProperties;
@@ -92,7 +93,7 @@ public class LimitOrderSubmissionCoordinator {
             candidate.signature(),
             data);
       }
-    } catch (Exception exception) {
+    } catch (JsonProcessingException | RuntimeException exception) {
       log.warn("Could not prepare saved limit order {} for submission.", candidate.id(), exception);
       result = LimitOrderSubmissionResult.failure(
           "The saved signed order is invalid and cannot be submitted.",

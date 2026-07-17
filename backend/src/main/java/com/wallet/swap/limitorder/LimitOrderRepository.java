@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -73,7 +74,7 @@ public class LimitOrderRepository {
         executionSupport,
         termsVersion,
         signedPayloadHash,
-        request.orderHash().trim().toLowerCase(),
+        request.orderHash().trim().toLowerCase(Locale.ROOT),
         request.signature().trim(),
         request.signedPayloadJson().trim(),
         LimitOrderPayloadIntegrity.CURRENT_VERSION);
@@ -84,7 +85,7 @@ public class LimitOrderRepository {
     List<LimitOrderResponse> rows = jdbcTemplate.query(
         "SELECT * FROM limit_orders WHERE lower(order_hash) = ? ORDER BY created_at LIMIT 1",
         (rs, rowNum) -> mapRow(rs),
-        orderHash.trim().toLowerCase());
+        orderHash.trim().toLowerCase(Locale.ROOT));
     return rows.stream().findFirst();
   }
 
@@ -468,7 +469,7 @@ public class LimitOrderRepository {
 
   private String normalizeTransactionHash(String value) {
     if (value == null || value.isBlank()) return null;
-    String normalized = value.trim().toLowerCase();
+    String normalized = value.trim().toLowerCase(Locale.ROOT);
     return normalized.matches("^0x[0-9a-f]{64}$") ? normalized : null;
   }
 

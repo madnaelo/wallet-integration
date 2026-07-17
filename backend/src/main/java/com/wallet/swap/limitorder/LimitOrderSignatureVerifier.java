@@ -3,7 +3,9 @@ package com.wallet.swap.limitorder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.common.ApiException;
+import java.io.IOException;
 import java.math.BigInteger;
+import java.security.SignatureException;
 import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -42,7 +44,7 @@ public class LimitOrderSignatureVerifier {
           "Signed order could not be verified.");
     } catch (ApiException exception) {
       throw exception;
-    } catch (Exception exception) {
+    } catch (IOException | SignatureException | RuntimeException exception) {
       throw invalidSignature("Signed order could not be verified.");
     }
   }
@@ -65,13 +67,13 @@ public class LimitOrderSignatureVerifier {
           "Signed cancellation could not be verified.");
     } catch (ApiException exception) {
       throw exception;
-    } catch (Exception exception) {
+    } catch (IOException | SignatureException | RuntimeException exception) {
       throw invalidSignature("Signed cancellation could not be verified.");
     }
   }
 
   private byte[] typedDataDigest(JsonNode typedData, String expectedPrimaryType, String invalidMessage)
-      throws Exception {
+      throws IOException {
     if (!typedData.isObject()
         || !expectedPrimaryType.equals(typedData.path("primaryType").asText())
         || !typedData.path("types").isObject()
@@ -88,7 +90,7 @@ public class LimitOrderSignatureVerifier {
       byte[] digest,
       String ownerMismatchMessage,
       String invalidMessage)
-      throws Exception {
+      throws SignatureException {
     Sign.SignatureData signatureData = Sign.signatureDataFromHex(signature.trim());
     BigInteger r = new BigInteger(1, signatureData.getR());
     BigInteger s = new BigInteger(1, signatureData.getS());

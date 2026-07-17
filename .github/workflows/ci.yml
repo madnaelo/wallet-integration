@@ -158,8 +158,8 @@ jobs:
           java-version: "17"
           cache: maven
 
-      - name: Test
-        run: mvn -B -ntp clean test
+      - name: Test and analyze
+        run: mvn -B -ntp clean verify
 
       - name: Verify Flyway migrations and application startup
         shell: bash

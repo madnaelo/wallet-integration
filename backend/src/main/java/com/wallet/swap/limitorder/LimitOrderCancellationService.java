@@ -1,5 +1,6 @@
 package com.wallet.swap.limitorder;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -174,7 +175,7 @@ public class LimitOrderCancellationService {
       return root;
     } catch (ApiException exception) {
       throw exception;
-    } catch (Exception exception) {
+    } catch (JsonProcessingException | RuntimeException exception) {
       throw savedIntegrityFailure();
     }
   }

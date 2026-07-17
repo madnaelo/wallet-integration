@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- Spring-managed collaborators and configuration beans are intentionally shared by reference. -->
+  <Match>
+    <Class name="~com\.wallet\.swap\..*" />
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2" />
+  </Match>
+
+  <!-- Wallet sign-in messages require stable LF separators on every operating system. -->
+  <Match>
+    <Class name="com.wallet.swap.auth.AuthService" />
+    <Method name="buildSignInMessage" />
+    <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE" />
+  </Match>
+
+  <!-- Notification bodies use stable LF separators across email, Telegram, and push channels. -->
+  <Match>
+    <Class name="com.wallet.swap.notification.NotificationMessageFormatter" />
+    <Method name="body" />
+    <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE" />
+  </Match>
+
+  <!-- SQL composition is deterministic and does not depend on the host line separator. -->
+  <Match>
+    <Class name="com.wallet.swap.notification.ReverseProfitCandidateRepository" />
+    <Method name="findCandidates" />
+    <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE" />
+  </Match>
+</FindBugsFilter>

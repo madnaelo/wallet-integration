@@ -6,6 +6,7 @@ import com.wallet.swap.notification.FavoritePairModels.FavoritePairResponse;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -112,6 +113,6 @@ public class FavoritePairService {
   }
 
   private String normalizeDirection(String direction) {
-    return direction == null || direction.isBlank() ? "above" : direction.trim().toLowerCase();
+    return direction == null || direction.isBlank() ? "above" : direction.trim().toLowerCase(Locale.ROOT);
   }
 }

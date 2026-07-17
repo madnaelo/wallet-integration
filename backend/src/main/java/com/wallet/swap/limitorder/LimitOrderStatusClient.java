@@ -124,7 +124,7 @@ public class LimitOrderStatusClient {
     if (hasCancel) return StatusResult.success("cancelled", transactionHash, null);
     BigInteger remaining = unsignedInteger(response.path("remainingMakerAmount").asText(null));
     if (remaining == null) return StatusResult.failure("Invalid 1inch remaining amount.");
-    if (remaining != null && remaining.signum() == 0 && hasFill) {
+    if (remaining.signum() == 0 && hasFill) {
       return StatusResult.success("filled", transactionHash, null);
     }
     if (hasFill) return StatusResult.success("partially_filled", transactionHash, null);

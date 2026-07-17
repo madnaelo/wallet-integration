@@ -1,5 +1,6 @@
 package com.wallet.swap.history;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.history.SwapHistoryModels.SaveSwapHistoryRequest;
@@ -97,7 +98,7 @@ public class SwapHistoryRepository {
     if (quoteJson != null) {
       try {
         quote = objectMapper.readTree(quoteJson);
-      } catch (Exception ignored) {
+      } catch (JsonProcessingException ignored) {
         quote = null;
       }
     }

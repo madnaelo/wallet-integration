@@ -1,11 +1,13 @@
 package com.wallet.swap.limitorder;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HexFormat;
@@ -20,7 +22,7 @@ final class LimitOrderPayloadIntegrity {
       String canonicalJson = objectMapper.writeValueAsString(canonicalize(payload, objectMapper));
       return HexFormat.of().formatHex(
           MessageDigest.getInstance("SHA-256").digest(canonicalJson.getBytes(StandardCharsets.UTF_8)));
-    } catch (Exception exception) {
+    } catch (JsonProcessingException | NoSuchAlgorithmException exception) {
       throw new IllegalStateException("Signed order payload could not be hashed.", exception);
     }
   }

@@ -2,6 +2,7 @@ package com.wallet.swap.auth;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.security.SignatureException;
 import java.util.Arrays;
 import org.springframework.stereotype.Component;
 import org.web3j.crypto.Keys;
@@ -25,7 +26,7 @@ public class EthereumSignatureVerifier {
       String recoveredAddress = "0x" + Keys.getAddress(publicKey);
 
       return WalletAddress.normalize(expectedAddress).equals(WalletAddress.normalize(recoveredAddress));
-    } catch (Exception exception) {
+    } catch (SignatureException | RuntimeException exception) {
       return false;
     }
   }

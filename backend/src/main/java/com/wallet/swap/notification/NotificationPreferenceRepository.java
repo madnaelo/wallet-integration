@@ -47,6 +47,13 @@ public class NotificationPreferenceRepository {
       int defaultThresholdBps,
       int defaultLossThresholdBps,
       int defaultCooldownMinutes) {
+    Integer reverseProfitThresholdBps = request.reverseProfitThresholdBps();
+    if (reverseProfitThresholdBps == null) reverseProfitThresholdBps = Integer.valueOf(defaultThresholdBps);
+    Integer reverseLossThresholdBps = request.reverseLossThresholdBps();
+    if (reverseLossThresholdBps == null) reverseLossThresholdBps = Integer.valueOf(defaultLossThresholdBps);
+    Integer cooldownMinutes = request.cooldownMinutes();
+    if (cooldownMinutes == null) cooldownMinutes = Integer.valueOf(defaultCooldownMinutes);
+
     jdbcTemplate.update(
         """
         INSERT INTO notification_preferences (
@@ -72,10 +79,10 @@ public class NotificationPreferenceRepository {
         blankToNull(telegramChatId),
         telegramEnabled,
         pushEnabled,
-        request.reverseProfitThresholdBps() == null ? defaultThresholdBps : request.reverseProfitThresholdBps(),
+        reverseProfitThresholdBps,
         Boolean.TRUE.equals(request.reverseLossEnabled()),
-        request.reverseLossThresholdBps() == null ? defaultLossThresholdBps : request.reverseLossThresholdBps(),
-        request.cooldownMinutes() == null ? defaultCooldownMinutes : request.cooldownMinutes());
+        reverseLossThresholdBps,
+        cooldownMinutes);
 
     return find(walletAddress).orElseThrow();
   }

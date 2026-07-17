@@ -176,7 +176,8 @@ class LimitOrderCancellationServiceTest {
         stored.expiresAt(),
         null);
     when(repository.findCancellationCandidate(stored.id(), WALLET))
-        .thenReturn(Optional.of(stored), Optional.of(submitting));
+        .thenReturn(Optional.of(stored))
+        .thenReturn(Optional.of(submitting));
     when(repository.cancelUnsubmitted(stored.id(), WALLET)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.cancel(

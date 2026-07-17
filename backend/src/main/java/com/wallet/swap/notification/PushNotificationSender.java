@@ -6,17 +6,21 @@ import com.wallet.swap.common.SafeErrorDetails;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.NotificationMessageFormatter.PushNotificationPayload;
 import com.wallet.swap.notification.PushSubscriptionRepository.PushSubscriptionRecord;
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.security.Security;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import nl.martijndwars.webpush.Encoding;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import org.apache.http.HttpResponse;
 import org.apache.http.util.EntityUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.jose4j.lang.JoseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -80,7 +84,14 @@ public class PushNotificationSender {
               failure);
           failures.add(failure);
         }
-      } catch (Exception exception) {
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Push notification delivery was interrupted.", exception);
+      } catch (GeneralSecurityException
+          | IOException
+          | JoseException
+          | ExecutionException
+          | RuntimeException exception) {
         String failure = safeFailure(exception);
         log.warn(
             "Push notification delivery failed for wallet {} subscription {}: {}.",

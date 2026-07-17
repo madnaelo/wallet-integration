@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -144,7 +145,7 @@ public class CoinGeckoPriceClient {
 
     for (TokenKey key : batch) {
       BigDecimal price = decimalAt(body.path(key.address()).path("usd"));
-      if (price == null) price = decimalAt(body.path(key.address().toLowerCase()).path("usd"));
+      if (price == null) price = decimalAt(body.path(key.address().toLowerCase(Locale.ROOT)).path("usd"));
       if (price != null) prices.put(key, price);
     }
     return prices;
@@ -197,7 +198,7 @@ public class CoinGeckoPriceClient {
     }
 
     static String normalizeAddress(String value) {
-      return value == null ? "" : value.trim().toLowerCase();
+      return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
   }
 }
