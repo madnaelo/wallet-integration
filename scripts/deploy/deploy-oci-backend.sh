@@ -153,13 +153,41 @@ container_is_running() {
   [ "$(run_container inspect -f '{{.State.Running}}' "$1" 2>/dev/null || true)" = "true" ]
 }
 
-container_has_network() {
-  local container_id
-  local network_inspect
-  container_id="$(run_container inspect -f '{{.Id}}' "$1" 2>/dev/null || true)"
-  [ -n "$container_id" ] || return 1
-  network_inspect="$(run_container network inspect "$2" 2>/dev/null || true)"
-  [[ "$network_inspect" == *"$container_id"* ]]
+attach_container_network() {
+  local network_name="$1"
+  local container_name="$2"
+  local alias_name="${3:-}"
+  local output
+  local -a connect_args=(network connect)
+
+  if [ -n "$alias_name" ]; then
+    connect_args+=(--alias "$alias_name")
+  fi
+  connect_args+=("$network_name" "$container_name")
+
+  if output="$(run_container "${connect_args[@]}" 2>&1)"; then
+    return 0
+  fi
+  if printf '%s' "$output" | grep -Eiq 'already connected|network is already connected'; then
+    return 0
+  fi
+  printf '%s\n' "$output" >&2
+  return 1
+}
+
+detach_container_network() {
+  local network_name="$1"
+  local container_name="$2"
+  local output
+
+  if output="$(run_container network disconnect -f "$network_name" "$container_name" 2>&1)"; then
+    return 0
+  fi
+  if printf '%s' "$output" | grep -Eiq 'is not connected|not connected to network'; then
+    return 0
+  fi
+  printf '%s\n' "$output" >&2
+  return 1
 }
 
 container_label() {
@@ -202,10 +230,7 @@ fi
 
 network_exists "$proxy_network" || fail "The configured Caddy proxy network does not exist: $proxy_network"
 container_exists "$caddy_container" || fail "The configured Caddy container does not exist: $caddy_container"
-if ! container_has_network "$caddy_container" "$proxy_network"; then
-  run_container network connect "$proxy_network" "$caddy_container"
-fi
-container_has_network "$caddy_container" "$proxy_network" \
+attach_container_network "$proxy_network" "$caddy_container" \
   || fail "Caddy container $caddy_container could not join proxy network $proxy_network."
 [ -f "$caddyfile_path" ] || fail "Configured Caddyfile does not exist: $caddyfile_path"
 
@@ -280,12 +305,8 @@ wait_for_postgres() {
 if container_exists "$rollback_container"; then
   run_container rm -f "$backend_container" >/dev/null 2>&1 || true
   run_container rename "$rollback_container" "$backend_container"
-  if ! container_has_network "$backend_container" "$internal_network"; then
-    run_container network connect "$internal_network" "$backend_container"
-  fi
-  if ! container_has_network "$backend_container" "$proxy_network"; then
-    run_container network connect --alias "$backend_container" "$proxy_network" "$backend_container"
-  fi
+  attach_container_network "$internal_network" "$backend_container"
+  attach_container_network "$proxy_network" "$backend_container" "$backend_container"
   run_container start "$backend_container" >/dev/null
 fi
 run_container rm -f "$candidate_container" >/dev/null 2>&1 || true
@@ -307,16 +328,13 @@ if container_exists "$postgres_container" && container_exists "$legacy_postgres_
   fi
 fi
 
-if container_exists "$backend_container" && ! container_has_network "$backend_container" "$internal_network"; then
-  run_container network connect "$internal_network" "$backend_container"
+if container_exists "$backend_container"; then
+  attach_container_network "$internal_network" "$backend_container"
 fi
 
 postgres_needs_recreate=false
 if container_exists "$postgres_container"; then
   if [ "$(container_label "$postgres_container" com.swapassistant.role)" != "database" ]; then
-    postgres_needs_recreate=true
-  fi
-  if container_has_network "$postgres_container" "$proxy_network"; then
     postgres_needs_recreate=true
   fi
 else
@@ -348,9 +366,7 @@ else
   if ! container_is_running "$postgres_container"; then
     run_container start "$postgres_container" >/dev/null
   fi
-  if ! container_has_network "$postgres_container" "$internal_network"; then
-    run_container network connect --alias "$postgres_container" "$internal_network" "$postgres_container"
-  fi
+  attach_container_network "$internal_network" "$postgres_container" "$postgres_container"
 fi
 wait_for_postgres || fail "PostgreSQL failed its readiness check."
 
@@ -362,12 +378,8 @@ if ! run_container run --rm --network "$internal_network" "$postgres_image" \
   fail "PostgreSQL is ready locally but is not reachable by name on $internal_network."
 fi
 
-if container_has_network "$postgres_container" "$proxy_network"; then
-  run_container network disconnect -f "$proxy_network" "$postgres_container"
-fi
-if container_has_network "$postgres_container" "$proxy_network"; then
-  fail "PostgreSQL is still attached to the shared proxy network."
-fi
+detach_container_network "$proxy_network" "$postgres_container" \
+  || fail "PostgreSQL could not be detached from the shared proxy network."
 
 extract_site_block() {
   awk -v domain="$api_domain" '
@@ -450,13 +462,11 @@ had_previous_backend=false
 if container_exists "$backend_container"; then
   had_previous_backend=true
   run_container stop --time 30 "$backend_container" >/dev/null
-  if container_has_network "$backend_container" "$proxy_network"; then
-    run_container network disconnect -f "$proxy_network" "$backend_container"
-  fi
+  detach_container_network "$proxy_network" "$backend_container"
   run_container rename "$backend_container" "$rollback_container"
 fi
 run_container rename "$candidate_container" "$backend_container"
-run_container network connect --alias "$backend_container" "$proxy_network" "$backend_container"
+attach_container_network "$proxy_network" "$backend_container" "$backend_container"
 run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null
 
 health_url="${BACKEND_HEALTH_URL:-https://$api_domain/api/health}"
@@ -473,13 +483,11 @@ done
 if [ "$external_healthy" != "true" ]; then
   echo "The promoted backend did not pass external build verification; rolling back." >&2
   run_container stop --time 20 "$backend_container" >/dev/null 2>&1 || true
-  if container_has_network "$backend_container" "$proxy_network"; then
-    run_container network disconnect -f "$proxy_network" "$backend_container" >/dev/null 2>&1 || true
-  fi
+  detach_container_network "$proxy_network" "$backend_container" >/dev/null 2>&1 || true
   run_container rename "$backend_container" "$failed_container" >/dev/null 2>&1 || true
   if [ "$had_previous_backend" = "true" ] && container_exists "$rollback_container"; then
     run_container rename "$rollback_container" "$backend_container"
-    run_container network connect --alias "$backend_container" "$proxy_network" "$backend_container"
+    attach_container_network "$proxy_network" "$backend_container" "$backend_container"
     run_container start "$backend_container" >/dev/null
     run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null || true
   fi
@@ -499,12 +507,8 @@ for legacy_network in wallet-internal wallet-db; do
   if [ "$legacy_role" != "internal" ] && [ "$legacy_role" != "database" ]; then
     continue
   fi
-  if container_has_network "$postgres_container" "$legacy_network"; then
-    run_container network disconnect -f "$legacy_network" "$postgres_container"
-  fi
-  if container_has_network "$backend_container" "$legacy_network"; then
-    run_container network disconnect -f "$legacy_network" "$backend_container"
-  fi
+  detach_container_network "$legacy_network" "$postgres_container"
+  detach_container_network "$legacy_network" "$backend_container"
   run_container network rm "$legacy_network" >/dev/null 2>&1 || true
 done
 
