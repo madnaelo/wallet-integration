@@ -215,6 +215,7 @@ class LimitOrderSubmissionCoordinatorTest {
         null,
         null,
         now,
+        LimitOrderTerms.CURRENT_VERSION,
         null,
         "submitted".equals(status) ? now : null,
         null,

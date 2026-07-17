@@ -15,6 +15,9 @@ export default function TermsPage() {
         </Link>
         <h1>Terms</h1>
         <p>
+          Effective July 17, 2026. Limit Order Terms version 2026-07-17.1.
+        </p>
+        <p>
           These terms describe the expected use of Swap Assistant. By using the
           app, you agree to use it only where lawful and to review every wallet
           request before signing.
@@ -58,15 +61,29 @@ export default function TermsPage() {
           </p>
         </section>
 
-        <section>
+        <section id="limit-orders">
           <h2>Limit Orders</h2>
           <p>
-            Limit orders are executed only when a supported protocol can verify
-            the exact signed order terms. Execution is not guaranteed and can
-            fail because of liquidity, gas costs, wallet balance, token allowance,
-            expiry, network issues, or provider availability. You remain
-            responsible for the terms you sign and for cancelling any order
-            through supported wallet or protocol tools when needed.
+            A limit order authorizes a supported protocol to fill only the
+            token, amount, minimum receive amount, recipient, network, and
+            expiry contained in the order you sign. The signature does not give
+            Swap Assistant your private key or permission to change those terms.
+          </p>
+          <p>
+            Execution is not guaranteed and can fail because of liquidity,
+            solver availability, gas costs, wallet balance, token allowance,
+            expiry, network conditions, smart contracts, or provider
+            availability. An order can fill at any time before expiry once its
+            signed conditions are satisfied, including while you are away from
+            the app.
+          </p>
+          <p>
+            Token approval is a separate onchain permission and can remain in
+            effect until used, replaced, or revoked. Cancellation is not final
+            until the relevant protocol or blockchain confirms it; an order can
+            fill while cancellation is pending. You are responsible for
+            reviewing the wallet signature, keeping enough balance, monitoring
+            open orders, and cancelling or revoking approvals when needed.
           </p>
         </section>
 

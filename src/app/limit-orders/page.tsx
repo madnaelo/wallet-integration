@@ -914,6 +914,7 @@ export default function LimitOrdersPage() {
         orderHash: preparedOrder.orderHash,
         signature,
         signedPayloadJson: preparedOrder.signedPayloadJson,
+        termsVersion: capability.termsVersion,
         termsAccepted
       });
       setOrders((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
@@ -1339,7 +1340,15 @@ export default function LimitOrdersPage() {
 
           <label className="limitOrderTerms">
             <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} />
-            <span>{languageCopy.terms}</span>
+            <span>
+              {languageCopy.terms}{" "}
+              <Link href="/terms#limit-orders" target="_blank" rel="noreferrer">
+                Read the Limit Order Terms
+              </Link>
+              {capability?.termsVersion ? (
+                <small className="limitOrderTermsVersion">Version {capability.termsVersion}</small>
+              ) : null}
+            </span>
           </label>
 
           {orderNotice ? <div className="ok limitOrderMessage">{orderNotice}</div> : null}

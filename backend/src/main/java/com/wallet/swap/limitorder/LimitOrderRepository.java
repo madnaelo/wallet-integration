@@ -37,6 +37,7 @@ public class LimitOrderRepository {
       String walletAddress,
       LimitOrderRequest request,
       String executionSupport,
+      String termsVersion,
       String signedPayloadHash) {
     List<LimitOrderResponse> rows = jdbcTemplate.query(
         """
@@ -46,10 +47,10 @@ public class LimitOrderRepository {
           buy_token_address, buy_token_symbol, buy_token_decimals,
           sell_amount_raw, min_buy_amount_raw, target_rate, expires_at,
           recipient_address, execution_provider, execution_support, execution_status,
-          terms_accepted_at, signed_payload_hash, order_hash, signature, signed_payload_json,
+          terms_version, terms_accepted_at, signed_payload_hash, order_hash, signature, signed_payload_json,
           signed_payload_hash_version, next_submission_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'stored', now(), ?, ?, ?, CAST(? AS jsonb), ?, now())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'stored', ?, now(), ?, ?, ?, CAST(? AS jsonb), ?, now())
         ON CONFLICT (order_hash) DO NOTHING
         RETURNING *
         """,
@@ -70,6 +71,7 @@ public class LimitOrderRepository {
         request.recipientAddress().trim(),
         request.executionProvider().trim(),
         executionSupport,
+        termsVersion,
         signedPayloadHash,
         request.orderHash().trim().toLowerCase(),
         request.signature().trim(),
@@ -447,6 +449,7 @@ public class LimitOrderRepository {
         rs.getString("provider_transaction_hash"),
         timestampToInstant(rs.getTimestamp("last_status_checked_at")),
         timestampToInstant(rs.getTimestamp("terms_accepted_at")),
+        rs.getString("terms_version"),
         rs.getString("execution_error"),
         timestampToInstant(rs.getTimestamp("submitted_at")),
         timestampToInstant(rs.getTimestamp("executed_at")),

@@ -44,7 +44,8 @@ public class LimitOrderCapabilityService {
         "supported",
         reason,
         requiredSignature,
-        "High");
+        "High",
+        LimitOrderTerms.CURRENT_VERSION);
   }
 
   private LimitOrderCapabilityResponse unsupported(String reason) {
@@ -54,7 +55,8 @@ public class LimitOrderCapabilityService {
         "unsupported",
         reason,
         "Unavailable for this pair",
-        "High");
+        "High",
+        LimitOrderTerms.CURRENT_VERSION);
   }
 
   private boolean isEvmContract(String value) {

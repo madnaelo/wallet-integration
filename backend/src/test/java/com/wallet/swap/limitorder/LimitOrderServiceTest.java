@@ -44,7 +44,8 @@ class LimitOrderServiceTest {
   void checksFeatureFlagBeforeSaving() {
     LimitOrderRequest request = validRequest(WALLET);
     LimitOrderResponse stored = response("stored");
-    when(repository.insertIfAbsent(eq(WALLET), any(), eq("supported"), any()))
+    when(repository.insertIfAbsent(
+        eq(WALLET), any(), eq("supported"), eq(LimitOrderTerms.CURRENT_VERSION), any()))
         .thenReturn(Optional.of(stored));
     when(submissionCoordinator.submitNow(stored.id())).thenReturn(Optional.of(response("submitted")));
 
@@ -66,13 +67,15 @@ class LimitOrderServiceTest {
   void submitsOnlyPersistedPayloadThatMatchesRequestTerms() {
     LimitOrderRequest request = validRequest(WALLET);
     LimitOrderResponse stored = response("stored");
-    when(repository.insertIfAbsent(eq(WALLET), any(), eq("supported"), any()))
+    when(repository.insertIfAbsent(
+        eq(WALLET), any(), eq("supported"), eq(LimitOrderTerms.CURRENT_VERSION), any()))
         .thenReturn(Optional.of(stored));
     when(submissionCoordinator.submitNow(stored.id())).thenReturn(Optional.of(response("submitted")));
 
     service.save(WALLET, request);
 
-    verify(repository).insertIfAbsent(eq(WALLET), eq(request), eq("supported"), any());
+    verify(repository).insertIfAbsent(
+        eq(WALLET), eq(request), eq("supported"), eq(LimitOrderTerms.CURRENT_VERSION), any());
     verify(signatureVerifier).verify(eq(WALLET), eq(request.orderHash()), eq(request.signature()), any());
     verify(submissionCoordinator).submitNow(stored.id());
   }
@@ -81,7 +84,8 @@ class LimitOrderServiceTest {
   void retriesAnExistingIdenticalOrderIdempotently() {
     LimitOrderRequest request = validRequest(WALLET);
     LimitOrderResponse failed = response("failed", payloadHash(request.signedPayloadJson()));
-    when(repository.insertIfAbsent(eq(WALLET), any(), eq("supported"), any()))
+    when(repository.insertIfAbsent(
+        eq(WALLET), any(), eq("supported"), eq(LimitOrderTerms.CURRENT_VERSION), any()))
         .thenReturn(Optional.empty());
     when(repository.findByOrderHash(request.orderHash())).thenReturn(Optional.of(failed));
     when(submissionCoordinator.submitNow(failed.id())).thenReturn(Optional.of(response("submitted")));
@@ -112,11 +116,43 @@ class LimitOrderServiceTest {
         valid.orderHash(),
         valid.signature(),
         valid.signedPayloadJson(),
+        valid.termsVersion(),
         true);
 
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("Target rate");
+  }
+
+  @Test
+  void rejectsStaleLimitOrderTerms() {
+    LimitOrderRequest request = withTermsVersion(validRequest(WALLET), "2026-01-01");
+
+    assertThatThrownBy(() -> service.save(WALLET, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("terms have changed");
+  }
+
+  private LimitOrderRequest withTermsVersion(LimitOrderRequest request, String termsVersion) {
+    return new LimitOrderRequest(
+        request.chainId(),
+        request.sellTokenAddress(),
+        request.sellTokenSymbol(),
+        request.sellTokenDecimals(),
+        request.buyTokenAddress(),
+        request.buyTokenSymbol(),
+        request.buyTokenDecimals(),
+        request.sellAmountRaw(),
+        request.minBuyAmountRaw(),
+        request.targetRate(),
+        request.expiresAt(),
+        request.recipientAddress(),
+        request.executionProvider(),
+        request.orderHash(),
+        request.signature(),
+        request.signedPayloadJson(),
+        termsVersion,
+        request.termsAccepted());
   }
 
   private LimitOrderRequest validRequest(String maker) {
@@ -142,6 +178,7 @@ class LimitOrderServiceTest {
         "0x" + "a".repeat(64),
         "0x" + "1".repeat(130),
         payload,
+        LimitOrderTerms.CURRENT_VERSION,
         true);
   }
 
@@ -247,6 +284,7 @@ class LimitOrderServiceTest {
         null,
         null,
         now,
+        LimitOrderTerms.CURRENT_VERSION,
         null,
         "submitted".equals(status) ? now : null,
         null,

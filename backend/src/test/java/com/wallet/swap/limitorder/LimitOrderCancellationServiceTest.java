@@ -295,6 +295,7 @@ class LimitOrderCancellationServiceTest {
         null,
         now,
         now,
+        LimitOrderTerms.CURRENT_VERSION,
         null,
         now,
         null,

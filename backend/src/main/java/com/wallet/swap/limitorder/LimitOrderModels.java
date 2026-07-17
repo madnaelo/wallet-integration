@@ -37,7 +37,8 @@ public final class LimitOrderModels {
       String executionSupport,
       String reason,
       String requiredSignature,
-      String riskLevel) {}
+      String riskLevel,
+      String termsVersion) {}
 
   public record LimitOrderRequest(
       @NotNull @Min(1) Long chainId,
@@ -71,6 +72,7 @@ public final class LimitOrderModels {
           @Pattern(regexp = EOA_SIGNATURE_PATTERN, message = "must be a 65-byte EVM signature")
           String signature,
       @NotBlank @Size(max = 20000) String signedPayloadJson,
+      @Size(max = 64) String termsVersion,
       @AssertTrue boolean termsAccepted) {}
 
   public record LimitOrderResponse(
@@ -97,6 +99,7 @@ public final class LimitOrderModels {
       String providerTransactionHash,
       Instant lastStatusCheckedAt,
       Instant termsAcceptedAt,
+      String termsVersion,
       String executionError,
       Instant submittedAt,
       Instant executedAt,

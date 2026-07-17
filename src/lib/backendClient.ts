@@ -182,6 +182,7 @@ export type LimitOrderCapability = {
   reason: string;
   requiredSignature: string;
   riskLevel: string;
+  termsVersion: string;
 };
 
 export type LimitOrder = {
@@ -208,6 +209,7 @@ export type LimitOrder = {
   providerTransactionHash?: string | null;
   lastStatusCheckedAt?: string | null;
   termsAcceptedAt: string;
+  termsVersion: string;
   executionError?: string | null;
   submittedAt?: string | null;
   executedAt?: string | null;
@@ -225,6 +227,7 @@ export type SaveLimitOrderRequest = LimitOrderCapabilityRequest & {
   orderHash: string;
   signature: string;
   signedPayloadJson: string;
+  termsVersion: string;
   termsAccepted: boolean;
 };
 

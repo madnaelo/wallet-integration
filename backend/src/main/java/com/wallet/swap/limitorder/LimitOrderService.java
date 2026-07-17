@@ -101,7 +101,12 @@ public class LimitOrderService {
     LimitOrderResponse saved = repository.findByOrderHash(request.orderHash())
         .map(existing -> requireIdempotentMatch(existing, walletAddress, request, payloadHash))
         .orElseGet(() -> repository
-            .insertIfAbsent(walletAddress, request, capability.executionSupport(), payloadHash)
+            .insertIfAbsent(
+                walletAddress,
+                request,
+                capability.executionSupport(),
+                LimitOrderTerms.CURRENT_VERSION,
+                payloadHash)
             .orElseGet(() -> existingIdempotentOrder(walletAddress, request, payloadHash)));
     if (saved.executionStatus().equals("stored") || saved.executionStatus().equals("failed")) {
       repository.scheduleManualRetry(saved.id());
@@ -134,6 +139,11 @@ public class LimitOrderService {
   private void validate(LimitOrderRequest request) {
     if (!request.termsAccepted()) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Accept the Limit Order terms before saving.");
+    }
+    if (!LimitOrderTerms.CURRENT_VERSION.equals(request.termsVersion())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "Limit Order terms have changed. Refresh this page and review them again.");
     }
     if (request.chainId() == null || request.chainId() <= 0) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Network is required.");
