@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -50,9 +51,10 @@ public class AuthService {
     return new NonceResponse(walletAddress, nonce, message, expiresAt);
   }
 
+  @Transactional
   public VerifyResponse verify(String rawWalletAddress, String signature) {
     String walletAddress = normalizeOrBadRequest(rawWalletAddress);
-    AuthRepository.StoredNonce storedNonce = authRepository.findNonce(walletAddress)
+    AuthRepository.StoredNonce storedNonce = authRepository.findNonceForUpdate(walletAddress)
         .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "No active sign-in nonce for this wallet."));
 
     if (storedNonce.expiresAt().isBefore(Instant.now())) {

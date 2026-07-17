@@ -11,12 +11,16 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -31,10 +35,22 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
 
   private final ApiProperties apiProperties;
   private final ApiRateLimiter rateLimiter;
+  private final Set<String> allowedOrigins;
+  private final boolean allowAnyOrigin;
 
   public ApiRequestGuardFilter(ApiProperties apiProperties, ApiRateLimiter rateLimiter) {
     this.apiProperties = apiProperties;
     this.rateLimiter = rateLimiter;
+    Set<String> configuredOrigins = java.util.Arrays.stream(apiProperties.getCorsAllowedOrigins().split(","))
+        .map(String::trim)
+        .filter(origin -> !origin.isBlank())
+        .collect(Collectors.toUnmodifiableSet());
+    this.allowAnyOrigin = configuredOrigins.contains("*");
+    this.allowedOrigins = configuredOrigins.stream()
+        .filter(origin -> !"*".equals(origin))
+        .map(this::canonicalOrigin)
+        .filter(origin -> origin != null)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   @Override
@@ -48,6 +64,11 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
     String path = request.getRequestURI();
     if (!path.startsWith("/api/") || "OPTIONS".equalsIgnoreCase(request.getMethod())) {
       filterChain.doFilter(request, response);
+      return;
+    }
+
+    if (!isAllowedBrowserRequest(request)) {
+      writeError(response, HttpStatus.FORBIDDEN, "Request origin is not allowed.");
       return;
     }
 
@@ -87,6 +108,54 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
     response.setHeader("X-Permitted-Cross-Domain-Policies", "none");
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  }
+
+  private boolean isAllowedBrowserRequest(HttpServletRequest request) {
+    String rawOrigin = request.getHeader(HttpHeaders.ORIGIN);
+    String origin = canonicalOrigin(rawOrigin);
+    if (rawOrigin != null && (origin == null || (!allowAnyOrigin && !allowedOrigins.contains(origin)))) {
+      return false;
+    }
+    return !isStateChanging(request) || !hasSessionCookie(request) || origin != null;
+  }
+
+  private boolean isStateChanging(HttpServletRequest request) {
+    return switch (request.getMethod().toUpperCase(Locale.ROOT)) {
+      case "POST", "PUT", "PATCH", "DELETE" -> true;
+      default -> false;
+    };
+  }
+
+  private boolean hasSessionCookie(HttpServletRequest request) {
+    if (request.getCookies() == null) return false;
+    for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+      if ("wallet_session".equals(cookie.getName()) && !cookie.getValue().isBlank()) return true;
+    }
+    return false;
+  }
+
+  private String canonicalOrigin(String value) {
+    if (value == null || value.isBlank() || "null".equalsIgnoreCase(value.trim())) return null;
+    try {
+      URI uri = new URI(value.trim());
+      String scheme = uri.getScheme();
+      String host = uri.getHost();
+      if (scheme == null || host == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+        return null;
+      }
+      if (uri.getUserInfo() != null || uri.getQuery() != null || uri.getFragment() != null) return null;
+      if (uri.getPath() != null && !uri.getPath().isBlank() && !"/".equals(uri.getPath())) return null;
+      return new URI(
+          scheme.toLowerCase(Locale.ROOT),
+          null,
+          host.toLowerCase(Locale.ROOT),
+          uri.getPort(),
+          null,
+          null,
+          null).toString();
+    } catch (URISyntaxException exception) {
+      return null;
+    }
   }
 
   private ApiRateLimitDecision checkRateLimit(String path, String ip) {
@@ -242,10 +311,7 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
   }
 
   private boolean hasRequestBody(HttpServletRequest request) {
-    return switch (request.getMethod().toUpperCase(Locale.ROOT)) {
-      case "POST", "PUT", "PATCH", "DELETE" -> true;
-      default -> false;
-    };
+    return isStateChanging(request);
   }
 
   private static final class BodySizeLimitRequestWrapper extends HttpServletRequestWrapper {

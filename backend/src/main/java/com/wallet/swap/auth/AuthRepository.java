@@ -42,9 +42,9 @@ public class AuthRepository {
         Timestamp.from(expiresAt));
   }
 
-  public Optional<StoredNonce> findNonce(String walletAddress) {
+  public Optional<StoredNonce> findNonceForUpdate(String walletAddress) {
     return jdbcTemplate.query(
-        "SELECT nonce, message, expires_at FROM wallet_nonces WHERE wallet_address = ?",
+        "SELECT nonce, message, expires_at FROM wallet_nonces WHERE wallet_address = ? FOR UPDATE",
         rs -> {
           if (!rs.next()) return Optional.empty();
           return Optional.of(new StoredNonce(

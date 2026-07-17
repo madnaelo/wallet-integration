@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -68,6 +69,55 @@ class ApiRequestGuardFilterTest {
     chainCalled.set(false);
     MockHttpServletResponse response = new MockHttpServletResponse();
     filter.doFilter(apiRequest("GET", "/api/health", "203.0.113.30"), response, flaggingChain(chainCalled));
+
+    assertThat(chainCalled).isTrue();
+    assertThat(response.getStatus()).isEqualTo(HttpStatus.OK.value());
+  }
+
+  @Test
+  void rejectsExplicitOriginOutsideAllowList() throws Exception {
+    ApiProperties properties = new ApiProperties();
+    properties.setCorsAllowedOrigins("https://app.example");
+    ApiRequestGuardFilter filter = newFilter(properties);
+    MockHttpServletRequest request = apiRequest("POST", "/api/auth/nonce", "203.0.113.31");
+    request.addHeader("Origin", "https://evil.example");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicBoolean chainCalled = new AtomicBoolean(false);
+
+    filter.doFilter(request, response, flaggingChain(chainCalled));
+
+    assertThat(chainCalled).isFalse();
+    assertThat(response.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+  }
+
+  @Test
+  void requiresOriginForCookieAuthenticatedMutation() throws Exception {
+    ApiProperties properties = new ApiProperties();
+    properties.setCorsAllowedOrigins("https://app.example");
+    ApiRequestGuardFilter filter = newFilter(properties);
+    MockHttpServletRequest request = apiRequest("POST", "/api/auth/logout", "203.0.113.32");
+    request.setCookies(new Cookie("wallet_session", "session-token"));
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicBoolean chainCalled = new AtomicBoolean(false);
+
+    filter.doFilter(request, response, flaggingChain(chainCalled));
+
+    assertThat(chainCalled).isFalse();
+    assertThat(response.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+  }
+
+  @Test
+  void acceptsAllowedOriginForCookieAuthenticatedMutation() throws Exception {
+    ApiProperties properties = new ApiProperties();
+    properties.setCorsAllowedOrigins("https://app.example");
+    ApiRequestGuardFilter filter = newFilter(properties);
+    MockHttpServletRequest request = apiRequest("POST", "/api/auth/logout", "203.0.113.33");
+    request.addHeader("Origin", "https://APP.example/");
+    request.setCookies(new Cookie("wallet_session", "session-token"));
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicBoolean chainCalled = new AtomicBoolean(false);
+
+    filter.doFilter(request, response, flaggingChain(chainCalled));
 
     assertThat(chainCalled).isTrue();
     assertThat(response.getStatus()).isEqualTo(HttpStatus.OK.value());
