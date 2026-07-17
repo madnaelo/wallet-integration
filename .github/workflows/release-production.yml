@@ -405,7 +405,6 @@ jobs:
       NEXT_PUBLIC_APP_VERSION: ${{ needs.prepare.outputs.release_sha }}
       NEXT_PUBLIC_COMMIT_TIMESTAMP: ${{ needs.prepare.outputs.committed_at }}
       VERCEL_ENVIRONMENT: production
-      VERCEL_CLI_VERSION: ${{ vars.VERCEL_CLI_VERSION || '54.5.0' }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

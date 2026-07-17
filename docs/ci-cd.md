@@ -103,8 +103,8 @@ The Telegram monitor secrets are optional, but recommended after the Telegram
 bot token is rotated. Without them, GitHub Actions failures still show that
 production is unhealthy.
 
-`VERCEL_CLI_VERSION` is an optional GitHub variable and defaults to the pinned version in
-`scripts/deploy/deploy-vercel-frontend.sh`.
+The Vercel CLI version is pinned and verified inside
+`scripts/deploy/deploy-vercel-frontend.sh`; changing it requires a reviewed code change.
 
 `GHCR_READ_TOKEN` is optional. By default the backend workflow passes the
 ephemeral `GITHUB_TOKEN` to the OCI deploy script for pulling the image it just

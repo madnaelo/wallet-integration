@@ -4,7 +4,8 @@ set -Eeuo pipefail
 cd "$(dirname "$0")/../.."
 
 environment="${VERCEL_ENVIRONMENT:-production}"
-vercel_cli_version="${VERCEL_CLI_VERSION:-54.5.0}"
+vercel_cli_version="56.3.1"
+vercel_cli=(npx --yes "vercel@$vercel_cli_version")
 prod_flag=()
 if [ "$environment" = "production" ]; then
   prod_flag=(--prod)
@@ -29,7 +30,13 @@ if [ "${#missing[@]}" -gt 0 ]; then
   exit 1
 fi
 
-npx --yes "vercel@$vercel_cli_version" pull --yes --environment="$environment" --token "$VERCEL_TOKEN"
+reported_cli_version="$("${vercel_cli[@]}" --version | tail -n 1 | tr -d '\r')"
+if [[ "$reported_cli_version" != *"$vercel_cli_version"* ]]; then
+  echo "Expected Vercel CLI $vercel_cli_version, received: $reported_cli_version" >&2
+  exit 1
+fi
+
+"${vercel_cli[@]}" pull --yes --environment="$environment" --token "$VERCEL_TOKEN"
 node <<'NODE'
 const fs = require("node:fs");
 const project = JSON.parse(fs.readFileSync(".vercel/project.json", "utf8"));
@@ -38,8 +45,8 @@ if (project.orgId !== process.env.VERCEL_ORG_ID || project.projectId !== process
 }
 NODE
 
-npx --yes "vercel@$vercel_cli_version" build "${prod_flag[@]}" --token "$VERCEL_TOKEN"
-deployment_url="$(npx --yes "vercel@$vercel_cli_version" deploy --yes --prebuilt "${prod_flag[@]}" --token "$VERCEL_TOKEN" | tail -n 1 | tr -d '\r')"
+"${vercel_cli[@]}" build "${prod_flag[@]}" --token "$VERCEL_TOKEN"
+deployment_url="$("${vercel_cli[@]}" deploy --yes --prebuilt "${prod_flag[@]}" --token "$VERCEL_TOKEN" | tail -n 1 | tr -d '\r')"
 if ! [[ "$deployment_url" =~ ^https://[A-Za-z0-9.-]+$ ]]; then
   echo "Vercel did not return a valid deployment URL." >&2
   exit 1
