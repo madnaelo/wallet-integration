@@ -3,6 +3,7 @@ package com.wallet.swap.config;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ProductionConfigurationValidatorTest {
@@ -93,7 +94,50 @@ class ProductionConfigurationValidatorTest {
     assertThatCode(configuration::validate).doesNotThrowAnyException();
   }
 
+  @Test
+  void rejectsProviderUrlsThatCouldReceiveProductionCredentials() {
+    var limitOrders = validLimitOrderProperties();
+    limitOrders.setCowPartnerOrderbookBaseUrl("https://partners.cow.fi.attacker.example");
+    var notifications = validNotificationProperties();
+    notifications.getPrice().setCoingeckoBaseUrl("https://api.coingecko.com.attacker.example/api/v3");
+    notifications.getTelegram().setEnabled(true);
+    notifications.getTelegram().setBotToken("12345678901234567890123456789012");
+    notifications.getTelegram().setBotUsername("SwapAssistantBot");
+    notifications.getTelegram().setBaseUrl("https://api.telegram.org.attacker.example");
+
+    var configuration = productionConfiguration(limitOrders, notifications);
+
+    assertThatThrownBy(configuration::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("COINGECKO_BASE_URL")
+        .hasMessageContaining("TELEGRAM_BASE_URL")
+        .hasMessageContaining("COW_PARTNER_ORDERBOOK_BASE_URL");
+  }
+
+  @Test
+  void rejectsUnrecognizedPushServicesAndCoinGeckoHeaders() {
+    var notifications = validNotificationProperties();
+    notifications.getPrice().setCoingeckoApiKeyHeader("Authorization");
+    notifications.getPush().setEnabled(true);
+    notifications.getPush().setVapidPublicKey("A".repeat(87));
+    notifications.getPush().setVapidPrivateKey("B".repeat(43));
+    notifications.getPush().setAllowedEndpointHosts(List.of(".attacker.example"));
+
+    var configuration = productionConfiguration(validLimitOrderProperties(), notifications);
+
+    assertThatThrownBy(configuration::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("COINGECKO_API_KEY_HEADER")
+        .hasMessageContaining("PUSH_ALLOWED_ENDPOINT_HOSTS");
+  }
+
   private ProductionConfigurationValidator validConfiguration() {
+    return productionConfiguration(validLimitOrderProperties(), validNotificationProperties());
+  }
+
+  private ProductionConfigurationValidator productionConfiguration(
+      LimitOrderProperties limitOrders,
+      NotificationProperties notifications) {
     return new ProductionConfigurationValidator(
         "production",
         "jdbc:postgresql://wallet-postgres:5432/wallet",
@@ -102,8 +146,8 @@ class ProductionConfigurationValidatorTest {
         validApiProperties(),
         validAuthProperties(),
         validFeatureProperties(),
-        validLimitOrderProperties(),
-        validNotificationProperties());
+        limitOrders,
+        notifications);
   }
 
   private ApiProperties validApiProperties() {

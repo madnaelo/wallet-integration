@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -11,6 +12,16 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ProductionConfigurationValidator implements ApplicationRunner {
+  private static final Set<String> COINGECKO_HOSTS = Set.of("api.coingecko.com", "pro-api.coingecko.com");
+  private static final Set<String> ONEINCH_HOSTS = Set.of("api.1inch.com", "api.1inch.dev");
+  private static final Set<String> COW_PUBLIC_HOSTS = Set.of("api.cow.fi");
+  private static final Set<String> COW_PARTNER_HOSTS = Set.of("partners.cow.fi");
+  private static final Set<String> TELEGRAM_HOSTS = Set.of("api.telegram.org");
+  private static final Set<String> ALLOWED_PUSH_HOST_PATTERNS = Set.of(
+      "fcm.googleapis.com",
+      "updates.push.services.mozilla.com",
+      "web.push.apple.com",
+      ".notify.windows.com");
   private final String appEnvironment;
   private final String databaseUrl;
   private final String databasePassword;
@@ -111,11 +122,26 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
   private void validateNotifications(List<String> problems) {
     if (httpsUri(notificationProperties.getAppUrl()) == null) problems.add("APP_URL must be an HTTPS URL");
 
+    URI coinGeckoUri = validateProviderUrl(
+        problems,
+        "COINGECKO_BASE_URL",
+        notificationProperties.getPrice().getCoingeckoBaseUrl(),
+        COINGECKO_HOSTS);
+    String coinGeckoHeader = text(notificationProperties.getPrice().getCoingeckoApiKeyHeader())
+        .toLowerCase(Locale.ROOT);
+    if (!Set.of("x-cg-demo-api-key", "x-cg-pro-api-key").contains(coinGeckoHeader)) {
+      problems.add("COINGECKO_API_KEY_HEADER must be a supported CoinGecko header");
+    } else if (coinGeckoUri != null
+        && coinGeckoUri.getHost().equalsIgnoreCase("pro-api.coingecko.com")
+        && !coinGeckoHeader.equals("x-cg-pro-api-key")) {
+      problems.add("COINGECKO_API_KEY_HEADER must match the CoinGecko Pro host");
+    }
+
     NotificationProperties.Telegram telegram = notificationProperties.getTelegram();
     if (telegram.isEnabled()) {
       if (isWeakSecret(telegram.getBotToken(), 32)) problems.add("TELEGRAM_BOT_TOKEN is missing");
       if (text(telegram.getBotUsername()).isBlank()) problems.add("TELEGRAM_BOT_USERNAME is missing");
-      if (httpsUri(telegram.getBaseUrl()) == null) problems.add("TELEGRAM_BASE_URL must be HTTPS");
+      validateProviderUrl(problems, "TELEGRAM_BASE_URL", telegram.getBaseUrl(), TELEGRAM_HOSTS);
     }
 
     NotificationProperties.Push push = notificationProperties.getPush();
@@ -126,7 +152,13 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
       if (!(subject.startsWith("mailto:") || subject.startsWith("https://"))) {
         problems.add("PUSH_VAPID_SUBJECT must be a mailto or HTTPS URI");
       }
-      if (push.getAllowedEndpointHosts().isEmpty()) problems.add("PUSH_ALLOWED_ENDPOINT_HOSTS is empty");
+      if (push.getAllowedEndpointHosts().isEmpty()
+          || push.getAllowedEndpointHosts().stream()
+              .map(this::text)
+              .map(value -> value.toLowerCase(Locale.ROOT))
+              .anyMatch(value -> !ALLOWED_PUSH_HOST_PATTERNS.contains(value))) {
+        problems.add("PUSH_ALLOWED_ENDPOINT_HOSTS must contain only supported browser push services");
+      }
     }
 
     if (notificationProperties.getEmail().isEnabled()) {
@@ -141,11 +173,39 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
         && isWeakSecret(limitOrderProperties.getOneinchApiKey(), 16)) {
       problems.add("ONEINCH_API_KEY is required for limit-order fallback");
     }
-    if (httpsUri(limitOrderProperties.getOneinchOrderbookBaseUrl()) == null
-        || httpsUri(limitOrderProperties.getCowOrderbookBaseUrl()) == null
-        || httpsUri(limitOrderProperties.getCowPartnerOrderbookBaseUrl()) == null) {
-      problems.add("limit-order provider URLs must use HTTPS");
+    validateProviderUrl(
+        problems,
+        "ONEINCH_ORDERBOOK_BASE_URL",
+        limitOrderProperties.getOneinchOrderbookBaseUrl(),
+        ONEINCH_HOSTS);
+    validateProviderUrl(
+        problems,
+        "COW_ORDERBOOK_BASE_URL",
+        limitOrderProperties.getCowOrderbookBaseUrl(),
+        COW_PUBLIC_HOSTS);
+    validateProviderUrl(
+        problems,
+        "COW_PARTNER_ORDERBOOK_BASE_URL",
+        limitOrderProperties.getCowPartnerOrderbookBaseUrl(),
+        COW_PARTNER_HOSTS);
+  }
+
+  private URI validateProviderUrl(
+      List<String> problems,
+      String settingName,
+      String value,
+      Set<String> allowedHosts) {
+    URI uri = httpsUri(value);
+    String host = uri == null ? "" : text(uri.getHost()).toLowerCase(Locale.ROOT);
+    if (uri == null
+        || !allowedHosts.contains(host)
+        || uri.getRawQuery() != null
+        || uri.getRawFragment() != null
+        || (uri.getPort() != -1 && uri.getPort() != 443)) {
+      problems.add(settingName + " must use an approved provider HTTPS host");
+      return null;
     }
+    return uri;
   }
 
   private boolean isUnsafeProductionOrigin(String value) {

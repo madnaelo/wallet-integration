@@ -49,6 +49,27 @@ if (process.env.VERCEL_ENV === "production") {
   if (!corsOrigins.length || corsOrigins.some((origin) => !isExplicitHttpsOrigin(origin))) {
     throw new Error("CORS_ALLOW_ORIGINS must contain only explicit production HTTPS origins.");
   }
+  assertTrustedProviderBaseUrl(
+    process.env.PARASWAP_BASE_URL ?? "https://api.paraswap.io",
+    "PARASWAP_BASE_URL",
+    ["api.paraswap.io"]
+  );
+  assertTrustedProviderBaseUrl(
+    process.env.ODOS_BASE_URL ?? "https://api.odos.xyz",
+    "ODOS_BASE_URL",
+    ["api.odos.xyz", "enterprise-api.odos.xyz"]
+  );
+  assertTrustedProviderBaseUrl(
+    process.env.LIFI_BASE_URL ?? "https://li.quest",
+    "LIFI_BASE_URL",
+    ["li.quest"]
+  );
+  if (
+    process.env.PARASWAP_API_KEY?.trim()
+    && (process.env.PARASWAP_API_KEY_HEADER ?? "X-API-Key").trim().toLowerCase() !== "x-api-key"
+  ) {
+    throw new Error("PARASWAP_API_KEY_HEADER must be X-API-Key in production.");
+  }
   assertHttpsOrigin(process.env.NEXT_PUBLIC_SITE_URL, "NEXT_PUBLIC_SITE_URL");
   if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 300) {
     throw new Error("PLATFORM_FEE_BPS must be an integer between 0 and 300.");
@@ -143,6 +164,26 @@ function readBoolean(value, fallback) {
 function assertHttpsOrigin(value, name) {
   if (!isExplicitHttpsOrigin((value ?? "").trim())) {
     throw new Error(`${name} must be an explicit HTTPS origin in production.`);
+  }
+}
+
+function assertTrustedProviderBaseUrl(value, name, allowedHosts) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (
+      url.protocol !== "https:"
+      || url.username
+      || url.password
+      || url.search
+      || url.hash
+      || (url.port && url.port !== "443")
+      || !allowedHosts.includes(host)
+    ) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error(`${name} must use an approved provider HTTPS host in production.`);
   }
 }
 
