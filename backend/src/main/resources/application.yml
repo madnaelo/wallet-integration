@@ -58,6 +58,10 @@ wallet:
     cow-orderbook-base-url: ${COW_ORDERBOOK_BASE_URL:https://api.cow.fi}
     cow-partner-orderbook-base-url: ${COW_PARTNER_ORDERBOOK_BASE_URL:https://partners.cow.fi}
     request-timeout-seconds: ${LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS:8}
+    submission-retry-fixed-delay-ms: ${LIMIT_ORDER_SUBMISSION_RETRY_FIXED_DELAY_MS:30000}
+    submission-batch-size: ${LIMIT_ORDER_SUBMISSION_BATCH_SIZE:25}
+    submission-max-attempts: ${LIMIT_ORDER_SUBMISSION_MAX_ATTEMPTS:8}
+    submission-lock-ttl-seconds: ${LIMIT_ORDER_SUBMISSION_LOCK_TTL_SECONDS:60}
   maintenance:
     cleanup-fixed-delay-ms: ${MAINTENANCE_CLEANUP_FIXED_DELAY_MS:3600000}
     dry-run-history-retention-days: ${DRY_RUN_HISTORY_RETENTION_DAYS:180}

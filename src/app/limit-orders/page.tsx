@@ -40,7 +40,7 @@ const UINT_40_MAX = (1n << 40n) - 1n;
 const COW_PROTOCOL_PROVIDER = "cow_protocol";
 const ONEINCH_PROVIDER = "1inch_orderbook";
 const COW_SETTLEMENT_CONTRACT = "0x9008D19f58AAbD9eD0D60971565AA8510560ab41";
-const COW_EMPTY_APP_DATA = `0x${"0".repeat(64)}`;
+const COW_EMPTY_APP_DATA = "0xb48d38f93eaa084033fc5970bf96e559c33c4cdc07d889ab00b4d63f9590739d";
 const RATE_SAMPLE_INTERVAL_MS = 45_000;
 const MAX_RATE_SAMPLES = 7;
 
@@ -1585,6 +1585,7 @@ async function buildOneInchOrder(params: {
   const { Address, LimitOrder: OneInchLimitOrder, MakerTraits, randBigInt } = await import("@1inch/limit-order-sdk");
   const expiration = BigInt(Math.floor(params.expiresAt.getTime() / 1000));
   const makerTraits = MakerTraits.default()
+    .disablePartialFills()
     .withExpiration(expiration)
     .withNonce(randBigInt(UINT_40_MAX));
   const orderInfo: ConstructorParameters<typeof OneInchLimitOrder>[0] = {
@@ -1855,9 +1856,13 @@ function limitOrderStatusMessage(order: LimitOrderRecord): string {
     return "Your signed limit order was submitted. Execution depends on liquidity, allowance, balance, gas, and expiry.";
   }
   if (order.executionStatus === "failed") {
-    return "Your signed order was saved, but the execution provider could not accept it right now. Review the details and try again later.";
+    return order.executionError || "The order could not be accepted. Review the details and create a new order.";
   }
-  return "Your signed order was saved, but provider submission is not enabled right now.";
+  if (order.executionStatus === "pending_submission") {
+    return "Your signed order is saved and is being sent securely.";
+  }
+  if (order.executionError) return order.executionError;
+  return "Your signed order is saved and will be submitted automatically when the order service is available.";
 }
 
 function formatOrderTarget(order: LimitOrderRecord): string {

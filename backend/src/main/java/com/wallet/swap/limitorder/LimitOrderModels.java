@@ -15,8 +15,8 @@ import java.util.UUID;
 
 public final class LimitOrderModels {
   private static final String EVM_ADDRESS_PATTERN = "(?i)^0x[0-9a-f]{40}$";
-  private static final String HEX_BYTES_PATTERN = "(?i)^0x(?:[0-9a-f]{2}){32,255}$";
   private static final String ORDER_HASH_PATTERN = "(?i)^0x[0-9a-f]{64}$";
+  private static final String EOA_SIGNATURE_PATTERN = "(?i)^0x[0-9a-f]{130}$";
 
   private LimitOrderModels() {}
 
@@ -65,8 +65,8 @@ public final class LimitOrderModels {
           @Pattern(regexp = ORDER_HASH_PATTERN, message = "must be a 32-byte hex hash")
           String orderHash,
       @NotBlank
-          @Size(max = 512)
-          @Pattern(regexp = HEX_BYTES_PATTERN, message = "must be a hex signature")
+          @Size(min = 132, max = 132)
+          @Pattern(regexp = EOA_SIGNATURE_PATTERN, message = "must be a 65-byte EVM signature")
           String signature,
       @NotBlank @Size(max = 20000) String signedPayloadJson,
       @AssertTrue boolean termsAccepted) {}
