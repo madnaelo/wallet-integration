@@ -148,13 +148,13 @@ Reference:
 Status: code wired, delegated-fee quote accepted; live payout verification
 pending.
 
-The Odos client sends:
+The Odos V3 client sends:
 
-- `partnerFeePercent`
-- `feeRecipient`
+- `referralFee`
+- `referralFeeRecipient`
 
 Odos documents an automatic 80% partner / 20% Odos split for delegated fees
-when `partnerFeePercent` and `feeRecipient` are supplied. On May 27, 2026, the
+when `referralFee` and `referralFeeRecipient` are supplied. On May 27, 2026, the
 configured API key accepted a Base quote request with those fee parameters and
 returned a route id. That confirms our request shape is accepted, but it does
 not prove payout until a real swap settles and the treasury receives its share.

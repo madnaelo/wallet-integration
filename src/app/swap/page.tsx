@@ -2361,7 +2361,7 @@ export default function Page() {
     );
     const buyTokenFeesDeducted = sumFeesChargedInToken(swapFeeLines, buyDisplayToken);
     const netBuyAmount = stringValue(quote.netBuyAmount) || subtractIntegerStrings(grossBuyAmount, buyTokenFeesDeducted);
-    const netMinBuyAmount = minBuyAmount ? subtractIntegerStrings(minBuyAmount, buyTokenFeesDeducted) : "";
+    const netMinBuyAmount = minBuyAmount;
     const networkCost = networkFeeLine?.display ?? "Not provided";
     const platformFeeBps = numberValue(quote.platformFeeBps);
     const platformFeeLabel = platformFeeBps > 0 ? formatFeeBps(platformFeeBps) : "";

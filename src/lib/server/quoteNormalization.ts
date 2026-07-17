@@ -42,8 +42,10 @@ export function normalizeQuote(
     platformFeeBps?: number;
   }
 ): QuoteResponse {
-  const grossBuyAmount = fields.buyAmount;
-  const netBuyAmount = subtractIntegerStrings(grossBuyAmount, sumFeesInToken(fields.serviceFees ?? [], params.buyToken));
+  // Provider buy amounts are executable, post-fee amounts. Fee objects are a
+  // disclosure of deductions already encoded in the returned transaction.
+  const netBuyAmount = fields.buyAmount;
+  const grossBuyAmount = addIntegerStrings(netBuyAmount, sumFeesInToken(fields.serviceFees ?? [], params.buyToken));
   const quote: QuoteResponse = {
     ...body,
     quoteId: buildQuoteId(meta.providerId, params, fields.to, grossBuyAmount),
@@ -51,7 +53,7 @@ export function normalizeQuote(
     providerName: meta.providerName,
     platformFeeBps: fields.platformFeeBps,
     sellAmount: params.sellAmount,
-    buyAmount: grossBuyAmount,
+    buyAmount: netBuyAmount,
     grossBuyAmount,
     netBuyAmount,
     minBuyAmount: fields.minBuyAmount,
@@ -207,10 +209,9 @@ function sumFeesInToken(fees: QuoteFee[], tokenAddress: string): string {
     .toString();
 }
 
-function subtractIntegerStrings(value: string, deduction: string): string {
-  if (!/^\d+$/.test(value) || !/^\d+$/.test(deduction)) return value;
-  const result = BigInt(value) - BigInt(deduction);
-  return result > 0n ? result.toString() : "0";
+function addIntegerStrings(value: string, addition: string): string {
+  if (!/^\d+$/.test(value) || !/^\d+$/.test(addition)) return value;
+  return (BigInt(value) + BigInt(addition)).toString();
 }
 
 function normalizeTokenKey(token: string): string {
