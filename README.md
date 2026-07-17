@@ -58,7 +58,9 @@ Implemented:
   frontend builds a provider-verifiable order, the user signs exact terms in
   their wallet, and the backend validates the payload against the authenticated
   wallet before submitting it through the configured CoW Protocol or 1inch
-  adapter.
+  adapter. Submitted orders are reconciled with provider state and can be
+  cancelled through an immediate local action, a CoW wallet signature, or a
+  1inch on-chain cancellation transaction as appropriate.
 
 Not implemented yet:
 
@@ -70,8 +72,6 @@ Not implemented yet:
 - Native asset, native BTC, cross-chain, and non-EVM automatic limit-order
   execution. These stay blocked until each path has a provider-verifiable
   signed-intent adapter.
-- Limit-order cancellation/status sync UI beyond the local submitted/stored
-  record.
 
 ## Architecture
 
@@ -107,7 +107,10 @@ High-level flow:
 8. Limit Orders use a provider-verifiable signed-order path. For supported EVM
    contract-token pairs, the wallet signs the exact order terms and the backend
    submits only the signed payload whose maker, assets, amounts, recipient, and
-   chain match the authenticated request.
+   chain match the authenticated request. A leased reconciliation worker tracks
+   provider state without double-processing across replicas. Cancellation is
+   ownership-scoped and remains pending in the UI until the provider confirms
+   whether cancellation or an in-flight fill won the race.
 
 Native BTC swaps use the same form model: the source wallet pays, the receive
 wallet/address receives, and the connected destination wallet pre-fills the

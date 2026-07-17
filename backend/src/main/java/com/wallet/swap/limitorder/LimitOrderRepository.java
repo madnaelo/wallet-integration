@@ -90,6 +90,93 @@ public class LimitOrderRepository {
     return queryOne("SELECT * FROM limit_orders WHERE id = ?", id);
   }
 
+  public Optional<LimitOrderResponse> findByIdForWallet(UUID id, String walletAddress) {
+    List<LimitOrderResponse> rows = jdbcTemplate.query(
+        "SELECT * FROM limit_orders WHERE id = ? AND wallet_address = ?",
+        (rs, rowNum) -> mapRow(rs),
+        id,
+        walletAddress);
+    return rows.stream().findFirst();
+  }
+
+  public Optional<CancellationCandidate> findCancellationCandidate(UUID id, String walletAddress) {
+    List<CancellationCandidate> rows = jdbcTemplate.query(
+        """
+        SELECT id, wallet_address, chain_id, execution_provider, execution_status,
+          order_hash, provider_order_id, signature, signed_payload_hash, signed_payload_hash_version,
+          signed_payload_json::text, expires_at, cancellation_requested_at
+        FROM limit_orders
+        WHERE id = ? AND wallet_address = ?
+        """,
+        (rs, rowNum) -> new CancellationCandidate(
+            rs.getObject("id", UUID.class),
+            rs.getString("wallet_address"),
+            rs.getLong("chain_id"),
+            rs.getString("execution_provider"),
+            rs.getString("execution_status"),
+            rs.getString("order_hash"),
+            rs.getString("provider_order_id"),
+            rs.getString("signature"),
+            rs.getString("signed_payload_hash"),
+            rs.getInt("signed_payload_hash_version"),
+            rs.getString("signed_payload_json"),
+            timestampToInstant(rs.getTimestamp("expires_at")),
+            timestampToInstant(rs.getTimestamp("cancellation_requested_at"))),
+        id,
+        walletAddress);
+    return rows.stream().findFirst();
+  }
+
+  public Optional<LimitOrderResponse> cancelUnsubmitted(UUID id, String walletAddress) {
+    List<LimitOrderResponse> rows = jdbcTemplate.query(
+        """
+        UPDATE limit_orders
+        SET execution_status = 'cancelled',
+            cancellation_requested_at = now(),
+            execution_error = NULL,
+            next_submission_at = NULL,
+            submission_locked_until = NULL,
+            submission_lock_token = NULL,
+            updated_at = now()
+        WHERE id = ?
+          AND wallet_address = ?
+          AND provider_order_id IS NULL
+          AND execution_status IN ('stored', 'pending_submission', 'failed')
+          AND cancellation_requested_at IS NULL
+          AND (submission_locked_until IS NULL OR submission_locked_until <= now())
+        RETURNING *
+        """,
+        (rs, rowNum) -> mapRow(rs),
+        id,
+        walletAddress);
+    return rows.stream().findFirst();
+  }
+
+  public Optional<LimitOrderResponse> markProviderCancellationRequested(
+      UUID id,
+      String walletAddress,
+      String transactionHash) {
+    List<LimitOrderResponse> rows = jdbcTemplate.query(
+        """
+        UPDATE limit_orders
+        SET cancellation_requested_at = now(),
+            cancellation_transaction_hash = ?,
+            next_status_check_at = now(),
+            status_check_error = NULL,
+            updated_at = now()
+        WHERE id = ?
+          AND wallet_address = ?
+          AND execution_status IN ('submitted', 'open', 'partially_filled')
+          AND cancellation_requested_at IS NULL
+        RETURNING *
+        """,
+        (rs, rowNum) -> mapRow(rs),
+        normalizeTransactionHash(transactionHash),
+        id,
+        walletAddress);
+    return rows.stream().findFirst();
+  }
+
   public void scheduleManualRetry(UUID id) {
     jdbcTemplate.update(
         """
@@ -331,6 +418,11 @@ public class LimitOrderRepository {
   }
 
   private LimitOrderResponse mapRow(ResultSet rs) throws SQLException {
+    String executionStatus = rs.getString("execution_status");
+    Instant cancellationRequestedAt = timestampToInstant(rs.getTimestamp("cancellation_requested_at"));
+    if (cancellationRequestedAt != null && isProviderActive(executionStatus)) {
+      executionStatus = "cancellation_pending";
+    }
     return new LimitOrderResponse(
         rs.getObject("id", UUID.class),
         rs.getString("wallet_address"),
@@ -348,7 +440,7 @@ public class LimitOrderRepository {
         rs.getString("recipient_address"),
         rs.getString("execution_provider"),
         rs.getString("execution_support"),
-        rs.getString("execution_status"),
+        executionStatus,
         rs.getString("signed_payload_hash"),
         rs.getString("order_hash"),
         rs.getString("provider_order_id"),
@@ -377,6 +469,10 @@ public class LimitOrderRepository {
     return normalized.matches("^0x[0-9a-f]{64}$") ? normalized : null;
   }
 
+  private boolean isProviderActive(String status) {
+    return "submitted".equals(status) || "open".equals(status) || "partially_filled".equals(status);
+  }
+
   public record SubmissionCandidate(
       UUID id,
       String walletAddress,
@@ -401,4 +497,19 @@ public class LimitOrderRepository {
       Instant expiresAt,
       int attempts,
       UUID lockToken) {}
+
+  public record CancellationCandidate(
+      UUID id,
+      String walletAddress,
+      long chainId,
+      String executionProvider,
+      String executionStatus,
+      String orderHash,
+      String providerOrderId,
+      String signature,
+      String signedPayloadHash,
+      int signedPayloadHashVersion,
+      String signedPayloadJson,
+      Instant expiresAt,
+      Instant cancellationRequestedAt) {}
 }

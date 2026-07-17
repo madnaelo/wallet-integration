@@ -52,6 +52,58 @@ class LimitOrderSignatureVerifierTest {
         .hasMessageContaining("owner");
   }
 
+  @Test
+  void verifiesAnExactCowCancellationSigner() throws Exception {
+    JsonNode typedData = objectMapper.readTree("""
+        {
+          "types": {
+            "EIP712Domain": [
+              {"name": "name", "type": "string"},
+              {"name": "version", "type": "string"},
+              {"name": "chainId", "type": "uint256"},
+              {"name": "verifyingContract", "type": "address"}
+            ],
+            "OrderCancellation": [
+              {"name": "orderUid", "type": "bytes"}
+            ]
+          },
+          "primaryType": "OrderCancellation",
+          "domain": {
+            "name": "Gnosis Protocol",
+            "version": "v2",
+            "chainId": 1,
+            "verifyingContract": "0x9008D19f58AAbD9eD0D60971565AA8510560ab41"
+          },
+          "message": {
+            "orderUid": "0x%s"
+          }
+        }
+        """.formatted("a".repeat(112)));
+    byte[] digest = new StructuredDataEncoder(objectMapper.writeValueAsString(typedData)).hashStructuredData();
+    ECKeyPair keyPair = ECKeyPair.create(BigInteger.ONE);
+    String signature = signatureHex(digest, keyPair);
+    String wallet = "0x" + Keys.getAddress(keyPair.getPublicKey());
+
+    assertThatCode(() -> verifier.verifyTypedDataSigner(
+        wallet,
+        "OrderCancellation",
+        signature,
+        typedData)).doesNotThrowAnyException();
+  }
+
+  @Test
+  void rejectsCancellationTypedDataWithAnotherPrimaryType() throws Exception {
+    SignedOrder order = signedOrder();
+
+    assertThatThrownBy(() -> verifier.verifyTypedDataSigner(
+        order.wallet(),
+        "OrderCancellation",
+        order.signature(),
+        order.typedData()))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("cancellation");
+  }
+
   private SignedOrder signedOrder() throws Exception {
     JsonNode typedData = objectMapper.readTree("""
         {
@@ -102,16 +154,21 @@ class LimitOrderSignatureVerifierTest {
         """);
     byte[] digest = new StructuredDataEncoder(objectMapper.writeValueAsString(typedData)).hashStructuredData();
     ECKeyPair keyPair = ECKeyPair.create(BigInteger.ONE);
+    String signature = signatureHex(digest, keyPair);
+    return new SignedOrder(
+        "0x" + Keys.getAddress(keyPair.getPublicKey()),
+        Numeric.toHexString(digest),
+        signature,
+        typedData);
+  }
+
+  private String signatureHex(byte[] digest, ECKeyPair keyPair) {
     Sign.SignatureData signatureData = Sign.signMessage(digest, keyPair, false);
     byte[] signature = new byte[65];
     System.arraycopy(signatureData.getR(), 0, signature, 0, 32);
     System.arraycopy(signatureData.getS(), 0, signature, 32, 32);
     System.arraycopy(signatureData.getV(), 0, signature, 64, 1);
-    return new SignedOrder(
-        "0x" + Keys.getAddress(keyPair.getPublicKey()),
-        Numeric.toHexString(digest),
-        Numeric.toHexString(signature),
-        typedData);
+    return Numeric.toHexString(signature);
   }
 
   private record SignedOrder(String wallet, String orderHash, String signature, JsonNode typedData) {}

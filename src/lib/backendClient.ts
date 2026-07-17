@@ -241,6 +241,23 @@ export type SaveLimitOrderRequest = LimitOrderCapabilityRequest & {
   termsAccepted: boolean;
 };
 
+export type LimitOrderCancellationPlan = {
+  mode: "local" | "cow_signature" | "oneinch_transaction" | "unavailable";
+  chainId: number;
+  executionProvider: string;
+  orderHash: string;
+  providerOrderId?: string | null;
+  contractAddress?: string | null;
+  makerTraits?: string | null;
+  typedData?: unknown;
+  reason: string;
+};
+
+export type CancelLimitOrderRequest = {
+  signature?: string;
+  transactionHash?: string;
+};
+
 export class BackendClientError extends Error {
   status: number;
   body: unknown;
@@ -501,6 +518,34 @@ export async function saveLimitOrder(
   request: SaveLimitOrderRequest
 ): Promise<LimitOrder> {
   return backendFetch<LimitOrder>(backendBaseUrl, "/api/limit-orders", {
+    method: "POST",
+    headers: authHeaders(session),
+    body: JSON.stringify(request)
+  });
+}
+
+export async function getLimitOrderCancellationPlan(
+  backendBaseUrl: string,
+  session: BackendSession,
+  id: string
+): Promise<LimitOrderCancellationPlan> {
+  return backendFetch<LimitOrderCancellationPlan>(
+    backendBaseUrl,
+    `/api/limit-orders/${encodeURIComponent(id)}/cancellation-plan`,
+    {
+      method: "GET",
+      headers: authHeaders(session)
+    }
+  );
+}
+
+export async function cancelLimitOrder(
+  backendBaseUrl: string,
+  session: BackendSession,
+  id: string,
+  request: CancelLimitOrderRequest
+): Promise<LimitOrder> {
+  return backendFetch<LimitOrder>(backendBaseUrl, `/api/limit-orders/${encodeURIComponent(id)}/cancel`, {
     method: "POST",
     headers: authHeaders(session),
     body: JSON.stringify(request)

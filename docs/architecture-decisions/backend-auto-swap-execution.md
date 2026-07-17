@@ -64,15 +64,14 @@ configured provider adapters. Native BTC, native assets, cross-chain routes, and
 non-EVM pairs remain blocked from automatic execution until a matching
 provider-verifiable adapter exists.
 
-## Production-Grade Path To Real Backend Execution
+## Implemented Non-Custodial Execution Model
 
-Implement real backend execution in phases:
+The production implementation follows these rules:
 
-1. Keep the current alert-to-confirm flow as the default for all unsupported
-   pairs.
-2. Add provider-specific signed-order adapters one surface at a time.
-3. Require the frontend to collect an explicit wallet signature for that exact
-   order/intent, including:
+1. Keep alert-to-confirm as the fallback for unsupported pairs.
+2. Use provider-verifiable signed-order adapters for supported pairs: CoW
+   Protocol first and 1inch Orderbook as the current fallback.
+3. Require an explicit wallet signature for the exact order, including:
    - chain,
    - sell token,
    - buy token,
@@ -82,22 +81,14 @@ Implement real backend execution in phases:
    - expiry,
    - cancellation path,
    - scoped allowance/permit requirements.
-4. Store the signed order/intent in PostgreSQL with status, expiry, cancellation
-   metadata, and a full audit trail.
-5. Add a backend execution worker that submits only supported signed orders when
-   provider-side validation still passes.
-6. Keep native BTC and unsupported pairs on alert-to-confirm until a safe PSBT
-   or provider-native intent model exists for them.
-
-## Required Product Decision Before Implementation
-
-Before coding real execution, choose the first execution model:
-
-- signed limit orders/intents through one provider,
-- smart-account/session-key automation,
-- or a custom contract/escrow route.
-
-For the current non-custodial consumer app, the recommended first step is a
-provider-specific signed-order pilot for a small EVM ERC20 surface. Do not
-promise "all available pairs" until each network/token path has a safe delegated
-execution mechanism.
+4. Store the signed order in PostgreSQL with a canonical payload hash, status,
+   expiry, provider identifiers, and cancellation audit metadata.
+5. Submit and reconcile through database-leased workers so multiple backend
+   replicas do not process the same order concurrently.
+6. Cancel unsubmitted orders atomically. Submitted CoW orders require a fresh
+   EIP-712 cancellation signature; submitted 1inch orders require an on-chain
+   cancellation transaction from the maker wallet.
+7. Keep cancellation pending until provider reconciliation confirms the final
+   state because an in-flight fill can win the race.
+8. Keep native BTC and unsupported pairs on alert-to-confirm until a safe PSBT
+   or provider-native signed-intent model exists.

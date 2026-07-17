@@ -74,7 +74,8 @@ Fee collection must be transparent in product/legal copy before public launch.
 - Alert delivery/cooldown records.
 - Set Alerts preference rules.
 - Limit Orders with signed payload hashes, order hashes, execution provider,
-  status, expiry, and audit metadata.
+  status, expiry, provider reconciliation, ownership-scoped cancellation, and
+  audit metadata.
 
 ## Launch Readiness
 

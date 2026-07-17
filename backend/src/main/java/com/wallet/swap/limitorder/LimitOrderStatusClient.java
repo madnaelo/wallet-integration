@@ -70,7 +70,7 @@ public class LimitOrderStatusClient {
   }
 
   private StatusResult checkCow(StatusCheckCandidate candidate) {
-    String network = cowNetworkPath(candidate.chainId());
+    String network = LimitOrderProviderSupport.cowNetworkPath(candidate.chainId());
     if (network == null) return StatusResult.failure("Unsupported CoW Protocol network.");
     String uid = candidate.providerOrderId();
     if (uid == null || !uid.matches("(?i)^0x[0-9a-f]{112}$")) {
@@ -198,22 +198,6 @@ public class LimitOrderStatusClient {
     if (value == null) return null;
     String normalized = value.trim().toLowerCase(Locale.ROOT);
     return normalized.matches("^0x[0-9a-f]{64}$") ? normalized : null;
-  }
-
-  private String cowNetworkPath(long chainId) {
-    return switch ((int) chainId) {
-      case 1 -> "mainnet";
-      case 56 -> "bnb";
-      case 100 -> "xdai";
-      case 137 -> "polygon";
-      case 8453 -> "base";
-      case 9745 -> "plasma";
-      case 42161 -> "arbitrum_one";
-      case 43114 -> "avalanche";
-      case 57073 -> "ink";
-      case 59144 -> "linea";
-      default -> null;
-    };
   }
 
   public record StatusResult(

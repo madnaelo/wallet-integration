@@ -1,5 +1,6 @@
 package com.wallet.swap.limitorder;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -17,6 +18,7 @@ public final class LimitOrderModels {
   private static final String EVM_ADDRESS_PATTERN = "(?i)^0x[0-9a-f]{40}$";
   private static final String ORDER_HASH_PATTERN = "(?i)^0x[0-9a-f]{64}$";
   private static final String EOA_SIGNATURE_PATTERN = "(?i)^0x[0-9a-f]{130}$";
+  private static final String TRANSACTION_HASH_PATTERN = "(?i)^0x[0-9a-f]{64}$";
 
   private LimitOrderModels() {}
 
@@ -100,4 +102,23 @@ public final class LimitOrderModels {
       Instant executedAt,
       Instant createdAt,
       Instant updatedAt) {}
+
+  public record LimitOrderCancellationPlanResponse(
+      String mode,
+      long chainId,
+      String executionProvider,
+      String orderHash,
+      String providerOrderId,
+      String contractAddress,
+      String makerTraits,
+      JsonNode typedData,
+      String reason) {}
+
+  public record LimitOrderCancellationRequest(
+      @Size(max = 132)
+          @Pattern(regexp = EOA_SIGNATURE_PATTERN, message = "must be a 65-byte EVM signature")
+          String signature,
+      @Size(max = 66)
+          @Pattern(regexp = TRANSACTION_HASH_PATTERN, message = "must be a 32-byte transaction hash")
+          String transactionHash) {}
 }

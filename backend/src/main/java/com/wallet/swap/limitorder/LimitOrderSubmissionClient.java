@@ -103,7 +103,7 @@ public class LimitOrderSubmissionClient {
   }
 
   private LimitOrderSubmissionResult submitCow(long chainId, String orderHash, String signature, JsonNode data) {
-    String network = cowNetworkPath(chainId);
+    String network = LimitOrderProviderSupport.cowNetworkPath(chainId);
     if (network == null) {
       return LimitOrderSubmissionResult.failure("This network is not available for limit orders.", false);
     }
@@ -240,22 +240,6 @@ public class LimitOrderSubmissionClient {
     if (value == null || value.isBlank()) return "no response body";
     String compact = value.replaceAll("\\s+", " ").trim();
     return compact.length() <= 500 ? compact : compact.substring(0, 500);
-  }
-
-  private String cowNetworkPath(long chainId) {
-    return switch ((int) chainId) {
-      case 1 -> "mainnet";
-      case 56 -> "bnb";
-      case 100 -> "xdai";
-      case 137 -> "polygon";
-      case 8453 -> "base";
-      case 9745 -> "plasma";
-      case 42161 -> "arbitrum_one";
-      case 43114 -> "avalanche";
-      case 57073 -> "ink";
-      case 59144 -> "linea";
-      default -> null;
-    };
   }
 
   public record LimitOrderSubmissionResult(

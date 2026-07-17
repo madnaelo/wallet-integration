@@ -12,13 +12,16 @@ import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import type { BackendSession, LimitOrder as LimitOrderRecord, LimitOrderCapability } from "@/lib/backendClient";
 import {
   BackendClientError,
+  cancelLimitOrder as submitLimitOrderCancellation,
   checkLimitOrderCapability,
   getFeatureFlags,
+  getLimitOrderCancellationPlan,
   listLimitOrders,
   requestAuthNonce,
   saveLimitOrder,
   verifyAuthSignature
 } from "@/lib/backendClient";
+import { submitOneInchLimitOrderCancellation } from "@/lib/limitOrderCancellation";
 import type { TokenInfo } from "@/lib/tokens";
 import { listTokens } from "@/lib/tokenClient";
 import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
@@ -48,6 +51,7 @@ const COW_SETTLEMENT_CONTRACT = "0x9008D19f58AAbD9eD0D60971565AA8510560ab41";
 const COW_EMPTY_APP_DATA = "0xb48d38f93eaa084033fc5970bf96e559c33c4cdc07d889ab00b4d63f9590739d";
 const RATE_SAMPLE_INTERVAL_MS = 45_000;
 const MAX_RATE_SAMPLES = 7;
+const ORDER_STATUS_REFRESH_INTERVAL_MS = 30_000;
 
 type ProviderKind = "injected" | "walletconnect" | null;
 type LimitOrderLanguage = "simple" | "crypto" | "expert";
@@ -230,6 +234,8 @@ export default function LimitOrdersPage() {
   const [orders, setOrders] = useState<LimitOrderRecord[]>([]);
   const [ordersLoaded, setOrdersLoaded] = useState(false);
   const [orderSaving, setOrderSaving] = useState(false);
+  const [cancellingOrderId, setCancellingOrderId] = useState("");
+  const [orderToCancel, setOrderToCancel] = useState<LimitOrderRecord | null>(null);
   const [orderError, setOrderError] = useState("");
   const [orderNotice, setOrderNotice] = useState("");
   const recipientQrVideoRef = useRef<HTMLVideoElement>(null);
@@ -279,6 +285,17 @@ export default function LimitOrdersPage() {
     if (!parseUnitsSafe(sellAmount, executionSellToken.decimals)) return "";
     return computeTakingAmountRaw(sellAmount, targetRate, executionBuyToken.decimals) ?? "";
   }, [executionBuyToken, executionSellToken, sellAmount, targetRate]);
+  const hasOrdersNeedingRefresh = useMemo(
+    () => orders.some((order) => [
+      "stored",
+      "pending_submission",
+      "submitted",
+      "open",
+      "partially_filled",
+      "cancellation_pending"
+    ].includes(order.executionStatus)),
+    [orders]
+  );
 
   useEffect(() => {
     const controllers: AbortController[] = [];
@@ -349,6 +366,38 @@ export default function LimitOrdersPage() {
     setOrders([]);
     setOrdersLoaded(false);
   }, [address]);
+
+  useEffect(() => {
+    if (!address || !ordersLoaded || !hasOrdersNeedingRefresh) return;
+    let disposed = false;
+    let refreshInFlight = false;
+
+    const refresh = async () => {
+      if (refreshInFlight || document.visibilityState !== "visible") return;
+      const session = backendSession ?? readStoredBackendSession();
+      if (!session || !isSessionForWallet(session, address)) return;
+      refreshInFlight = true;
+      try {
+        const nextOrders = await listLimitOrders(envPublic.BACKEND_BASE_URL, session);
+        if (!disposed) setOrders(nextOrders);
+      } catch (error) {
+        if (!disposed && isExpiredBackendSessionError(error)) {
+          clearStoredBackendSession();
+          setBackendSession(null);
+        }
+      } finally {
+        refreshInFlight = false;
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refresh();
+    }, ORDER_STATUS_REFRESH_INTERVAL_MS);
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+    };
+  }, [address, backendSession, hasOrdersNeedingRefresh, ordersLoaded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -718,6 +767,81 @@ export default function LimitOrdersPage() {
         setBackendSession(null);
       }
       setOrderError(normalizeWalletError(error));
+    }
+  }
+
+  async function cancelSavedLimitOrder(order: LimitOrderRecord) {
+    setCancellingOrderId(order.id);
+    setOrderError("");
+    setOrderNotice("");
+    try {
+      if (!walletProvider || !address) throw new Error("Connect the wallet that created this order first.");
+      if (order.walletAddress.toLowerCase() !== address.toLowerCase()) {
+        throw new Error("Connect the wallet that created this order.");
+      }
+      const session = await ensureBackendSession();
+      const plan = await getLimitOrderCancellationPlan(envPublic.BACKEND_BASE_URL, session, order.id);
+      let saved: LimitOrderRecord;
+
+      if (plan.mode === "local") {
+        saved = await submitLimitOrderCancellation(envPublic.BACKEND_BASE_URL, session, order.id, {});
+      } else if (plan.mode === "cow_signature") {
+        if (!plan.typedData) throw new Error("The cancellation request could not be prepared safely.");
+        await ensureCorrectNetwork(walletProvider, plan.chainId);
+        setOrderNotice(`Open ${walletName} and approve the cancellation. This signature cannot move funds.`);
+        const signature = await signTypedData(
+          walletProvider,
+          address,
+          plan.typedData,
+          providerKind,
+          "Your wallet did not return the cancellation signature."
+        );
+        setOrderNotice("Sending the signed cancellation...");
+        saved = await submitLimitOrderCancellation(
+          envPublic.BACKEND_BASE_URL,
+          session,
+          order.id,
+          { signature }
+        );
+      } else if (plan.mode === "oneinch_transaction") {
+        if (!plan.contractAddress || !plan.makerTraits) {
+          throw new Error("The cancellation transaction could not be prepared safely.");
+        }
+        await ensureCorrectNetwork(walletProvider, plan.chainId);
+        const transactionHash = await submitOneInchLimitOrderCancellation({
+          provider: walletProvider,
+          ownerAddress: address,
+          expectedChainId: plan.chainId,
+          contractAddress: plan.contractAddress,
+          makerTraits: plan.makerTraits,
+          orderHash: plan.orderHash,
+          onWalletRequest: () => {
+            setOrderNotice(`Open ${walletName} and confirm the cancellation transaction. Network gas may apply.`);
+          },
+          onTransactionSubmitted: () => {
+            setOrderNotice("Cancellation sent. Waiting for network confirmation...");
+          }
+        });
+        saved = await submitLimitOrderCancellation(
+          envPublic.BACKEND_BASE_URL,
+          session,
+          order.id,
+          { transactionHash }
+        );
+      } else {
+        throw new Error(plan.reason || "This order cannot be cancelled right now.");
+      }
+
+      setOrders((current) => current.map((item) => item.id === saved.id ? saved : item));
+      setOrderNotice(cancellationStatusMessage(saved));
+    } catch (error) {
+      if (isExpiredBackendSessionError(error)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setOrderError(normalizeWalletError(error));
+    } finally {
+      setCancellingOrderId("");
     }
   }
 
@@ -1274,7 +1398,7 @@ export default function LimitOrdersPage() {
       <section className="panel limitOrderAudit">
         <div className="limitOrderSectionHeader">
           <h2>Your Limit Orders</h2>
-          <button className="btn" type="button" disabled={!address || orderSaving} onClick={() => void loadOrders()}>
+          <button className="btn" type="button" disabled={!address || orderSaving || Boolean(cancellingOrderId)} onClick={() => void loadOrders()}>
             {ordersLoaded ? "Refresh" : "Load"}
           </button>
         </div>
@@ -1284,11 +1408,23 @@ export default function LimitOrdersPage() {
           <div className="limitOrderList">
             {orders.map((order) => (
               <div className="limitOrderItem" key={order.id}>
-                <div>
+                <div className="limitOrderItemDetails">
                   <strong>{order.sellTokenSymbol} to {order.buyTokenSymbol}</strong>
                   <span className="small">{formatOrderTarget(order)} - expires {formatDate(order.expiresAt)}</span>
                 </div>
-                <span className="badge">{formatOrderStatus(order.executionStatus)}</span>
+                <div className="limitOrderItemActions">
+                  <span className="badge">{formatOrderStatus(order.executionStatus)}</span>
+                  {canCancelLimitOrder(order) ? (
+                    <button
+                      className="btn btnDanger limitOrderCancelButton"
+                      type="button"
+                      disabled={Boolean(cancellingOrderId)}
+                      onClick={() => setOrderToCancel(order)}
+                    >
+                      {cancellingOrderId === order.id ? "Cancelling..." : "Cancel"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
@@ -1296,6 +1432,49 @@ export default function LimitOrdersPage() {
           <p className="small">No signed limit orders yet.</p>
         )}
       </section>
+
+      {orderToCancel ? (
+        <div className="recipientDialogOverlay" role="presentation">
+          <div className="recipientDialog" role="dialog" aria-modal="true" aria-labelledby="cancel-order-dialog-title">
+            <div className="recipientDialogHeader">
+              <h2 id="cancel-order-dialog-title">
+                Cancel {orderToCancel.sellTokenSymbol} to {orderToCancel.buyTokenSymbol}?
+              </h2>
+              <button
+                className="recipientDialogClose"
+                type="button"
+                aria-label="Close cancellation dialog"
+                onClick={() => setOrderToCancel(null)}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="recipientDialogBody">
+              <p className="small">
+                If this order has already reached the order service, your wallet may ask you to approve the
+                cancellation. Network gas may apply. An order already being filled can still complete before
+                cancellation takes effect.
+              </p>
+              <div className="recipientDialogActions">
+                <button className="btn" type="button" onClick={() => setOrderToCancel(null)}>
+                  Keep Order
+                </button>
+                <button
+                  className="btn btnDanger"
+                  type="button"
+                  onClick={() => {
+                    const selectedOrder = orderToCancel;
+                    setOrderToCancel(null);
+                    void cancelSavedLimitOrder(selectedOrder);
+                  }}
+                >
+                  Continue Cancellation
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -1746,7 +1925,8 @@ async function signTypedData(
   provider: Eip1193Provider,
   walletAddress: string,
   typedData: unknown,
-  providerKind: ProviderKind
+  providerKind: ProviderKind,
+  timeoutMessage = "Your wallet did not return a limit order signature."
 ): Promise<string> {
   const request = providerKind === "walletconnect"
     ? provider.request(
@@ -1758,7 +1938,7 @@ async function signTypedData(
   const signature = await requestWithTimeout(
     request,
     providerKind === "walletconnect" ? WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS : SIGNING_ATTEMPT_TIMEOUT_MS,
-    "Your wallet did not return a limit order signature."
+    timeoutMessage
   );
   if (typeof signature !== "string" || !signature.startsWith("0x")) {
     throw new Error("Wallet did not return a valid limit order signature.");
@@ -1890,12 +2070,37 @@ function limitOrderStatusMessage(order: LimitOrderRecord): string {
   return "Your signed order is saved and will be submitted automatically when the order service is available.";
 }
 
+function cancellationStatusMessage(order: LimitOrderRecord): string {
+  if (order.executionStatus === "cancelled") {
+    return "Your limit order is cancelled.";
+  }
+  if (order.executionStatus === "cancellation_pending") {
+    return "Cancellation was sent and is being confirmed. The order can still fill until the provider confirms it.";
+  }
+  if (order.executionStatus === "filled") {
+    return "This order filled before cancellation took effect.";
+  }
+  return "The order changed while cancellation was being processed. Review its latest status.";
+}
+
+function canCancelLimitOrder(order: LimitOrderRecord): boolean {
+  if (order.executionStatus === "failed") return !order.providerOrderId;
+  return [
+    "stored",
+    "pending_submission",
+    "submitted",
+    "open",
+    "partially_filled"
+  ].includes(order.executionStatus);
+}
+
 function formatOrderTarget(order: LimitOrderRecord): string {
   return `target ${order.targetRate} ${order.buyTokenSymbol} per ${order.sellTokenSymbol}`;
 }
 
 function formatOrderStatus(status: string): string {
-  return status.replaceAll("_", " ");
+  const label = status.replaceAll("_", " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function formatExecutionProvider(provider: string): string {

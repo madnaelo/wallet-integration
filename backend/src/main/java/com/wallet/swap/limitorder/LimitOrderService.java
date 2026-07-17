@@ -25,10 +25,6 @@ public class LimitOrderService {
   private static final String COW_EMPTY_APP_DATA_HASH =
       "0xb48d38f93eaa084033fc5970bf96e559c33c4cdc07d889ab00b4d63f9590739d";
   private static final Duration MAX_ORDER_LIFETIME = Duration.ofDays(7);
-  private static final BigInteger UINT_40_MASK = BigInteger.ONE.shiftLeft(40).subtract(BigInteger.ONE);
-  private static final BigInteger UINT_80_MASK = BigInteger.ONE.shiftLeft(80).subtract(BigInteger.ONE);
-  private static final BigInteger UINT_256_MASK = BigInteger.ONE.shiftLeft(256).subtract(BigInteger.ONE);
-  private static final BigInteger ONEINCH_SAFE_HIGH_BITS = BigInteger.ONE.shiftLeft(255);
   private static final List<Eip712Field> DOMAIN_FIELDS = List.of(
       new Eip712Field("name", "string"),
       new Eip712Field("version", "string"),
@@ -258,7 +254,7 @@ public class LimitOrderService {
         "Signed order verification contract is not supported.");
     requireSameText(domain.path("name").asText(""), "1inch Aggregation Router", "Signed order domain is not supported.");
     requireSameText(domain.path("version").asText(""), "6", "Signed order domain version is not supported.");
-    validateOneInchTraits(data.path("makerTraits").asText(""), request.expiresAt());
+    OneInchMakerTraitsValidator.validate(data.path("makerTraits").asText(""), request.expiresAt());
   }
 
   private void validateCowPayload(
@@ -311,32 +307,6 @@ public class LimitOrderService {
         "Signed order verification contract is not supported.");
     requireSameText(domain.path("name").asText(""), "Gnosis Protocol", "Signed order domain is not supported.");
     requireSameText(domain.path("version").asText(""), "v2", "Signed order domain version is not supported.");
-  }
-
-  private void validateOneInchTraits(String makerTraits, Instant expiresAt) {
-    try {
-      BigInteger traits = new BigInteger(makerTraits);
-      if (traits.signum() < 0 || traits.bitLength() > 256) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "Signed order settings are invalid.");
-      }
-      long signedExpiration = traits.shiftRight(80).and(UINT_40_MASK).longValueExact();
-      if (signedExpiration != expiresAt.getEpochSecond()) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "Signed order expiry does not match.");
-      }
-      if (traits.and(UINT_80_MASK).signum() != 0
-          || traits.shiftRight(160).and(UINT_40_MASK).signum() != 0) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "Signed order restrictions are not supported.");
-      }
-      BigInteger lowBits = BigInteger.ONE.shiftLeft(200).subtract(BigInteger.ONE);
-      BigInteger highBits = traits.and(UINT_256_MASK.xor(lowBits));
-      if (!highBits.equals(ONEINCH_SAFE_HIGH_BITS)) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "Signed order settings are not supported.");
-      }
-    } catch (ApiException exception) {
-      throw exception;
-    } catch (Exception exception) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Signed order expiry is invalid.");
-    }
   }
 
   private void requireTypeSchema(

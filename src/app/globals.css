@@ -298,10 +298,34 @@ body {
   padding: 10px 12px;
 }
 
-.limitOrderItem > div {
+.limitOrderItemDetails {
   display: grid;
   gap: 3px;
   min-width: 0;
+}
+
+.limitOrderItemActions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.limitOrderCancelButton {
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+@media (max-width: 640px) {
+  .limitOrderItem {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .limitOrderItemActions {
+    justify-content: space-between;
+  }
 }
 
 .limitOrderHero {
@@ -1531,6 +1555,19 @@ body {
 .btnPrimary {
   background: rgba(110, 168, 254, 0.35);
   border-color: rgba(110, 168, 254, 0.55);
+}
+
+.btnDanger {
+  background: rgba(255, 107, 107, 0.14);
+  border-color: rgba(255, 107, 107, 0.48);
+  color: #ffd7d7;
+}
+
+.btnDanger:hover,
+.btnDanger:focus-visible {
+  background: rgba(255, 107, 107, 0.22);
+  border-color: rgba(255, 107, 107, 0.72);
+  outline: none;
 }
 
 .quoteButtonWrap {
