@@ -89,20 +89,6 @@ export type PushSubscriptionPayload = {
   expirationTime?: number | null;
 };
 
-export type PushDiagnosticEntryPayload = {
-  time: string;
-  stage: string;
-  status: "info" | "success" | "error";
-  detail: string;
-};
-
-export type PushDiagnosticReportPayload = {
-  attemptId: string;
-  result: string;
-  location: string;
-  entries: PushDiagnosticEntryPayload[];
-};
-
 export type FeatureFlags = {
   autoSwapEnabled: boolean;
   priceAlertsEnabled: boolean;
@@ -399,18 +385,6 @@ export async function getPushSubscriptionStatus(
     method: "POST",
     headers: authHeaders(session),
     body: endpoint ? JSON.stringify({ endpoint }) : undefined
-  });
-}
-
-export async function submitPushDiagnostics(
-  backendBaseUrl: string,
-  session: BackendSession,
-  report: PushDiagnosticReportPayload
-): Promise<void> {
-  await backendFetch<Record<string, never>>(backendBaseUrl, "/api/notifications/preferences/push-diagnostics", {
-    method: "POST",
-    headers: authHeaders(session),
-    body: JSON.stringify(report)
   });
 }
 

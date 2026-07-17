@@ -8,6 +8,7 @@ import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusResponse;
 import java.net.URI;
+import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -78,12 +79,28 @@ public class PushSubscriptionService {
   private void validateEndpoint(String endpointValue) {
     try {
       URI endpoint = URI.create(endpointValue.trim());
-      if (!"https".equalsIgnoreCase(endpoint.getScheme())) {
+      String host = endpoint.getHost();
+      if (!"https".equalsIgnoreCase(endpoint.getScheme())
+          || host == null
+          || endpoint.getUserInfo() != null
+          || endpoint.getFragment() != null
+          || (endpoint.getPort() != -1 && endpoint.getPort() != 443)
+          || !isAllowedPushServiceHost(host)) {
         throw new ApiException(HttpStatus.BAD_REQUEST, "Push notification setup was incomplete. Please try again.");
       }
     } catch (IllegalArgumentException exception) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Push notification setup was incomplete. Please try again.");
     }
+  }
+
+  private boolean isAllowedPushServiceHost(String endpointHost) {
+    String host = endpointHost.toLowerCase(Locale.ROOT);
+    return properties.getPush().getAllowedEndpointHosts().stream()
+        .map(value -> value == null ? "" : value.trim().toLowerCase(Locale.ROOT))
+        .filter(value -> !value.isBlank())
+        .anyMatch(value -> value.startsWith(".")
+            ? host.length() > value.length() && host.endsWith(value)
+            : host.equals(value));
   }
 
   private boolean hasText(String value) {

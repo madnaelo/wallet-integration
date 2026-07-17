@@ -54,18 +54,6 @@ public final class NotificationModels {
       boolean linked,
       int walletSubscriptionCount) {}
 
-  public record PushDiagnosticReport(
-      @Size(max = 64) String attemptId,
-      @Size(max = 128) String result,
-      @Size(max = 2048) String location,
-      @Valid java.util.List<PushDiagnosticEntry> entries) {}
-
-  public record PushDiagnosticEntry(
-      @Size(max = 64) String time,
-      @Size(max = 64) String stage,
-      @Size(max = 16) String status,
-      @Size(max = 2000) String detail) {}
-
   public record PushSubscriptionKeys(
       @NotBlank @Size(max = 512) String p256dh,
       @NotBlank @Size(max = 256) String auth) {}

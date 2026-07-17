@@ -2440,55 +2440,6 @@ body {
   margin-top: 4px;
 }
 
-.pushDiagnostics {
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-top: 4px;
-  padding: 8px 10px;
-}
-
-.pushDiagnostics summary {
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.pushDiagnosticsList {
-  display: grid;
-  gap: 7px;
-  margin-top: 8px;
-}
-
-.pushDiagnosticItem {
-  display: grid;
-  gap: 2px;
-}
-
-.pushDiagnosticItem span {
-  color: var(--text);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.pushDiagnosticItem code {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.pushDiagnosticsuccess span {
-  color: #53dd9e;
-}
-
-.pushDiagnosticerror span {
-  color: #ff7a90;
-}
-
 .inlineCheck {
   align-items: center;
   color: var(--text);

@@ -277,10 +277,17 @@ public class NotificationProperties {
   }
 
   public static class Push {
+    private static final List<String> DEFAULT_ALLOWED_ENDPOINT_HOSTS = List.of(
+        "fcm.googleapis.com",
+        "updates.push.services.mozilla.com",
+        "web.push.apple.com",
+        ".notify.windows.com");
+
     private boolean enabled = false;
     private String vapidPublicKey = "";
     private String vapidPrivateKey = "";
     private String vapidSubject = "mailto:alerts@swapassistant.app";
+    private List<String> allowedEndpointHosts = DEFAULT_ALLOWED_ENDPOINT_HOSTS;
 
     public boolean isEnabled() {
       return enabled;
@@ -315,6 +322,16 @@ public class NotificationProperties {
       this.vapidSubject = "mailto:alerts@thewallet.app".equalsIgnoreCase(normalized)
           ? "mailto:alerts@swapassistant.app"
           : normalized;
+    }
+
+    public List<String> getAllowedEndpointHosts() {
+      return allowedEndpointHosts;
+    }
+
+    public void setAllowedEndpointHosts(List<String> allowedEndpointHosts) {
+      this.allowedEndpointHosts = allowedEndpointHosts == null || allowedEndpointHosts.isEmpty()
+          ? DEFAULT_ALLOWED_ENDPOINT_HOSTS
+          : List.copyOf(allowedEndpointHosts);
     }
   }
 }
