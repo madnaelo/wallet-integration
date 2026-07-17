@@ -90,8 +90,8 @@ export class OdosClient implements DexAggregatorClient {
         userAddr: params.takerAddress,
         ...(this.cfg.platformFee.enabled
           ? {
-              partnerFeePercent: this.cfg.platformFee.feeFraction,
-              feeRecipient: this.cfg.platformFee.recipient
+              referralFee: this.cfg.platformFee.feeFraction,
+              referralFeeRecipient: this.cfg.platformFee.recipient
             }
           : {}),
         compact: true

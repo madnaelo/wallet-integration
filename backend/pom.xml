@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.5.14</version>
+    <version>3.5.15</version>
     <relativePath />
   </parent>
 
@@ -24,7 +24,7 @@
     <postgresql.version>42.7.11</postgresql.version>
     <httpclient.version>4.5.14</httpclient.version>
     <jose4j.version>0.9.6</jose4j.version>
-    <netty.version>4.1.133.Final</netty.version>
+    <netty.version>4.1.136.Final</netty.version>
     <tomcat.version>10.1.55</tomcat.version>
     <web3j.version>4.12.3</web3j.version>
     <webpush.version>5.1.2</webpush.version>

@@ -10,7 +10,9 @@ RUN mvn -q -DskipTests package
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-RUN addgroup -S app && adduser -S app -G app
+RUN apk upgrade --no-cache \
+  && addgroup -S app \
+  && adduser -S app -G app
 COPY --from=build /app/target/swap-backend-*.jar /app/swap-backend.jar
 
 USER app
