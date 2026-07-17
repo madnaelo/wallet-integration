@@ -11,7 +11,9 @@ import static org.mockito.Mockito.when;
 import com.wallet.swap.auth.AuthModels.VerifyResponse;
 import com.wallet.swap.config.AuthProperties;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,35 +28,68 @@ class AuthServiceTest {
 
   @Test
   void locksAndConsumesNonceInsideTransactionalVerification() throws Exception {
+    UUID nonceId = UUID.randomUUID();
     Instant expiresAt = Instant.now().plusSeconds(300);
-    AuthRepository.StoredNonce nonce = new AuthRepository.StoredNonce("nonce", "message", expiresAt);
-    when(repository.findNonceForUpdate(WALLET)).thenReturn(Optional.of(nonce));
+    AuthRepository.StoredNonce nonce = new AuthRepository.StoredNonce(nonceId, "nonce", "message", expiresAt);
+    when(repository.findNonceForUpdate(nonceId, WALLET)).thenReturn(Optional.of(nonce));
     when(signatureVerifier.verifySignedMessage(WALLET, nonce.message(), "signature")).thenReturn(true);
     when(tokenHasher.sha256(any())).thenReturn("token-hash");
 
-    VerifyResponse response = service.verify(WALLET, "signature");
+    VerifyResponse response = service.verify(nonceId, WALLET, "signature");
 
     assertThat(response.walletAddress()).isEqualTo(WALLET);
-    verify(repository).findNonceForUpdate(WALLET);
+    verify(repository).findNonceForUpdate(nonceId, WALLET);
     verify(repository).saveSession(any(), eq(WALLET), eq("token-hash"), any());
-    verify(repository).deleteNonce(WALLET);
+    verify(repository).deleteNonce(nonceId, WALLET);
     verify(repository).markLastLogin(WALLET);
-    assertThat(AuthService.class.getMethod("verify", String.class, String.class)
+    assertThat(AuthService.class.getMethod("verify", UUID.class, String.class, String.class)
         .isAnnotationPresent(Transactional.class)).isTrue();
   }
 
   @Test
   void expiredNonceIsDeletedWithoutCreatingSession() {
+    UUID nonceId = UUID.randomUUID();
     AuthRepository.StoredNonce nonce = new AuthRepository.StoredNonce(
+        nonceId,
         "nonce",
         "message",
         Instant.now().minusSeconds(1));
-    when(repository.findNonceForUpdate(WALLET)).thenReturn(Optional.of(nonce));
+    when(repository.findNonceForUpdate(nonceId, WALLET)).thenReturn(Optional.of(nonce));
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.verify(WALLET, "signature"))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.verify(nonceId, WALLET, "signature"))
         .hasMessageContaining("expired");
 
-    verify(repository).deleteNonce(WALLET);
+    verify(repository).deleteNonce(nonceId, WALLET);
     verify(repository, never()).saveSession(any(), any(), any(), any());
+  }
+
+  @Test
+  void createsIndependentBoundedNonceRequests() throws Exception {
+    var response = service.createNonce(WALLET);
+
+    assertThat(response.nonceId()).isNotNull();
+    verify(repository).lockUserForNonce(WALLET);
+    verify(repository).saveNonce(eq(response.nonceId()), eq(WALLET), any(), eq(response.message()), eq(response.expiresAt()));
+    verify(repository).pruneWalletNonces(WALLET, 5);
+    assertThat(AuthService.class.getMethod("createNonce", String.class)
+        .isAnnotationPresent(Transactional.class)).isTrue();
+  }
+
+  @Test
+  void supportsSignedMessagesCreatedByAnAlreadyOpenClient() {
+    UUID nonceId = UUID.randomUUID();
+    AuthRepository.StoredNonce nonce = new AuthRepository.StoredNonce(
+        nonceId,
+        "nonce",
+        "message",
+        Instant.now().plusSeconds(300));
+    when(repository.findWalletNoncesForUpdate(WALLET)).thenReturn(List.of(nonce));
+    when(signatureVerifier.verifySignedMessage(WALLET, nonce.message(), "signature")).thenReturn(true);
+    when(tokenHasher.sha256(any())).thenReturn("token-hash");
+
+    VerifyResponse response = service.verify(null, WALLET, "signature");
+
+    assertThat(response.walletAddress()).isEqualTo(WALLET);
+    verify(repository).deleteNonce(nonceId, WALLET);
   }
 }

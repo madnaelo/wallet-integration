@@ -1281,7 +1281,12 @@ export default function Page() {
           connectedWalletName
         );
         setAuthNotice("Thanks. Loading your saved data...");
-        const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, walletAddress, signature);
+        const session = await verifyAuthSignature(
+          envPublic.BACKEND_BASE_URL,
+          walletAddress,
+          nonce.nonceId,
+          signature
+        );
         writeStoredBackendSession(session);
         setBackendSession(session);
         return session;

@@ -739,7 +739,7 @@ export default function LimitOrdersPage() {
       const nonce = await requestAuthNonce(envPublic.BACKEND_BASE_URL, address);
       setOrderNotice(`Open ${walletName} and approve sign-in. This only proves the wallet is yours.`);
       const signature = await signMessage(walletProvider, address, nonce.message, providerKind);
-      const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, address, signature);
+      const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, address, nonce.nonceId, signature);
       writeStoredBackendSession(session);
       setBackendSession(session);
       return session;

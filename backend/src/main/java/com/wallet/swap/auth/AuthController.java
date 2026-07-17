@@ -30,7 +30,7 @@ public class AuthController {
 
   @PostMapping("/verify")
   public VerifyResponse verify(@Valid @RequestBody VerifyRequest request, HttpServletResponse response) {
-    VerifyResponse session = authService.verify(request.walletAddress(), request.signature());
+    VerifyResponse session = authService.verify(request.nonceId(), request.walletAddress(), request.signature());
     response.addHeader(HttpHeaders.SET_COOKIE, authService.sessionCookie(session.accessToken(), session.expiresAt()).toString());
     return authService.clientVerifyResponse(session);
   }

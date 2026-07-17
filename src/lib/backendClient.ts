@@ -7,6 +7,7 @@ export type BackendSession = {
 };
 
 export type AuthNonceResponse = {
+  nonceId: string;
   walletAddress: string;
   nonce: string;
   message: string;
@@ -278,11 +279,12 @@ export async function requestAuthNonce(backendBaseUrl: string, walletAddress: st
 export async function verifyAuthSignature(
   backendBaseUrl: string,
   walletAddress: string,
+  nonceId: string,
   signature: string
 ): Promise<BackendSession> {
   return backendFetch<BackendSession>(backendBaseUrl, "/api/auth/verify", {
     method: "POST",
-    body: JSON.stringify({ walletAddress, signature })
+    body: JSON.stringify({ nonceId, walletAddress, signature })
   });
 }
 

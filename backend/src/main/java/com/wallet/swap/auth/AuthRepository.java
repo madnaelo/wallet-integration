@@ -2,6 +2,7 @@ package com.wallet.swap.auth;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -25,38 +26,78 @@ public class AuthRepository {
         walletAddress);
   }
 
-  public void saveNonce(String walletAddress, String nonce, String message, Instant expiresAt) {
+  public void lockUserForNonce(String walletAddress) {
+    jdbcTemplate.queryForObject(
+        "SELECT wallet_address FROM wallet_users WHERE wallet_address = ? FOR UPDATE",
+        String.class,
+        walletAddress);
+  }
+
+  public void saveNonce(UUID id, String walletAddress, String nonce, String message, Instant expiresAt) {
     jdbcTemplate.update(
         """
-        INSERT INTO wallet_nonces (wallet_address, nonce, message, expires_at, created_at)
-        VALUES (?, ?, ?, ?, now())
-        ON CONFLICT (wallet_address)
-        DO UPDATE SET nonce = EXCLUDED.nonce,
-          message = EXCLUDED.message,
-          expires_at = EXCLUDED.expires_at,
-          created_at = now()
+        INSERT INTO wallet_nonces (id, wallet_address, nonce, message, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ?, now())
         """,
+        id,
         walletAddress,
         nonce,
         message,
         Timestamp.from(expiresAt));
   }
 
-  public Optional<StoredNonce> findNonceForUpdate(String walletAddress) {
+  public void pruneWalletNonces(String walletAddress, int keepCount) {
+    jdbcTemplate.update(
+        """
+        DELETE FROM wallet_nonces
+        WHERE wallet_address = ?
+          AND id NOT IN (
+            SELECT id
+            FROM wallet_nonces
+            WHERE wallet_address = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+          )
+        """,
+        walletAddress,
+        walletAddress,
+        keepCount);
+  }
+
+  public Optional<StoredNonce> findNonceForUpdate(UUID id, String walletAddress) {
     return jdbcTemplate.query(
-        "SELECT nonce, message, expires_at FROM wallet_nonces WHERE wallet_address = ? FOR UPDATE",
+        "SELECT id, nonce, message, expires_at FROM wallet_nonces WHERE id = ? AND wallet_address = ? FOR UPDATE",
         rs -> {
           if (!rs.next()) return Optional.empty();
           return Optional.of(new StoredNonce(
+              rs.getObject("id", UUID.class),
               rs.getString("nonce"),
               rs.getString("message"),
               rs.getTimestamp("expires_at").toInstant()));
         },
+        id,
         walletAddress);
   }
 
-  public void deleteNonce(String walletAddress) {
-    jdbcTemplate.update("DELETE FROM wallet_nonces WHERE wallet_address = ?", walletAddress);
+  public List<StoredNonce> findWalletNoncesForUpdate(String walletAddress) {
+    return jdbcTemplate.query(
+        """
+        SELECT id, nonce, message, expires_at
+        FROM wallet_nonces
+        WHERE wallet_address = ?
+        ORDER BY created_at DESC, id DESC
+        FOR UPDATE
+        """,
+        (rs, rowNum) -> new StoredNonce(
+            rs.getObject("id", UUID.class),
+            rs.getString("nonce"),
+            rs.getString("message"),
+            rs.getTimestamp("expires_at").toInstant()),
+        walletAddress);
+  }
+
+  public void deleteNonce(UUID id, String walletAddress) {
+    jdbcTemplate.update("DELETE FROM wallet_nonces WHERE id = ? AND wallet_address = ?", id, walletAddress);
   }
 
   public void saveSession(UUID id, String walletAddress, String tokenHash, Instant expiresAt) {
@@ -99,5 +140,5 @@ public class AuthRepository {
     jdbcTemplate.update("UPDATE wallet_users SET last_login_at = now() WHERE wallet_address = ?", walletAddress);
   }
 
-  public record StoredNonce(String nonce, String message, Instant expiresAt) {}
+  public record StoredNonce(UUID id, String nonce, String message, Instant expiresAt) {}
 }

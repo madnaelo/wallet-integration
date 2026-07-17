@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.ResponseCookie;
@@ -39,37 +40,56 @@ public class AuthService {
     this.tokenHasher = tokenHasher;
   }
 
+  @Transactional
   public NonceResponse createNonce(String rawWalletAddress) {
     String walletAddress = normalizeOrBadRequest(rawWalletAddress);
+    UUID nonceId = UUID.randomUUID();
     String nonce = secureToken(24);
     Instant expiresAt = Instant.now().plus(authProperties.getNonceTtlMinutes(), ChronoUnit.MINUTES);
-    String message = buildSignInMessage(walletAddress, nonce, expiresAt);
+    String message = buildSignInMessage(nonceId, walletAddress, nonce, expiresAt);
 
     authRepository.upsertUser(walletAddress);
-    authRepository.saveNonce(walletAddress, nonce, message, expiresAt);
+    authRepository.lockUserForNonce(walletAddress);
+    authRepository.saveNonce(nonceId, walletAddress, nonce, message, expiresAt);
+    authRepository.pruneWalletNonces(walletAddress, 5);
 
-    return new NonceResponse(walletAddress, nonce, message, expiresAt);
+    return new NonceResponse(nonceId, walletAddress, nonce, message, expiresAt);
   }
 
-  @Transactional
-  public VerifyResponse verify(String rawWalletAddress, String signature) {
+  @Transactional(noRollbackFor = ApiException.class)
+  public VerifyResponse verify(UUID nonceId, String rawWalletAddress, String signature) {
     String walletAddress = normalizeOrBadRequest(rawWalletAddress);
-    AuthRepository.StoredNonce storedNonce = authRepository.findNonceForUpdate(walletAddress)
-        .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "No active sign-in nonce for this wallet."));
+    List<AuthRepository.StoredNonce> candidates = nonceId == null
+        ? authRepository.findWalletNoncesForUpdate(walletAddress)
+        : authRepository.findNonceForUpdate(nonceId, walletAddress).map(List::of).orElseGet(List::of);
+    if (candidates.isEmpty()) {
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "No active sign-in nonce for this wallet.");
+    }
 
-    if (storedNonce.expiresAt().isBefore(Instant.now())) {
-      authRepository.deleteNonce(walletAddress);
+    Instant now = Instant.now();
+    candidates.stream()
+        .filter(candidate -> !candidate.expiresAt().isAfter(now))
+        .forEach(candidate -> authRepository.deleteNonce(candidate.id(), walletAddress));
+
+    List<AuthRepository.StoredNonce> activeCandidates = candidates.stream()
+        .filter(candidate -> candidate.expiresAt().isAfter(now))
+        .toList();
+    if (activeCandidates.isEmpty()) {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "Sign-in nonce expired. Request a new one.");
     }
 
-    if (!signatureVerifier.verifySignedMessage(walletAddress, storedNonce.message(), signature)) {
+    AuthRepository.StoredNonce storedNonce = activeCandidates.stream()
+        .filter(candidate -> signatureVerifier.verifySignedMessage(walletAddress, candidate.message(), signature))
+        .findFirst()
+        .orElse(null);
+    if (storedNonce == null) {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "Wallet signature could not be verified.");
     }
 
     String accessToken = secureToken(48);
     Instant sessionExpiresAt = Instant.now().plus(authProperties.getSessionTtlHours(), ChronoUnit.HOURS);
     authRepository.saveSession(UUID.randomUUID(), walletAddress, tokenHasher.sha256(accessToken), sessionExpiresAt);
-    authRepository.deleteNonce(walletAddress);
+    authRepository.deleteNonce(storedNonce.id(), walletAddress);
     authRepository.markLastLogin(walletAddress);
 
     return new VerifyResponse(walletAddress, accessToken, sessionExpiresAt);
@@ -152,7 +172,7 @@ public class AuthService {
     }
   }
 
-  private String buildSignInMessage(String walletAddress, String nonce, Instant expiresAt) {
+  private String buildSignInMessage(UUID nonceId, String walletAddress, String nonce, Instant expiresAt) {
     return """
         Sign in to Swap Assistant.
 
@@ -161,12 +181,14 @@ public class AuthService {
 
         Domain: %s
         URI: %s
+        Request ID: %s
         Nonce: %s
         Expires: %s
         """.formatted(
         walletAddress,
         nonBlank(authProperties.getSigningDomain(), "localhost:3000"),
         nonBlank(authProperties.getSigningUri(), "http://localhost:3000"),
+        nonceId,
         nonce,
         expiresAt);
   }
