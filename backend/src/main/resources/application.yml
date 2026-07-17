@@ -16,6 +16,10 @@ server:
       max: ${SERVER_MAX_THREADS:100}
       min-spare: ${SERVER_MIN_SPARE_THREADS:10}
 
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [requestId=%X{requestId:-}] %logger{36} - %msg%n"
+
 spring:
   config:
     import:

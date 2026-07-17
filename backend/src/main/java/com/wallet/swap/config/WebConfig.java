@@ -34,7 +34,8 @@ public class WebConfig implements WebMvcConfigurer {
       registry.addMapping("/api/**")
           .allowedOriginPatterns("*")
           .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-          .allowedHeaders("Authorization", "Content-Type", "X-Admin-Key")
+          .allowedHeaders("Authorization", "Content-Type", "X-Admin-Key", RequestCorrelationFilter.HEADER_NAME)
+          .exposedHeaders(RequestCorrelationFilter.HEADER_NAME)
           .allowCredentials(false)
           .maxAge(3600);
       return;
@@ -43,7 +44,8 @@ public class WebConfig implements WebMvcConfigurer {
     registry.addMapping("/api/**")
         .allowedOrigins(origins.toArray(String[]::new))
         .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-        .allowedHeaders("Authorization", "Content-Type", "X-Admin-Key")
+        .allowedHeaders("Authorization", "Content-Type", "X-Admin-Key", RequestCorrelationFilter.HEADER_NAME)
+        .exposedHeaders(RequestCorrelationFilter.HEADER_NAME)
         .allowCredentials(true)
         .maxAge(3600);
   }

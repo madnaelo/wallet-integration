@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class ApiRequestGuardFilter extends OncePerRequestFilter {
   private static final String APPLICATION_JSON = "application/json";
 
