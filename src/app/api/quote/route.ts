@@ -10,6 +10,7 @@ import { createNativeBitcoinQuoteClient, createQuoteClient } from "@/lib/server/
 import { getProviderErrorStatus } from "@/lib/server/quoteNormalization";
 import { isNativeBitcoinToken, type TokenInfo } from "@/lib/tokens";
 import { getTokensForChain } from "@/lib/server/tokenRegistry";
+import { parseQuoteSlippageBps } from "@/lib/server/quoteRequestValidation";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const corsOrigin = req.headers.get("origin");
   if (!isOriginAllowed(corsOrigin)) {
-    return NextResponse.json({ error: "CORS origin not allowed." }, { status: 403 });
+    return withCors(NextResponse.json({ error: "Request origin not allowed." }, { status: 403 }), corsOrigin);
   }
 
   const rl = await rateLimit(ip);
@@ -128,16 +129,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  let slippageBps: number | undefined;
-  if (slippageBpsStr) {
-    if (!/^\d+$/.test(slippageBpsStr)) {
-      return withCors(NextResponse.json({ error: "Invalid slippageBps." }, { status: 400 }), corsOrigin);
-    }
-    slippageBps = Number(slippageBpsStr);
-    if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps > 10_000) {
-      return withCors(NextResponse.json({ error: "slippageBps must be between 0 and 10000." }, { status: 400 }), corsOrigin);
-    }
+  const slippage = parseQuoteSlippageBps(slippageBpsStr);
+  if (!slippage.valid) {
+    return withCors(NextResponse.json({ error: slippage.error }, { status: 400 }), corsOrigin);
   }
+  const slippageBps = slippage.value;
 
   const chain = getChainById(chainId);
   if (!chain) {
@@ -241,5 +237,7 @@ function withCors(res: NextResponse, origin: string | null) {
   }
   res.headers.set("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.headers.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  res.headers.set("Cache-Control", "private, no-store, max-age=0");
+  res.headers.set("Pragma", "no-cache");
   return res;
 }
