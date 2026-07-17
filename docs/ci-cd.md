@@ -115,11 +115,14 @@ never placed in the remote command line.
 
 `OCI_BACKEND_ENV` is the full contents of `infra/oci-backend.env.example` with
 real production values. Keep `APP_ENVIRONMENT=production`,
-`API_RATE_LIMIT_KEY_PEPPER` and `ADMIN_API_KEY` as independent long
-random secrets, `AUTH_SESSION_COOKIE_SECURE=true`,
+`ADMIN_API_KEY` as a long random secret, `AUTH_SESSION_COOKIE_SECURE=true`,
 `AUTH_SESSION_COOKIE_SAME_SITE=Lax`, and
 `AUTH_EXPOSE_ACCESS_TOKEN=false`. The frontend proxies backend calls through
 `/backend`, so the browser uses a Secure, HttpOnly first-party cookie.
+The release workflow derives `API_RATE_LIMIT_KEY_PEPPER` with HMAC-SHA256
+from `ADMIN_API_KEY` and a versioned domain label. This produces a stable,
+cryptographically separated backend key without storing or logging another
+deploy secret.
 For push notifications, set
 `PUSH_NOTIFICATIONS_ENABLED=true`, `PUSH_VAPID_PUBLIC_KEY`,
 `PUSH_VAPID_PRIVATE_KEY`, and `PUSH_VAPID_SUBJECT`. For Limit Orders, also set

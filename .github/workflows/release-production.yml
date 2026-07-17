@@ -289,6 +289,26 @@ jobs:
           )
           backend_env_file="$(mktemp)"
           trap 'rm -f "$backend_env_file"' EXIT
+          admin_api_key="$(
+            printf '%s\n' "$OCI_BACKEND_ENV" |
+              awk '
+                index($0, "ADMIN_API_KEY=") == 1 {
+                  value = substr($0, length("ADMIN_API_KEY=") + 1)
+                  sub(/\r$/, "", value)
+                }
+                END { print value }
+              '
+          )"
+          if [ "${#admin_api_key}" -lt 32 ]; then
+            echo "OCI_BACKEND_ENV must contain a strong ADMIN_API_KEY." >&2
+            exit 1
+          fi
+          rate_limit_key_pepper="$(
+            printf '%s' "$admin_api_key" |
+              python3 -c 'import base64, hashlib, hmac, sys; key = sys.stdin.buffer.read(); digest = hmac.new(key, b"swap-assistant/api-rate-limit-key/v1", hashlib.sha256).digest(); print(base64.urlsafe_b64encode(digest).rstrip(b"=").decode())'
+          )"
+          unset admin_api_key
+          echo "::add-mask::$rate_limit_key_pepper"
           for name in ONEINCH_API_KEY COW_API_KEY; do
             value="${!name:-}"
             if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
@@ -319,6 +339,7 @@ jobs:
             printf 'AUTH_SESSION_COOKIE_SAME_SITE=Lax\n'
             printf 'AUTH_SESSION_COOKIE_SECURE=true\n'
             printf 'AUTH_EXPOSE_ACCESS_TOKEN=false\n'
+            printf 'API_RATE_LIMIT_KEY_PEPPER=%s\n' "$rate_limit_key_pepper"
             printf 'LIMIT_ORDERS_DEFAULT_ENABLED=true\n'
             printf 'ONEINCH_API_KEY=%s\n' "$ONEINCH_API_KEY"
             printf 'ONEINCH_ORDERBOOK_BASE_URL=https://api.1inch.com/orderbook/v4.1\n'
