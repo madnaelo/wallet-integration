@@ -19,6 +19,51 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
+  repository-quality:
+    name: Repository Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Lint GitHub Actions workflows
+        run: >-
+          docker run --rm
+          -v "$PWD:/repo:ro"
+          -w /repo
+          rhysd/actionlint@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9
+
+      - name: Lint shell scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(git ls-files '*.sh')
+          if (( ${#scripts[@]} == 0 )); then
+            echo "No shell scripts found." >&2
+            exit 1
+          fi
+
+          mounted_scripts=()
+          for script in "${scripts[@]}"; do
+            mounted_scripts+=("/repo/$script")
+          done
+
+          docker run --rm \
+            -v "$PWD:/repo:ro" \
+            koalaman/shellcheck-alpine@sha256:5921d946dac740cbeec2fb1c898747b6105e585130cc7f0602eec9a10f7ddb63 \
+            shellcheck "${mounted_scripts[@]}"
+
+      - name: Lint Dockerfiles
+        run: >-
+          docker run --rm
+          -v "$PWD:/repo:ro"
+          hadolint/hadolint@sha256:3c206a451cec6d486367e758645269fd7d696c5ccb6ff59d8b03b0e45268a199
+          /bin/hadolint
+          --failure-threshold warning
+          /repo/Dockerfile.frontend
+          /repo/backend/Dockerfile
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
