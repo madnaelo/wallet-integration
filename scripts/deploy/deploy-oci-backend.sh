@@ -154,10 +154,12 @@ container_is_running() {
 }
 
 container_has_network() {
-  # The container engine expands this Go template, not the shell.
-  # shellcheck disable=SC2016
-  run_container inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$1" 2>/dev/null \
-    | grep -Fxq "$2"
+  local container_id
+  local network_inspect
+  container_id="$(run_container inspect -f '{{.Id}}' "$1" 2>/dev/null || true)"
+  [ -n "$container_id" ] || return 1
+  network_inspect="$(run_container network inspect "$2" 2>/dev/null || true)"
+  [[ "$network_inspect" == *"$container_id"* ]]
 }
 
 container_label() {
