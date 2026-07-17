@@ -18,19 +18,34 @@ if [ -z "${NEXT_PUBLIC_COMMIT_TIMESTAMP:-}" ]; then
 fi
 export NEXT_PUBLIC_COMMIT_TIMESTAMP
 
-if [ -n "${VERCEL_TOKEN:-}" ] && [ -n "${VERCEL_ORG_ID:-}" ] && [ -n "${VERCEL_PROJECT_ID:-}" ]; then
-  npx --yes "vercel@$vercel_cli_version" pull --yes --environment="$environment" --token "$VERCEL_TOKEN"
-  npx --yes "vercel@$vercel_cli_version" build "${prod_flag[@]}" --token "$VERCEL_TOKEN"
-  npx --yes "vercel@$vercel_cli_version" deploy --prebuilt "${prod_flag[@]}" --token "$VERCEL_TOKEN"
-  exit 0
+missing=()
+for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+  if [ -z "${!name:-}" ]; then
+    missing+=("$name")
+  fi
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+  printf 'Missing required Vercel values: %s\n' "${missing[*]}" >&2
+  exit 1
 fi
 
-if [ -n "${VERCEL_DEPLOY_HOOK_URL:-}" ]; then
-  curl --fail --silent --show-error --retry 3 --request POST "$VERCEL_DEPLOY_HOOK_URL" >/dev/null
-  echo "Triggered Vercel deployment through deploy hook."
-  exit 0
+npx --yes "vercel@$vercel_cli_version" pull --yes --environment="$environment" --token "$VERCEL_TOKEN"
+node <<'NODE'
+const fs = require("node:fs");
+const project = JSON.parse(fs.readFileSync(".vercel/project.json", "utf8"));
+if (project.orgId !== process.env.VERCEL_ORG_ID || project.projectId !== process.env.VERCEL_PROJECT_ID) {
+  throw new Error("Vercel pull linked a different organization or project.");
+}
+NODE
+
+npx --yes "vercel@$vercel_cli_version" build "${prod_flag[@]}" --token "$VERCEL_TOKEN"
+deployment_url="$(npx --yes "vercel@$vercel_cli_version" deploy --yes --prebuilt "${prod_flag[@]}" --token "$VERCEL_TOKEN" | tail -n 1 | tr -d '\r')"
+if ! [[ "$deployment_url" =~ ^https://[A-Za-z0-9.-]+$ ]]; then
+  echo "Vercel did not return a valid deployment URL." >&2
+  exit 1
 fi
 
-echo "Set VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID for verified prebuilt deploys." >&2
-echo "VERCEL_DEPLOY_HOOK_URL remains supported only as a fallback." >&2
-exit 1
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+fi
+echo "Frontend deployed to $deployment_url"

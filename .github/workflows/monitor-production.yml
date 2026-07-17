@@ -31,6 +31,4 @@ jobs:
           ADMIN_API_KEY: ${{ secrets.PRODUCTION_ADMIN_API_KEY }}
           TELEGRAM_ALERT_BOT_TOKEN: ${{ secrets.PRODUCTION_MONITOR_TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALERT_CHAT_ID: ${{ secrets.PRODUCTION_MONITOR_TELEGRAM_CHAT_ID }}
-          EXPECTED_COMMIT: ${{ github.sha }}
-          DEPLOY_GRACE_MINUTES: "30"
         run: ./scripts/ops/check-production-health.sh

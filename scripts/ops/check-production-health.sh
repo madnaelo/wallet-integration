@@ -9,8 +9,8 @@ admin_api_key="${ADMIN_API_KEY:-}"
 telegram_alert_bot_token="${TELEGRAM_ALERT_BOT_TOKEN:-}"
 telegram_alert_chat_id="${TELEGRAM_ALERT_CHAT_ID:-}"
 telegram_base_url="${TELEGRAM_ALERT_BASE_URL:-https://api.telegram.org}"
-expected_commit="${EXPECTED_COMMIT:-$(git rev-parse HEAD 2>/dev/null || true)}"
-expected_commit_timestamp="${EXPECTED_COMMIT_TIMESTAMP:-$(git show -s --format=%ct HEAD 2>/dev/null || true)}"
+expected_commit="${EXPECTED_COMMIT:-}"
+expected_commit_timestamp="${EXPECTED_COMMIT_TIMESTAMP:-}"
 deploy_grace_minutes="${DEPLOY_GRACE_MINUTES:-30}"
 
 if ! [[ "$deploy_grace_minutes" =~ ^[0-9]+$ ]]; then
@@ -52,6 +52,8 @@ frontend_file="$tmp_dir/frontend.html"
 check_http "Frontend" "$frontend_url" "$frontend_file" || true
 
 within_deploy_grace=false
+frontend_actual_commit=""
+backend_actual_commit=""
 if [[ "$expected_commit_timestamp" =~ ^[0-9]+$ ]]; then
   commit_age_seconds="$(( $(date +%s) - expected_commit_timestamp ))"
   if [ "$commit_age_seconds" -lt "$((deploy_grace_minutes * 60))" ]; then
@@ -85,6 +87,11 @@ PY
   if [ -z "$actual_commit" ]; then
     failures+=("$name health payload has no build commit")
     return 1
+  fi
+  if [ "$name" = "Frontend" ]; then
+    frontend_actual_commit="$actual_commit"
+  elif [ "$name" = "Backend" ]; then
+    backend_actual_commit="$actual_commit"
   fi
   if [ -n "$expected_commit" ] && [ "$actual_commit" != "$expected_commit" ]; then
     if [ "$within_deploy_grace" = "true" ]; then
@@ -134,6 +141,11 @@ PY
     echo "$health_summary"
   fi
   validate_build_commit "Backend" "$health_file" || true
+fi
+
+if [ -n "$frontend_actual_commit" ] && [ -n "$backend_actual_commit" ] \
+  && [ "$frontend_actual_commit" != "$backend_actual_commit" ]; then
+  failures+=("Frontend and backend serve different commits: $frontend_actual_commit vs $backend_actual_commit")
 fi
 
 if [ -n "$admin_api_key" ] && [ -n "$admin_ops_url" ]; then

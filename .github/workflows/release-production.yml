@@ -1,0 +1,502 @@
+name: Release Production
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Full commit SHA to release; leave blank for the selected branch head
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  packages: write
+  security-events: write
+
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/wallet-backend
+
+jobs:
+  prepare:
+    name: Select verified release
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      committed_at: ${{ steps.release.outputs.committed_at }}
+    steps:
+      - name: Checkout release history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release commit
+        id: release
+        shell: bash
+        env:
+          REQUESTED_SHA: ${{ inputs.release_sha }}
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_run" ]; then
+            release_sha="$VERIFIED_SHA"
+          else
+            release_sha="${REQUESTED_SHA:-$GITHUB_SHA}"
+          fi
+
+          if ! [[ "$release_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "Release SHA must be a full 40-character commit hash." >&2
+            exit 1
+          fi
+          git cat-file -e "$release_sha^{commit}"
+
+          allowed=false
+          for branch in master main; do
+            if git show-ref --verify --quiet "refs/remotes/origin/$branch" \
+              && git merge-base --is-ancestor "$release_sha" "origin/$branch"; then
+              allowed=true
+              break
+            fi
+          done
+          if [ "$allowed" != "true" ]; then
+            echo "Release SHA must belong to master or main." >&2
+            exit 1
+          fi
+
+          release_sha="$(git rev-parse "$release_sha^{commit}")"
+          committed_at="$(git show -s --format=%cI "$release_sha")"
+          echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
+          echo "committed_at=$committed_at" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for required security checks
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          workflows=(security.yml)
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            workflows=(ci.yml security.yml)
+          fi
+
+          for workflow in "${workflows[@]}"; do
+            completed=false
+            for attempt in $(seq 1 90); do
+              state="$(gh api --method GET \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$RELEASE_SHA&event=push&per_page=1" \
+                --jq '(.workflow_runs[0].status // "") + ":" + (.workflow_runs[0].conclusion // "")')"
+              case "$state" in
+                completed:success)
+                  completed=true
+                  break
+                  ;;
+                completed:*)
+                  echo "$workflow did not pass for $RELEASE_SHA ($state)." >&2
+                  exit 1
+                  ;;
+              esac
+              echo "Waiting for $workflow on $RELEASE_SHA ($attempt/90)."
+              sleep 10
+            done
+            if [ "$completed" != "true" ]; then
+              echo "Timed out waiting for $workflow on $RELEASE_SHA." >&2
+              exit 1
+            fi
+          done
+
+  build:
+    name: Test, scan, and publish image
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Test backend
+        run: mvn -B -ntp -f backend/pom.xml clean test
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=sha-${{ needs.prepare.outputs.release_sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.release_sha }}
+
+      - name: Build image locally
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Select immutable image
+        id: image
+        run: echo "image=${REGISTRY}/${IMAGE_NAME}:sha-${{ needs.prepare.outputs.release_sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.image }}
+          scanners: vuln
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          timeout: 10m
+
+      - name: Build backend image SARIF
+        if: ${{ !github.event.repository.private || vars.CODEQL_ENABLED == 'true' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.image }}
+          scanners: vuln
+          format: sarif
+          output: trivy-backend-image.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "0"
+          ignore-unfixed: true
+          timeout: 10m
+          limit-severities-for-sarif: true
+
+      - name: Upload backend image SARIF
+        if: ${{ !github.event.repository.private || vars.CODEQL_ENABLED == 'true' }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-backend-image.sarif
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Publish scanned image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker push "${REGISTRY}/${IMAGE_NAME}:sha-${{ needs.prepare.outputs.release_sha }}"
+
+  deploy:
+    name: Deploy on OCI
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    env:
+      OCI_SSH_PORT: ${{ secrets.OCI_SSH_PORT || '22' }}
+      OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH || '/home/opc/wallet' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+
+      - name: Validate deployment secrets
+        shell: bash
+        env:
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
+          OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
+          ONEINCH_API_KEY: ${{ secrets.ONEINCH_API_KEY }}
+          COW_API_KEY: ${{ secrets.COW_API_KEY }}
+          WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
+          OCI_PROXY_NETWORK: ${{ vars.OCI_PROXY_NETWORK || secrets.OCI_PROXY_NETWORK || secrets.OCI_CONTAINER_NETWORK }}
+          OCI_CADDYFILE_PATH: ${{ vars.OCI_CADDYFILE_PATH || secrets.OCI_CADDYFILE_PATH }}
+          OCI_CADDY_CONTAINER: ${{ vars.OCI_CADDY_CONTAINER || secrets.OCI_CADDY_CONTAINER }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV ONEINCH_API_KEY WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required GitHub secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OCI_SSH_PRIVATE_KEY" > ~/.ssh/oci_deploy_key
+          chmod 600 ~/.ssh/oci_deploy_key
+          printf '%s\n' "$OCI_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+        env:
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
+
+      - name: Upload deployment files
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          ssh_opts=(
+            -o ServerAliveInterval=30
+            -o ServerAliveCountMax=20
+            -o TCPKeepAlive=yes
+            -o ConnectTimeout=30
+            -o StrictHostKeyChecking=yes
+          )
+          backend_env_file="$(mktemp)"
+          trap 'rm -f "$backend_env_file"' EXIT
+          for name in ONEINCH_API_KEY COW_API_KEY; do
+            value="${!name:-}"
+            if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+              echo "$name must be a single-line value." >&2
+              exit 1
+            fi
+          done
+          for name in OCI_DEPLOY_PATH OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PORT; do
+            value="${!name:-}"
+            if ! [[ "$value" =~ ^[A-Za-z0-9_./:@-]+$ ]]; then
+              echo "$name contains unsupported characters." >&2
+              exit 1
+            fi
+          done
+          ssh "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+            "mkdir -p '$OCI_DEPLOY_PATH/scripts/deploy' '$OCI_DEPLOY_PATH/infra/systemd'"
+          scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+            scripts/deploy/deploy-oci-backend.sh \
+            scripts/deploy/backup-oci-postgres.sh \
+            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/scripts/deploy/"
+          scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+            infra/systemd/wallet-postgres-backup.service \
+            infra/systemd/wallet-postgres-backup.timer \
+            "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/infra/systemd/"
+          {
+            printf '%s\n' "$OCI_BACKEND_ENV"
+            printf '\nAPP_ENVIRONMENT=production\n'
+            printf 'AUTH_SESSION_COOKIE_SAME_SITE=Lax\n'
+            printf 'AUTH_SESSION_COOKIE_SECURE=true\n'
+            printf 'AUTH_EXPOSE_ACCESS_TOKEN=false\n'
+            printf 'LIMIT_ORDERS_DEFAULT_ENABLED=true\n'
+            printf 'ONEINCH_API_KEY=%s\n' "$ONEINCH_API_KEY"
+            printf 'ONEINCH_ORDERBOOK_BASE_URL=https://api.1inch.com/orderbook/v4.1\n'
+            printf 'COW_API_KEY=%s\n' "${COW_API_KEY:-}"
+            printf 'COW_ORDERBOOK_BASE_URL=https://api.cow.fi\n'
+            printf 'COW_PARTNER_ORDERBOOK_BASE_URL=https://partners.cow.fi\n'
+            printf 'LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED=true\n'
+            printf 'LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS=8\n'
+            printf 'LIMIT_ORDER_SUBMISSION_RETRY_FIXED_DELAY_MS=30000\n'
+            printf 'LIMIT_ORDER_SUBMISSION_BATCH_SIZE=25\n'
+            printf 'LIMIT_ORDER_SUBMISSION_MAX_ATTEMPTS=8\n'
+            printf 'LIMIT_ORDER_SUBMISSION_LOCK_TTL_SECONDS=60\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_FIXED_DELAY_MS=30000\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_BATCH_SIZE=50\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_LOCK_TTL_SECONDS=60\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_OPEN_INTERVAL_SECONDS=60\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_PARTIAL_INTERVAL_SECONDS=30\n'
+            printf 'LIMIT_ORDER_STATUS_CHECK_MAX_BACKOFF_SECONDS=1800\n'
+          } > "$backend_env_file"
+          scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+            "$backend_env_file" "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/backend.env.next"
+          ssh "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+            "chmod 600 '$OCI_DEPLOY_PATH/backend.env.next' && mv '$OCI_DEPLOY_PATH/backend.env.next' '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh' '$OCI_DEPLOY_PATH/scripts/deploy/backup-oci-postgres.sh'"
+        env:
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
+          OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
+          ONEINCH_API_KEY: ${{ secrets.ONEINCH_API_KEY }}
+          COW_API_KEY: ${{ secrets.COW_API_KEY }}
+
+      - name: Deploy backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh_opts=(
+            -o ServerAliveInterval=30
+            -o ServerAliveCountMax=20
+            -o TCPKeepAlive=yes
+            -o ConnectTimeout=30
+            -o StrictHostKeyChecking=yes
+          )
+          deployed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for name in BACKEND_IMAGE APP_VERSION GIT_COMMIT GHCR_USERNAME OCI_DEPLOY_PATH \
+            WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_INTERNAL_NETWORK OCI_CONTAINER_ENGINE \
+            OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER; do
+            value="${!name:-}"
+            if ! [[ "$value" =~ ^[A-Za-z0-9_./:@-]*$ ]]; then
+              echo "$name contains unsupported characters." >&2
+              exit 1
+            fi
+          done
+
+          remote_token_file="$OCI_DEPLOY_PATH/.ghcr-token-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf '%s' "$GHCR_TOKEN" | ssh "${ssh_opts[@]}" \
+            -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+            "set -e; umask 077; cat > '$remote_token_file'; trap 'rm -f $remote_token_file' EXIT; cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' APP_VERSION='$APP_VERSION' GIT_COMMIT='$GIT_COMMIT' DEPLOYED_AT='$deployed_at' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN_FILE='$remote_token_file' OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' WALLET_API_DOMAIN='$WALLET_API_DOMAIN' OCI_PROXY_NETWORK='$OCI_PROXY_NETWORK' OCI_INTERNAL_NETWORK='$OCI_INTERNAL_NETWORK' OCI_CONTAINER_ENGINE='$OCI_CONTAINER_ENGINE' OCI_CADDYFILE_PATH='$OCI_CADDYFILE_PATH' OCI_CADDY_CONTAINER='$OCI_CADDY_CONTAINER' ./scripts/deploy/deploy-oci-backend.sh"
+        env:
+          BACKEND_IMAGE: ${{ needs.build.outputs.image }}
+          APP_VERSION: ${{ needs.prepare.outputs.release_sha }}
+          GIT_COMMIT: ${{ needs.prepare.outputs.release_sha }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN || github.token }}
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
+          WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
+          OCI_PROXY_NETWORK: ${{ vars.OCI_PROXY_NETWORK || secrets.OCI_PROXY_NETWORK || secrets.OCI_CONTAINER_NETWORK }}
+          OCI_INTERNAL_NETWORK: ${{ vars.OCI_INTERNAL_NETWORK || secrets.OCI_INTERNAL_NETWORK || 'wallet-internal' }}
+          OCI_CONTAINER_ENGINE: ${{ vars.OCI_CONTAINER_ENGINE || secrets.OCI_CONTAINER_ENGINE }}
+          OCI_CADDYFILE_PATH: ${{ vars.OCI_CADDYFILE_PATH || secrets.OCI_CADDYFILE_PATH }}
+          OCI_CADDY_CONTAINER: ${{ vars.OCI_CADDY_CONTAINER || secrets.OCI_CADDY_CONTAINER }}
+
+  frontend:
+    name: Deploy on Vercel
+    needs:
+      - prepare
+      - deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://wallet-integration-theta.vercel.app' }}
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_VERSION: ${{ needs.prepare.outputs.release_sha }}
+      NEXT_PUBLIC_COMMIT_TIMESTAMP: ${{ needs.prepare.outputs.committed_at }}
+      VERCEL_ENVIRONMENT: production
+      VERCEL_CLI_VERSION: ${{ vars.VERCEL_CLI_VERSION || '54.5.0' }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout exact release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate Vercel credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required GitHub secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Build and deploy exact frontend release
+        id: vercel
+        shell: bash
+        run: ./scripts/deploy/deploy-vercel-frontend.sh
+
+      - name: Verify deployed frontend build
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.vercel.outputs.deployment_url }}
+          EXPECTED_COMMIT: ${{ needs.prepare.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          health_url="${DEPLOYMENT_URL%/}/api/health"
+          for attempt in $(seq 1 18); do
+            if body="$(curl --fail --silent --show-error --max-time 20 "$health_url" 2>/dev/null)" \
+              && DEPLOY_BODY="$body" node -e '
+                const payload = JSON.parse(process.env.DEPLOY_BODY);
+                if (payload.status !== "ok" || payload.build?.commit !== process.env.EXPECTED_COMMIT) process.exit(1);
+              '; then
+              exit 0
+            fi
+            echo "Waiting for Vercel build $EXPECTED_COMMIT ($attempt/18)."
+            sleep 5
+          done
+          echo "Vercel deployment did not serve the expected healthy commit." >&2
+          exit 1
+
+  verify:
+    name: Verify production release
+    needs:
+      - prepare
+      - deploy
+      - frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+
+      - name: Verify frontend and backend commit
+        shell: bash
+        env:
+          FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://wallet-integration-theta.vercel.app' }}
+          FRONTEND_HEALTH_URL: ${{ vars.PRODUCTION_FRONTEND_HEALTH_URL || 'https://wallet-integration-theta.vercel.app/api/health' }}
+          BACKEND_HEALTH_URL: ${{ vars.PRODUCTION_BACKEND_HEALTH_URL || 'https://wallet-api.84-235-254-97.sslip.io/api/health' }}
+          ADMIN_OPS_URL: ${{ vars.PRODUCTION_ADMIN_OPS_URL || 'https://wallet-api.84-235-254-97.sslip.io/api/admin/ops/summary' }}
+          ADMIN_API_KEY: ${{ secrets.PRODUCTION_ADMIN_API_KEY }}
+          EXPECTED_COMMIT: ${{ needs.prepare.outputs.release_sha }}
+          DEPLOY_GRACE_MINUTES: "0"
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if ./scripts/ops/check-production-health.sh; then
+              exit 0
+            fi
+            echo "Waiting for both production services ($attempt/12)."
+            sleep 10
+          done
+          exit 1

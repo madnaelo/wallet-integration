@@ -26,6 +26,7 @@ caddyfile_path="${OCI_CADDYFILE_PATH:-}"
 caddy_container="${OCI_CADDY_CONTAINER:-}"
 postgres_env_file=""
 registry_auth_dir=""
+registry_token_file="${GHCR_TOKEN_FILE:-}"
 
 fail() {
   echo "$*" >&2
@@ -144,6 +145,8 @@ container_is_running() {
 }
 
 container_has_network() {
+  # The container engine expands this Go template, not the shell.
+  # shellcheck disable=SC2016
   run_container inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$1" 2>/dev/null \
     | grep -Fxq "$2"
 }
@@ -159,11 +162,27 @@ cleanup() {
   if [ -n "$registry_auth_dir" ]; then
     rm -rf "$registry_auth_dir"
   fi
+  if [ -n "$registry_token_file" ]; then
+    rm -f "$registry_token_file"
+  fi
 }
 trap cleanup EXIT
 
-if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
-  printf '%s' "$GHCR_TOKEN" | run_container login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null
+registry_token="${GHCR_TOKEN:-}"
+if [ -z "$registry_token" ] && [ -n "$registry_token_file" ]; then
+  [ -f "$registry_token_file" ] || fail "GHCR_TOKEN_FILE does not exist."
+  registry_token="$(<"$registry_token_file")"
+fi
+if [ -n "${GHCR_USERNAME:-}" ] || [ -n "$registry_token" ]; then
+  if [ -z "${GHCR_USERNAME:-}" ] || [ -z "$registry_token" ]; then
+    fail "GHCR_USERNAME and a registry token must be provided together."
+  fi
+  printf '%s' "$registry_token" | run_container login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null
+fi
+registry_token=""
+unset GHCR_TOKEN
+if [ -n "$registry_token_file" ]; then
+  rm -f "$registry_token_file"
 fi
 
 network_exists "$proxy_network" || fail "The configured Caddy proxy network does not exist: $proxy_network"
