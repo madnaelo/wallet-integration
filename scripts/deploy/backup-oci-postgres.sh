@@ -113,6 +113,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Variables in this block intentionally expand inside the PostgreSQL container.
+# shellcheck disable=SC2016
 run_container exec "$postgres_container" sh -ceu '
   : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
   PGPASSWORD="$POSTGRES_PASSWORD" pg_dump \
