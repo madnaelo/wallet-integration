@@ -233,7 +233,10 @@ provided by the Podman compatibility package. CNI-based Podman requires the
 Oracle podman-plugins package for private container-name resolution. The
 deployment verifies that support and installs the fixed package through
 dnf/yum when it is missing; the deploy user therefore needs passwordless
-sudo for the container engine and that package installation.
+sudo for the container engine and that package installation. On legacy CNI
+hosts where the DNS service still fails at runtime, deployment accepts only a
+validated private address that passes a same-network PostgreSQL probe and
+injects it into the candidate backend without publishing the database port.
 
 Open ports `80` and `443` in the OCI security list/network security group.
 The current backend API uses `wallet-api.84-235-254-97.sslip.io`; attach a

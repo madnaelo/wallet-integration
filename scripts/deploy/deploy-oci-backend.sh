@@ -87,6 +87,11 @@ postgres_password="$(read_env_value POSTGRES_PASSWORD || true)"
 if [ -z "$postgres_db" ] || [ -z "$postgres_user" ] || [ -z "$postgres_password" ]; then
   fail "POSTGRES_DB, POSTGRES_USER, and POSTGRES_PASSWORD must be set in $env_file."
 fi
+for postgres_identifier in "$postgres_db" "$postgres_user"; do
+  if ! [[ "$postgres_identifier" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+    fail "PostgreSQL database and user names may contain only letters, digits, dot, underscore, and hyphen."
+  fi
+done
 
 engine="${OCI_CONTAINER_ENGINE:-}"
 engine_kind=""
@@ -437,13 +442,47 @@ postgres_reachable_by_name() {
     pg_isready -h "$postgres_container" -U "$postgres_user" -d "$postgres_db" >/dev/null 2>&1
 }
 
+valid_ipv4_address() {
+  local address="$1"
+  local octet
+  local -a octets
+
+  IFS=. read -r -a octets <<< "$address"
+  [ "${#octets[@]}" -eq 4 ] || return 1
+  for octet in "${octets[@]}"; do
+    [[ "$octet" =~ ^[0-9]{1,3}$ ]] || return 1
+    [ "$octet" -le 255 ] || return 1
+  done
+}
+
+find_reachable_postgres_ip() {
+  local address
+  local container_addresses
+
+  container_addresses="$(run_container exec "$postgres_container" sh -c 'hostname -i 2>/dev/null || true')"
+  for address in $container_addresses; do
+    if valid_ipv4_address "$address" \
+      && run_container run --rm --network "$internal_network" "$postgres_image" \
+        pg_isready -h "$address" -U "$postgres_user" -d "$postgres_db" >/dev/null 2>&1; then
+      printf '%s' "$address"
+      return 0
+    fi
+  done
+  return 1
+}
+
+database_host="$postgres_container"
 if ! postgres_reachable_by_name; then
   echo "Refreshing PostgreSQL network registration after a failed container DNS probe." >&2
   run_container restart --time 30 "$postgres_container" >/dev/null
   wait_for_postgres || fail "PostgreSQL did not recover after refreshing its network registration."
 fi
 if ! postgres_reachable_by_name; then
-  fail "PostgreSQL is ready locally but is not reachable by name on $internal_network."
+  database_host="$(find_reachable_postgres_ip || true)"
+  if [ -z "$database_host" ]; then
+    fail "PostgreSQL is ready locally but is unreachable from other containers on $internal_network."
+  fi
+  echo "Container DNS remains unavailable; using a verified private database address for this release." >&2
 fi
 
 detach_container_network "$proxy_network" "$postgres_container" \
@@ -493,6 +532,7 @@ run_container run -d \
   --restart unless-stopped \
   --network "$internal_network" \
   --env-file "$env_file" \
+  -e "DATABASE_URL=jdbc:postgresql://$database_host:5432/$postgres_db" \
   -e "APP_VERSION=$app_version" \
   -e "GIT_COMMIT=$git_commit" \
   -e "DEPLOYED_AT=$deployed_at" \
