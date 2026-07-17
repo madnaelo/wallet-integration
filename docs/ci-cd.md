@@ -148,7 +148,7 @@ OCI_SSH_HOST=84.235.254.97
 OCI_SSH_USER=opc
 OCI_DEPLOY_PATH=/home/opc/wallet
 OCI_PROXY_NETWORK=uk-property-check
-OCI_DATABASE_NETWORK=wallet-db
+OCI_DATABASE_NETWORK=wallet-database
 OCI_CADDYFILE_PATH=/home/opc/uk-property-check-middleware/Caddyfile
 OCI_CADDY_CONTAINER=uk-property-check-caddy
 WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
@@ -156,7 +156,7 @@ WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
 
 The proxy network, Caddy process, and site block are shared infrastructure and
 must already exist. The deploy script validates but never edits them. PostgreSQL
-is attached only to the dedicated `wallet-db` database network and never
+is attached only to the dedicated `wallet-database` network and never
 publishes a host port; the backend joins both the database and proxy networks.
 Docker uses an internal database network. Podman uses a dedicated DNS-enabled
 bridge because CNI-based Podman disables container name resolution on internal

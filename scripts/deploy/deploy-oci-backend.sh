@@ -5,7 +5,7 @@ deploy_path="${OCI_DEPLOY_PATH:-/home/opc/wallet}"
 env_file="${DEPLOY_ENV_FILE:-$deploy_path/backend.env}"
 backend_image="${BACKEND_IMAGE:-}"
 proxy_network="${OCI_PROXY_NETWORK:-${OCI_CONTAINER_NETWORK:-}}"
-internal_network="${OCI_INTERNAL_NETWORK:-wallet-db}"
+internal_network="${OCI_INTERNAL_NETWORK:-wallet-database}"
 backend_container="${BACKEND_CONTAINER_NAME:-wallet-backend}"
 candidate_container="${backend_container}-candidate"
 rollback_container="${backend_container}-rollback"
@@ -89,6 +89,7 @@ if [ -z "$postgres_db" ] || [ -z "$postgres_user" ] || [ -z "$postgres_password"
 fi
 
 engine="${OCI_CONTAINER_ENGINE:-}"
+engine_kind=""
 if [ -n "$engine" ] && [ "$engine" != "docker" ] && [ "$engine" != "podman" ]; then
   fail "OCI_CONTAINER_ENGINE must be docker or podman."
 fi
@@ -110,13 +111,21 @@ fi
 if [ -z "$engine" ]; then
   fail "Could not find the Docker or Podman engine that owns $caddy_container."
 fi
+engine_version="$({ "$engine" --version || true; } 2>&1)"
+if printf '%s' "$engine_version" | grep -qi podman; then
+  engine_kind="podman"
+elif printf '%s' "$engine_version" | grep -qi docker; then
+  engine_kind="docker"
+else
+  fail "Could not identify whether $engine is Docker or Podman."
+fi
 
 umask 077
 registry_auth_dir="$(mktemp -d "$deploy_path/.registry-auth.XXXXXX")"
 
 run_container() {
   declare -a auth_env
-  if [ "$engine" = "podman" ]; then
+  if [ "$engine_kind" = "podman" ]; then
     auth_env=(env "REGISTRY_AUTH_FILE=$registry_auth_dir/auth.json")
   else
     auth_env=(env "DOCKER_CONFIG=$registry_auth_dir")
@@ -153,6 +162,10 @@ container_has_network() {
 
 container_label() {
   run_container inspect -f "{{index .Config.Labels \"$2\"}}" "$1" 2>/dev/null || true
+}
+
+network_label() {
+  run_container network inspect -f "{{index .Labels \$2\}}" "$1" 2>/dev/null || true
 }
 
 cleanup() {
@@ -192,7 +205,7 @@ container_has_network "$caddy_container" "$proxy_network" \
 [ -f "$caddyfile_path" ] || fail "Configured Caddyfile does not exist: $caddyfile_path"
 
 if ! network_exists "$internal_network"; then
-  if [ "$engine" = "podman" ]; then
+  if [ "$engine_kind" = "podman" ]; then
     # CNI-based Podman disables container DNS on --internal networks. The
     # database remains private because it publishes no host ports.
     run_container network create --label com.swapassistant.role=database "$internal_network" >/dev/null
@@ -205,10 +218,10 @@ if run_container network inspect "$internal_network" 2>/dev/null \
   | grep -Eiq '"[Ii]nternal"[[:space:]]*:[[:space:]]*true'; then
   network_is_internal=true
 fi
-if [ "$engine" = "docker" ] && [ "$network_is_internal" != "true" ]; then
+if [ "$engine_kind" = "docker" ] && [ "$network_is_internal" != "true" ]; then
   fail "Docker database network $internal_network must be internal."
 fi
-if [ "$engine" = "podman" ] && [ "$network_is_internal" = "true" ]; then
+if [ "$engine_kind" = "podman" ] && [ "$network_is_internal" = "true" ]; then
   fail "Podman database network $internal_network must support container DNS; use a dedicated non-internal network with no published database ports."
 fi
 
@@ -226,7 +239,7 @@ postgres_env_file="$(mktemp "$deploy_path/.wallet-postgres-env.XXXXXX")"
 
 run_postgres() {
   declare -a log_args=(--log-opt max-size=10m)
-  if [ "$engine" = "docker" ]; then
+  if [ "$engine_kind" = "docker" ]; then
     log_args+=(--log-opt max-file=5)
   fi
   run_container run -d \
@@ -387,7 +400,7 @@ run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile
 run_container pull "$backend_image" >/dev/null
 
 declare -a backend_log_args=(--log-opt max-size=10m)
-if [ "$engine" = "docker" ]; then
+if [ "$engine_kind" = "docker" ]; then
   backend_log_args+=(--log-opt max-file=5)
 fi
 run_container run -d \
@@ -472,6 +485,23 @@ fi
 if container_exists "$rollback_container"; then
   run_container rm -f "$rollback_container" >/dev/null
 fi
+
+for legacy_network in wallet-internal wallet-db; do
+  if [ "$legacy_network" = "$internal_network" ] || ! network_exists "$legacy_network"; then
+    continue
+  fi
+  legacy_role="$(network_label "$legacy_network" com.swapassistant.role)"
+  if [ "$legacy_role" != "internal" ] && [ "$legacy_role" != "database" ]; then
+    continue
+  fi
+  if container_has_network "$postgres_container" "$legacy_network"; then
+    run_container network disconnect -f "$legacy_network" "$postgres_container"
+  fi
+  if container_has_network "$backend_container" "$legacy_network"; then
+    run_container network disconnect -f "$legacy_network" "$backend_container"
+  fi
+  run_container network rm "$legacy_network" >/dev/null 2>&1 || true
+done
 
 enable_backups="$(read_env_value ENABLE_POSTGRES_BACKUP_TIMER || printf 'false')"
 if [ "$enable_backups" = "true" ]; then
