@@ -61,7 +61,24 @@ class AutoSwapRuleServiceTest {
         .hasMessageContaining("Invalid alert mode");
   }
 
+  @Test
+  void rejectsSlippageAboveTenPercent() {
+    AutoSwapRuleRequest request = evmRequest("2525", "above", "notify_to_confirm", 1_001);
+
+    assertThatThrownBy(() -> service.save(WALLET, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessage("Slippage tolerance must be between 0% and 10%.");
+  }
+
   private AutoSwapRuleRequest evmRequest(String thresholdRate, String direction, String executionMode) {
+    return evmRequest(thresholdRate, direction, executionMode, 100);
+  }
+
+  private AutoSwapRuleRequest evmRequest(
+      String thresholdRate,
+      String direction,
+      String executionMode,
+      int slippageBps) {
     return new AutoSwapRuleRequest(
         1L,
         "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
@@ -73,7 +90,7 @@ class AutoSwapRuleServiceTest {
         "1000000000000000000",
         new BigDecimal(thresholdRate),
         direction,
-        100,
+        slippageBps,
         "0x0000000000000000000000000000000000000001",
         executionMode);
   }

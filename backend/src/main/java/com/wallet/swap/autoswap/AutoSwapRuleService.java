@@ -63,7 +63,7 @@ public class AutoSwapRuleService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Choose two different tokens.");
     }
     if (request.sellAmountRaw() == null || !request.sellAmountRaw().trim().matches("^[0-9]+$")) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Amount must be a positive base-unit value.");
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Enter a valid amount.");
     }
     if (new java.math.BigInteger(request.sellAmountRaw().trim()).signum() <= 0) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Amount must be greater than zero.");
@@ -76,8 +76,8 @@ public class AutoSwapRuleService {
     if (request.thresholdRate() == null || request.thresholdRate().signum() <= 0) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Target rate must be greater than zero.");
     }
-    if (request.slippageBps() == null || request.slippageBps() < 0 || request.slippageBps() > 10_000) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Slippage tolerance must be between 0% and 100%.");
+    if (request.slippageBps() == null || request.slippageBps() < 0 || request.slippageBps() > 1_000) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Slippage tolerance must be between 0% and 10%.");
     }
     String executionMode = normalizeBlank(request.executionMode(), NOTIFY_TO_CONFIRM);
     if (!EXECUTION_MODES.contains(executionMode)) {
