@@ -228,6 +228,13 @@ sudo usermod -aG docker "$USER"
 Log out and back in so the Docker group applies. The deploy user must be able
 to run `docker compose` without `sudo`.
 
+The OCI deployment script also supports Oracle Linux hosts where Docker is
+provided by the Podman compatibility package. CNI-based Podman requires the
+Oracle podman-plugins package for private container-name resolution. The
+deployment verifies that support and installs the fixed package through
+dnf/yum when it is missing; the deploy user therefore needs passwordless
+sudo for the container engine and that package installation.
+
 Open ports `80` and `443` in the OCI security list/network security group.
 The current backend API uses `wallet-api.84-235-254-97.sslip.io`; attach a
 custom API domain later by pointing it at the OCI VM public IP and updating

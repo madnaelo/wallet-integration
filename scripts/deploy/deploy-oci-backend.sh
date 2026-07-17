@@ -137,6 +137,14 @@ run_container() {
   fi
 }
 
+run_privileged() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
 container_exists() {
   run_container container inspect "$1" >/dev/null 2>&1
 }
@@ -198,6 +206,46 @@ network_label() {
   run_container network inspect -f "{{index .Labels \$2\}}" "$1" 2>/dev/null || true
 }
 
+network_supports_container_dns() {
+  run_container network inspect "$1" 2>/dev/null \
+    | grep -Eiq '"dns_enabled"[[:space:]]*:[[:space:]]*true|"type"[[:space:]]*:[[:space:]]*"dnsname"'
+}
+
+podman_dns_plugin_installed() {
+  local plugin_path
+  for plugin_path in /usr/libexec/cni/dnsname /usr/lib/cni/dnsname /opt/cni/bin/dnsname; do
+    if run_privileged test -x "$plugin_path"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+install_podman_dns_plugin() {
+  if podman_dns_plugin_installed; then
+    return 0
+  fi
+  if command -v dnf >/dev/null 2>&1; then
+    run_privileged dnf install -y podman-plugins
+  elif command -v yum >/dev/null 2>&1; then
+    run_privileged yum install -y podman-plugins
+  else
+    fail "Podman CNI name resolution requires the podman-plugins package; install it before deploying."
+  fi
+  podman_dns_plugin_installed \
+    || fail "podman-plugins installed without a usable dnsname CNI plugin."
+}
+
+create_database_network() {
+  if [ "$engine_kind" = "podman" ]; then
+    # CNI-based Podman disables container DNS on --internal networks. The
+    # database remains private because it publishes no host ports.
+    run_container network create --label com.swapassistant.role=database "$internal_network" >/dev/null
+  else
+    run_container network create --internal --label com.swapassistant.role=database "$internal_network" >/dev/null
+  fi
+}
+
 cleanup() {
   if [ -n "$postgres_env_file" ]; then
     rm -f "$postgres_env_file"
@@ -235,13 +283,24 @@ attach_container_network "$proxy_network" "$caddy_container" \
 [ -f "$caddyfile_path" ] || fail "Configured Caddyfile does not exist: $caddyfile_path"
 
 if ! network_exists "$internal_network"; then
-  if [ "$engine_kind" = "podman" ]; then
-    # CNI-based Podman disables container DNS on --internal networks. The
-    # database remains private because it publishes no host ports.
-    run_container network create --label com.swapassistant.role=database "$internal_network" >/dev/null
-  else
-    run_container network create --internal --label com.swapassistant.role=database "$internal_network" >/dev/null
+  create_database_network
+fi
+if [ "$engine_kind" = "podman" ] && ! network_supports_container_dns "$internal_network"; then
+  install_podman_dns_plugin
+  if [ "$(network_label "$internal_network" com.swapassistant.role)" != "database" ]; then
+    fail "Refusing to recreate an OCI database network not owned by Swap Assistant: $internal_network"
   fi
+  for project_container in \
+    "$backend_container" "$candidate_container" "$rollback_container" "$failed_container" \
+    "$postgres_container" "$legacy_postgres_container"; do
+    if container_exists "$project_container"; then
+      detach_container_network "$internal_network" "$project_container"
+    fi
+  done
+  run_container network rm "$internal_network" >/dev/null
+  create_database_network
+  network_supports_container_dns "$internal_network" \
+    || fail "Podman database network $internal_network still has no container DNS support."
 fi
 network_is_internal=false
 if run_container network inspect "$internal_network" 2>/dev/null \
@@ -373,8 +432,17 @@ wait_for_postgres || fail "PostgreSQL failed its readiness check."
 if [ -n "$(run_container port "$postgres_container" 2>/dev/null)" ]; then
   fail "PostgreSQL must not publish host ports."
 fi
-if ! run_container run --rm --network "$internal_network" "$postgres_image" \
-  pg_isready -h "$postgres_container" -U "$postgres_user" -d "$postgres_db" >/dev/null 2>&1; then
+postgres_reachable_by_name() {
+  run_container run --rm --network "$internal_network" "$postgres_image" \
+    pg_isready -h "$postgres_container" -U "$postgres_user" -d "$postgres_db" >/dev/null 2>&1
+}
+
+if ! postgres_reachable_by_name; then
+  echo "Refreshing PostgreSQL network registration after a failed container DNS probe." >&2
+  run_container restart --time 30 "$postgres_container" >/dev/null
+  wait_for_postgres || fail "PostgreSQL did not recover after refreshing its network registration."
+fi
+if ! postgres_reachable_by_name; then
   fail "PostgreSQL is ready locally but is not reachable by name on $internal_network."
 fi
 
