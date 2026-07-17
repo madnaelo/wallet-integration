@@ -78,7 +78,7 @@ OCI_CADDY_CONTAINER
 Optional non-secret GitHub Environment variables:
 
 ```text
-OCI_INTERNAL_NETWORK
+OCI_DATABASE_NETWORK
 OCI_CONTAINER_ENGINE
 ```
 
@@ -148,17 +148,20 @@ OCI_SSH_HOST=84.235.254.97
 OCI_SSH_USER=opc
 OCI_DEPLOY_PATH=/home/opc/wallet
 OCI_PROXY_NETWORK=uk-property-check
-OCI_INTERNAL_NETWORK=wallet-internal
+OCI_DATABASE_NETWORK=wallet-db
 OCI_CADDYFILE_PATH=/home/opc/uk-property-check-middleware/Caddyfile
 OCI_CADDY_CONTAINER=uk-property-check-caddy
 WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
 ```
 
 The proxy network, Caddy process, and site block are shared infrastructure and
-must already exist. The deploy script validates but never edits them. PostgreSQL is attached
-only to the dedicated internal `wallet-internal` network; the backend joins both
-that private network and the proxy network. No other application receives the
-Swap Assistant backend environment or database network.
+must already exist. The deploy script validates but never edits them. PostgreSQL
+is attached only to the dedicated `wallet-db` database network and never
+publishes a host port; the backend joins both the database and proxy networks.
+Docker uses an internal database network. Podman uses a dedicated DNS-enabled
+bridge because CNI-based Podman disables container name resolution on internal
+networks. No other application receives the Swap Assistant backend environment
+or database network.
 
 ## Vercel Environment
 

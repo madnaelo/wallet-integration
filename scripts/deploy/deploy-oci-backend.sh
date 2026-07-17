@@ -5,7 +5,7 @@ deploy_path="${OCI_DEPLOY_PATH:-/home/opc/wallet}"
 env_file="${DEPLOY_ENV_FILE:-$deploy_path/backend.env}"
 backend_image="${BACKEND_IMAGE:-}"
 proxy_network="${OCI_PROXY_NETWORK:-${OCI_CONTAINER_NETWORK:-}}"
-internal_network="${OCI_INTERNAL_NETWORK:-wallet-internal}"
+internal_network="${OCI_INTERNAL_NETWORK:-wallet-db}"
 backend_container="${BACKEND_CONTAINER_NAME:-wallet-backend}"
 candidate_container="${backend_container}-candidate"
 rollback_container="${backend_container}-rollback"
@@ -192,11 +192,24 @@ container_has_network "$caddy_container" "$proxy_network" \
 [ -f "$caddyfile_path" ] || fail "Configured Caddyfile does not exist: $caddyfile_path"
 
 if ! network_exists "$internal_network"; then
-  run_container network create --internal --label com.swapassistant.role=internal "$internal_network" >/dev/null
+  if [ "$engine" = "podman" ]; then
+    # CNI-based Podman disables container DNS on --internal networks. The
+    # database remains private because it publishes no host ports.
+    run_container network create --label com.swapassistant.role=database "$internal_network" >/dev/null
+  else
+    run_container network create --internal --label com.swapassistant.role=database "$internal_network" >/dev/null
+  fi
 fi
-if ! run_container network inspect "$internal_network" 2>/dev/null \
+network_is_internal=false
+if run_container network inspect "$internal_network" 2>/dev/null \
   | grep -Eiq '"[Ii]nternal"[[:space:]]*:[[:space:]]*true'; then
-  fail "Network $internal_network exists but is not internal. Refusing to expose the database on it."
+  network_is_internal=true
+fi
+if [ "$engine" = "docker" ] && [ "$network_is_internal" != "true" ]; then
+  fail "Docker database network $internal_network must be internal."
+fi
+if [ "$engine" = "podman" ] && [ "$network_is_internal" = "true" ]; then
+  fail "Podman database network $internal_network must support container DNS; use a dedicated non-internal network with no published database ports."
 fi
 
 if ! volume_exists "$postgres_volume"; then
@@ -220,6 +233,7 @@ run_postgres() {
     --name "$postgres_container" \
     --restart unless-stopped \
     --network "$internal_network" \
+    --network-alias "$postgres_container" \
     --env-file "$postgres_env_file" \
     --label com.swapassistant.app=backend \
     --label com.swapassistant.role=database \
@@ -317,10 +331,18 @@ else
     run_container start "$postgres_container" >/dev/null
   fi
   if ! container_has_network "$postgres_container" "$internal_network"; then
-    run_container network connect "$internal_network" "$postgres_container"
+    run_container network connect --alias "$postgres_container" "$internal_network" "$postgres_container"
   fi
 fi
 wait_for_postgres || fail "PostgreSQL failed its readiness check."
+
+if [ -n "$(run_container port "$postgres_container" 2>/dev/null)" ]; then
+  fail "PostgreSQL must not publish host ports."
+fi
+if ! run_container run --rm --network "$internal_network" "$postgres_image" \
+  pg_isready -h "$postgres_container" -U "$postgres_user" -d "$postgres_db" >/dev/null 2>&1; then
+  fail "PostgreSQL is ready locally but is not reachable by name on $internal_network."
+fi
 
 if container_has_network "$postgres_container" "$proxy_network"; then
   run_container network disconnect -f "$proxy_network" "$postgres_container"
