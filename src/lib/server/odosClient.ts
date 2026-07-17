@@ -66,7 +66,7 @@ export class OdosClient implements DexAggregatorClient {
     assertExecutableQuote(fields);
     if (!fields.buyAmount) throw new Error("Odos did not return an output amount.");
 
-    return normalizeQuote({ quote, assemble }, params, this, fields);
+    return normalizeQuote(params, this, fields);
   }
 
   private async fetchQuote(params: QuoteParams): Promise<Record<string, unknown>> {

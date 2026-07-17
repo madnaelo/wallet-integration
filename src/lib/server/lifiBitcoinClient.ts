@@ -97,17 +97,12 @@ export class LifiBitcoinClient implements DexAggregatorClient {
     assertExecutableQuote(fields);
     if (!fields.buyAmount) throw new Error("LI.FI did not return a Bitcoin output amount.");
 
-    return normalizeQuote(
-      {
-        executionKind: isBitcoinToken(params.sellToken) ? "bitcoin-to-evm" : "evm-to-bitcoin",
-        totalNetworkFee: sumCostAmounts(gasCosts),
-        networkFeeToken: firstCostToken(gasCosts),
-        tool: stringValue(body.tool)
-      },
-      params,
-      this,
-      fields
-    );
+    return normalizeQuote(params, this, {
+      ...fields,
+      executionKind: isBitcoinToken(params.sellToken) ? "bitcoin-to-evm" : "evm-to-bitcoin",
+      totalNetworkFee: sumCostAmounts(gasCosts),
+      networkFeeToken: firstCostToken(gasCosts)
+    });
   }
 }
 

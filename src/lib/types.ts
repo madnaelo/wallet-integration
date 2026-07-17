@@ -41,6 +41,8 @@ export type QuoteResponse = {
   data: string;
   value?: string;
   gas?: string;
+  gasPrice?: string;
+  totalNetworkFee?: string;
 
   allowanceTarget?: string;
   networkFeeToken?: QuoteToken;
@@ -48,6 +50,4 @@ export type QuoteResponse = {
   serviceFees?: QuoteFee[];
   availableQuotes?: QuoteResponse[];
   quoteErrors?: QuoteProviderError[];
-
-  [key: string]: unknown;
 };

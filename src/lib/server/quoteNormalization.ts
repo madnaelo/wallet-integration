@@ -26,7 +26,6 @@ export function toMinAmount(amount: string, slippageBps: number | undefined): st
 }
 
 export function normalizeQuote(
-  body: Record<string, unknown>,
   params: QuoteParams,
   meta: ProviderMeta,
   fields: {
@@ -37,6 +36,9 @@ export function normalizeQuote(
     value?: string;
     gas?: string;
     gasPrice?: string;
+    totalNetworkFee?: string;
+    networkFeeToken?: QuoteResponse["networkFeeToken"];
+    executionKind?: QuoteResponse["executionKind"];
     allowanceTarget?: string;
     routeLines?: QuoteRouteLine[];
     serviceFees?: QuoteFee[];
@@ -48,7 +50,6 @@ export function normalizeQuote(
   const netBuyAmount = fields.buyAmount;
   const grossBuyAmount = addIntegerStrings(netBuyAmount, sumFeesInToken(fields.serviceFees ?? [], params.buyToken));
   const quote: QuoteResponse = {
-    ...body,
     quoteId: buildQuoteId(meta.providerId, params, fields.to, grossBuyAmount),
     providerId: meta.providerId,
     providerName: meta.providerName,
@@ -62,17 +63,14 @@ export function normalizeQuote(
     data: fields.data,
     value: fields.value ?? "0",
     gas: fields.gas,
+    gasPrice: fields.gasPrice,
+    totalNetworkFee: fields.totalNetworkFee,
+    networkFeeToken: fields.networkFeeToken,
+    executionKind: fields.executionKind,
     allowanceTarget: fields.allowanceTarget,
     routeLines: fields.routeLines ?? [],
     serviceFees: fields.serviceFees ?? []
   };
-
-  if (fields.gasPrice) {
-    quote.transaction = {
-      ...(typeof body.transaction === "object" && body.transaction ? body.transaction : {}),
-      gasPrice: fields.gasPrice
-    };
-  }
 
   return quote;
 }
@@ -186,8 +184,16 @@ export function collectNestedProtocolLines(value: unknown): QuoteRouteLine[] {
 
     const item = recordValue(node);
     if (Object.keys(item).length === 0) return;
-    const name = stringValue(item.name) || stringValue(item.title) || stringValue(item.id) || stringValue(item.exchange);
-    const part = numberValue(item.part ?? item.share ?? item.percent ?? item.percentage);
+    const name =
+      stringValue(item.name) ||
+      stringValue(item.title) ||
+      stringValue(item.id) ||
+      stringValue(item.exchange) ||
+      stringValue(item.source);
+    const proportionBps = numberValue(item.proportionBps);
+    const part = proportionBps > 0
+      ? proportionBps / 100
+      : numberValue(item.part ?? item.share ?? item.percent ?? item.percentage);
     if (name) totals.set(name, (totals.get(name) ?? 0) + (part || 0));
 
     Object.values(item).forEach((child) => {

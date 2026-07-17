@@ -82,7 +82,7 @@ export class OneInchClient implements DexAggregatorClient {
     assertExecutableQuote(fields);
     if (!fields.buyAmount) throw new Error("1inch did not return an output amount.");
 
-    return normalizeQuote(body, params, this, fields);
+    return normalizeQuote(params, this, fields);
   }
 
   private async getAllowanceTarget(chainId: number, signal?: AbortSignal): Promise<string> {

@@ -83,7 +83,7 @@ export class ParaswapClient implements DexAggregatorClient {
     assertExecutableQuote(fields);
     if (!fields.buyAmount) throw new Error("ParaSwap did not return an output amount.");
 
-    return normalizeQuote(body, params, this, fields);
+    return normalizeQuote(params, this, fields);
   }
 
   private headers(): Record<string, string> {

@@ -37,7 +37,6 @@ describe("quote provider errors", () => {
 describe("quote amount normalization", () => {
   it("treats provider output as post-fee and reconstructs gross output for display", () => {
     const quote = normalizeQuote(
-      {},
       {
         chainId: 1,
         sellToken: "0xsell",
@@ -66,6 +65,41 @@ describe("quote amount normalization", () => {
     expect(quote.netBuyAmount).toBe("1000");
     expect(quote.grossBuyAmount).toBe("1025");
     expect(quote.minBuyAmount).toBe("950");
+  });
+
+  it("returns only the normalized executable contract", () => {
+    const quote = normalizeQuote(
+      {
+        chainId: 1,
+        sellToken: "0xsell",
+        sellTokenSymbol: "SELL",
+        sellTokenDecimals: 18,
+        buyToken: "0xbuy",
+        buyTokenSymbol: "BUY",
+        buyTokenDecimals: 6,
+        sellAmount: "10000",
+        takerAddress: "0xtaker"
+      },
+      { providerId: "provider", providerName: "Provider" },
+      {
+        buyAmount: "1000",
+        to: "0xrouter",
+        data: "0x1234",
+        gas: "21000",
+        gasPrice: "100",
+        totalNetworkFee: "2100000"
+      }
+    );
+
+    expect(quote).toMatchObject({
+      providerId: "provider",
+      gas: "21000",
+      gasPrice: "100",
+      totalNetworkFee: "2100000"
+    });
+    expect(quote).not.toHaveProperty("transaction");
+    expect(quote).not.toHaveProperty("route");
+    expect(quote).not.toHaveProperty("fees");
   });
 });
 

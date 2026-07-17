@@ -3,6 +3,7 @@ import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
 import { SAME_CHAIN_QUOTE_CHAIN_IDS } from "@/lib/chains";
 import {
   assertExecutableQuote,
+  collectNestedProtocolLines,
   normalizeNativeToken,
   normalizeQuote,
   readProviderResponse,
@@ -78,14 +79,16 @@ export class ZeroXClient implements DexAggregatorClient {
       value: stringValue(transaction.value) || stringValue(body.value) || "0",
       gas: stringValue(transaction.gas) || stringValue(body.gas),
       gasPrice: stringValue(transaction.gasPrice),
+      totalNetworkFee: stringValue(body.totalNetworkFee),
       allowanceTarget: stringValue(allowance.spender) || stringValue(body.allowanceTarget),
+      routeLines: collectNestedProtocolLines(body.route),
       serviceFees: collectZeroXFees(body),
       platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
     assertExecutableQuote(fields);
 
-    return normalizeQuote(body, params, this, fields);
+    return normalizeQuote(params, this, fields);
   }
 }
 

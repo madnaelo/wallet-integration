@@ -45,6 +45,9 @@ describe("provider monetization requests", () => {
         zeroExFee: { amount: "3", token: BUY_TOKEN },
         integratorFee: { amount: "2", token: BUY_TOKEN }
       },
+      route: {
+        fills: [{ source: "Uniswap_V3", proportionBps: "10000", from: SELL_TOKEN, to: BUY_TOKEN }]
+      },
       issues: { allowance: { spender: "0xallowance" } },
       transaction: { to: "0xrouter", data: "0x1234", value: "0", gas: "100000" }
     }));
@@ -62,6 +65,11 @@ describe("provider monetization requests", () => {
     expect(url.searchParams.get("swapFeeToken")).toBe(BUY_TOKEN);
     expect(quote.netBuyAmount).toBe("1000");
     expect(quote.grossBuyAmount).toBe("1005");
+    expect(quote.routeLines).toEqual([{ source: "Uniswap_V3", share: "100%" }]);
+    expect(quote.serviceFees).toHaveLength(2);
+    expect(quote).not.toHaveProperty("transaction");
+    expect(quote).not.toHaveProperty("fees");
+    expect(quote).not.toHaveProperty("route");
   });
 
   it("sends 1inch fee percent and referrer", async () => {

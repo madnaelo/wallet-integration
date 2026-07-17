@@ -2343,9 +2343,9 @@ export default function Page() {
     const sellHuman = formatTokenAmount(quote.sellAmount, sellDisplayToken);
     const grossBuyAmount = stringValue(quote.grossBuyAmount) || quote.buyAmount;
     const minBuyAmount = stringValue(quote.minBuyAmount);
-    const routeLines = collectRouteLines(quote, tokenForAddress);
-    const gasUnits = (quote.gas as string | undefined) ?? nestedString(quote, ["transaction", "gas"]);
-    const gasPriceWei = nestedString(quote, ["transaction", "gasPrice"]);
+    const routeLines = collectRouteLines(quote);
+    const gasUnits = stringValue(quote.gas);
+    const gasPriceWei = stringValue(quote.gasPrice);
     const networkFeeWei = stringValue(quote.totalNetworkFee) || multiplyIntegerStrings(gasUnits, gasPriceWei);
     const networkFeeLine = networkFeeWei
       ? {
@@ -5070,53 +5070,14 @@ function subtractIntegerStrings(value: string, deduction: string): string {
   return result > 0n ? result.toString() : "0";
 }
 
-function collectRouteLines(quote: QuoteResponse, tokenForAddress: (address: string) => DisplayToken): RouteLine[] {
+function collectRouteLines(quote: QuoteResponse): RouteLine[] {
   if (Array.isArray(quote.routeLines) && quote.routeLines.length) {
-    return quote.routeLines.map((line: any) => ({
-      source: stringValue(line?.source) || "Liquidity source",
-      share: stringValue(line?.share) || "Best route"
+    return quote.routeLines.map((line) => ({
+      source: stringValue(line.source) || "Liquidity source",
+      share: stringValue(line.share) || "Best route"
     }));
   }
-
-  const fills = (quote as any)?.route?.fills;
-  if (!Array.isArray(fills)) return [];
-
-  return fills
-    .map((fill: any) => {
-      const source =
-        stringValue(fill?.source) ||
-        stringValue(fill?.sourceName) ||
-        stringValue(fill?.name) ||
-        "Liquidity source";
-      const share = formatRouteShare(fill?.proportionBps ?? fill?.proportion ?? fill?.shareBps ?? fill?.percentage);
-      const from = stringValue(fill?.from);
-      const to = stringValue(fill?.to);
-      const pair =
-        from && to
-          ? `${tokenForAddress(from).symbol} -> ${tokenForAddress(to).symbol}`
-          : stringValue(fill?.input) && stringValue(fill?.output)
-            ? `${tokenForAddress(stringValue(fill.input)).symbol} -> ${tokenForAddress(stringValue(fill.output)).symbol}`
-            : "";
-
-      return {
-        source: pair ? `${source} (${pair})` : source,
-        share
-      };
-    })
-    .filter((line) => line.source.trim().length > 0);
-}
-
-function formatRouteShare(value: unknown): string {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value > 100 ? `${formatDecimal(String(value / 100), 2)}%` : `${formatDecimal(String(value), 2)}%`;
-  }
-  if (typeof value === "string" && value.trim()) {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) {
-      return numeric > 100 ? `${formatDecimal(String(numeric / 100), 2)}%` : `${formatDecimal(String(numeric), 2)}%`;
-    }
-  }
-  return "Best route";
+  return [];
 }
 
 function formatRouteSummary(lines: RouteLine[], providerName?: string): string {
@@ -5129,13 +5090,13 @@ function formatRouteSummary(lines: RouteLine[], providerName?: string): string {
 function collectFeeLines(quote: QuoteResponse, tokenForAddress: (address: string) => DisplayToken): FeeLine[] {
   if (Array.isArray(quote.serviceFees) && quote.serviceFees.length) {
     return quote.serviceFees
-      .map((fee: any) => {
-        const amount = stringValue(fee?.amount);
-        const tokenAddress = stringValue(fee?.token);
+      .map((fee) => {
+        const amount = stringValue(fee.amount);
+        const tokenAddress = stringValue(fee.token);
         if (!amount || !tokenAddress) return null;
         const token = tokenForAddress(tokenAddress);
         return {
-          label: stringValue(fee?.label) || "Service fee",
+          label: stringValue(fee.label) || "Service fee",
           amount,
           token,
           display: formatTokenAmount(amount, token)
@@ -5144,19 +5105,7 @@ function collectFeeLines(quote: QuoteResponse, tokenForAddress: (address: string
       .filter((fee): fee is FeeLine => !!fee);
   }
 
-  const fees: any = quote.fees;
-  if (!fees || typeof fees !== "object") return [];
-
-  const lines: FeeLine[] = [];
-  pushFeeLine(lines, "Service fee", fees.zeroExFee, tokenForAddress);
-  pushFeeLine(lines, "Platform fee", fees.integratorFee, tokenForAddress);
-  if (Array.isArray(fees.integratorFees)) {
-    fees.integratorFees.forEach((fee: unknown, index: number) => {
-      pushFeeLine(lines, `Platform fee ${index + 1}`, fee, tokenForAddress);
-    });
-  }
-  pushFeeLine(lines, "Additional gas fee", fees.gasFee, tokenForAddress);
-  return lines;
+  return [];
 }
 
 function withBuyTokenEquivalent(
@@ -5227,26 +5176,6 @@ function isSameToken(a: DisplayToken, b: DisplayToken): boolean {
   return normalizeTokenKey(a.address) === normalizeTokenKey(b.address);
 }
 
-function pushFeeLine(
-  lines: FeeLine[],
-  label: string,
-  fee: unknown,
-  tokenForAddress: (address: string) => DisplayToken
-) {
-  if (!fee || typeof fee !== "object") return;
-  const amount = stringValue((fee as any).amount);
-  const tokenAddress = stringValue((fee as any).token);
-  if (!amount || !tokenAddress) return;
-
-  const token = tokenForAddress(tokenAddress);
-  lines.push({
-    label,
-    amount,
-    token,
-    display: formatTokenAmount(amount, token)
-  });
-}
-
 function formatConvertedFeeTotal(lines: FeeLine[], buyToken: DisplayToken): string {
   const buyTokenTotal = sumBuyTokenFees(lines);
   const unconvertedFees = lines.filter((line) => !line.buyTokenAmount);
@@ -5289,14 +5218,6 @@ function formatOriginalFeeTotal(lines: FeeLine[]): string {
   return Array.from(totals.values())
     .map((total) => formatTokenAmount(total.amount.toString(), total.token))
     .join(" + ");
-}
-
-function nestedString(obj: unknown, path: string[]): string {
-  let current: any = obj;
-  for (const key of path) {
-    current = current?.[key];
-  }
-  return typeof current === "string" ? current : "";
 }
 
 function normalizeRecipientImportError(e: any): string {
