@@ -7,15 +7,54 @@ if (process.env.VERCEL_ENV === "production") {
   const redisConfigured = Boolean(
     process.env.UPSTASH_REDIS_REST_URL?.trim() && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
   );
+  const rateLimitPepper = (process.env.RATE_LIMIT_KEY_PEPPER ?? "").trim();
+  const corsOrigins = (process.env.CORS_ALLOW_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const feeBps = Number(process.env.PLATFORM_FEE_BPS ?? "0");
+  const feeRecipient = (
+    process.env.FEE_RECIPIENT_ADDRESS ??
+    process.env.AFFILIATE_ADDRESS ??
+    ""
+  ).trim();
 
   if (!backendProxyTarget) {
     throw new Error("BACKEND_PROXY_TARGET is required for a production Vercel build.");
   }
-  if (publicBackendBaseUrl && publicBackendBaseUrl !== "/backend") {
+  if (publicBackendBaseUrl !== "/backend") {
     throw new Error("NEXT_PUBLIC_BACKEND_BASE_URL must be /backend in production.");
+  }
+  if (!redisRequired) {
+    throw new Error("RATE_LIMIT_REDIS_REQUIRED must be true in production.");
   }
   if (redisRequired && !redisConfigured) {
     throw new Error("Production distributed rate limiting requires the Upstash Redis REST URL and token.");
+  }
+  if (redisConfigured) {
+    assertHttpsOrigin(process.env.UPSTASH_REDIS_REST_URL, "UPSTASH_REDIS_REST_URL");
+    if (isWeakConfiguredValue(process.env.UPSTASH_REDIS_REST_TOKEN, 20)) {
+      throw new Error("UPSTASH_REDIS_REST_TOKEN must be a non-placeholder production secret.");
+    }
+  }
+  if (readBoolean(process.env.RATE_LIMIT_REDIS_FAIL_OPEN, false)) {
+    throw new Error("RATE_LIMIT_REDIS_FAIL_OPEN must be false in production.");
+  }
+  if (isWeakConfiguredValue(rateLimitPepper, 32)) {
+    throw new Error("RATE_LIMIT_KEY_PEPPER must be a non-placeholder secret of at least 32 characters.");
+  }
+  if (!readBoolean(process.env.REQUIRE_ALLOWED_ORIGIN, false)) {
+    throw new Error("REQUIRE_ALLOWED_ORIGIN must be true in production.");
+  }
+  if (!corsOrigins.length || corsOrigins.some((origin) => !isExplicitHttpsOrigin(origin))) {
+    throw new Error("CORS_ALLOW_ORIGINS must contain only explicit production HTTPS origins.");
+  }
+  assertHttpsOrigin(process.env.NEXT_PUBLIC_SITE_URL, "NEXT_PUBLIC_SITE_URL");
+  if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 300) {
+    throw new Error("PLATFORM_FEE_BPS must be an integer between 0 and 300.");
+  }
+  if (feeBps > 0 && (!isEvmAddress(feeRecipient) || /^0x0{40}$/i.test(feeRecipient))) {
+    throw new Error("A non-zero FEE_RECIPIENT_ADDRESS is required when production platform fees are enabled.");
   }
 }
 
@@ -99,4 +138,38 @@ function normalizeBackendProxyTarget(value) {
 function readBoolean(value, fallback) {
   if (!value?.trim()) return fallback;
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+function assertHttpsOrigin(value, name) {
+  if (!isExplicitHttpsOrigin((value ?? "").trim())) {
+    throw new Error(`${name} must be an explicit HTTPS origin in production.`);
+  }
+}
+
+function isExplicitHttpsOrigin(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:"
+      && !url.username
+      && !url.password
+      && !url.search
+      && !url.hash
+      && (url.pathname === "" || url.pathname === "/")
+      && !["localhost", "127.0.0.1", "::1"].includes(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function isWeakConfiguredValue(value, minimumLength) {
+  const text = (value ?? "").trim();
+  if (text.length < minimumLength) return true;
+  const normalized = text.toLowerCase();
+  return ["change_me", "changeme", "replace_me", "replace-me", "placeholder"].some((marker) =>
+    normalized.includes(marker)
+  ) || normalized.startsWith("your_") || normalized.startsWith("your-");
+}
+
+function isEvmAddress(value) {
+  return /^0x[0-9a-fA-F]{40}$/.test(value);
 }

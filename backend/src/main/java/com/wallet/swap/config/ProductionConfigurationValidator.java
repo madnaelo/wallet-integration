@@ -68,10 +68,10 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
       problems.add("CORS_ALLOWED_ORIGINS must contain only explicit HTTPS origins");
     }
     if (!apiProperties.isRateLimitEnabled()) problems.add("API_RATE_LIMIT_ENABLED must be true");
-    if (text(apiProperties.getRateLimitKeyPepper()).length() < 32) {
+    if (isWeakSecret(apiProperties.getRateLimitKeyPepper(), 32)) {
       problems.add("API_RATE_LIMIT_KEY_PEPPER must contain at least 32 characters");
     }
-    if (text(featureProperties.getAdminApiKey()).length() < 32) {
+    if (isWeakSecret(featureProperties.getAdminApiKey(), 32)) {
       problems.add("ADMIN_API_KEY must contain at least 32 characters");
     }
   }
@@ -103,7 +103,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
       problems.add("DATABASE_URL must point to the production PostgreSQL service");
     }
     String password = text(databasePassword);
-    if (password.length() < 16 || password.equalsIgnoreCase("wallet") || password.toLowerCase(Locale.ROOT).contains("change_me")) {
+    if (isWeakSecret(password, 16) || password.equalsIgnoreCase("wallet")) {
       problems.add("DATABASE_PASSWORD must be a non-default secret of at least 16 characters");
     }
   }
@@ -113,7 +113,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
 
     NotificationProperties.Telegram telegram = notificationProperties.getTelegram();
     if (telegram.isEnabled()) {
-      if (text(telegram.getBotToken()).length() < 32) problems.add("TELEGRAM_BOT_TOKEN is missing");
+      if (isWeakSecret(telegram.getBotToken(), 32)) problems.add("TELEGRAM_BOT_TOKEN is missing");
       if (text(telegram.getBotUsername()).isBlank()) problems.add("TELEGRAM_BOT_USERNAME is missing");
       if (httpsUri(telegram.getBaseUrl()) == null) problems.add("TELEGRAM_BASE_URL must be HTTPS");
     }
@@ -121,7 +121,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     NotificationProperties.Push push = notificationProperties.getPush();
     if (push.isEnabled()) {
       if (text(push.getVapidPublicKey()).length() < 80) problems.add("PUSH_VAPID_PUBLIC_KEY is invalid");
-      if (text(push.getVapidPrivateKey()).length() < 40) problems.add("PUSH_VAPID_PRIVATE_KEY is invalid");
+      if (isWeakSecret(push.getVapidPrivateKey(), 40)) problems.add("PUSH_VAPID_PRIVATE_KEY is invalid");
       String subject = text(push.getVapidSubject());
       if (!(subject.startsWith("mailto:") || subject.startsWith("https://"))) {
         problems.add("PUSH_VAPID_SUBJECT must be a mailto or HTTPS URI");
@@ -137,7 +137,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
 
   private void validateLimitOrders(List<String> problems) {
     if (!limitOrderProperties.isOrderbookSubmissionEnabled()) return;
-    if (text(limitOrderProperties.getOneinchApiKey()).length() < 16) {
+    if (isWeakSecret(limitOrderProperties.getOneinchApiKey(), 16)) {
       problems.add("ONEINCH_API_KEY is required for limit-order fallback");
     }
     if (httpsUri(limitOrderProperties.getOneinchOrderbookBaseUrl()) == null
@@ -170,6 +170,19 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
   private boolean isLocalHost(String host) {
     String value = text(host).toLowerCase(Locale.ROOT);
     return value.equals("localhost") || value.equals("127.0.0.1") || value.equals("::1");
+  }
+
+  private boolean isWeakSecret(String value, int minimumLength) {
+    String secret = text(value);
+    if (secret.length() < minimumLength) return true;
+    String normalized = secret.toLowerCase(Locale.ROOT);
+    return normalized.contains("change_me")
+        || normalized.contains("changeme")
+        || normalized.contains("replace_me")
+        || normalized.contains("replace-me")
+        || normalized.contains("placeholder")
+        || normalized.startsWith("your_")
+        || normalized.startsWith("your-");
   }
 
   private String text(String value) {

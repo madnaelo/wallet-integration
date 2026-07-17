@@ -41,6 +41,39 @@ class ProductionConfigurationValidatorTest {
         .hasMessageContaining("DATABASE_URL");
   }
 
+  @Test
+  void rejectsDocumentationPlaceholdersInProductionSecrets() {
+    var api = validApiProperties();
+    api.setRateLimitKeyPepper("change_me_to_a_random_secret_in_production");
+    var features = validFeatureProperties();
+    features.setAdminApiKey("your_admin_api_key_that_is_long_enough");
+    var limitOrders = validLimitOrderProperties();
+    limitOrders.setOneinchApiKey("your_1inch_api_key_here");
+    var notifications = validNotificationProperties();
+    notifications.getTelegram().setEnabled(true);
+    notifications.getTelegram().setBotToken("replace_me_with_a_real_telegram_bot_token");
+    notifications.getTelegram().setBotUsername("SwapAssistantBot");
+
+    var configuration = new ProductionConfigurationValidator(
+        "production",
+        "jdbc:postgresql://wallet-postgres:5432/wallet",
+        "change_me_to_a_long_random_database_password",
+        "",
+        api,
+        validAuthProperties(),
+        features,
+        limitOrders,
+        notifications);
+
+    assertThatThrownBy(configuration::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("API_RATE_LIMIT_KEY_PEPPER")
+        .hasMessageContaining("ADMIN_API_KEY")
+        .hasMessageContaining("DATABASE_PASSWORD")
+        .hasMessageContaining("TELEGRAM_BOT_TOKEN")
+        .hasMessageContaining("ONEINCH_API_KEY");
+  }
+
   private ProductionConfigurationValidator validConfiguration() {
     return new ProductionConfigurationValidator(
         "production",
