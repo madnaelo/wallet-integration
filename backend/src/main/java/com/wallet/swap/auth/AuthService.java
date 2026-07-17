@@ -63,7 +63,7 @@ public class AuthService {
         ? authRepository.findWalletNoncesForUpdate(walletAddress)
         : authRepository.findNonceForUpdate(nonceId, walletAddress).map(List::of).orElseGet(List::of);
     if (candidates.isEmpty()) {
-      throw new ApiException(HttpStatus.UNAUTHORIZED, "No active sign-in nonce for this wallet.");
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "This sign-in request is no longer active. Please try again.");
     }
 
     Instant now = Instant.now();
@@ -75,7 +75,7 @@ public class AuthService {
         .filter(candidate -> candidate.expiresAt().isAfter(now))
         .toList();
     if (activeCandidates.isEmpty()) {
-      throw new ApiException(HttpStatus.UNAUTHORIZED, "Sign-in nonce expired. Request a new one.");
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "This sign-in request expired. Please try again.");
     }
 
     AuthRepository.StoredNonce storedNonce = activeCandidates.stream()
@@ -146,7 +146,9 @@ public class AuthService {
 
   private String extractBearerToken(String authorizationHeader) {
     String token = extractBearerTokenOrNull(authorizationHeader);
-    if (token == null || token.isBlank()) throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing bearer token.");
+    if (token == null || token.isBlank()) {
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "Please sign in with your wallet to continue.");
+    }
     return token;
   }
 

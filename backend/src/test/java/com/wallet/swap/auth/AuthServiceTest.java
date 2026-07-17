@@ -92,4 +92,11 @@ class AuthServiceTest {
     assertThat(response.walletAddress()).isEqualTo(WALLET);
     verify(repository).deleteNonce(nonceId, WALLET);
   }
+
+  @Test
+  void usesUserFriendlyMessageWhenSessionIsMissing() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.authenticateBearerToken(null))
+        .isInstanceOf(com.wallet.swap.common.ApiException.class)
+        .hasMessage("Please sign in with your wallet to continue.");
+  }
 }
