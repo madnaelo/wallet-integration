@@ -12,6 +12,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
@@ -44,14 +46,17 @@ public class TelegramNotificationSender {
         .path("/bot{token}/sendMessage")
         .build(properties.getTelegram().getBotToken().trim());
 
-    restClient.post()
-        .uri(uri)
-        .header(HttpHeaders.ACCEPT, "application/json")
-        .body(Map.of(
-            "chat_id", chatId.trim(),
-            "text", text))
-        .retrieve()
-        .toBodilessEntity();
+    execute(() -> {
+      restClient.post()
+          .uri(uri)
+          .header(HttpHeaders.ACCEPT, "application/json")
+          .body(Map.of(
+              "chat_id", chatId.trim(),
+              "text", text))
+          .retrieve()
+          .toBodilessEntity();
+      return null;
+    });
   }
 
   public Optional<String> getBotUsername() {
@@ -66,11 +71,11 @@ public class TelegramNotificationSender {
         .path("/bot{token}/getMe")
         .build(properties.getTelegram().getBotToken().trim());
 
-    JsonNode body = restClient.get()
+    JsonNode body = execute(() -> restClient.get()
         .uri(uri)
         .header(HttpHeaders.ACCEPT, "application/json")
         .retrieve()
-        .body(JsonNode.class);
+        .body(JsonNode.class));
     String username = body == null ? "" : body.path("result").path("username").asText("");
     return username.isBlank() ? Optional.empty() : Optional.of(normalizeBotUsername(username));
   }
@@ -85,11 +90,11 @@ public class TelegramNotificationSender {
         .queryParam("limit", 100)
         .build(properties.getTelegram().getBotToken().trim());
 
-    JsonNode body = restClient.get()
+    JsonNode body = execute(() -> restClient.get()
         .uri(uri)
         .header(HttpHeaders.ACCEPT, "application/json")
         .retrieve()
-        .body(JsonNode.class);
+        .body(JsonNode.class));
     if (body == null || !body.path("ok").asBoolean(false) || !body.path("result").isArray()) {
       return List.of();
     }
@@ -108,6 +113,17 @@ public class TelegramNotificationSender {
 
   private String normalizeBotUsername(String username) {
     return username.trim().replaceFirst("^@", "");
+  }
+
+  private <T> T execute(java.util.function.Supplier<T> request) {
+    try {
+      return request.get();
+    } catch (RestClientResponseException exception) {
+      throw new IllegalStateException(
+          "Telegram service rejected the request (HTTP " + exception.getStatusCode().value() + ").");
+    } catch (RestClientException exception) {
+      throw new IllegalStateException("Telegram service could not be reached.");
+    }
   }
 
   public record TelegramIncomingMessage(String chatId, String text) {}

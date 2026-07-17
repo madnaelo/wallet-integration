@@ -1,5 +1,20 @@
 server:
   port: ${PORT:8080}
+  forward-headers-strategy: framework
+  shutdown: graceful
+  compression:
+    enabled: true
+    min-response-size: 1024
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-exception: false
+  tomcat:
+    accept-count: ${SERVER_ACCEPT_COUNT:100}
+    max-connections: ${SERVER_MAX_CONNECTIONS:2048}
+    threads:
+      max: ${SERVER_MAX_THREADS:100}
+      min-spare: ${SERVER_MIN_SPARE_THREADS:10}
 
 spring:
   config:
@@ -12,8 +27,20 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:56434/wallet}
     username: ${DATABASE_USERNAME:wallet}
     password: ${DATABASE_PASSWORD:wallet}
+    hikari:
+      maximum-pool-size: ${DATABASE_POOL_MAX_SIZE:12}
+      minimum-idle: ${DATABASE_POOL_MIN_IDLE:2}
+      connection-timeout: ${DATABASE_CONNECTION_TIMEOUT_MS:5000}
+      validation-timeout: ${DATABASE_VALIDATION_TIMEOUT_MS:3000}
+      idle-timeout: ${DATABASE_IDLE_TIMEOUT_MS:600000}
+      max-lifetime: ${DATABASE_MAX_LIFETIME_MS:1800000}
+      keepalive-time: ${DATABASE_KEEPALIVE_MS:300000}
   flyway:
     enabled: true
+    clean-disabled: true
+    validate-on-migrate: true
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   mail:
     host: ${SMTP_HOST:}
     port: ${SMTP_PORT:587}
