@@ -2,6 +2,14 @@ import type { NextRequest } from "next/server";
 import { isIP } from "net";
 
 export function getClientIp(req: NextRequest): string | null {
+  if (process.env.VERCEL === "1") {
+    const vercelForwardedFor = req.headers.get("x-vercel-forwarded-for");
+    if (vercelForwardedFor) {
+      const vercelIp = firstValidForwardedIp(vercelForwardedFor);
+      if (vercelIp) return vercelIp;
+    }
+  }
+
   const xff = req.headers.get("x-forwarded-for");
   if (xff) {
     const first = firstValidForwardedIp(xff);
