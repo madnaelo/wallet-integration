@@ -229,7 +229,6 @@ export default function Page() {
   const isDryRun = envPublic.DISALLOW_MAINNET;
   const [activeView, setActiveView] = useState<ActiveView>("swap");
   const [featureFlags, setFeatureFlags] = useState({
-    autoSwapEnabled: false,
     priceAlertsEnabled: false,
     limitOrdersEnabled: false
   });
@@ -516,7 +515,7 @@ export default function Page() {
         if (!cancelled) setFeatureFlags(flags);
       })
       .catch(() => {
-        if (!cancelled) setFeatureFlags({ autoSwapEnabled: false, priceAlertsEnabled: false, limitOrdersEnabled: false });
+        if (!cancelled) setFeatureFlags({ priceAlertsEnabled: false, limitOrdersEnabled: false });
       })
       .finally(() => {
         if (!cancelled) setFeatureFlagsLoaded(true);

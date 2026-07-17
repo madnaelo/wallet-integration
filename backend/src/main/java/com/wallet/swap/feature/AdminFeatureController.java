@@ -25,13 +25,6 @@ public class AdminFeatureController {
     return featureFlagService.setPriceAlertsEnabled(adminApiKey, request);
   }
 
-  @PutMapping("/auto-swap")
-  public FeatureFlagResponse setAutoSwapEnabled(
-      @RequestHeader(name = "X-Admin-Key", required = false) String adminApiKey,
-      @Valid @RequestBody FeatureFlagUpdateRequest request) {
-    return featureFlagService.setAutoSwapEnabled(adminApiKey, request);
-  }
-
   @PutMapping("/limit-orders")
   public FeatureFlagResponse setLimitOrdersEnabled(
       @RequestHeader(name = "X-Admin-Key", required = false) String adminApiKey,

@@ -4,16 +4,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "wallet.features")
 public class FeatureProperties {
-  private boolean autoSwapDefaultEnabled = false;
+  private boolean priceAlertsDefaultEnabled = false;
   private boolean limitOrdersDefaultEnabled = true;
   private String adminApiKey = "";
 
-  public boolean isAutoSwapDefaultEnabled() {
-    return autoSwapDefaultEnabled;
+  public boolean isPriceAlertsDefaultEnabled() {
+    return priceAlertsDefaultEnabled;
   }
 
-  public void setAutoSwapDefaultEnabled(boolean autoSwapDefaultEnabled) {
-    this.autoSwapDefaultEnabled = autoSwapDefaultEnabled;
+  public void setPriceAlertsDefaultEnabled(boolean priceAlertsDefaultEnabled) {
+    this.priceAlertsDefaultEnabled = priceAlertsDefaultEnabled;
   }
 
   public boolean isLimitOrdersDefaultEnabled() {

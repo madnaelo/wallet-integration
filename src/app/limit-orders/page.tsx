@@ -242,7 +242,6 @@ export default function LimitOrdersPage() {
   const [capabilityLoading, setCapabilityLoading] = useState(false);
   const [capabilityError, setCapabilityError] = useState("");
   const [featureFlags, setFeatureFlags] = useState({
-    autoSwapEnabled: false,
     priceAlertsEnabled: false,
     limitOrdersEnabled: true
   });
@@ -423,7 +422,7 @@ export default function LimitOrdersPage() {
         if (!cancelled) setFeatureFlags(flags);
       })
       .catch(() => {
-        if (!cancelled) setFeatureFlags({ autoSwapEnabled: false, priceAlertsEnabled: false, limitOrdersEnabled: true });
+        if (!cancelled) setFeatureFlags({ priceAlertsEnabled: false, limitOrdersEnabled: true });
       })
       .finally(() => {
         if (!cancelled) setFeatureFlagsLoaded(true);

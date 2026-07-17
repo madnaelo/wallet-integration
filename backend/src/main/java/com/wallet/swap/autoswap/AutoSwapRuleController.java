@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/price-alerts/rules", "/api/auto-swap/rules"})
+@RequestMapping("/api/price-alerts/rules")
 public class AutoSwapRuleController {
   private final AuthService authService;
   private final AutoSwapRuleService autoSwapRuleService;

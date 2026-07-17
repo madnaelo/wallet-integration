@@ -10,8 +10,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class FeatureFlagService {
-  public static final String AUTO_SWAP_FEATURE_KEY = "auto_swap";
-  public static final String PRICE_ALERTS_FEATURE_KEY = AUTO_SWAP_FEATURE_KEY;
+  public static final String PRICE_ALERTS_FEATURE_KEY = "price_alerts";
   public static final String LIMIT_ORDERS_FEATURE_KEY = "limit_orders";
 
   private final FeatureProperties featureProperties;
@@ -29,17 +28,13 @@ public class FeatureFlagService {
 
   public FeatureFlagsResponse publicFlags() {
     boolean priceAlertsEnabled = isPriceAlertsEnabled();
-    return new FeatureFlagsResponse(priceAlertsEnabled, priceAlertsEnabled, isLimitOrdersEnabled());
+    return new FeatureFlagsResponse(priceAlertsEnabled, isLimitOrdersEnabled());
   }
 
   public boolean isPriceAlertsEnabled() {
     return repository.find(PRICE_ALERTS_FEATURE_KEY)
         .map(FeatureFlagResponse::enabled)
-        .orElse(featureProperties.isAutoSwapDefaultEnabled());
-  }
-
-  public boolean isAutoSwapEnabled() {
-    return isPriceAlertsEnabled();
+        .orElse(featureProperties.isPriceAlertsDefaultEnabled());
   }
 
   public boolean isLimitOrdersEnabled() {
@@ -54,10 +49,6 @@ public class FeatureFlagService {
     }
   }
 
-  public void requireAutoSwapEnabled() {
-    requirePriceAlertsEnabled();
-  }
-
   public void requireLimitOrdersEnabled() {
     if (!isLimitOrdersEnabled()) {
       throw new ApiException(HttpStatus.NOT_FOUND, "Limit Orders are not available.");
@@ -68,10 +59,6 @@ public class FeatureFlagService {
     adminAuthService.requireAdminApiKey(adminApiKey);
     boolean enabled = Boolean.TRUE.equals(request.enabled());
     return repository.upsert(PRICE_ALERTS_FEATURE_KEY, enabled, "admin");
-  }
-
-  public FeatureFlagResponse setAutoSwapEnabled(String adminApiKey, FeatureFlagUpdateRequest request) {
-    return setPriceAlertsEnabled(adminApiKey, request);
   }
 
   public FeatureFlagResponse setLimitOrdersEnabled(String adminApiKey, FeatureFlagUpdateRequest request) {

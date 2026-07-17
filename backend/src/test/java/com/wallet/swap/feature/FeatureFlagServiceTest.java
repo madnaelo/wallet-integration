@@ -19,17 +19,17 @@ class FeatureFlagServiceTest {
 
   @Test
   void usesConfiguredDefaultWhenDatabaseFlagIsMissing() {
-    properties.setAutoSwapDefaultEnabled(true);
-    when(repository.find(FeatureFlagService.AUTO_SWAP_FEATURE_KEY)).thenReturn(Optional.empty());
+    properties.setPriceAlertsDefaultEnabled(true);
+    when(repository.find(FeatureFlagService.PRICE_ALERTS_FEATURE_KEY)).thenReturn(Optional.empty());
 
     assertThat(service.isPriceAlertsEnabled()).isTrue();
   }
 
   @Test
   void databaseFlagOverridesConfiguredDefault() {
-    properties.setAutoSwapDefaultEnabled(true);
-    when(repository.find(FeatureFlagService.AUTO_SWAP_FEATURE_KEY))
-        .thenReturn(Optional.of(new FeatureFlagResponse("auto_swap", false, Instant.now())));
+    properties.setPriceAlertsDefaultEnabled(true);
+    when(repository.find(FeatureFlagService.PRICE_ALERTS_FEATURE_KEY))
+        .thenReturn(Optional.of(new FeatureFlagResponse("price_alerts", false, Instant.now())));
 
     assertThat(service.isPriceAlertsEnabled()).isFalse();
   }

@@ -91,7 +91,6 @@ export type PushSubscriptionPayload = {
 };
 
 export type FeatureFlags = {
-  autoSwapEnabled: boolean;
   priceAlertsEnabled: boolean;
   limitOrdersEnabled: boolean;
 };
@@ -264,10 +263,8 @@ export async function getFeatureFlags(backendBaseUrl: string): Promise<FeatureFl
   const flags = await backendFetch<Partial<FeatureFlags>>(backendBaseUrl, "/api/features", {
     method: "GET"
   });
-  const priceAlertsEnabled = Boolean(flags.priceAlertsEnabled ?? flags.autoSwapEnabled);
   return {
-    autoSwapEnabled: priceAlertsEnabled,
-    priceAlertsEnabled,
+    priceAlertsEnabled: Boolean(flags.priceAlertsEnabled),
     limitOrdersEnabled: Boolean(flags.limitOrdersEnabled)
   };
 }
