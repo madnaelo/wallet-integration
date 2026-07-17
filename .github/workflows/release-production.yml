@@ -242,7 +242,6 @@ jobs:
           OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
           OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
           OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
-          ONEINCH_API_KEY: ${{ secrets.ONEINCH_API_KEY }}
           COW_API_KEY: ${{ secrets.COW_API_KEY }}
           WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
           OCI_PROXY_NETWORK: ${{ vars.OCI_PROXY_NETWORK || secrets.OCI_PROXY_NETWORK || secrets.OCI_CONTAINER_NETWORK }}
@@ -251,7 +250,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=()
-          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV ONEINCH_API_KEY WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER; do
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER; do
             if [ -z "${!name:-}" ]; then
               missing+=("$name")
             fi
@@ -309,7 +308,7 @@ jobs:
           )"
           unset admin_api_key
           echo "::add-mask::$rate_limit_key_pepper"
-          for name in ONEINCH_API_KEY COW_API_KEY; do
+          for name in COW_API_KEY; do
             value="${!name:-}"
             if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
               echo "$name must be a single-line value." >&2
@@ -341,7 +340,8 @@ jobs:
             printf 'AUTH_EXPOSE_ACCESS_TOKEN=false\n'
             printf 'API_RATE_LIMIT_KEY_PEPPER=%s\n' "$rate_limit_key_pepper"
             printf 'LIMIT_ORDERS_DEFAULT_ENABLED=true\n'
-            printf 'ONEINCH_API_KEY=%s\n' "$ONEINCH_API_KEY"
+            printf 'ONEINCH_ORDERBOOK_ENABLED=false\n'
+            printf 'ONEINCH_API_KEY=\n'
             printf 'ONEINCH_ORDERBOOK_BASE_URL=https://api.1inch.com/orderbook/v4.1\n'
             printf 'COW_API_KEY=%s\n' "${COW_API_KEY:-}"
             printf 'COW_ORDERBOOK_BASE_URL=https://api.cow.fi\n'
@@ -367,7 +367,6 @@ jobs:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
           OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
-          ONEINCH_API_KEY: ${{ secrets.ONEINCH_API_KEY }}
           COW_API_KEY: ${{ secrets.COW_API_KEY }}
 
       - name: Deploy backend

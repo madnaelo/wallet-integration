@@ -64,6 +64,9 @@ public class LimitOrderSubmissionClient {
   }
 
   private LimitOrderSubmissionResult submitOneInch(long chainId, String orderHash, String signature, JsonNode data) {
+    if (!properties.isOneinchOrderbookEnabled()) {
+      return LimitOrderSubmissionResult.skipped("Automatic submission is temporarily unavailable.");
+    }
     if (properties.getOneinchApiKey() == null || properties.getOneinchApiKey().isBlank()) {
       return LimitOrderSubmissionResult.skipped("Automatic submission is temporarily unavailable.");
     }

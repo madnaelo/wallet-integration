@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.config.LimitOrderProperties;
+import com.wallet.swap.limitorder.LimitOrderRepository.StatusCheckCandidate;
 import com.wallet.swap.limitorder.LimitOrderStatusClient.StatusResult;
 import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
@@ -100,6 +102,25 @@ class LimitOrderStatusClientTest {
         Instant.parse("2030-01-02T00:00:00Z"),
         Instant.parse("2030-01-01T00:00:00Z")).checked()).isFalse();
     assertThat(client.parseCow(json("{\"status\":\"open\",\"executedSellAmount\":\"bad\"}")).checked()).isFalse();
+  }
+
+  @Test
+  void doesNotPollOneInchWhenProviderIsDisabled() {
+    StatusCheckCandidate candidate = new StatusCheckCandidate(
+        UUID.randomUUID(),
+        10L,
+        LimitOrderCapabilityService.ONEINCH_PROVIDER,
+        "0x" + "ab".repeat(32),
+        "0x" + "ab".repeat(32),
+        "open",
+        Instant.now().plusSeconds(3_600),
+        0,
+        UUID.randomUUID());
+
+    StatusResult result = client.check(candidate);
+
+    assertThat(result.checked()).isFalse();
+    assertThat(result.error()).contains("unavailable");
   }
 
   private JsonNode json(String value) throws Exception {

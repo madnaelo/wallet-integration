@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "wallet.limit-orders")
 public class LimitOrderProperties {
   private boolean orderbookSubmissionEnabled = true;
+  private boolean oneinchOrderbookEnabled;
   private String oneinchApiKey = "";
   private String oneinchOrderbookBaseUrl = "https://api.1inch.com/orderbook/v4.1";
   private String cowApiKey = "";
@@ -28,6 +29,14 @@ public class LimitOrderProperties {
 
   public void setOrderbookSubmissionEnabled(boolean orderbookSubmissionEnabled) {
     this.orderbookSubmissionEnabled = orderbookSubmissionEnabled;
+  }
+
+  public boolean isOneinchOrderbookEnabled() {
+    return oneinchOrderbookEnabled;
+  }
+
+  public void setOneinchOrderbookEnabled(boolean oneinchOrderbookEnabled) {
+    this.oneinchOrderbookEnabled = oneinchOrderbookEnabled;
   }
 
   public String getOneinchApiKey() {

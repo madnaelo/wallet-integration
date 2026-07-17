@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.config.LimitOrderProperties;
 import com.wallet.swap.feature.FeatureFlagService;
 import com.wallet.swap.limitorder.LimitOrderModels.LimitOrderRequest;
 import com.wallet.swap.limitorder.LimitOrderModels.LimitOrderResponse;
@@ -27,7 +28,8 @@ class LimitOrderServiceTest {
   private static final String USDT = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 
   private final ObjectMapper objectMapper = new ObjectMapper();
-  private final LimitOrderCapabilityService capabilityService = new LimitOrderCapabilityService();
+  private final LimitOrderCapabilityService capabilityService =
+      new LimitOrderCapabilityService(enabledOneInchProperties());
   private final FeatureFlagService featureFlagService = mock(FeatureFlagService.class);
   private final LimitOrderRepository repository = mock(LimitOrderRepository.class);
   private final LimitOrderSubmissionCoordinator submissionCoordinator = mock(LimitOrderSubmissionCoordinator.class);
@@ -298,5 +300,11 @@ class LimitOrderServiceTest {
     } catch (Exception exception) {
       throw new IllegalStateException(exception);
     }
+  }
+
+  private static LimitOrderProperties enabledOneInchProperties() {
+    var properties = new LimitOrderProperties();
+    properties.setOneinchOrderbookEnabled(true);
+    return properties;
   }
 }

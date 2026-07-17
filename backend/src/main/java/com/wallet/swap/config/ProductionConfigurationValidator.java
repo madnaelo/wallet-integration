@@ -137,7 +137,8 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
 
   private void validateLimitOrders(List<String> problems) {
     if (!limitOrderProperties.isOrderbookSubmissionEnabled()) return;
-    if (isWeakSecret(limitOrderProperties.getOneinchApiKey(), 16)) {
+    if (limitOrderProperties.isOneinchOrderbookEnabled()
+        && isWeakSecret(limitOrderProperties.getOneinchApiKey(), 16)) {
       problems.add("ONEINCH_API_KEY is required for limit-order fallback");
     }
     if (httpsUri(limitOrderProperties.getOneinchOrderbookBaseUrl()) == null

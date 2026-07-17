@@ -83,8 +83,10 @@ Reference:
 
 ### 1inch
 
-Status: code wired; due-diligence form submitted, explicit commercial
-fee-collecting account confirmation still required.
+Status: code wired but production-disabled. The May 8, 2026 approval email says
+the free plan is limited to non-commercial/internal testing and commercial API
+use requires a paid plan. The due-diligence form does not replace commercial
+approval.
 
 The 1inch quote client sends:
 
@@ -101,8 +103,8 @@ Action remaining:
   personal/non-commercial unless 1inch explicitly confirms that this is correct.
 - Complete 1inch due diligence truthfully. Do not submit as personal
   non-commercial if the app is taking platform fees.
-- If commercial/fee-collecting use is not approved, disable `1inch` in
-  production `SWAP_PROVIDERS` until the account terms are resolved.
+- Keep `1inch` out of production `SWAP_PROVIDERS` and keep
+  `ONEINCH_ORDERBOOK_ENABLED=false` until the account terms are resolved.
 - Run a small real swap and verify fee behavior.
 
 Reference:

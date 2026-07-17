@@ -2,6 +2,7 @@ package com.wallet.swap.limitorder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.wallet.swap.config.LimitOrderProperties;
 import com.wallet.swap.limitorder.LimitOrderModels.LimitOrderCapabilityRequest;
 import org.junit.jupiter.api.Test;
 
@@ -9,7 +10,8 @@ class LimitOrderCapabilityServiceTest {
   private static final String WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
   private static final String USDT = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 
-  private final LimitOrderCapabilityService service = new LimitOrderCapabilityService();
+  private final LimitOrderProperties properties = enabledProperties();
+  private final LimitOrderCapabilityService service = new LimitOrderCapabilityService(properties);
 
   @Test
   void prefersCowProtocolWhenChainIsSupported() {
@@ -25,6 +27,16 @@ class LimitOrderCapabilityServiceTest {
 
     assertThat(response.automaticExecutionSupported()).isTrue();
     assertThat(response.executionProvider()).isEqualTo(LimitOrderCapabilityService.ONEINCH_PROVIDER);
+  }
+
+  @Test
+  void doesNotOfferOneInchWhenCommercialAccessIsDisabled() {
+    properties.setOneinchOrderbookEnabled(false);
+
+    var response = service.check(request(10L, WETH, USDT));
+
+    assertThat(response.automaticExecutionSupported()).isFalse();
+    assertThat(response.executionProvider()).isEqualTo("none");
   }
 
   @Test
@@ -44,5 +56,11 @@ class LimitOrderCapabilityServiceTest {
         buyToken,
         "BUY",
         6);
+  }
+
+  private static LimitOrderProperties enabledProperties() {
+    var properties = new LimitOrderProperties();
+    properties.setOneinchOrderbookEnabled(true);
+    return properties;
   }
 }

@@ -46,6 +46,9 @@ public class LimitOrderStatusClient {
   }
 
   private StatusResult checkOneInch(StatusCheckCandidate candidate) {
+    if (!properties.isOneinchOrderbookEnabled()) {
+      return StatusResult.failure("1inch order status is unavailable.");
+    }
     String apiKey = properties.getOneinchApiKey() == null ? "" : properties.getOneinchApiKey().trim();
     if (apiKey.isBlank()) return StatusResult.failure("1inch order status credentials are unavailable.");
 

@@ -54,7 +54,6 @@ OCI_SSH_PRIVATE_KEY
 OCI_SSH_KNOWN_HOSTS
 OCI_BACKEND_ENV
 WALLET_API_DOMAIN
-ONEINCH_API_KEY
 ```
 
 Optional backend deployment secrets:
@@ -126,9 +125,10 @@ deploy secret.
 For push notifications, set
 `PUSH_NOTIFICATIONS_ENABLED=true`, `PUSH_VAPID_PUBLIC_KEY`,
 `PUSH_VAPID_PRIVATE_KEY`, and `PUSH_VAPID_SUBJECT`. For Limit Orders, also set
-`LIMIT_ORDERS_DEFAULT_ENABLED=true`, `ONEINCH_ORDERBOOK_BASE_URL`, and
+`LIMIT_ORDERS_DEFAULT_ENABLED=true`, `ONEINCH_ORDERBOOK_ENABLED=false`, and
 `LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED=true` in the backend environment. Do
-not commit the real file.
+not commit the real file. Keep 1inch disabled until the API account has written
+commercial-use approval; enabling it also requires `ONEINCH_API_KEY`.
 
 `OCI_SSH_KNOWN_HOSTS` must contain the OCI host key line for
 `OCI_SSH_HOST`/`OCI_SSH_PORT`. Generate it once from a trusted machine with
@@ -182,7 +182,7 @@ NEXT_PUBLIC_ALLOWED_CHAIN_IDS=1,42161,10,8453,137,56,43114
 NEXT_PUBLIC_DISALLOW_MAINNET=false
 
 ZEROX_API_KEY=...
-ONEINCH_API_KEY=...
+ONEINCH_API_KEY=
 PARASWAP_BASE_URL=https://api.paraswap.io
 PARASWAP_API_KEY=
 PARASWAP_API_KEY_HEADER=X-API-Key
@@ -192,7 +192,7 @@ ODOS_API_KEY=...
 LIFI_BASE_URL=https://li.quest
 LIFI_API_KEY=...
 LIFI_INTEGRATOR=...
-SWAP_PROVIDERS=0x,1inch,paraswap,odos,lifi
+SWAP_PROVIDERS=0x,paraswap,odos,lifi
 
 AFFILIATE_ADDRESS=...
 FEE_RECIPIENT_ADDRESS=...

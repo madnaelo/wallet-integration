@@ -74,6 +74,25 @@ class ProductionConfigurationValidatorTest {
         .hasMessageContaining("ONEINCH_API_KEY");
   }
 
+  @Test
+  void permitsMissingOneInchCredentialsWhenProviderIsDisabled() {
+    var limitOrders = validLimitOrderProperties();
+    limitOrders.setOneinchOrderbookEnabled(false);
+    limitOrders.setOneinchApiKey("");
+    var configuration = new ProductionConfigurationValidator(
+        "production",
+        "jdbc:postgresql://wallet-postgres:5432/wallet",
+        "a-long-random-database-password",
+        "",
+        validApiProperties(),
+        validAuthProperties(),
+        validFeatureProperties(),
+        limitOrders,
+        validNotificationProperties());
+
+    assertThatCode(configuration::validate).doesNotThrowAnyException();
+  }
+
   private ProductionConfigurationValidator validConfiguration() {
     return new ProductionConfigurationValidator(
         "production",
@@ -113,6 +132,7 @@ class ProductionConfigurationValidatorTest {
 
   private LimitOrderProperties validLimitOrderProperties() {
     var properties = new LimitOrderProperties();
+    properties.setOneinchOrderbookEnabled(true);
     properties.setOneinchApiKey("1234567890123456");
     return properties;
   }
