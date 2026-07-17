@@ -6,7 +6,7 @@ type Bucket = {
   resetAt: number;
 };
 
-type RateLimitDecision = { allowed: boolean; retryAfterMs: number };
+type RateLimitDecision = { allowed: boolean; retryAfterMs: number; unavailable?: boolean };
 
 type RedisResponse = {
   result?: unknown;
@@ -14,15 +14,20 @@ type RedisResponse = {
 };
 
 const buckets = new Map<string, Bucket>();
+const MAX_MEMORY_BUCKETS = 50_000;
 let lastSweepAt = 0;
 
 export async function rateLimit(key: string): Promise<RateLimitDecision> {
-  if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+  const redisConfigured = hasRedisConfiguration();
+  if (env.RATE_LIMIT_REDIS_REQUIRED && !redisConfigured) {
+    return { allowed: false, retryAfterMs: normalizedWindowMs(), unavailable: true };
+  }
+  if (redisConfigured) {
     try {
       return await redisRateLimit(key);
     } catch (error) {
       if (!env.RATE_LIMIT_REDIS_FAIL_OPEN) {
-        return { allowed: false, retryAfterMs: env.RATE_LIMIT_WINDOW_MS };
+        return { allowed: false, retryAfterMs: normalizedWindowMs(), unavailable: true };
       }
       console.error("[rate-limit] Redis limiter failed; falling back to memory", error);
     }
@@ -32,12 +37,15 @@ export async function rateLimit(key: string): Promise<RateLimitDecision> {
 
 function memoryRateLimit(key: string): RateLimitDecision {
   const now = Date.now();
-  const windowMs = env.RATE_LIMIT_WINDOW_MS;
-  const max = env.RATE_LIMIT_MAX;
+  const windowMs = normalizedWindowMs();
+  const max = normalizedMaxRequests();
   sweepExpiredBuckets(now);
 
   const b = buckets.get(key);
   if (!b || now >= b.resetAt) {
+    if (!b && buckets.size >= MAX_MEMORY_BUCKETS) {
+      return { allowed: false, retryAfterMs: windowMs };
+    }
     buckets.set(key, { count: 1, resetAt: now + windowMs });
     return { allowed: true, retryAfterMs: 0 };
   }
@@ -51,9 +59,9 @@ function memoryRateLimit(key: string): RateLimitDecision {
 }
 
 async function redisRateLimit(key: string): Promise<RateLimitDecision> {
-  const windowMs = Math.max(1_000, env.RATE_LIMIT_WINDOW_MS);
+  const windowMs = normalizedWindowMs();
   const ttlSeconds = Math.max(1, Math.ceil(windowMs / 1000));
-  const max = Math.max(1, env.RATE_LIMIT_MAX);
+  const max = normalizedMaxRequests();
   const redisKey = `${env.RATE_LIMIT_REDIS_PREFIX}:rl:${hashKey(key)}`;
 
   const response = await fetch(`${env.UPSTASH_REDIS_REST_URL.replace(/\/+$/, "")}/multi-exec`, {
@@ -67,7 +75,8 @@ async function redisRateLimit(key: string): Promise<RateLimitDecision> {
       ["INCR", redisKey],
       ["TTL", redisKey]
     ]),
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(2_500)
   });
 
   if (!response.ok) {
@@ -90,7 +99,27 @@ async function redisRateLimit(key: string): Promise<RateLimitDecision> {
 }
 
 function hashKey(key: string): string {
-  return createHash("sha256").update(key).digest("hex");
+  return createHash("sha256").update(`${env.RATE_LIMIT_KEY_PEPPER}:${key}`).digest("hex");
+}
+
+export function getRateLimitReadiness() {
+  const redisConfigured = hasRedisConfiguration();
+  return {
+    ready: !env.RATE_LIMIT_REDIS_REQUIRED || redisConfigured,
+    mode: redisConfigured ? "redis" : "memory"
+  };
+}
+
+function hasRedisConfiguration(): boolean {
+  return Boolean(env.UPSTASH_REDIS_REST_URL.trim() && env.UPSTASH_REDIS_REST_TOKEN.trim());
+}
+
+function normalizedWindowMs(): number {
+  return Math.max(1_000, Math.min(3_600_000, Math.round(env.RATE_LIMIT_WINDOW_MS)));
+}
+
+function normalizedMaxRequests(): number {
+  return Math.max(1, Math.min(10_000, Math.round(env.RATE_LIMIT_MAX)));
 }
 
 function sweepExpiredBuckets(now: number) {

@@ -8,6 +8,12 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const rl = await rateLimit(`tokens:${getClientIp(req) ?? "unknown"}`);
+  if (rl.unavailable) {
+    return NextResponse.json(
+      { error: "Token search is temporarily unavailable. Please try again shortly." },
+      { status: 503 }
+    );
+  }
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again later." },

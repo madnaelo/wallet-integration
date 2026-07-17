@@ -21,6 +21,12 @@ export async function GET(req: NextRequest) {
   }
 
   const rl = await rateLimit(ip);
+  if (rl.unavailable) {
+    return withCors(
+      NextResponse.json({ error: "Quotes are temporarily unavailable. Please try again shortly." }, { status: 503 }),
+      corsOrigin
+    );
+  }
   if (!rl.allowed) {
     return withCors(
       NextResponse.json(
@@ -105,6 +111,12 @@ export async function GET(req: NextRequest) {
   }
 
   const walletLimit = await rateLimit(`quote-wallet:${normalizeTokenKey(takerAddress)}`);
+  if (walletLimit.unavailable) {
+    return withCors(
+      NextResponse.json({ error: "Quotes are temporarily unavailable. Please try again shortly." }, { status: 503 }),
+      corsOrigin
+    );
+  }
   if (!walletLimit.allowed) {
     return withCors(
       NextResponse.json(

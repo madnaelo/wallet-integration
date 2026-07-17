@@ -527,14 +527,30 @@ export async function cancelLimitOrder(
 }
 
 async function backendFetch<T>(backendBaseUrl: string, path: string, init: RequestInit): Promise<T> {
-  const res = await fetch(`${backendBaseUrl.replace(/\/$/, "")}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {})
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20_000);
+  const abortFromCaller = () => controller.abort();
+  init.signal?.addEventListener("abort", abortFromCaller, { once: true });
+  let res: Response;
+  try {
+    res = await fetch(`${backendBaseUrl.replace(/\/$/, "")}${path}`, {
+      ...init,
+      signal: controller.signal,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init.headers ?? {})
+      }
+    });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new BackendClientError("The service took too long to respond. Please try again.", 408, {});
     }
-  });
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+    init.signal?.removeEventListener("abort", abortFromCaller);
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const message = body?.error ?? body?.message ?? `The request could not be completed. Please try again. (${res.status})`;
