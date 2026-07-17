@@ -15,27 +15,27 @@
     "generate:vapid": "node scripts/generate-vapid-keys.mjs"
   },
   "dependencies": {
-    "@1inch/limit-order-sdk": "^5.3.0",
-    "@base-org/account": "^2.5.6",
-    "@reown/appkit": "^1.8.20",
-    "@reown/appkit-adapter-bitcoin": "^1.8.20",
-    "@reown/appkit-adapter-ethers": "^1.8.20",
-    "@walletconnect/sign-client": "^2.23.9",
+    "@1inch/limit-order-sdk": "^5.3.1",
+    "@base-org/account": "^2.5.7",
+    "@reown/appkit": "^1.8.22",
+    "@reown/appkit-adapter-bitcoin": "^1.8.22",
+    "@reown/appkit-adapter-ethers": "^1.8.22",
+    "@walletconnect/sign-client": "^2.23.10",
     "bitcoin-address-validation": "3.0.0",
-    "ethers": "^6.13.2",
-    "next": "^15.5.16",
+    "ethers": "^6.17.0",
+    "next": "^16.2.10",
     "qrcode": "^1.5.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
-    "@types/node": "^20.14.10",
+    "@types/node": "^26.1.1",
     "@types/qrcode": "^1.5.6",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^15.5.16",
-    "typescript": "^5.5.4",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^10.6.0",
+    "eslint-config-next": "^16.2.10",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   },
   "overrides": {
