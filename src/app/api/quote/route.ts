@@ -7,6 +7,7 @@ import { isAddress, isPositiveIntegerString } from "@/lib/validation";
 import { env } from "@/lib/server/env";
 import type { QuoteResponse } from "@/lib/types";
 import { createNativeBitcoinQuoteClient, createQuoteClient } from "@/lib/server/quoteProvider";
+import { getProviderErrorStatus } from "@/lib/server/quoteNormalization";
 import { isNativeBitcoinToken, type TokenInfo } from "@/lib/tokens";
 import { getTokensForChain } from "@/lib/server/tokenRegistry";
 
@@ -184,10 +185,21 @@ export async function GET(req: NextRequest) {
     quoteCache.set(cacheKey, quote);
 
     return withCors(NextResponse.json(quote, { status: 200 }), corsOrigin);
-  } catch (e: any) {
-    const status = typeof e?.status === "number" ? e.status : 502;
-    const message = e?.message || "Failed to fetch quote.";
-    return withCors(NextResponse.json({ error: message }, { status }), corsOrigin);
+  } catch (error: unknown) {
+    const providerStatus = getProviderErrorStatus(error);
+    console.warn({
+      event: "quote_request_failed",
+      chainId,
+      providerStatus,
+      errorType: error instanceof Error ? error.name : "UnknownError"
+    });
+    const message =
+      providerStatus === 429
+        ? "Quotes are busy right now. Please try again shortly."
+        : providerStatus === 400 || providerStatus === 404 || providerStatus === 422
+          ? "No swap route is available for these details."
+          : "Quotes are temporarily unavailable. Please try again shortly.";
+    return withCors(NextResponse.json({ error: message }, { status: 502 }), corsOrigin);
   }
 }
 

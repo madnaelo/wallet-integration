@@ -87,17 +87,28 @@ export function getComparableBuyAmount(quote: QuoteResponse): string {
   return stringValue(quote.netBuyAmount) || stringValue(quote.buyAmount);
 }
 
-export function providerError(providerId: string, providerName: string, e: any) {
+export function providerError(providerId: string, providerName: string, error: unknown) {
   return {
     providerId,
     providerName,
-    message: normalizeProviderError(e),
-    status: typeof e?.status === "number" ? e.status : undefined
+    message: normalizeProviderError(error),
+    status: getProviderErrorStatus(error)
   };
 }
 
-export function normalizeProviderError(e: any): string {
-  return e?.message || e?.reason || e?.error || "Quote unavailable.";
+export function normalizeProviderError(error: unknown): string {
+  const status = getProviderErrorStatus(error);
+  if (status === 429) return "This route is busy. Try again shortly.";
+  if (status === 400 || status === 404 || status === 422) {
+    return "No route is available for these swap details.";
+  }
+  return "This route is temporarily unavailable.";
+}
+
+export function getProviderErrorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object" || !("status" in error)) return undefined;
+  const status = Number((error as { status?: unknown }).status);
+  return Number.isInteger(status) && status >= 400 && status <= 599 ? status : undefined;
 }
 
 export function assertExecutableQuote(fields: { to?: string; data?: string }) {

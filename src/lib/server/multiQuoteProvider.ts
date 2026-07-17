@@ -1,6 +1,7 @@
 import type { QuoteProviderError, QuoteResponse } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
 import {
+  getProviderErrorStatus,
   providerError,
   rankQuotes,
   sanitizeQuoteForList
@@ -82,15 +83,14 @@ function logProviderResult(
     durationMs
   };
   if (error) {
-    console.warn({ ...event, message: normalizeLogError(error) });
+    console.warn({
+      ...event,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+      status: getProviderErrorStatus(error)
+    });
   } else {
     console.info(event);
   }
-}
-
-function normalizeLogError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  return message.length <= 500 ? message : message.substring(0, 500);
 }
 
 function withProviderTimeout(

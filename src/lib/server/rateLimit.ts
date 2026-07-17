@@ -29,7 +29,11 @@ export async function rateLimit(key: string): Promise<RateLimitDecision> {
       if (!env.RATE_LIMIT_REDIS_FAIL_OPEN) {
         return { allowed: false, retryAfterMs: normalizedWindowMs(), unavailable: true };
       }
-      console.error("[rate-limit] Redis limiter failed; falling back to memory", error);
+      console.error({
+        event: "rate_limit_redis_failed",
+        fallback: "memory",
+        errorType: error instanceof Error ? error.name : "UnknownError"
+      });
     }
   }
   return memoryRateLimit(key);
