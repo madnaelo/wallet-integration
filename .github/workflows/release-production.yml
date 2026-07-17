@@ -339,6 +339,7 @@ jobs:
             printf 'AUTH_SESSION_COOKIE_SECURE=true\n'
             printf 'AUTH_EXPOSE_ACCESS_TOKEN=false\n'
             printf 'API_RATE_LIMIT_KEY_PEPPER=%s\n' "$rate_limit_key_pepper"
+            printf 'ENABLE_POSTGRES_BACKUP_TIMER=true\n'
             printf 'LIMIT_ORDERS_DEFAULT_ENABLED=true\n'
             printf 'ONEINCH_ORDERBOOK_ENABLED=false\n'
             printf 'ONEINCH_API_KEY=\n'

@@ -637,6 +637,11 @@ if [ "$enable_backups" = "true" ]; then
   sudo cp "$backup_timer_template" /etc/systemd/system/wallet-postgres-backup.timer
   sudo systemctl daemon-reload
   sudo systemctl enable --now wallet-postgres-backup.timer >/dev/null
+  sudo systemctl is-enabled --quiet wallet-postgres-backup.timer \
+    || fail "PostgreSQL backup timer was not enabled."
+  sudo systemctl is-active --quiet wallet-postgres-backup.timer \
+    || fail "PostgreSQL backup timer is not active."
+  echo "PostgreSQL backup timer is enabled and active."
 fi
 
 echo "Backend is healthy at $health_url and serves commit $git_commit."

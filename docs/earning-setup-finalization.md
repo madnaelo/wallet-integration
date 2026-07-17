@@ -219,7 +219,7 @@ Before public launch:
 - Keep clear alert wording that notifications are estimates, not financial
   advice.
 - Verify CORS origins after the final custom domain is attached.
-- Enable the OCI PostgreSQL backup timer after confirming VM disk retention.
+- Verify the production-enforced OCI PostgreSQL backup timer after each release.
 - Configure production monitor secrets so GitHub Actions can send uptime/error
   alerts to Telegram after the bot token is rotated.
 - Monitor `/api/health` and `/api/admin/ops/summary` after each deployment.

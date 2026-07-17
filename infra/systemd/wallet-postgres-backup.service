@@ -5,6 +5,14 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+User=root
 WorkingDirectory=__WALLET_DEPLOY_PATH__
 Environment=OCI_DEPLOY_PATH=__WALLET_DEPLOY_PATH__
 ExecStart=__WALLET_DEPLOY_PATH__/scripts/deploy/backup-oci-postgres.sh
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+TimeoutStartSec=30min

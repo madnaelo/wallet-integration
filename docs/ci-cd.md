@@ -135,14 +135,14 @@ commercial-use approval; enabling it also requires `ONEINCH_API_KEY`.
 `ssh-keyscan -p 22 <oci-host>` and verify the fingerprint in the OCI console
 before saving it as a GitHub secret.
 
-Set `ENABLE_POSTGRES_BACKUP_TIMER=true` inside `OCI_BACKEND_ENV`. The backend
+Production releases force `ENABLE_POSTGRES_BACKUP_TIMER=true`. The backend
 deploy workflow uploads the backup script and systemd timer assets, and the
-deploy script enables `wallet-postgres-backup.timer`. Each custom-format dump is
-validated with `pg_restore`, checksummed, and pruned locally according to
-`BACKUP_RETENTION_DAYS`. Local VM backups are not disaster recovery: configure
-`OCI_BACKUP_BUCKET` and an OCI instance-principal policy so each dump and its
-checksum are also uploaded to Object Storage. Configure remote retention with an
-Object Storage lifecycle rule.
+deploy fails unless `wallet-postgres-backup.timer` is enabled and active. Each
+custom-format dump is validated with `pg_restore`, checksummed, and pruned
+locally according to `BACKUP_RETENTION_DAYS`. Local VM backups are not disaster
+recovery: configure `OCI_BACKUP_BUCKET` and an OCI instance-principal policy so
+each dump and its checksum are also uploaded to Object Storage. Configure remote
+retention with an Object Storage lifecycle rule.
 
 For the current OCI VM, these values match the manual deployment:
 
