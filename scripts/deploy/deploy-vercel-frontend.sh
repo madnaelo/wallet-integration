@@ -45,8 +45,18 @@ if (project.orgId !== process.env.VERCEL_ORG_ID || project.projectId !== process
 }
 NODE
 
-"${vercel_cli[@]}" build "${prod_flag[@]}" --token "$VERCEL_TOKEN"
-deployment_url="$("${vercel_cli[@]}" deploy --yes --prebuilt "${prod_flag[@]}" --token "$VERCEL_TOKEN" | tail -n 1 | tr -d '\r')"
+# Sensitive Vercel variables cannot be decrypted by `vercel pull`. Build on
+# Vercel so those values remain server-side and are available to Next.js.
+deployment_url="$("${vercel_cli[@]}" deploy \
+  --yes \
+  --force \
+  --archive=tgz \
+  "${prod_flag[@]}" \
+  --build-env "NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION" \
+  --build-env "NEXT_PUBLIC_COMMIT_TIMESTAMP=$NEXT_PUBLIC_COMMIT_TIMESTAMP" \
+  --token "$VERCEL_TOKEN" \
+  | tail -n 1 \
+  | tr -d '\r')"
 if ! [[ "$deployment_url" =~ ^https://[A-Za-z0-9.-]+$ ]]; then
   echo "Vercel did not return a valid deployment URL." >&2
   exit 1
