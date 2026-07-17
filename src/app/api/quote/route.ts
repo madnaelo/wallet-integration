@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/server/ip";
 import { rateLimit } from "@/lib/server/rateLimit";
 import { quoteCache } from "@/lib/server/cache";
-import { getAllowedChainIds, getChainById, isChainAllowed } from "@/lib/chains";
+import { getChainById, isChainAllowed } from "@/lib/chains";
 import { isAddress, isBitcoinMainnetAddress, isPositiveIntegerString } from "@/lib/validation";
 import { env } from "@/lib/server/env";
 import type { QuoteResponse } from "@/lib/types";
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const corsOrigin = req.headers.get("origin");
   if (!isOriginAllowed(corsOrigin)) {
-    return withCors(NextResponse.json({ error: "Request origin not allowed." }, { status: 403 }), corsOrigin);
+    return withCors(NextResponse.json({ error: "This request cannot be completed from this site." }, { status: 403 }), corsOrigin);
   }
 
   const rl = await rateLimit(ip);
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   if (!rl.allowed) {
     return withCors(
       NextResponse.json(
-        { error: "Rate limit exceeded. Please try again later." },
+        { error: "Quotes are being refreshed too quickly. Wait a moment and try again." },
         { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
       ),
       corsOrigin
@@ -50,20 +50,20 @@ export async function GET(req: NextRequest) {
   const slippageBpsStr = searchParams.get("slippageBps") ?? "";
 
   if (!chainIdStr || !/^\d+$/.test(chainIdStr)) {
-    return withCors(NextResponse.json({ error: "Invalid chainId." }, { status: 400 }), corsOrigin);
+    return withCors(NextResponse.json({ error: "Choose a valid network." }, { status: 400 }), corsOrigin);
   }
   const chainId = Number(chainIdStr);
 
   if (!isChainAllowed(chainId)) {
     return withCors(
-      NextResponse.json({ error: `Unsupported chainId. Allowed: ${getAllowedChainIds().join(", ")}` }, { status: 400 }),
+      NextResponse.json({ error: "This network is not supported yet." }, { status: 400 }),
       corsOrigin
     );
   }
 
   if (!sellToken || !buyToken) {
     return withCors(
-      NextResponse.json({ error: "sellToken and buyToken are required." }, { status: 400 }),
+      NextResponse.json({ error: "Choose both tokens." }, { status: 400 }),
       corsOrigin
     );
   }
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
 
   if (!isSellTokenOk || !isBuyTokenOk) {
     return withCors(
-      NextResponse.json({ error: "Invalid token address." }, { status: 400 }),
+      NextResponse.json({ error: "Choose a valid token." }, { status: 400 }),
       corsOrigin
     );
   }
@@ -85,11 +85,11 @@ export async function GET(req: NextRequest) {
     );
   }
   if (sellAmount.length > 78) {
-    return withCors(NextResponse.json({ error: "sellAmount is too large." }, { status: 400 }), corsOrigin);
+    return withCors(NextResponse.json({ error: "Enter a smaller amount." }, { status: 400 }), corsOrigin);
   }
   if (!isPositiveIntegerString(sellAmount)) {
     return withCors(
-      NextResponse.json({ error: "sellAmount must be greater than zero." }, { status: 400 }),
+      NextResponse.json({ error: "Enter an amount greater than zero." }, { status: 400 }),
       corsOrigin
     );
   }
@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
   if (!walletLimit.allowed) {
     return withCors(
       NextResponse.json(
-        { error: "Rate limit exceeded. Please try again later." },
+        { error: "Quotes are being refreshed too quickly. Wait a moment and try again." },
         { status: 429, headers: { "Retry-After": String(Math.ceil(walletLimit.retryAfterMs / 1000)) } }
       ),
       corsOrigin
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
 
   const chain = getChainById(chainId);
   if (!chain) {
-    return withCors(NextResponse.json({ error: "Chain registry missing configuration." }, { status: 500 }), corsOrigin);
+    return withCors(NextResponse.json({ error: "This network is temporarily unavailable." }, { status: 500 }), corsOrigin);
   }
 
   const sellTokenInfo = await resolveTokenInfo(chainId, sellToken);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllowedChainIds, isChainAllowed } from "@/lib/chains";
+import { isChainAllowed } from "@/lib/chains";
 import { getClientIp } from "@/lib/server/ip";
 import { rateLimit } from "@/lib/server/rateLimit";
 import { getTokensForChain } from "@/lib/server/tokenRegistry";
@@ -16,20 +16,20 @@ export async function GET(req: NextRequest) {
   }
   if (!rl.allowed) {
     return NextResponse.json(
-      { error: "Rate limit exceeded. Please try again later." },
+      { error: "Token search is being refreshed too quickly. Wait a moment and try again." },
       { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
     );
   }
 
   const chainIdValue = new URL(req.url).searchParams.get("chainId") ?? "";
   if (!/^\d+$/.test(chainIdValue)) {
-    return NextResponse.json({ error: "Invalid chainId." }, { status: 400 });
+    return NextResponse.json({ error: "Choose a valid network." }, { status: 400 });
   }
 
   const chainId = Number(chainIdValue);
   if (!isChainAllowed(chainId)) {
     return NextResponse.json(
-      { error: `Unsupported chainId. Allowed: ${getAllowedChainIds().join(", ")}` },
+      { error: "This network is not supported yet." },
       { status: 400 }
     );
   }
