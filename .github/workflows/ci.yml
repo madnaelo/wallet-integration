@@ -78,6 +78,27 @@ jobs:
     name: Backend
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: wallet_ci
+          POSTGRES_USER: wallet_ci
+          POSTGRES_PASSWORD: wallet_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wallet_ci -d wallet_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: jdbc:postgresql://localhost:5432/wallet_ci
+      DATABASE_USERNAME: wallet_ci
+      DATABASE_PASSWORD: wallet_ci_password
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      NOTIFICATIONS_MONITOR_ENABLED: "false"
+      LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED: "false"
     defaults:
       run:
         working-directory: backend
@@ -94,6 +115,31 @@ jobs:
 
       - name: Test
         run: mvn -B -ntp clean test
+
+      - name: Verify Flyway migrations and application startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp package -DskipTests
+          java -jar target/swap-backend-0.1.0.jar > target/ci-startup.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" >/dev/null 2>&1 || true; wait "$app_pid" >/dev/null 2>&1 || true' EXIT
+
+          deadline=$((SECONDS + 120))
+          while (( SECONDS < deadline )); do
+            if health=$(curl --fail --silent --show-error http://127.0.0.1:8080/api/health 2>/dev/null); then
+              printf '%s' "$health" | grep -q '"status":"ok"'
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" >/dev/null 2>&1; then
+              cat target/ci-startup.log >&2
+              exit 1
+            fi
+            sleep 2
+          done
+
+          cat target/ci-startup.log >&2
+          exit 1
 
   docker-config:
     name: Docker Compose Config
