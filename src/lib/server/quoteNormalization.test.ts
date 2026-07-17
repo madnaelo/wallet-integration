@@ -4,7 +4,8 @@ import {
   getProviderErrorStatus,
   normalizeQuote,
   normalizeProviderError,
-  providerError
+  providerError,
+  readProviderResponse
 } from "@/lib/server/quoteNormalization";
 
 describe("quote provider errors", () => {
@@ -65,5 +66,22 @@ describe("quote amount normalization", () => {
     expect(quote.netBuyAmount).toBe("1000");
     expect(quote.grossBuyAmount).toBe("1025");
     expect(quote.minBuyAmount).toBe("950");
+  });
+});
+
+describe("provider response limits", () => {
+  it("parses normal provider responses", async () => {
+    await expect(readProviderResponse(new Response('{"buyAmount":"1000"}'), "Provider"))
+      .resolves.toEqual({ buyAmount: "1000" });
+  });
+
+  it("rejects a declared response larger than the safe limit", async () => {
+    const response = new Response("{}", { headers: { "Content-Length": String(3 * 1024 * 1024) } });
+    await expect(readProviderResponse(response, "Provider")).rejects.toMatchObject({ status: 502 });
+  });
+
+  it("rejects an oversized streamed response without a content length", async () => {
+    const response = new Response("x".repeat(2 * 1024 * 1024 + 1));
+    await expect(readProviderResponse(response, "Provider")).rejects.toMatchObject({ status: 502 });
   });
 });

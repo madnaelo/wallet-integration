@@ -3,6 +3,7 @@ import type { QuoteParams } from "@/lib/server/aggregator";
 
 export const NATIVE_TOKEN_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 export type ProviderMeta = {
   providerId: string;
@@ -126,7 +127,7 @@ export function parseJsonBody(text: string): Record<string, unknown> {
 }
 
 export async function readProviderResponse(res: Response, providerName: string): Promise<Record<string, unknown>> {
-  const body = parseJsonBody(await res.text());
+  const body = parseJsonBody(await readProviderResponseText(res, providerName));
   if (!res.ok) {
     const msg =
       stringValue((body as any)?.error?.message) ||
@@ -141,6 +142,37 @@ export async function readProviderResponse(res: Response, providerName: string):
     throw err;
   }
   return body;
+}
+
+async function readProviderResponseText(res: Response, providerName: string): Promise<string> {
+  const declaredLength = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_PROVIDER_RESPONSE_BYTES) {
+    throw providerResponseTooLarge(providerName);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) return "";
+
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytesRead = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytesRead += value.byteLength;
+    if (bytesRead > MAX_PROVIDER_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw providerResponseTooLarge(providerName);
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+
+  return text + decoder.decode();
+}
+
+function providerResponseTooLarge(providerName: string): Error & { status: number } {
+  return Object.assign(new Error(`${providerName} response exceeded the safe size limit.`), { status: 502 });
 }
 
 export function collectNestedProtocolLines(value: unknown): QuoteRouteLine[] {
