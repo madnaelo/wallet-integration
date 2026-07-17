@@ -8,7 +8,7 @@ toward favorite pairs, reverse-swap profit checks, and notifications.
 The application never stores private keys, never takes custody of funds, and the
 backend never signs swap transactions.
 
-## Current MVP
+## Current Product
 
 Implemented:
 
@@ -80,8 +80,8 @@ The repository keeps quote execution and persisted user data separate:
 - `src/`: Next.js frontend and quote route.
 - `src/lib/server/`: server-only swap provider clients, quote normalization,
   fee configuration, rate limiting, and quote cache.
-- `backend/`: Spring Boot API for wallet-authenticated history and reverse
-  profit notifications and favorite pairs.
+- `backend/`: Spring Boot API for wallet-authenticated history, alert delivery,
+  favorite pairs, and signed limit-order submission/reconciliation.
 - `backend/src/main/resources/db/migration/`: Flyway database migrations.
 - `docker-compose.yml`: local PostgreSQL and optional full local stack.
 - `docker-compose.prod.yml`, `infra/`, and `scripts/`: OCI-oriented production
@@ -230,9 +230,9 @@ Do not commit real provider keys, production database passwords, or a live fee
 recipient secret bundle. Public `NEXT_PUBLIC_*` values are shipped to the
 browser by design.
 
-Wallet sign-in sessions are kept in tab-scoped browser storage. Closing the tab
-requires a fresh wallet signature and old persistent local copies are cleared
-automatically.
+Production wallet sign-in uses a Secure, HttpOnly first-party cookie through
+the frontend `/backend` proxy. JavaScript stores only non-secret tab metadata;
+it cannot read the production session credential.
 
 ## Verification
 
@@ -246,8 +246,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\verify.ps1'
 Or run the frontend checks directly:
 
 ```powershell
+npm run test
 npm run typecheck
 npm run lint
+npm run build
 ```
 
 ## Deployment Shape
@@ -258,9 +260,10 @@ The current deployment target is split by responsibility:
 - OCI runs the Spring Boot backend, private PostgreSQL database, and Caddy HTTPS
   proxy.
 
-The frontend quote route keeps provider keys server-side in Vercel. Spring Boot
-serves wallet-authenticated history and runs the reverse-profit notification
-scheduler behind the OCI backend API domain. See [docs/ci-cd.md](docs/ci-cd.md)
+The frontend quote route keeps provider keys server-side in Vercel. Browser
+backend calls use the same-origin `/backend` proxy and a Secure, HttpOnly
+session cookie; Spring Boot remains on OCI behind Caddy. See
+[docs/ci-cd.md](docs/ci-cd.md)
 for GitHub Actions, Vercel, OCI, and secret setup. See
 [docs/earning-setup-finalization.md](docs/earning-setup-finalization.md) for
 the fee-recipient, provider monetization, and launch revenue checklist.
@@ -283,5 +286,6 @@ The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:
   protection alerts, trade risk cues, actionable favorite-pair links, PWA
   installability, browser push alerts, onboarding, mobile polish, and CI/CD
   deployment gate hardening.
-- Prompt 39: production-grade Limit Orders with protocol-verifiable signed terms
-  and backend submission only for supported non-custodial adapters.
+- Prompts 39-41: production-grade Limit Orders with protocol-verifiable signed
+  terms, CoW/1inch adapters, live rate samples, recipient-wallet handling, and
+  user-selectable explanation levels.

@@ -1,6 +1,6 @@
 # Earning Setup Finalization
 
-Last reviewed: May 27, 2026
+Last reviewed: July 17, 2026
 
 This checklist tracks what is required before Swap Assistant can reliably collect
 platform fees in production.
@@ -32,7 +32,7 @@ Use one treasury EVM address for the first production release:
 - `FEE_RECIPIENT_ADDRESS`: the wallet intended to receive direct platform fees.
 - `AFFILIATE_ADDRESS`: fallback/legacy partner wallet address.
 
-For MVP production, set both variables to the same treasury EVM address. The
+For the initial production treasury, set both variables to the same EVM address. The
 code prefers `FEE_RECIPIENT_ADDRESS` and falls back to `AFFILIATE_ADDRESS` only
 when the fee recipient is blank.
 
@@ -46,7 +46,7 @@ The treasury address must:
 
 Recommended path:
 
-1. Use a dedicated treasury EOA for the MVP if speed matters.
+1. Use a dedicated treasury EOA for the first controlled production tests.
 2. Move to a multi-sig treasury such as Safe once we have volume.
 3. If using Safe, make sure the Safe address is available and operational on
    every EVM chain where we collect fees.
@@ -83,7 +83,8 @@ Reference:
 
 ### 1inch
 
-Status: code wired, compliance review needed before production revenue use.
+Status: code wired; due-diligence form submitted, explicit commercial
+fee-collecting account confirmation still required.
 
 The 1inch quote client sends:
 
@@ -221,6 +222,12 @@ Before public launch:
   alerts to Telegram after the bot token is rotated.
 - Monitor `/api/health` and `/api/admin/ops/summary` after each deployment.
 - Run small real swaps through each provider and record the fee receipt result.
+- Confirm the operating legal entity, jurisdiction, privacy contact, and
+  counsel-reviewed Terms/Privacy language before broad commercial launch.
+- Confirm an off-host PostgreSQL backup and perform a documented restore test.
+- Attach the final branded domain before public marketing.
+- Treat Limit Orders as a separate monetization track: current CoW/1inch signed
+  order adapters do not add the normal swap platform fee.
 
 ## Remaining Owner Actions
 

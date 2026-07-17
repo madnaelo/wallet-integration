@@ -19,8 +19,20 @@ if (-not $env:npm_config_cache) {
 
 Push-Location $repoRoot
 try {
-  npm run typecheck
-  mvn "-Dmaven.repo.local=$mavenRepo" -f backend/pom.xml test
+  npm.cmd test
+  npm.cmd audit --audit-level=moderate
+  npm.cmd run typecheck
+  npm.cmd run lint
+  npm.cmd run build
+  mvn.cmd "-Dmaven.repo.local=$mavenRepo" -f backend/pom.xml clean test
+
+  if (Get-Command docker -ErrorAction SilentlyContinue) {
+    docker compose config --quiet
+    docker compose --env-file infra/prod.env.example -f docker-compose.prod.yml config --quiet
+    docker compose --env-file infra/oci-backend.env.example -f docker-compose.oci-backend.yml config --quiet
+  } else {
+    Write-Warning "Docker is unavailable; Compose validation was skipped."
+  }
 } finally {
   Pop-Location
 }
