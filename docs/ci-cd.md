@@ -25,12 +25,15 @@ The workflows are in `.github/workflows`.
   `workflow_dispatch`. A Vercel deploy hook is still supported by the local
   script as a fallback, but CI expects the CLI secrets below.
 - `Deploy Backend - OCI`: builds the Spring Boot backend image, pushes it to
-  GHCR, then deploys it to the OCI VM after every push to `master`/`main`, or
-  manually through `workflow_dispatch`. It is designed for the current
-  side-by-side OCI VM where another app already owns ports 80/443 through Caddy.
+  GHCR only after its vulnerability scan passes, then deploys the immutable
+  image to OCI after every push to `master`/`main`, or manually through
+  `workflow_dispatch`. The candidate must pass an internal health check before
+  promotion and an external commit check afterward; a failed promotion restores
+  the previous backend automatically.
 - `Monitor Production`: checks the frontend, backend health, and optional
-  admin operations summary every 15 minutes. It fails the workflow and can send
-  a Telegram alert when production health is not acceptable.
+  admin operations summary every 15 minutes. It also verifies that both services
+  expose the current Git commit after a short deployment grace period. It fails
+  the workflow and can send a Telegram alert when production is unhealthy or stale.
 
 `vercel.json` disables direct Vercel Git auto-deploys so the GitHub Actions
 workflow is the single production deployment trigger.
@@ -64,15 +67,31 @@ Optional backend deployment secrets:
 ```text
 OCI_SSH_PORT
 OCI_DEPLOY_PATH
-OCI_CONTAINER_NETWORK
+```
+
+`OCI_CONTAINER_NETWORK` remains a temporary compatibility alias for
+`OCI_PROXY_NETWORK`; new configuration should use `OCI_PROXY_NETWORK`.
+
+Required non-secret GitHub Environment variables:
+
+```text
+OCI_PROXY_NETWORK
 OCI_CADDYFILE_PATH
 OCI_CADDY_CONTAINER
+```
+
+Optional non-secret GitHub Environment variables:
+
+```text
+OCI_INTERNAL_NETWORK
+OCI_CONTAINER_ENGINE
 ```
 
 Production monitor variables:
 
 ```text
 PRODUCTION_FRONTEND_URL
+PRODUCTION_FRONTEND_HEALTH_URL
 PRODUCTION_BACKEND_HEALTH_URL
 PRODUCTION_ADMIN_OPS_URL
 ```
@@ -113,12 +132,14 @@ not commit the real file.
 `ssh-keyscan -p 22 <oci-host>` and verify the fingerprint in the OCI console
 before saving it as a GitHub secret.
 
-Set `ENABLE_POSTGRES_BACKUP_TIMER=true` inside `OCI_BACKEND_ENV` after the OCI
-VM has enough disk space for retention. The backend deploy workflow uploads the
-backup script and systemd timer assets, and the deploy script enables
-`wallet-postgres-backup.timer` when that flag is true. Backups are written to
-`BACKUP_DIR` as custom-format `pg_dump` files and old backups are pruned by
-`BACKUP_RETENTION_DAYS`.
+Set `ENABLE_POSTGRES_BACKUP_TIMER=true` inside `OCI_BACKEND_ENV`. The backend
+deploy workflow uploads the backup script and systemd timer assets, and the
+deploy script enables `wallet-postgres-backup.timer`. Each custom-format dump is
+validated with `pg_restore`, checksummed, and pruned locally according to
+`BACKUP_RETENTION_DAYS`. Local VM backups are not disaster recovery: configure
+`OCI_BACKUP_BUCKET` and an OCI instance-principal policy so each dump and its
+checksum are also uploaded to Object Storage. Configure remote retention with an
+Object Storage lifecycle rule.
 
 For the current OCI VM, these values match the manual deployment:
 
@@ -126,11 +147,18 @@ For the current OCI VM, these values match the manual deployment:
 OCI_SSH_HOST=84.235.254.97
 OCI_SSH_USER=opc
 OCI_DEPLOY_PATH=/home/opc/wallet
-OCI_CONTAINER_NETWORK=uk-property-check
+OCI_PROXY_NETWORK=uk-property-check
+OCI_INTERNAL_NETWORK=wallet-internal
 OCI_CADDYFILE_PATH=/home/opc/uk-property-check-middleware/Caddyfile
 OCI_CADDY_CONTAINER=uk-property-check-caddy
 WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
 ```
+
+The proxy network, Caddy process, and site block are shared infrastructure and
+must already exist. The deploy script validates but never edits them. PostgreSQL is attached
+only to the dedicated internal `wallet-internal` network; the backend joins both
+that private network and the proxy network. No other application receives the
+Swap Assistant backend environment or database network.
 
 ## Vercel Environment
 
@@ -214,6 +242,9 @@ export BACKEND_IMAGE=ghcr.io/<owner>/wallet-backend:<tag>
 export GHCR_USERNAME=<github-user>
 export GHCR_TOKEN=<read-packages-token>
 export WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
+export OCI_PROXY_NETWORK=<existing-caddy-network>
+export OCI_CADDYFILE_PATH=<host-path-to-caddyfile>
+export OCI_CADDY_CONTAINER=<existing-caddy-container>
 ./scripts/deploy/deploy-oci-backend.sh
 ```
 

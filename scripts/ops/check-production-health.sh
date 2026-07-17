@@ -2,12 +2,21 @@
 set -Eeuo pipefail
 
 frontend_url="${FRONTEND_URL:-https://wallet-integration-theta.vercel.app}"
+frontend_health_url="${FRONTEND_HEALTH_URL:-${frontend_url%/}/api/health}"
 backend_health_url="${BACKEND_HEALTH_URL:-https://wallet-api.84-235-254-97.sslip.io/api/health}"
 admin_ops_url="${ADMIN_OPS_URL:-https://wallet-api.84-235-254-97.sslip.io/api/admin/ops/summary}"
 admin_api_key="${ADMIN_API_KEY:-}"
 telegram_alert_bot_token="${TELEGRAM_ALERT_BOT_TOKEN:-}"
 telegram_alert_chat_id="${TELEGRAM_ALERT_CHAT_ID:-}"
 telegram_base_url="${TELEGRAM_ALERT_BASE_URL:-https://api.telegram.org}"
+expected_commit="${EXPECTED_COMMIT:-$(git rev-parse HEAD 2>/dev/null || true)}"
+expected_commit_timestamp="${EXPECTED_COMMIT_TIMESTAMP:-$(git show -s --format=%ct HEAD 2>/dev/null || true)}"
+deploy_grace_minutes="${DEPLOY_GRACE_MINUTES:-30}"
+
+if ! [[ "$deploy_grace_minutes" =~ ^[0-9]+$ ]]; then
+  echo "DEPLOY_GRACE_MINUTES must be a non-negative integer." >&2
+  exit 1
+fi
 
 tmp_dir="$(mktemp -d)"
 cleanup() {
@@ -42,6 +51,57 @@ check_http() {
 frontend_file="$tmp_dir/frontend.html"
 check_http "Frontend" "$frontend_url" "$frontend_file" || true
 
+within_deploy_grace=false
+if [[ "$expected_commit_timestamp" =~ ^[0-9]+$ ]]; then
+  commit_age_seconds="$(( $(date +%s) - expected_commit_timestamp ))"
+  if [ "$commit_age_seconds" -lt "$((deploy_grace_minutes * 60))" ]; then
+    within_deploy_grace=true
+  fi
+fi
+
+validate_build_commit() {
+  local name="$1"
+  local payload_file="$2"
+  local actual_commit
+  if ! actual_commit="$(python3 - "$payload_file" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+status = str(data.get("status", "")).lower()
+if status != "ok":
+    raise SystemExit(f"service status is {status or 'missing'}")
+
+build = data.get("build") or {}
+print(str(build.get("commit") or "").strip())
+PY
+  )"; then
+    failures+=("$name health payload is invalid: $actual_commit")
+    return 1
+  fi
+
+  if [ -z "$actual_commit" ]; then
+    failures+=("$name health payload has no build commit")
+    return 1
+  fi
+  if [ -n "$expected_commit" ] && [ "$actual_commit" != "$expected_commit" ]; then
+    if [ "$within_deploy_grace" = "true" ]; then
+      echo "$name is still deploying: expected $expected_commit, found $actual_commit"
+      return 0
+    fi
+    failures+=("$name is stale: expected commit $expected_commit, found $actual_commit")
+    return 1
+  fi
+  echo "$name serves expected commit $actual_commit"
+}
+
+frontend_health_file="$tmp_dir/frontend-health.json"
+if check_http "Frontend health" "$frontend_health_url" "$frontend_health_file"; then
+  validate_build_commit "Frontend" "$frontend_health_file" || true
+fi
+
 health_file="$tmp_dir/backend-health.json"
 if check_http "Backend health" "$backend_health_url" "$health_file"; then
   if ! health_summary="$(python3 - "$health_file" <<'PY' 2>&1
@@ -73,6 +133,7 @@ PY
   else
     echo "$health_summary"
   fi
+  validate_build_commit "Backend" "$health_file" || true
 fi
 
 if [ -n "$admin_api_key" ] && [ -n "$admin_ops_url" ]; then

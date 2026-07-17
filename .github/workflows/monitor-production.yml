@@ -25,9 +25,12 @@ jobs:
         shell: bash
         env:
           FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://wallet-integration-theta.vercel.app' }}
+          FRONTEND_HEALTH_URL: ${{ vars.PRODUCTION_FRONTEND_HEALTH_URL || 'https://wallet-integration-theta.vercel.app/api/health' }}
           BACKEND_HEALTH_URL: ${{ vars.PRODUCTION_BACKEND_HEALTH_URL || 'https://wallet-api.84-235-254-97.sslip.io/api/health' }}
           ADMIN_OPS_URL: ${{ vars.PRODUCTION_ADMIN_OPS_URL || 'https://wallet-api.84-235-254-97.sslip.io/api/admin/ops/summary' }}
           ADMIN_API_KEY: ${{ secrets.PRODUCTION_ADMIN_API_KEY }}
           TELEGRAM_ALERT_BOT_TOKEN: ${{ secrets.PRODUCTION_MONITOR_TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALERT_CHAT_ID: ${{ secrets.PRODUCTION_MONITOR_TELEGRAM_CHAT_ID }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+          DEPLOY_GRACE_MINUTES: "30"
         run: ./scripts/ops/check-production-health.sh

@@ -3,150 +3,444 @@ set -Eeuo pipefail
 
 deploy_path="${OCI_DEPLOY_PATH:-/home/opc/wallet}"
 env_file="${DEPLOY_ENV_FILE:-$deploy_path/backend.env}"
-container_network="${OCI_CONTAINER_NETWORK:-uk-property-check}"
+backend_image="${BACKEND_IMAGE:-}"
+proxy_network="${OCI_PROXY_NETWORK:-${OCI_CONTAINER_NETWORK:-}}"
+internal_network="${OCI_INTERNAL_NETWORK:-wallet-internal}"
 backend_container="${BACKEND_CONTAINER_NAME:-wallet-backend}"
+candidate_container="${backend_container}-candidate"
+rollback_container="${backend_container}-rollback"
+failed_container="${backend_container}-failed"
 postgres_container="${POSTGRES_CONTAINER_NAME:-wallet-postgres}"
+legacy_postgres_container="${postgres_container}-legacy"
 postgres_volume="${POSTGRES_VOLUME_NAME:-wallet-postgres-data}"
+postgres_image="${POSTGRES_IMAGE:-docker.io/library/postgres:16-alpine}"
 backend_memory="${BACKEND_MEMORY:-520m}"
-app_version="${APP_VERSION:-${BACKEND_IMAGE##*:}}"
+backend_cpus="${BACKEND_CPUS:-1.0}"
+postgres_memory="${POSTGRES_MEMORY:-768m}"
+postgres_cpus="${POSTGRES_CPUS:-1.0}"
+app_version="${APP_VERSION:-${backend_image##*:}}"
 git_commit="${GIT_COMMIT:-}"
 deployed_at="${DEPLOYED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 api_domain="${WALLET_API_DOMAIN:-}"
-caddyfile_path="${OCI_CADDYFILE_PATH:-/home/opc/uk-property-check-middleware/Caddyfile}"
-caddy_container="${OCI_CADDY_CONTAINER:-uk-property-check-caddy}"
+caddyfile_path="${OCI_CADDYFILE_PATH:-}"
+caddy_container="${OCI_CADDY_CONTAINER:-}"
+postgres_env_file=""
+registry_auth_dir=""
 
-if [ -z "${BACKEND_IMAGE:-}" ]; then
-  echo "BACKEND_IMAGE is required." >&2
+fail() {
+  echo "$*" >&2
   exit 1
+}
+
+if [ -z "$backend_image" ]; then
+  fail "BACKEND_IMAGE is required."
 fi
 
 if [ ! -f "$env_file" ]; then
-  echo "Missing backend env file: $env_file" >&2
-  exit 1
+  fail "Missing backend env file: $env_file"
 fi
 
-sed -i \
-  -e 's|^PUSH_VAPID_SUBJECT=mailto:alerts@thewallet\.app$|PUSH_VAPID_SUBJECT=mailto:alerts@swapassistant.app|' \
-  -e 's|^PARASWAP_PARTNER=thewallet$|PARASWAP_PARTNER=swapassistant|' \
-  "$env_file"
-
-set -a
-# shellcheck disable=SC1090
-. "$env_file"
-set +a
-
-if command -v podman >/dev/null 2>&1; then
-  engine="podman"
-elif command -v docker >/dev/null 2>&1; then
-  engine="docker"
-else
-  echo "Neither podman nor docker is installed on this host." >&2
-  exit 1
+if [ -z "$git_commit" ]; then
+  fail "GIT_COMMIT is required for a verifiable production deployment."
+fi
+if ! [[ "$git_commit" =~ ^[0-9a-fA-F]{40}$ ]]; then
+  fail "GIT_COMMIT must be a full 40-character Git commit hash."
+fi
+if [ -z "$api_domain" ]; then
+  fail "WALLET_API_DOMAIN is required."
+fi
+if ! [[ "$api_domain" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]]; then
+  fail "WALLET_API_DOMAIN is not a valid hostname."
+fi
+if [ -z "$proxy_network" ]; then
+  fail "OCI_PROXY_NETWORK is required and must name the existing Caddy proxy network."
+fi
+if [ -z "$caddyfile_path" ] || [ -z "$caddy_container" ]; then
+  fail "OCI_CADDYFILE_PATH and OCI_CADDY_CONTAINER are required."
 fi
 
-run_container() {
-  sudo "$engine" "$@"
+for resource_name in "$proxy_network" "$internal_network" "$backend_container" "$postgres_container" "$postgres_volume"; do
+  if ! [[ "$resource_name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+    fail "Invalid container resource name: $resource_name"
+  fi
+done
+
+read_env_value() {
+  local key="$1"
+  awk -v key="$key" '
+    index($0, key "=") == 1 {
+      value = substr($0, length(key) + 2)
+      sub(/\r$/, "", value)
+      found = 1
+    }
+    END {
+      if (!found) exit 1
+      print value
+    }
+  ' "$env_file"
 }
 
+postgres_db="$(read_env_value POSTGRES_DB || true)"
+postgres_user="$(read_env_value POSTGRES_USER || true)"
+postgres_password="$(read_env_value POSTGRES_PASSWORD || true)"
+if [ -z "$postgres_db" ] || [ -z "$postgres_user" ] || [ -z "$postgres_password" ]; then
+  fail "POSTGRES_DB, POSTGRES_USER, and POSTGRES_PASSWORD must be set in $env_file."
+fi
+
+engine="${OCI_CONTAINER_ENGINE:-}"
+if [ -n "$engine" ] && [ "$engine" != "docker" ] && [ "$engine" != "podman" ]; then
+  fail "OCI_CONTAINER_ENGINE must be docker or podman."
+fi
+if [ -n "$engine" ] && ! command -v "$engine" >/dev/null 2>&1; then
+  fail "Configured container engine is not installed: $engine"
+fi
+if [ -z "$engine" ]; then
+  for candidate_engine in docker podman; do
+    if ! command -v "$candidate_engine" >/dev/null 2>&1; then
+      continue
+    fi
+    if { [ "$(id -u)" -eq 0 ] && "$candidate_engine" container inspect "$caddy_container" >/dev/null 2>&1; } \
+      || { [ "$(id -u)" -ne 0 ] && sudo "$candidate_engine" container inspect "$caddy_container" >/dev/null 2>&1; }; then
+      engine="$candidate_engine"
+      break
+    fi
+  done
+fi
+if [ -z "$engine" ]; then
+  fail "Could not find the Docker or Podman engine that owns $caddy_container."
+fi
+
+umask 077
+registry_auth_dir="$(mktemp -d "$deploy_path/.registry-auth.XXXXXX")"
+
+run_container() {
+  declare -a auth_env
+  if [ "$engine" = "podman" ]; then
+    auth_env=(env "REGISTRY_AUTH_FILE=$registry_auth_dir/auth.json")
+  else
+    auth_env=(env "DOCKER_CONFIG=$registry_auth_dir")
+  fi
+  if [ "$(id -u)" -eq 0 ]; then
+    "${auth_env[@]}" "$engine" "$@"
+  else
+    sudo "${auth_env[@]}" "$engine" "$@"
+  fi
+}
+
+container_exists() {
+  run_container container inspect "$1" >/dev/null 2>&1
+}
+
+network_exists() {
+  run_container network inspect "$1" >/dev/null 2>&1
+}
+
+volume_exists() {
+  run_container volume inspect "$1" >/dev/null 2>&1
+}
+
+container_is_running() {
+  [ "$(run_container inspect -f '{{.State.Running}}' "$1" 2>/dev/null || true)" = "true" ]
+}
+
+container_has_network() {
+  run_container inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$1" 2>/dev/null \
+    | grep -Fxq "$2"
+}
+
+container_label() {
+  run_container inspect -f "{{index .Config.Labels \"$2\"}}" "$1" 2>/dev/null || true
+}
+
+cleanup() {
+  if [ -n "$postgres_env_file" ]; then
+    rm -f "$postgres_env_file"
+  fi
+  if [ -n "$registry_auth_dir" ]; then
+    rm -rf "$registry_auth_dir"
+  fi
+}
+trap cleanup EXIT
+
 if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
-  echo "$GHCR_TOKEN" | run_container login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null
+  printf '%s' "$GHCR_TOKEN" | run_container login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null
 fi
 
-if ! run_container network exists "$container_network" >/dev/null 2>&1; then
-  run_container network create "$container_network" >/dev/null
+network_exists "$proxy_network" || fail "The configured Caddy proxy network does not exist: $proxy_network"
+container_exists "$caddy_container" || fail "The configured Caddy container does not exist: $caddy_container"
+container_has_network "$caddy_container" "$proxy_network" \
+  || fail "Caddy container $caddy_container is not connected to proxy network $proxy_network."
+[ -f "$caddyfile_path" ] || fail "Configured Caddyfile does not exist: $caddyfile_path"
+
+if ! network_exists "$internal_network"; then
+  run_container network create --internal --label com.swapassistant.role=internal "$internal_network" >/dev/null
+fi
+if ! run_container network inspect "$internal_network" 2>/dev/null \
+  | grep -Eiq '"[Ii]nternal"[[:space:]]*:[[:space:]]*true'; then
+  fail "Network $internal_network exists but is not internal. Refusing to expose the database on it."
 fi
 
-if ! run_container volume exists "$postgres_volume" >/dev/null 2>&1; then
-  run_container volume create "$postgres_volume" >/dev/null
+if ! volume_exists "$postgres_volume"; then
+  run_container volume create --label com.swapassistant.role=database "$postgres_volume" >/dev/null
 fi
 
-if run_container container exists "$postgres_container" >/dev/null 2>&1; then
-  run_container start "$postgres_container" >/dev/null
-else
+umask 077
+postgres_env_file="$(mktemp "$deploy_path/.wallet-postgres-env.XXXXXX")"
+{
+  printf 'POSTGRES_DB=%s\n' "$postgres_db"
+  printf 'POSTGRES_USER=%s\n' "$postgres_user"
+  printf 'POSTGRES_PASSWORD=%s\n' "$postgres_password"
+} > "$postgres_env_file"
+
+run_postgres() {
+  declare -a log_args=(--log-opt max-size=10m)
+  if [ "$engine" = "docker" ]; then
+    log_args+=(--log-opt max-file=5)
+  fi
   run_container run -d \
     --name "$postgres_container" \
     --restart unless-stopped \
-    --network "$container_network" \
-    --env-file "$env_file" \
+    --network "$internal_network" \
+    --env-file "$postgres_env_file" \
+    --label com.swapassistant.app=backend \
+    --label com.swapassistant.role=database \
+    --memory "$postgres_memory" \
+    --cpus "$postgres_cpus" \
+    --pids-limit 256 \
+    "${log_args[@]}" \
     -v "$postgres_volume:/var/lib/postgresql/data:Z" \
-    docker.io/library/postgres:16-alpine >/dev/null
+    "$postgres_image" >/dev/null
+}
+
+wait_for_postgres() {
+  for attempt in $(seq 1 60); do
+    if run_container exec "$postgres_container" pg_isready -U "$postgres_user" -d "$postgres_db" >/dev/null 2>&1; then
+      return 0
+    fi
+    if [ "$attempt" = "60" ]; then
+      run_container logs --tail=120 "$postgres_container" >&2 || true
+      return 1
+    fi
+    sleep 2
+  done
+}
+
+# Recover the known-good backend if a previous promotion was interrupted.
+if container_exists "$rollback_container"; then
+  run_container rm -f "$backend_container" >/dev/null 2>&1 || true
+  run_container rename "$rollback_container" "$backend_container"
+  if ! container_has_network "$backend_container" "$internal_network"; then
+    run_container network connect "$internal_network" "$backend_container"
+  fi
+  if ! container_has_network "$backend_container" "$proxy_network"; then
+    run_container network connect --alias "$backend_container" "$proxy_network" "$backend_container"
+  fi
+  run_container start "$backend_container" >/dev/null
+fi
+run_container rm -f "$candidate_container" >/dev/null 2>&1 || true
+run_container rm -f "$failed_container" >/dev/null 2>&1 || true
+if ! container_exists "$postgres_container" && container_exists "$legacy_postgres_container"; then
+  run_container rename "$legacy_postgres_container" "$postgres_container"
+  run_container start "$postgres_container" >/dev/null
+fi
+if container_exists "$postgres_container" && container_exists "$legacy_postgres_container"; then
+  if ! container_is_running "$postgres_container"; then
+    run_container start "$postgres_container" >/dev/null
+  fi
+  if wait_for_postgres; then
+    run_container rm -f "$legacy_postgres_container" >/dev/null
+  else
+    run_container rm -f "$postgres_container" >/dev/null 2>&1 || true
+    run_container rename "$legacy_postgres_container" "$postgres_container"
+    run_container start "$postgres_container" >/dev/null
+  fi
 fi
 
-for attempt in $(seq 1 60); do
-  if run_container exec "$postgres_container" pg_isready -U "${POSTGRES_USER:-wallet}" -d "${POSTGRES_DB:-wallet}" >/dev/null 2>&1; then
-    break
-  fi
-  if [ "$attempt" = "60" ]; then
-    run_container logs --tail=120 "$postgres_container" >&2
-    exit 1
-  fi
-  sleep 2
-done
-
-if ! run_container image exists "$BACKEND_IMAGE" >/dev/null 2>&1; then
-  run_container pull "$BACKEND_IMAGE" >/dev/null
+if container_exists "$backend_container" && ! container_has_network "$backend_container" "$internal_network"; then
+  run_container network connect "$internal_network" "$backend_container"
 fi
-run_container rm -f "$backend_container" >/dev/null 2>&1 || true
+
+postgres_needs_recreate=false
+if container_exists "$postgres_container"; then
+  if [ "$(container_label "$postgres_container" com.swapassistant.role)" != "database" ]; then
+    postgres_needs_recreate=true
+  fi
+  if container_has_network "$postgres_container" "$proxy_network"; then
+    postgres_needs_recreate=true
+  fi
+else
+  postgres_needs_recreate=true
+fi
+
+if [ "$postgres_needs_recreate" = "true" ]; then
+  run_container pull "$postgres_image" >/dev/null
+  if container_exists "$postgres_container"; then
+    if ! container_is_running "$postgres_container"; then
+      run_container start "$postgres_container" >/dev/null
+    fi
+    wait_for_postgres || fail "Existing PostgreSQL did not become ready before its safety backup."
+    OCI_DEPLOY_PATH="$deploy_path" BACKUP_DIR="$deploy_path/backups/pre-hardening" BACKUP_RETENTION_DAYS=30 \
+      "$deploy_path/scripts/deploy/backup-oci-postgres.sh"
+    run_container stop --time 30 "$postgres_container" >/dev/null
+    run_container rename "$postgres_container" "$legacy_postgres_container"
+  fi
+  if ! run_postgres || ! wait_for_postgres; then
+    run_container rm -f "$postgres_container" >/dev/null 2>&1 || true
+    if container_exists "$legacy_postgres_container"; then
+      run_container rename "$legacy_postgres_container" "$postgres_container"
+      run_container start "$postgres_container" >/dev/null
+    fi
+    fail "Hardened PostgreSQL failed to start; the previous database container was restored."
+  fi
+  run_container rm -f "$legacy_postgres_container" >/dev/null 2>&1 || true
+else
+  if ! container_is_running "$postgres_container"; then
+    run_container start "$postgres_container" >/dev/null
+  fi
+  if ! container_has_network "$postgres_container" "$internal_network"; then
+    run_container network connect "$internal_network" "$postgres_container"
+  fi
+fi
+wait_for_postgres || fail "PostgreSQL failed its readiness check."
+
+if container_has_network "$postgres_container" "$proxy_network"; then
+  run_container network disconnect -f "$proxy_network" "$postgres_container"
+fi
+if container_has_network "$postgres_container" "$proxy_network"; then
+  fail "PostgreSQL is still attached to the shared proxy network."
+fi
+
+extract_site_block() {
+  awk -v domain="$api_domain" '
+    {
+      compact = $0
+      gsub(/[[:space:]]/, "", compact)
+      if (!inside && compact == domain "{") {
+        inside = 1
+      }
+      if (inside) {
+        print
+        braces = $0
+        opens = gsub(/\{/, "{", braces)
+        braces = $0
+        closes = gsub(/\}/, "}", braces)
+        depth += opens - closes
+        if (depth == 0) exit
+      }
+    }
+  ' "$caddyfile_path"
+}
+
+site_block="$(extract_site_block)"
+if [ -z "$site_block" ]; then
+  fail "Caddy has no explicit $api_domain site block. Configure it once before deploying."
+fi
+if ! printf '%s\n' "$site_block" \
+  | grep -Eq "reverse_proxy[[:space:]]+$backend_container:8080([[:space:]]|$)"; then
+  fail "The existing $api_domain Caddy block does not route to $backend_container:8080."
+fi
+run_container exec "$caddy_container" caddy validate --config /etc/caddy/Caddyfile >/dev/null \
+  || fail "Caddy rejected its current configuration."
+run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null
+
+run_container pull "$backend_image" >/dev/null
+
+declare -a backend_log_args=(--log-opt max-size=10m)
+if [ "$engine" = "docker" ]; then
+  backend_log_args+=(--log-opt max-file=5)
+fi
 run_container run -d \
-  --name "$backend_container" \
+  --name "$candidate_container" \
   --restart unless-stopped \
-  --network "$container_network" \
+  --network "$internal_network" \
   --env-file "$env_file" \
   -e "APP_VERSION=$app_version" \
   -e "GIT_COMMIT=$git_commit" \
   -e "DEPLOYED_AT=$deployed_at" \
+  --label com.swapassistant.app=backend \
+  --label com.swapassistant.role=api \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+  --security-opt no-new-privileges \
+  --cap-drop ALL \
   --memory "$backend_memory" \
-  "$BACKEND_IMAGE" >/dev/null
+  --cpus "$backend_cpus" \
+  --pids-limit 256 \
+  "${backend_log_args[@]}" \
+  "$backend_image" >/dev/null
 
+candidate_healthy=false
 for attempt in $(seq 1 90); do
-  if run_container exec "$backend_container" wget -q -O - http://127.0.0.1:8080/api/health >/dev/null 2>&1; then
+  if candidate_health="$(run_container exec "$candidate_container" wget -q -O - http://127.0.0.1:8080/api/health 2>/dev/null)" \
+    && printf '%s' "$candidate_health" | grep -qF "$git_commit"; then
+    candidate_healthy=true
     break
   fi
   if [ "$attempt" = "90" ]; then
-    run_container logs --tail=180 "$backend_container" >&2
-    exit 1
+    run_container logs --tail=180 "$candidate_container" >&2 || true
+  else
+    sleep 2
   fi
-  sleep 2
 done
-
-if [ -n "$api_domain" ] && [ -f "$caddyfile_path" ] && run_container container exists "$caddy_container" >/dev/null 2>&1; then
-  marker="# wallet-backend:$api_domain"
-  if ! sudo grep -qF "$marker" "$caddyfile_path" \
-    && ! sudo grep -Eq "^[[:space:]]*$api_domain[[:space:]]*\\{" "$caddyfile_path"; then
-    sudo cp "$caddyfile_path" "$caddyfile_path.bak-wallet-$(date +%Y%m%d%H%M%S)"
-    {
-      echo ""
-      echo "$marker"
-      echo "$api_domain {"
-      echo "  encode zstd gzip"
-      echo "  header {"
-      echo "    Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\""
-      echo "    X-Content-Type-Options \"nosniff\""
-      echo "    X-Frame-Options \"DENY\""
-      echo "    Referrer-Policy \"strict-origin-when-cross-origin\""
-      echo "    Permissions-Policy \"camera=(), microphone=(), geolocation=(), payment=(), usb=()\""
-      echo "    X-Permitted-Cross-Domain-Policies \"none\""
-      echo "  }"
-      echo "  reverse_proxy $backend_container:8080"
-      echo "}"
-    } | sudo tee -a "$caddyfile_path" >/dev/null
-  fi
-  run_container exec "$caddy_container" caddy validate --config /etc/caddy/Caddyfile >/dev/null
-  run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null
+if [ "$candidate_healthy" != "true" ]; then
+  run_container rm -f "$candidate_container" >/dev/null 2>&1 || true
+  fail "Candidate backend failed its health or build-identity check."
 fi
 
-if [ "${ENABLE_POSTGRES_BACKUP_TIMER:-false}" = "true" ]; then
+had_previous_backend=false
+if container_exists "$backend_container"; then
+  had_previous_backend=true
+  run_container stop --time 30 "$backend_container" >/dev/null
+  if container_has_network "$backend_container" "$proxy_network"; then
+    run_container network disconnect -f "$proxy_network" "$backend_container"
+  fi
+  run_container rename "$backend_container" "$rollback_container"
+fi
+run_container rename "$candidate_container" "$backend_container"
+run_container network connect --alias "$backend_container" "$proxy_network" "$backend_container"
+run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null
+
+health_url="${BACKEND_HEALTH_URL:-https://$api_domain/api/health}"
+external_healthy=false
+for attempt in $(seq 1 30); do
+  if health_body="$(curl --fail --silent --show-error --max-time 15 "$health_url" 2>/dev/null)" \
+    && printf '%s' "$health_body" | grep -qF "$git_commit"; then
+    external_healthy=true
+    break
+  fi
+  sleep 5
+done
+
+if [ "$external_healthy" != "true" ]; then
+  echo "The promoted backend did not pass external build verification; rolling back." >&2
+  run_container stop --time 20 "$backend_container" >/dev/null 2>&1 || true
+  if container_has_network "$backend_container" "$proxy_network"; then
+    run_container network disconnect -f "$proxy_network" "$backend_container" >/dev/null 2>&1 || true
+  fi
+  run_container rename "$backend_container" "$failed_container" >/dev/null 2>&1 || true
+  if [ "$had_previous_backend" = "true" ] && container_exists "$rollback_container"; then
+    run_container rename "$rollback_container" "$backend_container"
+    run_container network connect --alias "$backend_container" "$proxy_network" "$backend_container"
+    run_container start "$backend_container" >/dev/null
+    run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null || true
+  fi
+  run_container rm -f "$failed_container" >/dev/null 2>&1 || true
+  fail "Backend release failed and the previous release was restored."
+fi
+
+if container_exists "$rollback_container"; then
+  run_container rm -f "$rollback_container" >/dev/null
+fi
+
+enable_backups="$(read_env_value ENABLE_POSTGRES_BACKUP_TIMER || printf 'false')"
+if [ "$enable_backups" = "true" ]; then
   backup_script="$deploy_path/scripts/deploy/backup-oci-postgres.sh"
   backup_service_template="$deploy_path/infra/systemd/wallet-postgres-backup.service"
   backup_timer_template="$deploy_path/infra/systemd/wallet-postgres-backup.timer"
   if [ ! -f "$backup_script" ] || [ ! -f "$backup_service_template" ] || [ ! -f "$backup_timer_template" ]; then
-    echo "Backup timer requested, but backup assets were not uploaded." >&2
-    exit 1
+    fail "Backup timer requested, but backup assets were not uploaded."
   fi
-  if ! command -v systemctl >/dev/null 2>&1; then
-    echo "Backup timer requested, but systemctl is unavailable on this host." >&2
-    exit 1
-  fi
+  command -v systemctl >/dev/null 2>&1 || fail "Backup timer requested, but systemctl is unavailable."
 
   chmod +x "$backup_script"
   escaped_deploy_path="$(printf '%s' "$deploy_path" | sed 's/[&|\\]/\\&/g')"
@@ -157,28 +451,4 @@ if [ "${ENABLE_POSTGRES_BACKUP_TIMER:-false}" = "true" ]; then
   sudo systemctl enable --now wallet-postgres-backup.timer >/dev/null
 fi
 
-health_url="${BACKEND_HEALTH_URL:-}"
-if [ -z "$health_url" ] && [ -n "$api_domain" ]; then
-  health_url="https://$api_domain/api/health"
-fi
-
-if [ -n "$health_url" ] && command -v curl >/dev/null 2>&1; then
-  for attempt in $(seq 1 30); do
-    if health_body="$(curl -fsS "$health_url")"; then
-      if [ -n "$git_commit" ] && ! printf '%s' "$health_body" | grep -qF "$git_commit"; then
-        echo "Backend health endpoint is reachable, but it is not serving the expected commit $git_commit." >&2
-        printf '%s\n' "$health_body" >&2
-        exit 1
-      fi
-      echo "Backend is healthy: $health_url"
-      exit 0
-    fi
-    if [ "$attempt" = "30" ]; then
-      run_container logs --tail=120 "$backend_container" >&2
-      exit 1
-    fi
-    sleep 5
-  done
-fi
-
-echo "Backend is healthy."
+echo "Backend is healthy at $health_url and serves commit $git_commit."

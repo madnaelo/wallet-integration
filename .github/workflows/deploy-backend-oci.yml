@@ -146,10 +146,13 @@ jobs:
           ONEINCH_API_KEY: ${{ secrets.ONEINCH_API_KEY }}
           COW_API_KEY: ${{ secrets.COW_API_KEY }}
           WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
+          OCI_PROXY_NETWORK: ${{ vars.OCI_PROXY_NETWORK || secrets.OCI_PROXY_NETWORK || secrets.OCI_CONTAINER_NETWORK }}
+          OCI_CADDYFILE_PATH: ${{ vars.OCI_CADDYFILE_PATH || secrets.OCI_CADDYFILE_PATH }}
+          OCI_CADDY_CONTAINER: ${{ vars.OCI_CADDY_CONTAINER || secrets.OCI_CADDY_CONTAINER }}
         run: |
           set -euo pipefail
           missing=()
-          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV ONEINCH_API_KEY WALLET_API_DOMAIN; do
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV ONEINCH_API_KEY WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER; do
             if [ -z "${!name:-}" ]; then
               missing+=("$name")
             fi
@@ -177,6 +180,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          umask 077
+          backend_env_file="$(mktemp)"
+          trap 'rm -f "$backend_env_file"' EXIT
           ssh $SSH_OPTS -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
             "mkdir -p '$OCI_DEPLOY_PATH/scripts/deploy' '$OCI_DEPLOY_PATH/infra/systemd'"
           scp $SSH_OPTS -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
@@ -197,8 +203,11 @@ jobs:
             printf 'COW_PARTNER_ORDERBOOK_BASE_URL=https://partners.cow.fi\n'
             printf 'LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED=true\n'
             printf 'LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS=8\n'
-          } | ssh $SSH_OPTS -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "cat > '$OCI_DEPLOY_PATH/backend.env' && chmod 600 '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh' '$OCI_DEPLOY_PATH/scripts/deploy/backup-oci-postgres.sh'"
+          } > "$backend_env_file"
+          scp $SSH_OPTS -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
+            "$backend_env_file" "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/backend.env.next"
+          ssh $SSH_OPTS -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
+            "chmod 600 '$OCI_DEPLOY_PATH/backend.env.next' && mv '$OCI_DEPLOY_PATH/backend.env.next' '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh' '$OCI_DEPLOY_PATH/scripts/deploy/backup-oci-postgres.sh'"
         env:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
@@ -210,8 +219,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          deployed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           ssh $SSH_OPTS -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' APP_VERSION='$APP_VERSION' GIT_COMMIT='$GIT_COMMIT' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' WALLET_API_DOMAIN='$WALLET_API_DOMAIN' OCI_CONTAINER_NETWORK='$OCI_CONTAINER_NETWORK' OCI_CADDYFILE_PATH='$OCI_CADDYFILE_PATH' OCI_CADDY_CONTAINER='$OCI_CADDY_CONTAINER' ./scripts/deploy/deploy-oci-backend.sh"
+            "cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' APP_VERSION='$APP_VERSION' GIT_COMMIT='$GIT_COMMIT' DEPLOYED_AT='$deployed_at' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' WALLET_API_DOMAIN='$WALLET_API_DOMAIN' OCI_PROXY_NETWORK='$OCI_PROXY_NETWORK' OCI_INTERNAL_NETWORK='$OCI_INTERNAL_NETWORK' OCI_CONTAINER_ENGINE='$OCI_CONTAINER_ENGINE' OCI_CADDYFILE_PATH='$OCI_CADDYFILE_PATH' OCI_CADDY_CONTAINER='$OCI_CADDY_CONTAINER' ./scripts/deploy/deploy-oci-backend.sh"
         env:
           BACKEND_IMAGE: ${{ needs.build.outputs.image }}
           APP_VERSION: ${{ github.sha }}
@@ -221,6 +231,8 @@ jobs:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
           WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
-          OCI_CONTAINER_NETWORK: ${{ secrets.OCI_CONTAINER_NETWORK || 'uk-property-check' }}
-          OCI_CADDYFILE_PATH: ${{ secrets.OCI_CADDYFILE_PATH || '/home/opc/uk-property-check-middleware/Caddyfile' }}
-          OCI_CADDY_CONTAINER: ${{ secrets.OCI_CADDY_CONTAINER || 'uk-property-check-caddy' }}
+          OCI_PROXY_NETWORK: ${{ vars.OCI_PROXY_NETWORK || secrets.OCI_PROXY_NETWORK || secrets.OCI_CONTAINER_NETWORK }}
+          OCI_INTERNAL_NETWORK: ${{ vars.OCI_INTERNAL_NETWORK || secrets.OCI_INTERNAL_NETWORK || 'wallet-internal' }}
+          OCI_CONTAINER_ENGINE: ${{ vars.OCI_CONTAINER_ENGINE || secrets.OCI_CONTAINER_ENGINE }}
+          OCI_CADDYFILE_PATH: ${{ vars.OCI_CADDYFILE_PATH || secrets.OCI_CADDYFILE_PATH }}
+          OCI_CADDY_CONTAINER: ${{ vars.OCI_CADDY_CONTAINER || secrets.OCI_CADDY_CONTAINER }}
