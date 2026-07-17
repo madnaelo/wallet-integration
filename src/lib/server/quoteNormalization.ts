@@ -120,7 +120,9 @@ export function assertExecutableQuote(fields: { to?: string; data?: string }) {
 
 export function parseJsonBody(text: string): Record<string, unknown> {
   try {
-    return text ? JSON.parse(text) : {};
+    if (!text) return {};
+    const parsed: unknown = JSON.parse(text);
+    return recordValue(parsed);
   } catch {
     return { raw: text };
   }
@@ -129,17 +131,15 @@ export function parseJsonBody(text: string): Record<string, unknown> {
 export async function readProviderResponse(res: Response, providerName: string): Promise<Record<string, unknown>> {
   const body = parseJsonBody(await readProviderResponseText(res, providerName));
   if (!res.ok) {
+    const nestedError = recordValue(body.error);
     const msg =
-      stringValue((body as any)?.error?.message) ||
-      stringValue((body as any)?.error) ||
-      stringValue((body as any)?.message) ||
-      stringValue((body as any)?.detail) ||
-      stringValue((body as any)?.reason) ||
+      stringValue(nestedError.message) ||
+      stringValue(body.error) ||
+      stringValue(body.message) ||
+      stringValue(body.detail) ||
+      stringValue(body.reason) ||
       `${providerName} quote unavailable (${res.status})`;
-    const err: any = new Error(msg);
-    err.status = res.status;
-    err.body = body;
-    throw err;
+    throw Object.assign(new Error(msg), { status: res.status, body });
   }
   return body;
 }
@@ -184,8 +184,8 @@ export function collectNestedProtocolLines(value: unknown): QuoteRouteLine[] {
       return;
     }
 
-    if (!node || typeof node !== "object") return;
-    const item: any = node;
+    const item = recordValue(node);
+    if (Object.keys(item).length === 0) return;
     const name = stringValue(item.name) || stringValue(item.title) || stringValue(item.id) || stringValue(item.exchange);
     const part = numberValue(item.part ?? item.share ?? item.percent ?? item.percentage);
     if (name) totals.set(name, (totals.get(name) ?? 0) + (part || 0));
@@ -207,6 +207,16 @@ export function collectNestedProtocolLines(value: unknown): QuoteRouteLine[] {
 
 export function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+export function scalarStringValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+}
+
+export function recordValue(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
 }
 
 export function numberValue(value: unknown): number {

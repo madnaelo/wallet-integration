@@ -8,6 +8,8 @@ import {
   normalizeNativeToken,
   normalizeQuote,
   readProviderResponse,
+  recordValue,
+  scalarStringValue,
   stringValue,
   toMinAmount
 } from "@/lib/server/quoteNormalization";
@@ -62,19 +64,18 @@ export class ParaswapClient implements DexAggregatorClient {
       signal: params.signal
     });
     const body = await readProviderResponse(res, this.providerName);
-    const raw: any = body;
-    const priceRoute = raw.priceRoute ?? raw;
-    const tx = raw.txParams ?? raw.transaction ?? raw.tx ?? {};
-    const buyAmount = stringValue(priceRoute.destAmount) || stringValue(raw.destAmount);
+    const priceRoute = Object.keys(recordValue(body.priceRoute)).length > 0 ? recordValue(body.priceRoute) : body;
+    const tx = firstRecord(body.txParams, body.transaction, body.tx);
+    const buyAmount = stringValue(priceRoute.destAmount) || stringValue(body.destAmount);
     const fields = {
       buyAmount,
       minBuyAmount: stringValue(priceRoute.destAmountWithSlippage) || toMinAmount(buyAmount, params.slippageBps),
       to: stringValue(tx.to),
       data: stringValue(tx.data),
       value: stringValue(tx.value) || "0",
-      gas: stringValue(tx.gas) || String(raw.gas ?? ""),
+      gas: scalarStringValue(tx.gas) || scalarStringValue(body.gas),
       gasPrice: stringValue(tx.gasPrice),
-      allowanceTarget: stringValue(priceRoute.tokenTransferProxy) || stringValue(raw.tokenTransferProxy) || stringValue(tx.to),
+      allowanceTarget: stringValue(priceRoute.tokenTransferProxy) || stringValue(body.tokenTransferProxy) || stringValue(tx.to),
       routeLines: collectNestedProtocolLines(priceRoute.bestRoute ?? priceRoute.route ?? priceRoute),
       platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
@@ -94,6 +95,14 @@ export class ParaswapClient implements DexAggregatorClient {
       ...(apiKey && apiKeyHeader ? { [apiKeyHeader]: apiKey } : {})
     };
   }
+}
+
+function firstRecord(...values: unknown[]): Record<string, unknown> {
+  for (const value of values) {
+    const record = recordValue(value);
+    if (Object.keys(record).length > 0) return record;
+  }
+  return {};
 }
 
 function normalizeHeaderName(value: string): string {

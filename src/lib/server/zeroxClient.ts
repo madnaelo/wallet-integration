@@ -1,4 +1,4 @@
-import type { QuoteResponse } from "@/lib/types";
+import type { QuoteFee, QuoteResponse } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
 import { SAME_CHAIN_QUOTE_CHAIN_IDS } from "@/lib/chains";
 import {
@@ -6,6 +6,7 @@ import {
   normalizeNativeToken,
   normalizeQuote,
   readProviderResponse,
+  recordValue,
   stringValue
 } from "@/lib/server/quoteNormalization";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
@@ -67,17 +68,18 @@ export class ZeroXClient implements DexAggregatorClient {
   }
 
   private normalizeZeroXQuote(body: Record<string, unknown>, params: QuoteParams): QuoteResponse {
-    const raw: any = body;
+    const transaction = recordValue(body.transaction);
+    const allowance = recordValue(recordValue(body.issues).allowance);
     const fields = {
-      buyAmount: stringValue(raw.buyAmount),
-      minBuyAmount: stringValue(raw.minBuyAmount),
-      to: stringValue(raw?.transaction?.to) || stringValue(raw.to),
-      data: stringValue(raw?.transaction?.data) || stringValue(raw.data),
-      value: stringValue(raw?.transaction?.value) || stringValue(raw.value) || "0",
-      gas: stringValue(raw?.transaction?.gas) || stringValue(raw.gas),
-      gasPrice: stringValue(raw?.transaction?.gasPrice),
-      allowanceTarget: stringValue(raw?.issues?.allowance?.spender) || stringValue(raw.allowanceTarget),
-      serviceFees: collectZeroXFees(raw),
+      buyAmount: stringValue(body.buyAmount),
+      minBuyAmount: stringValue(body.minBuyAmount),
+      to: stringValue(transaction.to) || stringValue(body.to),
+      data: stringValue(transaction.data) || stringValue(body.data),
+      value: stringValue(transaction.value) || stringValue(body.value) || "0",
+      gas: stringValue(transaction.gas) || stringValue(body.gas),
+      gasPrice: stringValue(transaction.gasPrice),
+      allowanceTarget: stringValue(allowance.spender) || stringValue(body.allowanceTarget),
+      serviceFees: collectZeroXFees(body),
       platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
@@ -93,14 +95,15 @@ async function readZeroXResponse(res: Response): Promise<Record<string, unknown>
   return body;
 }
 
-function collectZeroXFees(body: any) {
-  const fees = body?.fees;
-  if (!fees || typeof fees !== "object") return [];
+function collectZeroXFees(body: Record<string, unknown>): QuoteFee[] {
+  const fees = recordValue(body.fees);
+  if (Object.keys(fees).length === 0) return [];
 
-  const lines = [];
+  const lines: QuoteFee[] = [];
   for (const fee of [fees.zeroExFee, fees.integratorFee, ...(Array.isArray(fees.integratorFees) ? fees.integratorFees : [])]) {
-    const amount = stringValue(fee?.amount);
-    const token = stringValue(fee?.token);
+    const feeRecord = recordValue(fee);
+    const amount = stringValue(feeRecord.amount);
+    const token = stringValue(feeRecord.token);
     if (amount && token) {
       lines.push({ label: "Service fee", amount, token });
     }

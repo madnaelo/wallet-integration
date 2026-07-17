@@ -6,6 +6,7 @@ import {
   assertExecutableQuote,
   normalizeQuote,
   readProviderResponse,
+  recordValue,
   stringValue,
   ZERO_ADDRESS
 } from "@/lib/server/quoteNormalization";
@@ -70,9 +71,9 @@ export class LifiBitcoinClient implements DexAggregatorClient {
   }
 
   private normalizeLifiQuote(body: Record<string, unknown>, params: QuoteParams, hasPlatformFee: boolean): QuoteResponse {
-    const raw: any = body;
-    const estimate = raw.estimate ?? {};
-    const tx = raw.transactionRequest ?? {};
+    const estimate = recordValue(body.estimate);
+    const tx = recordValue(body.transactionRequest);
+    const toolDetails = recordValue(body.toolDetails);
     const gasCosts = Array.isArray(estimate.gasCosts) ? estimate.gasCosts : [];
     const fields = {
       buyAmount: stringValue(estimate.toAmount),
@@ -85,7 +86,7 @@ export class LifiBitcoinClient implements DexAggregatorClient {
       allowanceTarget: stringValue(estimate.approvalAddress) || stringValue(tx.to),
       routeLines: [
         {
-          source: stringValue(raw?.toolDetails?.name) || stringValue(raw.tool) || "LI.FI",
+          source: stringValue(toolDetails.name) || stringValue(body.tool) || "LI.FI",
           share: "Best route"
         }
       ],
@@ -101,7 +102,7 @@ export class LifiBitcoinClient implements DexAggregatorClient {
         executionKind: isBitcoinToken(params.sellToken) ? "bitcoin-to-evm" : "evm-to-bitcoin",
         totalNetworkFee: sumCostAmounts(gasCosts),
         networkFeeToken: firstCostToken(gasCosts),
-        tool: stringValue(raw.tool)
+        tool: stringValue(body.tool)
       },
       params,
       this,
@@ -112,13 +113,15 @@ export class LifiBitcoinClient implements DexAggregatorClient {
 
 function collectLifiFees(value: unknown): QuoteFee[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((fee) => {
-    const amount = stringValue(fee?.amount);
-    const token = stringValue(fee?.token?.address);
+  return value.flatMap((feeValue) => {
+    const fee = recordValue(feeValue);
+    const tokenDetails = recordValue(fee.token);
+    const amount = stringValue(fee.amount);
+    const token = stringValue(tokenDetails.address);
     if (!amount || !token) return [];
     return [
       {
-        label: feeLabel(stringValue(fee?.name)),
+        label: feeLabel(stringValue(fee.name)),
         amount,
         token
       }
@@ -132,7 +135,7 @@ function feeLabel(name: string): string {
 
 function gasCostPrice(costs: unknown[]): string {
   for (const cost of costs) {
-    const price = stringValue((cost as any)?.price);
+    const price = stringValue(recordValue(cost).price);
     if (price) return price;
   }
   return "";
@@ -140,7 +143,7 @@ function gasCostPrice(costs: unknown[]): string {
 
 function sumCostAmounts(costs: unknown[]): string {
   const total = costs.reduce<bigint>((sum, cost) => {
-    const amount = stringValue((cost as any)?.amount);
+    const amount = stringValue(recordValue(cost).amount);
     return /^\d+$/.test(amount) ? sum + BigInt(amount) : sum;
   }, 0n);
   return total > 0n ? total.toString() : "";
@@ -157,10 +160,10 @@ function isBitcoinToken(token: string): boolean {
 
 function firstCostToken(costs: unknown[]): QuoteToken | undefined {
   for (const cost of costs) {
-    const token = (cost as any)?.token;
-    const address = stringValue(token?.address);
-    const symbol = stringValue(token?.symbol);
-    const decimals = Number(token?.decimals);
+    const token = recordValue(recordValue(cost).token);
+    const address = stringValue(token.address);
+    const symbol = stringValue(token.symbol);
+    const decimals = Number(token.decimals);
     if (address && symbol && Number.isInteger(decimals) && decimals >= 0) {
       return { address, symbol, decimals };
     }

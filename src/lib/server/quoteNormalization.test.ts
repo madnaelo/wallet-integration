@@ -75,6 +75,22 @@ describe("provider response limits", () => {
       .resolves.toEqual({ buyAmount: "1000" });
   });
 
+  it("does not treat non-object JSON as a provider object", async () => {
+    await expect(readProviderResponse(new Response('[{"buyAmount":"1000"}]'), "Provider"))
+      .resolves.toEqual({});
+    await expect(readProviderResponse(new Response('"unexpected"'), "Provider"))
+      .resolves.toEqual({});
+  });
+
+  it("retains a provider status without trusting malformed error payloads", async () => {
+    const response = new Response('["upstream error"]', { status: 503 });
+    await expect(readProviderResponse(response, "Provider")).rejects.toMatchObject({
+      status: 503,
+      message: "Provider quote unavailable (503)",
+      body: {}
+    });
+  });
+
   it("rejects a declared response larger than the safe limit", async () => {
     const response = new Response("{}", { headers: { "Content-Length": String(3 * 1024 * 1024) } });
     await expect(readProviderResponse(response, "Provider")).rejects.toMatchObject({ status: 502 });

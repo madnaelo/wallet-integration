@@ -7,6 +7,8 @@ import {
   normalizeNativeToken,
   normalizeQuote,
   readProviderResponse,
+  recordValue,
+  scalarStringValue,
   stringValue,
   toSlippagePercent
 } from "@/lib/server/quoteNormalization";
@@ -63,18 +65,17 @@ export class OneInchClient implements DexAggregatorClient {
     });
 
     const body = await readProviderResponse(res, this.providerName);
-    const raw: any = body;
-    const tx = raw.tx ?? {};
+    const tx = recordValue(body.tx);
     const fields = {
-      buyAmount: stringValue(raw.dstAmount) || stringValue(raw.toAmount),
-      minBuyAmount: stringValue(raw.minReturnAmount),
+      buyAmount: stringValue(body.dstAmount) || stringValue(body.toAmount),
+      minBuyAmount: stringValue(body.minReturnAmount),
       to: stringValue(tx.to),
       data: stringValue(tx.data),
       value: stringValue(tx.value) || "0",
-      gas: String(tx.gas ?? raw.gas ?? ""),
+      gas: scalarStringValue(tx.gas) || scalarStringValue(body.gas),
       gasPrice: stringValue(tx.gasPrice),
       allowanceTarget: (await spenderPromise) || stringValue(tx.to),
-      routeLines: collectNestedProtocolLines(raw.protocols),
+      routeLines: collectNestedProtocolLines(body.protocols),
       platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
@@ -93,7 +94,7 @@ export class OneInchClient implements DexAggregatorClient {
       signal
     });
     const body = await readProviderResponse(res, this.providerName);
-    return stringValue((body as any).address);
+    return stringValue(body.address);
   }
 
   private headers() {

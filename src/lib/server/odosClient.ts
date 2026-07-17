@@ -6,6 +6,8 @@ import {
   normalizeNativeToken,
   normalizeQuote,
   readProviderResponse,
+  recordValue,
+  scalarStringValue,
   stringValue,
   toMinAmount,
   toSlippagePercent,
@@ -37,15 +39,16 @@ export class OdosClient implements DexAggregatorClient {
 
     const quote = await this.fetchQuote(params);
     const assemble = await this.assembleTransaction(quote, params);
-    const quoteRaw: any = quote;
-    const assembleRaw: any = assemble;
-    const tx = assembleRaw.transaction ?? {};
-    const output = Array.isArray(quoteRaw.outAmounts) ? stringValue(quoteRaw.outAmounts[0]) : stringValue(quoteRaw.outAmount);
-    const routeLines = Array.isArray(quoteRaw.pathViz)
-      ? quoteRaw.pathViz.slice(0, 5).map((path: any, index: number) => ({
-          source: stringValue(path?.name) || stringValue(path?.protocol) || `Route ${index + 1}`,
-          share: stringValue(path?.percent) || "Best route"
-        }))
+    const tx = recordValue(assemble.transaction);
+    const output = Array.isArray(quote.outAmounts) ? stringValue(quote.outAmounts[0]) : stringValue(quote.outAmount);
+    const routeLines = Array.isArray(quote.pathViz)
+      ? quote.pathViz.slice(0, 5).map((pathValue: unknown, index: number) => {
+          const path = recordValue(pathValue);
+          return {
+            source: stringValue(path.name) || stringValue(path.protocol) || `Route ${index + 1}`,
+            share: scalarStringValue(path.percent) || "Best route"
+          };
+        })
       : [{ source: "Odos", share: "Best route" }];
 
     const fields = {
@@ -54,7 +57,7 @@ export class OdosClient implements DexAggregatorClient {
       to: stringValue(tx.to),
       data: stringValue(tx.data),
       value: stringValue(tx.value) || "0",
-      gas: String(tx.gas ?? assembleRaw.gasEstimate ?? ""),
+      gas: scalarStringValue(tx.gas) || scalarStringValue(assemble.gasEstimate),
       allowanceTarget: stringValue(tx.to),
       routeLines,
       platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
@@ -101,7 +104,7 @@ export class OdosClient implements DexAggregatorClient {
   }
 
   private async assembleTransaction(quote: Record<string, unknown>, params: QuoteParams): Promise<Record<string, unknown>> {
-    const pathId = stringValue((quote as any).pathId);
+    const pathId = stringValue(quote.pathId);
     if (!pathId) throw new Error("Odos did not return a route id.");
 
     const res = await fetch(new URL("/sor/assemble", this.cfg.baseUrl).toString(), {
