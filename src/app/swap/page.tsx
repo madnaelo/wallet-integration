@@ -17,7 +17,7 @@ import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
 import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
-import { ERC20_ABI } from "@/lib/erc20";
+import { ensureExactTokenAllowance } from "@/lib/tokenAllowance";
 import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect, useWalletInfo } from "@reown/appkit/react";
 import { isAppKitConfigured } from "@/context/appkit";
 import { envPublic } from "@/lib/envPublic";
@@ -2254,25 +2254,28 @@ export default function Page() {
     if (sellTokenInfo.isNative) return;
 
     const p = getProviderOrThrow();
-    const { BrowserProvider, Contract } = await import("ethers");
-    const provider = new BrowserProvider(p);
-    const signer = await provider.getSigner();
-
-    const token = new Contract(sellTokenInfo.address, ERC20_ABI, signer);
-
     const spender = (quote.allowanceTarget as string | undefined) ?? quote.to;
     if (!spender || !isAddress(spender)) throw new Error("This quote cannot be approved safely. Refresh and try another route.");
-
-    const currentAllowance: bigint = await token.allowance(walletAddress, spender);
     const needed = BigInt(quote.sellAmount);
-
-    if (currentAllowance >= needed) return;
-
-    setWalletRequestNotice(buildWalletApprovalNotice(connectedWalletName, "tokenApproval"));
-    const tx = await token.approve(spender, needed);
-    setApprovalTxHash(tx.hash);
-    setWalletRequestNotice("Approval submitted. Waiting for the network before opening the swap request.");
-    await tx.wait();
+    await ensureExactTokenAllowance({
+      provider: p,
+      ownerAddress: walletAddress,
+      tokenAddress: sellTokenInfo.address,
+      spenderAddress: spender,
+      expectedChainId: selectedChainId,
+      requiredAmount: needed,
+      onWalletRequest: (phase) => {
+        setWalletRequestNotice(
+          phase === "reset"
+            ? `Open ${normalizeWalletApprovalName(connectedWalletName)} and confirm clearing the previous token permission.`
+            : buildWalletApprovalNotice(connectedWalletName, "tokenApproval")
+        );
+      },
+      onTransactionSubmitted: (_phase, transactionHash) => {
+        setApprovalTxHash(transactionHash);
+        setWalletRequestNotice("Token approval submitted. Waiting for network confirmation.");
+      }
+    });
     setWalletRequestNotice("");
   }
 

@@ -24,6 +24,12 @@ import { listTokens } from "@/lib/tokenClient";
 import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
+import { ensureExactTokenAllowance } from "@/lib/tokenAllowance";
+import {
+  COW_PROTOCOL_PROVIDER,
+  ONEINCH_ORDERBOOK_PROVIDER,
+  resolveTrustedLimitOrderSpender
+} from "@/lib/limitOrderSpender";
 import { TokenPicker, type TokenPickerOption } from "@/components/TokenPicker";
 import {
   buildFallbackTokensByChain,
@@ -37,8 +43,7 @@ const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
 const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
 const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
 const UINT_40_MAX = (1n << 40n) - 1n;
-const COW_PROTOCOL_PROVIDER = "cow_protocol";
-const ONEINCH_PROVIDER = "1inch_orderbook";
+const ONEINCH_PROVIDER = ONEINCH_ORDERBOOK_PROVIDER;
 const COW_SETTLEMENT_CONTRACT = "0x9008D19f58AAbD9eD0D60971565AA8510560ab41";
 const COW_EMPTY_APP_DATA = "0xb48d38f93eaa084033fc5970bf96e559c33c4cdc07d889ab00b4d63f9590739d";
 const RATE_SAMPLE_INTERVAL_MS = 45_000;
@@ -86,7 +91,7 @@ const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
   simple: {
     label: "Simple",
     heroBody:
-      "Pick the tokens, choose the price you want, and approve one safe wallet message. Your funds stay in your wallet unless the order can be filled at your price.",
+      "Pick the tokens, choose the price you want, and approve the exact order in your wallet. Your funds stay in your wallet unless the order can be filled at your price.",
     formSubheading: "Like a normal swap, but it waits for your price.",
     capabilityChecking: "Checking this pair...",
     capabilityReady: "This pair can be ordered",
@@ -98,6 +103,7 @@ const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
       "The order may not fill, even if the market briefly touches your price.",
       "It needs enough token balance and approval in your wallet when execution happens.",
       "You can review the exact terms before signing. This signature is not a transfer.",
+      "If token approval is needed, your wallet asks separately and the network may charge gas.",
       "If a pair cannot be safely ordered yet, Swap Assistant keeps it as an alert instead."
     ],
     securityTitle: "How We Keep It Safe",
@@ -106,7 +112,7 @@ const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
     securityFootnote:
       "Swap Assistant does not hold your funds or private keys. Supported pairs use trusted signed-order protocols.",
     terms:
-      "I understand this order may not fill, and it needs enough balance and token approval in my wallet. Swap Assistant may submit only the exact terms I review and sign."
+      "I understand this order may not fill, and it needs enough balance and exact token approval in my wallet. A token approval may cost network gas. Swap Assistant may submit only the exact terms I review and sign."
   },
   crypto: {
     label: "Crypto",
@@ -743,6 +749,25 @@ export default function LimitOrdersPage() {
         sellAmountRaw,
         minBuyAmountRaw,
         expiresAt
+      });
+      const spenderAddress = await resolveTrustedLimitOrderSpender(preparedOrder.executionProvider, executionChainId);
+      await ensureExactTokenAllowance({
+        provider: walletProvider,
+        ownerAddress: address,
+        tokenAddress: executionSellToken.address,
+        spenderAddress,
+        expectedChainId: executionChainId,
+        requiredAmount: BigInt(sellAmountRaw),
+        onWalletRequest: (phase) => {
+          setOrderNotice(
+            phase === "reset"
+              ? `Open ${walletName} and confirm clearing the previous ${executionSellToken.symbol} permission.`
+              : `Open ${walletName} and approve access to exactly ${formatCompactNumber(sellAmount)} ${executionSellToken.symbol}.`
+          );
+        },
+        onTransactionSubmitted: () => {
+          setOrderNotice("Token approval submitted. Waiting for network confirmation.");
+        }
       });
       setOrderNotice(`Open ${walletName} and sign the ${formatExecutionProvider(preparedOrder.executionProvider)} terms. This signature is not a fund transfer.`);
       const signature = await signTypedData(walletProvider, address, preparedOrder.typedData, providerKind);
