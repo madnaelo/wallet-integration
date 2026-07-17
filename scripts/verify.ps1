@@ -24,7 +24,7 @@ try {
   npm.cmd run typecheck
   npm.cmd run lint
   npm.cmd run build
-  mvn.cmd "-Dmaven.repo.local=$mavenRepo" -f backend/pom.xml clean test
+  mvn.cmd "-Dmaven.repo.local=$mavenRepo" -f backend/pom.xml clean verify
 
   if (Get-Command docker -ErrorAction SilentlyContinue) {
     docker compose config --quiet
