@@ -16,7 +16,7 @@ import type { QuoteResponse } from "@/lib/types";
 import { CHAINS, getAllowedChains, getChainById } from "@/lib/chains";
 import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
 import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
-import { isAddress } from "@/lib/validation";
+import { isAddress, isBitcoinMainnetAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
 import { ensureExactTokenAllowance } from "@/lib/tokenAllowance";
 import type {
@@ -198,7 +198,7 @@ const ADDRESS_FAMILY_CONFIG: Record<AddressFamily, AddressFamilyConfig> = {
     recipientLabel: "Bitcoin recipient address",
     placeholder: "bc1...",
     parse: parseBitcoinAddressInput,
-    isValid: isBitcoinAddressInput
+    isValid: isBitcoinMainnetAddress
   }
 };
 
@@ -4730,14 +4730,6 @@ function tokenMetadataToDisplay(token: DisplayToken): DisplayToken {
 
 function normalizeTokenKey(address: string): string {
   return address.trim().toLowerCase();
-}
-
-function isBitcoinAddressInput(value: string): boolean {
-  const address = value.trim();
-  return (
-    /^(bc1)[ac-hj-np-z02-9]{11,87}$/i.test(address) ||
-    /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(address)
-  );
 }
 
 function waitMs(ms: number): Promise<void> {

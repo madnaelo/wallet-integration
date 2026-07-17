@@ -3,7 +3,7 @@ import { getClientIp } from "@/lib/server/ip";
 import { rateLimit } from "@/lib/server/rateLimit";
 import { quoteCache } from "@/lib/server/cache";
 import { getAllowedChainIds, getChainById, isChainAllowed } from "@/lib/chains";
-import { isAddress, isPositiveIntegerString } from "@/lib/validation";
+import { isAddress, isBitcoinMainnetAddress, isPositiveIntegerString } from "@/lib/validation";
 import { env } from "@/lib/server/env";
 import type { QuoteResponse } from "@/lib/types";
 import { createNativeBitcoinQuoteClient, createQuoteClient } from "@/lib/server/quoteProvider";
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (isNativeBitcoinToken(sellToken)) {
-    if (!isBitcoinAddressInput(takerAddress)) {
+    if (!isBitcoinMainnetAddress(takerAddress)) {
       return withCors(NextResponse.json({ error: "Invalid Bitcoin source address." }, { status: 400 }), corsOrigin);
     }
   } else if (!isAddress(takerAddress)) {
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (isNativeBitcoinToken(buyToken)) {
-    if (!isBitcoinAddressInput(toAddress)) {
+    if (!isBitcoinMainnetAddress(toAddress)) {
       return withCors(NextResponse.json({ error: "Choose a Bitcoin receive address." }, { status: 400 }), corsOrigin);
     }
   } else if (toAddress && !isAddress(toAddress)) {
@@ -216,14 +216,6 @@ async function resolveTokenInfo(chainId: number, address: string): Promise<Token
 
 function normalizeTokenKey(address: string): string {
   return address.trim().toLowerCase();
-}
-
-function isBitcoinAddressInput(value: string): boolean {
-  const address = value.trim();
-  return (
-    /^(bc1)[ac-hj-np-z02-9]{11,87}$/i.test(address) ||
-    /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(address)
-  );
 }
 
 function withCors(res: NextResponse, origin: string | null) {
