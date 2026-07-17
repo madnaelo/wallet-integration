@@ -2,9 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { useAppKit, useAppKitAccount, useAppKitProvider, useWalletInfo } from "@reown/appkit/react";
-import { isAppKitConfigured } from "@/context/appkit";
+import type {
+  WalletBridgeActions,
+  WalletBridgeOpenOptions,
+  WalletBridgeState
+} from "@/components/WalletBridge";
+import { isAppKitConfigured } from "@/lib/walletConfig";
 import { CHAINS, getAllowedChains } from "@/lib/chains";
 import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
@@ -40,6 +45,8 @@ import {
   buildTokenPickerOptions,
   getEvmNetworkId
 } from "@/lib/tokenPickerOptions";
+
+const WalletBridge = dynamic(() => import("@/components/WalletBridge"), { ssr: false });
 
 const BACKEND_SESSION_STORAGE_KEY = "wallet.swapAssistant.backendSession.v1";
 const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
@@ -183,14 +190,24 @@ const WRAPPED_NATIVE_BY_CHAIN: Record<number, TokenInfo> = {
 
 export default function LimitOrdersPage() {
   const chains = useMemo(() => getAllowedChains(), []);
-  const { open } = useAppKit();
-  const { address, isConnected } = useAppKitAccount({ namespace: "eip155" });
-  const { walletProvider, walletProviderType } = useAppKitProvider<Eip1193Provider>("eip155");
-  const { walletInfo } = useWalletInfo("eip155");
+  const [walletBridgeState, setWalletBridgeState] = useState<WalletBridgeState>({ evmConnected: false });
+  const [walletBridgeActions, setWalletBridgeActions] = useState<WalletBridgeActions | null>(null);
+  const address = walletBridgeState.evmAddress;
+  const isConnected = walletBridgeState.evmConnected;
+  const walletProvider = walletBridgeState.evmProvider;
+  const walletProviderType = walletBridgeState.providerType;
+  const walletBridgeReady = Boolean(walletBridgeActions);
+  const open = useCallback(
+    async (options: WalletBridgeOpenOptions) => {
+      if (!walletBridgeActions) throw new Error("Wallet options are still loading. Try again in a moment.");
+      await walletBridgeActions.open(options);
+    },
+    [walletBridgeActions]
+  );
   const backendSessionRequestRef = useRef<Promise<BackendSession> | null>(null);
 
   const providerKind: ProviderKind = walletProviderType === "WALLET_CONNECT" ? "walletconnect" : walletProvider ? "injected" : null;
-  const walletName = getWalletDisplayName(walletInfo?.name, walletProviderType);
+  const walletName = getWalletDisplayName(walletBridgeState.evmWalletName, walletProviderType);
   const [chainId, setChainId] = useState<number>(chains[0]?.chainId ?? 1);
   const [tokensByChain, setTokensByChain] = useState<Record<number, TokenInfo[]>>(() =>
     buildFallbackTokensByChain(chains.map((chain) => chain.chainId))
@@ -691,7 +708,11 @@ export default function LimitOrdersPage() {
   }
 
   const appHeader = (
-    <header className="header">
+    <>
+      {isAppKitConfigured ? (
+        <WalletBridge onState={setWalletBridgeState} onActions={setWalletBridgeActions} />
+      ) : null}
+      <header className="header">
       <div className="headerTop">
         <div className="headerCopy">
           <h1 className="h1">Swap Assistant</h1>
@@ -701,10 +722,16 @@ export default function LimitOrdersPage() {
           <button
             className="btn btnPrimary"
             type="button"
-            disabled={!isAppKitConfigured}
+            disabled={!isAppKitConfigured || !walletBridgeReady}
             onClick={() => void open({ view: isConnected && address ? "Account" : "Connect", namespace: "eip155" })}
           >
-            {isConnected && address ? `${walletName} ${shortAddress(address)}` : "Connect Wallet"}
+            {isConnected && address
+              ? `${walletName} ${shortAddress(address)}`
+              : !isAppKitConfigured
+                ? "Wallet unavailable"
+                : walletBridgeReady
+                  ? "Connect Wallet"
+                  : "Preparing Wallets..."}
           </button>
         </div>
       </div>
@@ -722,7 +749,8 @@ export default function LimitOrdersPage() {
           <li><Link className="appMenuLink" href="/swap#preferences">Preferences</Link></li>
         </ul>
       </nav>
-    </header>
+      </header>
+    </>
   );
 
   async function ensureBackendSession(): Promise<BackendSession> {

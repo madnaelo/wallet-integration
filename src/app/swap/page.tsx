@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -18,8 +19,12 @@ import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
 import { ensureExactTokenAllowance } from "@/lib/tokenAllowance";
-import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect, useWalletInfo } from "@reown/appkit/react";
-import { isAppKitConfigured } from "@/context/appkit";
+import type {
+  WalletBridgeActions,
+  WalletBridgeOpenOptions,
+  WalletBridgeState
+} from "@/components/WalletBridge";
+import { isAppKitConfigured } from "@/lib/walletConfig";
 import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
 import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
@@ -64,6 +69,8 @@ import {
   startTelegramLink,
   verifyAuthSignature
 } from "@/lib/backendClient";
+
+const WalletBridge = dynamic(() => import("@/components/WalletBridge"), { ssr: false });
 
 type TxStatus = "idle" | "pending" | "submitted" | "confirmed" | "failed";
 type ActiveView = "swap" | "alerts" | "favorites" | "preferences";
@@ -197,14 +204,28 @@ const ADDRESS_FAMILY_CONFIG: Record<AddressFamily, AddressFamilyConfig> = {
 
 export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
-  const { open: openAppKit } = useAppKit();
-  const evmAccount = useAppKitAccount({ namespace: "eip155" });
-  const { address: appKitAddress, isConnected: appKitConnected } = evmAccount;
-  const { address: bitcoinAccountAddress } = useAppKitAccount({ namespace: "bip122" });
-  const { walletProvider: appKitProvider, walletProviderType } = useAppKitProvider<Eip1193Provider>("eip155");
-  const { walletInfo } = useWalletInfo("eip155");
-  const { walletInfo: bitcoinWalletInfo } = useWalletInfo("bip122");
-  const { disconnect: disconnectAppKit } = useDisconnect();
+  const [walletBridgeState, setWalletBridgeState] = useState<WalletBridgeState>({ evmConnected: false });
+  const [walletBridgeActions, setWalletBridgeActions] = useState<WalletBridgeActions | null>(null);
+  const appKitAddress = walletBridgeState.evmAddress;
+  const appKitConnected = walletBridgeState.evmConnected;
+  const bitcoinAccountAddress = walletBridgeState.bitcoinAddress;
+  const appKitProvider = walletBridgeState.evmProvider;
+  const walletProviderType = walletBridgeState.providerType;
+  const walletBridgeReady = Boolean(walletBridgeActions);
+  const openAppKit = useCallback(
+    async (options: WalletBridgeOpenOptions) => {
+      if (!walletBridgeActions) throw new Error("Wallet options are still loading. Try again in a moment.");
+      await walletBridgeActions.open(options);
+    },
+    [walletBridgeActions]
+  );
+  const disconnectAppKit = useCallback(
+    async (options: Parameters<WalletBridgeActions["disconnect"]>[0]) => {
+      if (!walletBridgeActions) return;
+      await walletBridgeActions.disconnect(options);
+    },
+    [walletBridgeActions]
+  );
   const isDryRun = envPublic.DISALLOW_MAINNET;
   const [activeView, setActiveView] = useState<ActiveView>("swap");
   const [featureFlags, setFeatureFlags] = useState({
@@ -330,19 +351,26 @@ export default function Page() {
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
   const connectedWalletName = useMemo(
-    () => getWalletDisplayName(walletInfo?.name, walletProviderType),
-    [walletInfo?.name, walletProviderType]
+    () => getWalletDisplayName(walletBridgeState.evmWalletName, walletProviderType),
+    [walletBridgeState.evmWalletName, walletProviderType]
   );
   const connectedWalletDisplay = useMemo(
     () =>
       buildConnectedWalletDisplay({
         address: walletAddress,
-        accountLabel: getEmbeddedAccountLabel(evmAccount.embeddedWalletInfo?.user),
+        accountLabel: getEmbeddedAccountLabel(walletBridgeState.embeddedUser),
         networkName: getWalletNetworkLabel(walletChainId, chain?.name),
         providerType: walletProviderType,
         walletName: connectedWalletName
       }),
-    [chain?.name, connectedWalletName, evmAccount.embeddedWalletInfo?.user, walletAddress, walletChainId, walletProviderType]
+    [
+      chain?.name,
+      connectedWalletName,
+      walletAddress,
+      walletBridgeState.embeddedUser,
+      walletChainId,
+      walletProviderType
+    ]
   );
   const [tokensByChain, setTokensByChain] = useState<Record<number, TokenInfo[]>>(() =>
     buildFallbackTokensByChain(allowedChains.map((allowedChain) => allowedChain.chainId))
@@ -761,15 +789,15 @@ export default function Page() {
     if (recipientAddressMode !== "connected" || !recipientAddress.trim()) return "";
     const walletNamespace = getTokenWalletNamespace(buyTokenInfo);
     return walletNamespace === "bip122"
-      ? getWalletDisplayName(bitcoinWalletInfo?.name, bitcoinWalletInfo?.type)
-      : getWalletDisplayName(walletInfo?.name, walletProviderType);
+      ? getWalletDisplayName(walletBridgeState.bitcoinWalletName, walletBridgeState.bitcoinWalletType)
+      : getWalletDisplayName(walletBridgeState.evmWalletName, walletProviderType);
   }, [
-    bitcoinWalletInfo?.name,
-    bitcoinWalletInfo?.type,
     buyTokenInfo,
     recipientAddress,
     recipientAddressMode,
-    walletInfo?.name,
+    walletBridgeState.bitcoinWalletName,
+    walletBridgeState.bitcoinWalletType,
+    walletBridgeState.evmWalletName,
     walletProviderType
   ]);
   const recipientAddressDisplay = useMemo(
@@ -1028,6 +1056,10 @@ export default function Page() {
     setActionError("");
     if (!isAppKitConfigured) {
       setActionError("Wallet connection is unavailable right now. Please try again later.");
+      return;
+    }
+    if (!walletBridgeReady) {
+      setActionError("Wallet options are loading. Try again in a moment.");
       return;
     }
 
@@ -2484,6 +2516,9 @@ export default function Page() {
 
   return (
     <div className="container">
+      {isAppKitConfigured ? (
+        <WalletBridge onState={setWalletBridgeState} onActions={setWalletBridgeActions} />
+      ) : null}
       <div className="header">
         <div className="headerTop">
           <div className="headerCopy">
@@ -2513,8 +2548,12 @@ export default function Page() {
                 </button>
               </div>
             ) : (
-              <button className="btn btnPrimary" onClick={openWalletChooser}>
-                Connect Wallet
+              <button className="btn btnPrimary" onClick={openWalletChooser} disabled={!walletBridgeReady}>
+                {!isAppKitConfigured
+                  ? "Wallet unavailable"
+                  : walletBridgeReady
+                    ? "Connect Wallet"
+                    : "Preparing Wallets..."}
               </button>
             )}
             {connectPromptVisible && !walletAddress ? (

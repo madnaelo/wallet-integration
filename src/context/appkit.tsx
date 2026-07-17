@@ -16,16 +16,10 @@ import {
   type AppKitNetwork
 } from "@reown/appkit/networks";
 import { getAllowedChainIds } from "@/lib/chains";
+import { WALLETCONNECT_PROJECT_ID } from "@/lib/walletConfig";
 
-const rawProjectId = (
-  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ??
-  process.env.NEXT_PUBLIC_WALLETCONNECT_ID ??
-  ""
-).trim();
 const placeholderProjectId = "your_walletconnect_project_id_here";
-const projectId = rawProjectId || placeholderProjectId;
-
-export const isAppKitConfigured = Boolean(rawProjectId) && !/^your[_-]/i.test(rawProjectId);
+const projectId = WALLETCONNECT_PROJECT_ID || placeholderProjectId;
 
 const networkByChainId: Record<number, AppKitNetwork> = {
   1: mainnet,
@@ -64,7 +58,7 @@ const metadata: AppKitMetadataWithRedirect = {
   name: "Swap Assistant",
   description: "Your Personal Swap Assistant",
   url: appUrl,
-  icons: [],
+  icons: [new URL("/icon-192.png", appUrl).toString()],
   redirect: {
     universal: appUrl
   }
