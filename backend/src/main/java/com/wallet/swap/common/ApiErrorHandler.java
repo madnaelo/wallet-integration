@@ -9,14 +9,22 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class ApiErrorHandler {
@@ -43,6 +51,40 @@ public class ApiErrorHandler {
   @ExceptionHandler({HttpMessageNotReadableException.class, MissingServletRequestParameterException.class})
   public ResponseEntity<Map<String, String>> handleMalformedRequest(Exception exception) {
     return ResponseEntity.badRequest().body(errorBody("Invalid request."));
+  }
+
+  @ExceptionHandler({MethodArgumentTypeMismatchException.class, ServletRequestBindingException.class})
+  public ResponseEntity<Map<String, String>> handleRequestBinding(Exception exception) {
+    return ResponseEntity.badRequest().body(errorBody("Invalid request."));
+  }
+
+  @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+  public ResponseEntity<Map<String, String>> handleNotFound(Exception exception) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorBody("Endpoint not found."));
+  }
+
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  public ResponseEntity<Map<String, String>> handleMethodNotSupported(
+      HttpRequestMethodNotSupportedException exception) {
+    ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+    if (exception.getSupportedHttpMethods() != null) {
+      response.allow(exception.getSupportedHttpMethods().toArray(HttpMethod[]::new));
+    }
+    return response.body(errorBody("Request method is not supported."));
+  }
+
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  public ResponseEntity<Map<String, String>> handleMediaTypeNotSupported(
+      HttpMediaTypeNotSupportedException exception) {
+    return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+        .body(errorBody("Request content type is not supported."));
+  }
+
+  @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+  public ResponseEntity<Map<String, String>> handleMediaTypeNotAcceptable(
+      HttpMediaTypeNotAcceptableException exception) {
+    return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
+        .body(errorBody("Requested response type is not supported."));
   }
 
   @ExceptionHandler(Exception.class)
