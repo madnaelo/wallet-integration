@@ -25,6 +25,14 @@ if (process.env.VERCEL_ENV === "production") {
   const quoteCacheTtlMs = Number(process.env.QUOTE_CACHE_TTL_MS ?? "8000");
   const quoteCacheMaxEntries = Number(process.env.QUOTE_CACHE_MAX_ENTRIES ?? "2000");
   const rateLimitPrefix = (process.env.RATE_LIMIT_REDIS_PREFIX ?? "").trim();
+  const enabledProviders = Array.from(
+    new Set(
+      (process.env.SWAP_PROVIDERS ?? "")
+        .split(",")
+        .map((provider) => provider.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
 
   if (!backendProxyTarget) {
     throw new Error("BACKEND_PROXY_TARGET is required for a production Vercel build.");
@@ -72,6 +80,7 @@ if (process.env.VERCEL_ENV === "production") {
   if (!/^[a-zA-Z0-9:_-]{1,64}$/.test(rateLimitPrefix)) {
     throw new Error("RATE_LIMIT_REDIS_PREFIX must contain 1-64 safe key-prefix characters.");
   }
+  assertProductionProviders(enabledProviders);
   assertTrustedProviderBaseUrl(
     process.env.PARASWAP_BASE_URL ?? "https://api.paraswap.io",
     "PARASWAP_BASE_URL",
@@ -213,6 +222,43 @@ function assertTrustedUpstashUrl(value) {
 function assertIntegerRange(value, minimum, maximum, name) {
   if (!Number.isInteger(value) || value < minimum || value > maximum) {
     throw new Error(`${name} must be an integer between ${minimum} and ${maximum}.`);
+  }
+}
+
+function assertProductionProviders(enabledProviders) {
+  const supportedProviders = new Set(["0x", "1inch", "paraswap", "odos", "lifi"]);
+  const unknownProviders = enabledProviders.filter((provider) => !supportedProviders.has(provider));
+  if (unknownProviders.length) {
+    throw new Error(`SWAP_PROVIDERS contains unsupported providers: ${unknownProviders.join(", ")}.`);
+  }
+  if (!enabledProviders.some((provider) => provider !== "lifi")) {
+    throw new Error("SWAP_PROVIDERS must enable at least one same-chain swap provider in production.");
+  }
+
+  const requiredApiKeys = {
+    "0x": "ZEROX_API_KEY",
+    "1inch": "ONEINCH_API_KEY",
+    odos: "ODOS_API_KEY",
+    lifi: "LIFI_API_KEY"
+  };
+  for (const provider of enabledProviders) {
+    const keyName = requiredApiKeys[provider];
+    if (keyName && isWeakConfiguredValue(process.env[keyName], 12)) {
+      throw new Error(`${keyName} must be configured when ${provider} is enabled in production.`);
+    }
+  }
+
+  if (enabledProviders.includes("lifi")) {
+    assertProviderIdentifier(process.env.LIFI_INTEGRATOR, "LIFI_INTEGRATOR");
+  }
+  if (enabledProviders.includes("paraswap")) {
+    assertProviderIdentifier(process.env.PARASWAP_PARTNER ?? "swapassistant", "PARASWAP_PARTNER");
+  }
+}
+
+function assertProviderIdentifier(value, name) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$/.test((value ?? "").trim())) {
+    throw new Error(`${name} must contain 2-64 letters, numbers, underscores, or hyphens.`);
   }
 }
 
