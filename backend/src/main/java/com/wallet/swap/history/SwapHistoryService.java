@@ -3,6 +3,7 @@ package com.wallet.swap.history;
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.history.SwapHistoryModels.SaveSwapHistoryRequest;
 import com.wallet.swap.history.SwapHistoryModels.SwapHistoryResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class SwapHistoryService {
   private static final Set<String> ALLOWED_STATUSES = Set.of("dry_run", "submitted", "confirmed", "failed");
+  private static final int MAX_QUOTE_JSON_BYTES = 65_536;
 
   private final SwapHistoryRepository swapHistoryRepository;
 
@@ -36,6 +38,10 @@ public class SwapHistoryService {
     validateIntegerString(request.buyAmountRaw(), "buyAmountRaw");
     if (request.minBuyAmountRaw() != null && !request.minBuyAmountRaw().isBlank()) {
       validateIntegerString(request.minBuyAmountRaw(), "minBuyAmountRaw");
+    }
+    if (request.quote() != null
+        && request.quote().toString().getBytes(StandardCharsets.UTF_8).length > MAX_QUOTE_JSON_BYTES) {
+      throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "Saved swap details are too large.");
     }
   }
 

@@ -49,7 +49,7 @@ public class AuthService {
     String message = buildSignInMessage(nonceId, walletAddress, nonce, expiresAt);
 
     authRepository.upsertUser(walletAddress);
-    authRepository.lockUserForNonce(walletAddress);
+    authRepository.lockUser(walletAddress);
     authRepository.saveNonce(nonceId, walletAddress, nonce, message, expiresAt);
     authRepository.pruneWalletNonces(walletAddress, 5);
 
@@ -59,6 +59,7 @@ public class AuthService {
   @Transactional(noRollbackFor = ApiException.class)
   public VerifyResponse verify(UUID nonceId, String rawWalletAddress, String signature) {
     String walletAddress = normalizeOrBadRequest(rawWalletAddress);
+    authRepository.lockUser(walletAddress);
     List<AuthRepository.StoredNonce> candidates = nonceId == null
         ? authRepository.findWalletNoncesForUpdate(walletAddress)
         : authRepository.findNonceForUpdate(nonceId, walletAddress).map(List::of).orElseGet(List::of);
@@ -89,6 +90,7 @@ public class AuthService {
     String accessToken = secureToken(48);
     Instant sessionExpiresAt = Instant.now().plus(authProperties.getSessionTtlHours(), ChronoUnit.HOURS);
     authRepository.saveSession(UUID.randomUUID(), walletAddress, tokenHasher.sha256(accessToken), sessionExpiresAt);
+    authRepository.pruneWalletSessions(walletAddress, 20);
     authRepository.deleteNonce(storedNonce.id(), walletAddress);
     authRepository.markLastLogin(walletAddress);
 

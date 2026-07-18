@@ -38,8 +38,10 @@ class AuthServiceTest {
     VerifyResponse response = service.verify(nonceId, WALLET, "signature");
 
     assertThat(response.walletAddress()).isEqualTo(WALLET);
+    verify(repository).lockUser(WALLET);
     verify(repository).findNonceForUpdate(nonceId, WALLET);
     verify(repository).saveSession(any(), eq(WALLET), eq("token-hash"), any());
+    verify(repository).pruneWalletSessions(WALLET, 20);
     verify(repository).deleteNonce(nonceId, WALLET);
     verify(repository).markLastLogin(WALLET);
     assertThat(AuthService.class.getMethod("verify", UUID.class, String.class, String.class)
@@ -68,7 +70,7 @@ class AuthServiceTest {
     var response = service.createNonce(WALLET);
 
     assertThat(response.nonceId()).isNotNull();
-    verify(repository).lockUserForNonce(WALLET);
+    verify(repository).lockUser(WALLET);
     verify(repository).saveNonce(eq(response.nonceId()), eq(WALLET), any(), eq(response.message()), eq(response.expiresAt()));
     verify(repository).pruneWalletNonces(WALLET, 5);
     assertThat(AuthService.class.getMethod("createNonce", String.class)

@@ -26,7 +26,7 @@ public class AuthRepository {
         walletAddress);
   }
 
-  public void lockUserForNonce(String walletAddress) {
+  public void lockUser(String walletAddress) {
     jdbcTemplate.queryForObject(
         "SELECT wallet_address FROM wallet_users WHERE wallet_address = ? FOR UPDATE",
         String.class,
@@ -110,6 +110,24 @@ public class AuthRepository {
         walletAddress,
         tokenHash,
         Timestamp.from(expiresAt));
+  }
+
+  public void pruneWalletSessions(String walletAddress, int keepCount) {
+    jdbcTemplate.update(
+        """
+        DELETE FROM wallet_sessions
+        WHERE wallet_address = ?
+          AND id NOT IN (
+            SELECT id
+            FROM wallet_sessions
+            WHERE wallet_address = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+          )
+        """,
+        walletAddress,
+        walletAddress,
+        Math.max(1, keepCount));
   }
 
   public Optional<String> findWalletBySessionTokenHash(String tokenHash, Instant now) {
