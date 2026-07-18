@@ -5100,7 +5100,7 @@ function normalizePushNotificationError(e: any): string {
 }
 
 function normalizeWalletError(e: any): string {
-  if (e?.code === 4001) return "User rejected the request in their wallet.";
+  if (e?.code === 4001) return "You cancelled this request in your wallet.";
 
   const msg =
     e?.shortMessage ||
