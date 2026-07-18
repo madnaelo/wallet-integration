@@ -57,7 +57,8 @@ class LimitOrderStatusCoordinatorTest {
     StatusCheckCandidate first = candidate("open", 1);
     StatusCheckCandidate second = candidate("open", 1);
     when(repository.claimDueStatusChecks(eq(1), any()))
-        .thenReturn(List.of(first), List.of(second));
+        .thenReturn(List.of(first))
+        .thenReturn(List.of(second));
     when(statusClient.check(any())).thenReturn(StatusResult.success("open", null, null));
 
     coordinator.reconcileDue();

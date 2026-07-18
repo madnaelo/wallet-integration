@@ -127,11 +127,14 @@ public class PushNotificationSender {
     }
   }
 
+  @SuppressWarnings("deprecation")
   private HttpResponse sendWithTimeout(
       PushService pushService,
       PushSubscriptionRecord subscription,
       String payloadJson)
       throws GeneralSecurityException, IOException, JoseException, ExecutionException, InterruptedException {
+    // PushAsyncService in web-push 5.1.2 has no public lifecycle cleanup; keep the
+    // closable per-request client until the replacement API can be managed safely.
     Future<HttpResponse> request = pushService.sendAsync(
         new Notification(
             subscription.endpoint(),

@@ -193,7 +193,8 @@ class LimitOrderSubmissionCoordinatorTest {
     SubmissionCandidate first = candidate(1);
     SubmissionCandidate second = candidate(1);
     when(repository.claimDue(eq(1), anyInt(), any()))
-        .thenReturn(List.of(first), List.of(second));
+        .thenReturn(List.of(first))
+        .thenReturn(List.of(second));
     when(client.submit(anyLong(), any(), any(), any(), any()))
         .thenReturn(LimitOrderSubmissionResult.success("provider-order"));
     when(repository.completeSubmission(

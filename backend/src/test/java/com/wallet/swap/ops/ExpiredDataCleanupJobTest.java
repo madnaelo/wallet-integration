@@ -73,7 +73,10 @@ class ExpiredDataCleanupJobTest {
 
   @Test
   void drainsFullBatchesWithoutExceedingPerRunLimit() {
-    when(authRepository.deleteExpiredNonces(any(Instant.class), eq(100))).thenReturn(100, 100, 50);
+    when(authRepository.deleteExpiredNonces(any(Instant.class), eq(100)))
+        .thenReturn(100)
+        .thenReturn(100)
+        .thenReturn(50);
     when(jobLockService.runIfAcquired(eq("expired-data-cleanup"), any(), any())).thenAnswer(invocation -> {
       invocation.getArgument(2, Runnable.class).run();
       return true;

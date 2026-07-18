@@ -34,7 +34,8 @@ class NotificationOutboxWorkerTest {
         "{}",
         1);
     when(repository.claimPending(eq(1), anyInt(), any()))
-        .thenReturn(List.of(first), List.of());
+        .thenReturn(List.of(first))
+        .thenReturn(List.of());
 
     NotificationOutboxWorker worker = new NotificationOutboxWorker(
         properties,
