@@ -2042,7 +2042,11 @@ function limitOrderStatusMessage(order: LimitOrderRecord): string {
     return "Your signed limit order was submitted. Execution depends on liquidity, allowance, balance, gas, and expiry.";
   }
   if (order.executionStatus === "failed") {
-    return order.executionError || "The order could not be accepted. Review the details and create a new order.";
+    return order.executionError
+      || "The order service could not confirm this order. For safety, keep its token approval unchanged until it expires.";
+  }
+  if (order.executionStatus === "rejected") {
+    return order.executionError || "The order service did not accept this order. It cannot execute.";
   }
   if (order.executionStatus === "pending_submission") {
     return "Your signed order is saved and is being sent securely.";
@@ -2065,10 +2069,8 @@ function cancellationStatusMessage(order: LimitOrderRecord): string {
 }
 
 function canCancelLimitOrder(order: LimitOrderRecord): boolean {
-  if (order.executionStatus === "failed") return !order.providerOrderId;
   return [
     "stored",
-    "pending_submission",
     "submitted",
     "open",
     "partially_filled"

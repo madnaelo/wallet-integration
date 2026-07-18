@@ -135,7 +135,7 @@ public class LimitOrderStatusClient {
 
     int providerStatus = response.path("orderStatus").asInt(1);
     if (providerStatus == 3 || providerStatus == 6) {
-      return StatusResult.success("failed", null, "The order provider marked these signed terms as invalid.");
+      return StatusResult.success("rejected", null, "The order provider marked these signed terms as invalid.");
     }
     String warning = providerStatus == 2
         ? "This order is waiting for sufficient token balance or approval."

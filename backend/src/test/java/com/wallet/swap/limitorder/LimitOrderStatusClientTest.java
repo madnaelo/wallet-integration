@@ -78,7 +78,7 @@ class LimitOrderStatusClientTest {
         """), Instant.parse("2030-01-02T00:00:00Z"), Instant.parse("2030-01-01T00:00:00Z"));
 
     assertThat(expired.executionStatus()).isEqualTo("expired");
-    assertThat(invalid.executionStatus()).isEqualTo("failed");
+    assertThat(invalid.executionStatus()).isEqualTo("rejected");
   }
 
   @Test

@@ -188,6 +188,29 @@ class LimitOrderCancellationServiceTest {
             assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
   }
 
+  @Test
+  void doesNotOfferLocalCancellationWhileSubmissionIsInFlight() {
+    CancellationCandidate candidate = cowCandidate("pending_submission", null, null);
+    when(repository.findCancellationCandidate(candidate.id(), WALLET)).thenReturn(Optional.of(candidate));
+
+    var plan = service.plan(WALLET, candidate.id());
+
+    assertThat(plan.mode()).isEqualTo(LimitOrderCancellationService.UNAVAILABLE_MODE);
+    assertThat(plan.reason()).contains("being sent");
+    verify(repository, never()).cancelUnsubmitted(any(), any());
+  }
+
+  @Test
+  void keepsAnUnconfirmedFailedOrderReservedUntilExpiry() {
+    CancellationCandidate candidate = cowCandidate("failed", null, null);
+    when(repository.findCancellationCandidate(candidate.id(), WALLET)).thenReturn(Optional.of(candidate));
+
+    var plan = service.plan(WALLET, candidate.id());
+
+    assertThat(plan.mode()).isEqualTo(LimitOrderCancellationService.UNAVAILABLE_MODE);
+    assertThat(plan.reason()).contains("could not confirm");
+  }
+
   private CancellationCandidate cowCandidate(
       String status,
       String providerOrderId,

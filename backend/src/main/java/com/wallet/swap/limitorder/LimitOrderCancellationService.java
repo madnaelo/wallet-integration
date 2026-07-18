@@ -252,6 +252,7 @@ public class LimitOrderCancellationService {
         || "cancelled".equals(latest.executionStatus())
         || "filled".equals(latest.executionStatus())
         || "expired".equals(latest.executionStatus())
+        || "rejected".equals(latest.executionStatus())
         || ("failed".equals(latest.executionStatus()) && latest.providerOrderId() != null)) {
       return requireOwnedResponse(walletAddress, id);
     }
@@ -276,9 +277,7 @@ public class LimitOrderCancellationService {
   }
 
   private boolean isLocalCancellation(CancellationCandidate candidate) {
-    String status = candidate.executionStatus();
-    return candidate.providerOrderId() == null
-        && ("stored".equals(status) || "pending_submission".equals(status) || "failed".equals(status));
+    return candidate.providerOrderId() == null && "stored".equals(candidate.executionStatus());
   }
 
   private boolean isProviderActive(String status) {
@@ -290,7 +289,10 @@ public class LimitOrderCancellationService {
       case "filled" -> "This order has already been filled.";
       case "expired" -> "This order has expired.";
       case "cancelled" -> "This order is already cancelled.";
-      case "failed" -> "This order is no longer active.";
+      case "pending_submission" -> "This order is being sent. Wait for its status to update before cancelling.";
+      case "failed" ->
+          "The order service could not confirm this order. For safety, it cannot be cancelled here before it expires.";
+      case "rejected" -> "The order service rejected this order, so it cannot execute.";
       default -> "This order cannot be cancelled in its current state.";
     };
   }

@@ -90,6 +90,7 @@ public class LimitOrderStatusCoordinator {
     return "filled".equals(status)
         || "expired".equals(status)
         || "cancelled".equals(status)
+        || "rejected".equals(status)
         || "failed".equals(status);
   }
 }

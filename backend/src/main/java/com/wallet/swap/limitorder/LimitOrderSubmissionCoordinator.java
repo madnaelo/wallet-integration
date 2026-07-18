@@ -99,12 +99,24 @@ public class LimitOrderSubmissionCoordinator {
           false);
     }
 
-    String status = result.submitted() ? "submitted" : result.skipped() ? "stored" : "failed";
     Instant nextAttemptAt = nextAttemptAt(candidate, result);
+    String status;
+    if (result.submitted()) {
+      status = "submitted";
+    } else if (result.skipped()) {
+      status = "stored";
+    } else {
+      status = result.retryable() ? "failed" : "rejected";
+    }
+    String executionError = result.message();
+    if ("failed".equals(status) && nextAttemptAt == null) {
+      executionError =
+          "The order service could not confirm this order. For safety, its token approval remains reserved until expiry.";
+    }
     Optional<LimitOrderResponse> completed = repository.completeSubmission(
         candidate,
         status,
-        result.submitted() ? null : result.message(),
+        result.submitted() ? null : executionError,
         result.providerOrderId(),
         nextAttemptAt,
         verifiedPayloadHash,

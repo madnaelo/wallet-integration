@@ -90,15 +90,15 @@ class LimitOrderSubmissionCoordinatorTest {
   }
 
   @Test
-  void doesNotRetryPermanentProviderFailure() {
-    SubmissionCandidate candidate = candidate(1);
+  void reservesAnUnconfirmedOrderAfterItsFinalRetry() {
+    SubmissionCandidate candidate = candidate(properties.getSubmissionMaxAttempts());
     LimitOrderResponse failed = response("failed");
     when(client.submit(eq(1L), eq("cow_protocol"), eq(candidate.orderHash()), eq(candidate.signature()), any()))
-        .thenReturn(LimitOrderSubmissionResult.failure("Terms rejected.", false));
+        .thenReturn(LimitOrderSubmissionResult.failure("Temporarily unavailable.", true));
     when(repository.completeSubmission(
         eq(candidate),
         eq("failed"),
-        eq("Terms rejected."),
+        eq("The order service could not confirm this order. For safety, its token approval remains reserved until expiry."),
         isNull(),
         isNull(),
         eq(candidate.signedPayloadHash()),
@@ -110,6 +110,34 @@ class LimitOrderSubmissionCoordinatorTest {
     verify(repository).completeSubmission(
         eq(candidate),
         eq("failed"),
+        eq("The order service could not confirm this order. For safety, its token approval remains reserved until expiry."),
+        isNull(),
+        isNull(),
+        eq(candidate.signedPayloadHash()),
+        eq(LimitOrderPayloadIntegrity.CURRENT_VERSION));
+  }
+
+  @Test
+  void doesNotRetryPermanentProviderFailure() {
+    SubmissionCandidate candidate = candidate(1);
+    LimitOrderResponse rejected = response("rejected");
+    when(client.submit(eq(1L), eq("cow_protocol"), eq(candidate.orderHash()), eq(candidate.signature()), any()))
+        .thenReturn(LimitOrderSubmissionResult.failure("Terms rejected.", false));
+    when(repository.completeSubmission(
+        eq(candidate),
+        eq("rejected"),
+        eq("Terms rejected."),
+        isNull(),
+        isNull(),
+        eq(candidate.signedPayloadHash()),
+        eq(LimitOrderPayloadIntegrity.CURRENT_VERSION)))
+        .thenReturn(Optional.of(rejected));
+
+    coordinator.submitClaimed(candidate);
+
+    verify(repository).completeSubmission(
+        eq(candidate),
+        eq("rejected"),
         eq("Terms rejected."),
         isNull(),
         isNull(),
@@ -133,16 +161,16 @@ class LimitOrderSubmissionCoordinatorTest {
         original.expiresAt(),
         original.attempts(),
         original.lockToken());
-    LimitOrderResponse failed = response("failed");
+    LimitOrderResponse rejected = response("rejected");
     when(repository.completeSubmission(
         eq(tampered),
-        eq("failed"),
+        eq("rejected"),
         eq("The saved signed order failed its integrity check and cannot be submitted."),
         isNull(),
         isNull(),
         eq(tampered.signedPayloadHash()),
         eq(LimitOrderPayloadIntegrity.CURRENT_VERSION)))
-        .thenReturn(Optional.of(failed));
+        .thenReturn(Optional.of(rejected));
 
     coordinator.submitClaimed(tampered);
 

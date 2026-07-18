@@ -182,9 +182,8 @@ public class LimitOrderRepository {
         WHERE id = ?
           AND wallet_address = ?
           AND provider_order_id IS NULL
-          AND execution_status IN ('stored', 'pending_submission', 'failed')
+          AND execution_status = 'stored'
           AND cancellation_requested_at IS NULL
-          AND (submission_locked_until IS NULL OR submission_locked_until <= now())
         RETURNING *
         """,
         (rs, rowNum) -> mapRow(rs),
