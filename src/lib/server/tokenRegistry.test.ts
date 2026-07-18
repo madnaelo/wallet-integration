@@ -35,7 +35,31 @@ describe("token registry refresh", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(tokens.some((token) => token.symbol === "ETH")).toBe(true);
   });
+
+  it("rejects unsafe token labels and omits unsafe optional names", async () => {
+    vi.stubEnv("ONEINCH_API_KEY", "");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      tokens: [
+        token("0x1111111111111111111111111111111111111111", "SAFE", "Safe\u202eName"),
+        token("0x2222222222222222222222222222222222222222", "BAD\u202e", "Unsafe symbol"),
+        token("0x3333333333333333333333333333333333333333", "A".repeat(33), "Long symbol")
+      ]
+    }))));
+    const { getTokensForChain } = await import("@/lib/server/tokenRegistry");
+
+    const tokens = await getTokensForChain(1);
+    const safe = tokens.find((entry) => entry.symbol === "SAFE");
+
+    expect(safe).toMatchObject({ address: "0x1111111111111111111111111111111111111111" });
+    expect(safe?.name).toBeUndefined();
+    expect(tokens.some((entry) => entry.address === "0x2222222222222222222222222222222222222222")).toBe(false);
+    expect(tokens.some((entry) => entry.address === "0x3333333333333333333333333333333333333333")).toBe(false);
+  });
 });
+
+function token(address: string, symbol: string, name: string) {
+  return { chainId: 1, address, symbol, name, decimals: 18 };
+}
 
 function tokenListResponse(): Response {
   return new Response(JSON.stringify({

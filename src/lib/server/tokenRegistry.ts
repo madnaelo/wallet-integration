@@ -11,6 +11,10 @@ const FALLBACK_CACHE_TTL_MS = 5 * 60 * 1000;
 const TOKEN_REQUEST_TIMEOUT_MS = 8_000;
 const MAX_TOKEN_LIST_RESPONSE_BYTES = 8 * 1024 * 1024;
 const MAX_REMOTE_TOKENS_PER_SOURCE = 10_000;
+const MAX_MERGED_TOKENS = 10_000;
+const MAX_TOKEN_SYMBOL_LENGTH = 32;
+const MAX_TOKEN_NAME_LENGTH = 128;
+const UNSAFE_DISPLAY_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069]/u;
 const NATIVE_TOKEN_SENTINELS = new Set([
   "0x0000000000000000000000000000000000000000",
   "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
@@ -60,6 +64,7 @@ async function refreshTokensForChain(chainId: number): Promise<TokenInfo[]> {
 function mergeTokens(curated: TokenInfo[], remote: TokenInfo[]): TokenInfo[] {
   const tokens = new Map<string, TokenInfo>();
   [...curated, ...remote].forEach((token) => {
+    if (tokens.size >= MAX_MERGED_TOKENS) return;
     const key = normalizeTokenKey(token.address);
     if (!tokens.has(key)) tokens.set(key, token);
   });
@@ -138,15 +143,22 @@ function toTokenInfo(value: unknown, chainId: number): TokenInfo[] {
   if (typeof value.chainId === "number" && value.chainId !== chainId) return [];
 
   const address = typeof value.address === "string" ? value.address.trim() : "";
-  const symbol = typeof value.symbol === "string" ? value.symbol.trim() : "";
+  const symbol = normalizeDisplayText(value.symbol, MAX_TOKEN_SYMBOL_LENGTH);
   const decimals = typeof value.decimals === "number" ? value.decimals : Number.NaN;
   if (!address || !symbol || !Number.isInteger(decimals) || decimals < 0 || decimals > 30) return [];
   if (!isAddress(address) || NATIVE_TOKEN_SENTINELS.has(normalizeTokenKey(address))) return [];
 
   const token: TokenInfo = { address, symbol, decimals };
-  if (typeof value.name === "string" && value.name.trim()) token.name = value.name.trim();
-  if (typeof value.logoURI === "string" && value.logoURI.trim()) token.logoURI = value.logoURI.trim();
+  const name = normalizeDisplayText(value.name, MAX_TOKEN_NAME_LENGTH);
+  if (name) token.name = name;
   return [token];
+}
+
+function normalizeDisplayText(value: unknown, maximumLength: number): string {
+  if (typeof value !== "string") return "";
+  const normalized = value.normalize("NFC").trim();
+  if (!normalized || normalized.length > maximumLength || UNSAFE_DISPLAY_CHARACTERS.test(normalized)) return "";
+  return normalized;
 }
 
 function hasApiKey(value: string, placeholder: string): boolean {

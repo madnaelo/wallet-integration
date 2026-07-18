@@ -4,7 +4,6 @@ export type TokenInfo = {
   decimals: number;
   isNative?: boolean;
   name?: string;
-  logoURI?: string;
   searchAliases?: string[];
   assetKind?: "evm" | "bitcoin";
   addressFamily?: "evm" | "bitcoin";

@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TokenInfo } from "@/lib/tokens";
 
 const MAX_VISIBLE_TOKENS = 100;
+const TOKEN_MATCH_SCORE_COUNT = 14;
 
 export type TokenPickerNetwork = {
   id: string;
@@ -98,6 +99,7 @@ export function TokenPicker({
         className="tokenPickerButton"
         type="button"
         aria-expanded={open}
+        aria-label={`${label}: ${selectedToken?.symbol ?? "select token"}`}
         aria-describedby={describedBy}
         data-invalid={invalid ? "true" : undefined}
         onClick={() => {
@@ -115,6 +117,8 @@ export function TokenPicker({
       {open ? (
         <div
           className="tokenPickerPanel"
+          role="dialog"
+          aria-label={`${label} options`}
           style={panelPosition ? {
             left: panelPosition.left,
             top: panelPosition.top,
@@ -180,19 +184,18 @@ export function TokenPicker({
 }
 
 function calculatePanelPosition(root: HTMLDivElement | null) {
-  const viewportMargin = 12;
+  const viewportMargin = Math.min(12, Math.max(4, Math.floor(window.innerWidth / 20)));
   const gap = 8;
-  const fallbackWidth = 320;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const width = Math.max(240, Math.min(360, viewportWidth - viewportMargin * 2));
+  const width = Math.max(0, Math.min(360, viewportWidth - viewportMargin * 2));
 
   if (!root) {
     return {
       left: viewportMargin,
       top: viewportMargin,
-      width: Math.max(240, Math.min(fallbackWidth, viewportWidth - viewportMargin * 2)),
-      maxHeight: viewportHeight - viewportMargin * 2
+      width,
+      maxHeight: Math.max(0, viewportHeight - viewportMargin * 2)
     };
   }
 
@@ -201,13 +204,14 @@ function calculatePanelPosition(root: HTMLDivElement | null) {
     viewportMargin,
     Math.min(rect.left, viewportWidth - width - viewportMargin)
   );
-  const availableBelow = viewportHeight - rect.bottom - gap - viewportMargin;
-  const availableAbove = rect.top - gap - viewportMargin;
+  const availableBelow = Math.max(0, viewportHeight - rect.bottom - gap - viewportMargin);
+  const availableAbove = Math.max(0, rect.top - gap - viewportMargin);
   const openAbove = availableBelow < 280 && availableAbove > availableBelow;
+  const availableHeight = openAbove ? availableAbove : availableBelow;
   const top = openAbove
     ? Math.max(viewportMargin, rect.top - gap - Math.min(420, availableAbove))
     : Math.min(rect.bottom + gap, viewportHeight - viewportMargin);
-  const maxHeight = Math.max(220, Math.min(420, openAbove ? availableAbove : availableBelow));
+  const maxHeight = Math.max(0, Math.min(420, availableHeight, viewportHeight - viewportMargin * 2));
 
   return { left, top, width, maxHeight };
 }
@@ -216,11 +220,15 @@ function searchTokens(tokens: TokenPickerOption[], query: string): TokenPickerOp
   const normalized = query.trim().toLowerCase();
   if (!normalized) return tokens;
 
-  return tokens
-    .map((token, order) => ({ token, order, score: scoreTokenMatch(token, normalized) }))
-    .filter((match) => match.score < Number.POSITIVE_INFINITY)
-    .sort((first, second) => first.score - second.score || first.order - second.order)
-    .map((match) => match.token);
+  const matches = Array.from(
+    { length: TOKEN_MATCH_SCORE_COUNT },
+    () => [] as TokenPickerOption[]
+  );
+  for (const token of tokens) {
+    const score = scoreTokenMatch(token, normalized);
+    if (score < TOKEN_MATCH_SCORE_COUNT) matches[score]!.push(token);
+  }
+  return matches.flat();
 }
 
 function scoreTokenMatch(token: TokenPickerOption, query: string): number {
