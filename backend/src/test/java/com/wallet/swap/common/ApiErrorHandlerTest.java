@@ -37,6 +37,15 @@ class ApiErrorHandlerTest {
   }
 
   @Test
+  void mapsUnsupportedMethodsWhenNoAllowedMethodsAreKnown() {
+    ResponseEntity<Map<String, String>> response = handler.handleMethodNotSupported(
+        new HttpRequestMethodNotSupportedException("TRACE"));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    assertThat(response.getHeaders().getAllow()).isEmpty();
+  }
+
+  @Test
   void mapsUnsupportedContentTypesToClientError() {
     ResponseEntity<Map<String, String>> response = handler.handleMediaTypeNotSupported(
         new HttpMediaTypeNotSupportedException(MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON)));

@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -65,10 +66,11 @@ public class ApiErrorHandler {
 
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   public ResponseEntity<Map<String, String>> handleMethodNotSupported(
-      HttpRequestMethodNotSupportedException exception) {
+    HttpRequestMethodNotSupportedException exception) {
     ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
-    if (exception.getSupportedHttpMethods() != null) {
-      response.allow(exception.getSupportedHttpMethods().toArray(HttpMethod[]::new));
+    Set<HttpMethod> supportedMethods = exception.getSupportedHttpMethods();
+    if (supportedMethods != null && !supportedMethods.isEmpty()) {
+      response.allow(supportedMethods.toArray(HttpMethod[]::new));
     }
     return response.body(errorBody("Request method is not supported."));
   }
