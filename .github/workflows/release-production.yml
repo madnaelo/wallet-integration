@@ -537,18 +537,23 @@ jobs:
           VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
-          vercel_cli=(npx --yes "vercel@56.3.1")
+          umask 077
           error_file="$(mktemp)"
-          trap 'rm -f "$error_file"' EXIT
+          bypass_header_file="$(mktemp)"
+          trap 'rm -f "$error_file" "$bypass_header_file"' EXIT
+          if ! [[ "$DEPLOYMENT_URL" =~ ^https://[A-Za-z0-9-]+\.vercel\.app$ ]]; then
+            echo "Staged deployment URL is not an expected Vercel HTTPS hostname." >&2
+            exit 1
+          fi
+          printf 'x-vercel-protection-bypass: %s\n' "$VERCEL_PROTECTION_BYPASS_SECRET" > "$bypass_header_file"
           last_failure="Protected deployment health request has not completed."
           for attempt in $(seq 1 18); do
             : > "$error_file"
             if body="$(
-              "${vercel_cli[@]}" --token "$VERCEL_TOKEN" curl /api/health \
-                --deployment "$DEPLOYMENT_URL" \
-                --protection-bypass "$VERCEL_PROTECTION_BYPASS_SECRET" \
-                --yes \
-                -- --fail --silent --show-error --max-time 20 \
+              curl --proto '=https' --tlsv1.2 \
+                --fail --silent --show-error --max-time 20 \
+                --header "@$bypass_header_file" \
+                "$DEPLOYMENT_URL/api/health" \
                 2>"$error_file"
             )"; then
               if DEPLOY_BODY="$body" node -e '

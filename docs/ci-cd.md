@@ -24,8 +24,8 @@ The workflows are in `.github/workflows`.
   promotes the already-verified Vercel deployment, and verifies that both
   public health endpoints serve the selected commit.
   Staged deployment URLs remain protected; the workflow verifies them through
-  an authenticated, pinned Vercel CLI request rather than weakening deployment
-  protection.
+  Vercel's dedicated automation-bypass header rather than weakening deployment
+  protection or depending on the beta `vercel curl` wrapper.
   `workflow_dispatch` can release or roll back to a full commit SHA that
   belongs to `master` and has passing CI/Security runs.
 - `Monitor Production`: checks the frontend, backend health, and optional
