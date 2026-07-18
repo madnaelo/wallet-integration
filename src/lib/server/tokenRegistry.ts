@@ -63,11 +63,26 @@ async function refreshTokensForChain(chainId: number): Promise<TokenInfo[]> {
 
 function mergeTokens(curated: TokenInfo[], remote: TokenInfo[]): TokenInfo[] {
   const tokens = new Map<string, TokenInfo>();
-  [...curated, ...remote].forEach((token) => {
-    if (tokens.size >= MAX_MERGED_TOKENS) return;
+  const curatedSymbols = new Set(curated.map((token) => normalizeIdentity(token.symbol)));
+  const curatedNames = new Set(
+    curated.flatMap((token) => token.name ? [normalizeIdentity(token.name)] : [])
+  );
+
+  for (const token of curated) {
+    if (tokens.size >= MAX_MERGED_TOKENS) break;
     const key = normalizeTokenKey(token.address);
     if (!tokens.has(key)) tokens.set(key, token);
-  });
+  }
+
+  for (const token of remote) {
+    if (tokens.size >= MAX_MERGED_TOKENS) break;
+    const key = normalizeTokenKey(token.address);
+    if (tokens.has(key)) continue;
+    if (curatedSymbols.has(normalizeIdentity(token.symbol))) continue;
+    if (token.name && curatedNames.has(normalizeIdentity(token.name))) continue;
+    tokens.set(key, token);
+  }
+
   return [...tokens.values()];
 }
 
@@ -89,9 +104,14 @@ async function loadOneInchTokens(chainId: number): Promise<TokenInfo[]> {
   if (!isRecord(body) || !isRecord(body.tokens)) return [];
   const tokens = body.tokens;
 
-  return Object.keys(tokens)
+  return Object.entries(tokens)
     .slice(0, MAX_REMOTE_TOKENS_PER_SOURCE)
-    .flatMap((address) => toTokenInfo(tokens[address], chainId));
+    .flatMap(([address, token]) => {
+      if (!isRecord(token)) return [];
+      const declaredAddress = typeof token.address === "string" ? token.address.trim() : "";
+      if (declaredAddress && normalizeTokenKey(declaredAddress) !== normalizeTokenKey(address)) return [];
+      return toTokenInfo({ ...token, address }, chainId);
+    });
 }
 
 async function fetchJson(url: string, headers?: Record<string, string>): Promise<unknown> {
@@ -172,4 +192,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function normalizeTokenKey(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function normalizeIdentity(value: string): string {
+  return value.normalize("NFKC").trim().toLowerCase();
 }

@@ -55,6 +55,26 @@ describe("token registry refresh", () => {
     expect(tokens.some((entry) => entry.address === "0x2222222222222222222222222222222222222222")).toBe(false);
     expect(tokens.some((entry) => entry.address === "0x3333333333333333333333333333333333333333")).toBe(false);
   });
+
+  it("prevents remote tokens from impersonating curated identities", async () => {
+    vi.stubEnv("ONEINCH_API_KEY", "");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      tokens: [
+        token("0x1111111111111111111111111111111111111111", "USDT", "Fake dollar"),
+        token("0x2222222222222222222222222222222222222222", "FAKE", "Tether USD"),
+        token("0x3333333333333333333333333333333333333333", "TEST", "Test Token")
+      ]
+    }))));
+    const { getTokensForChain } = await import("@/lib/server/tokenRegistry");
+
+    const tokens = await getTokensForChain(1);
+
+    expect(tokens.some((entry) => entry.address === "0x1111111111111111111111111111111111111111")).toBe(false);
+    expect(tokens.some((entry) => entry.address === "0x2222222222222222222222222222222222222222")).toBe(false);
+    expect(tokens.some((entry) => entry.address === "0x3333333333333333333333333333333333333333")).toBe(true);
+    expect(tokens.find((entry) => entry.symbol === "USDT")?.address.toLowerCase())
+      .toBe("0xdac17f958d2ee523a2206206994597c13d831ec7");
+  });
 });
 
 function token(address: string, symbol: string, name: string) {
