@@ -1,23 +1,23 @@
-package com.wallet.swap.autoswap;
+package com.wallet.swap.pricealert;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleCandidate;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertOpportunity;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertCandidate;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class AutoSwapCalculatorTest {
-  private final AutoSwapCalculator calculator = new AutoSwapCalculator();
+class PriceAlertCalculatorTest {
+  private final PriceAlertCalculator calculator = new PriceAlertCalculator();
 
   @Test
   void triggersWhenCurrentRateReachesAboveTarget() {
-    AutoSwapRuleCandidate candidate = candidate("above", "2000");
+    PriceAlertCandidate candidate = candidate("above", "2000");
 
-    Optional<AutoSwapOpportunity> result = calculator.evaluate(candidate, Map.of(
+    Optional<PriceAlertOpportunity> result = calculator.evaluate(candidate, Map.of(
         candidate.sellToken(), new BigDecimal("2100"),
         candidate.buyToken(), BigDecimal.ONE));
 
@@ -27,17 +27,17 @@ class AutoSwapCalculatorTest {
 
   @Test
   void ignoresWhenCurrentRateHasNotReachedBelowTarget() {
-    AutoSwapRuleCandidate candidate = candidate("below", "1900");
+    PriceAlertCandidate candidate = candidate("below", "1900");
 
-    Optional<AutoSwapOpportunity> result = calculator.evaluate(candidate, Map.of(
+    Optional<PriceAlertOpportunity> result = calculator.evaluate(candidate, Map.of(
         candidate.sellToken(), new BigDecimal("2000"),
         candidate.buyToken(), BigDecimal.ONE));
 
     assertThat(result).isEmpty();
   }
 
-  private AutoSwapRuleCandidate candidate(String direction, String thresholdRate) {
-    return new AutoSwapRuleCandidate(
+  private PriceAlertCandidate candidate(String direction, String thresholdRate) {
+    return new PriceAlertCandidate(
         UUID.randomUUID(),
         "0x0000000000000000000000000000000000000001",
         1L,

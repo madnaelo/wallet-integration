@@ -1,7 +1,7 @@
 package com.wallet.swap.notification;
 
 import com.wallet.swap.config.NotificationProperties;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertOpportunity;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitOpportunity;
 import java.math.BigDecimal;
@@ -40,7 +40,7 @@ public class NotificationMessageFormatter {
         opportunity.candidate().buyTokenSymbol());
   }
 
-  public String subject(AutoSwapOpportunity opportunity) {
+  public String subject(PriceAlertOpportunity opportunity) {
     return "Swap alert: %s to %s".formatted(
         opportunity.candidate().sellTokenSymbol(),
         opportunity.candidate().buyTokenSymbol());
@@ -100,8 +100,8 @@ public class NotificationMessageFormatter {
         swapUrl);
   }
 
-  public String body(AutoSwapOpportunity opportunity) {
-    String swapUrl = autoSwapUrl(opportunity);
+  public String body(PriceAlertOpportunity opportunity) {
+    String swapUrl = priceAlertUrl(opportunity);
     String direction = "below".equals(opportunity.candidate().alertDirection()) ? "at or below" : "at or above";
 
     return """
@@ -161,13 +161,13 @@ public class NotificationMessageFormatter {
         "favorite-%s-%s".formatted(opportunity.candidate().id(), opportunity.candidate().alertDirection()));
   }
 
-  public PushNotificationPayload pushPayload(AutoSwapOpportunity opportunity) {
+  public PushNotificationPayload pushPayload(PriceAlertOpportunity opportunity) {
     return new PushNotificationPayload(
         subject(opportunity),
         "%s to %s reached your target. Open Swap Assistant to review and approve from your wallet.".formatted(
             opportunity.candidate().sellTokenSymbol(),
             opportunity.candidate().buyTokenSymbol()),
-        autoSwapUrl(opportunity),
+        priceAlertUrl(opportunity),
         "price-alert-%s-%s".formatted(opportunity.candidate().id(), opportunity.candidate().alertDirection()));
   }
 
@@ -187,7 +187,7 @@ public class NotificationMessageFormatter {
         "");
   }
 
-  private String autoSwapUrl(AutoSwapOpportunity opportunity) {
+  private String priceAlertUrl(PriceAlertOpportunity opportunity) {
     return swapUrl(
         opportunity.candidate().chainId(),
         opportunity.candidate().sellTokenAddress(),

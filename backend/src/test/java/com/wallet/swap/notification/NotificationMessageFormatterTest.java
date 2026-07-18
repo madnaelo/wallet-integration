@@ -2,8 +2,8 @@ package com.wallet.swap.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleCandidate;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertOpportunity;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertCandidate;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairCandidate;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
@@ -95,11 +95,11 @@ class NotificationMessageFormatterTest {
   }
 
   @Test
-  void autoSwapAlertLinksToSelectedPairWithAmount() {
+  void priceAlertLinksToSelectedPairWithAmount() {
     NotificationMessageFormatter formatter = formatter("https://wallet.example");
-    AutoSwapRuleCandidate candidate = autoSwapCandidate();
+    PriceAlertCandidate candidate = priceAlertCandidate();
 
-    String body = formatter.body(new AutoSwapOpportunity(
+    String body = formatter.body(new PriceAlertOpportunity(
         candidate,
         new BigDecimal("2501"),
         new BigDecimal("2501"),
@@ -172,8 +172,8 @@ class NotificationMessageFormatterTest {
         360);
   }
 
-  private AutoSwapRuleCandidate autoSwapCandidate() {
-    return new AutoSwapRuleCandidate(
+  private PriceAlertCandidate priceAlertCandidate() {
+    return new PriceAlertCandidate(
         UUID.randomUUID(),
         "0x1234567890123456789012345678901234567890",
         1L,

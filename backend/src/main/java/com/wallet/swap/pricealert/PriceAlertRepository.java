@@ -1,9 +1,9 @@
-package com.wallet.swap.autoswap;
+package com.wallet.swap.pricealert;
 
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleRequest;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleResponse;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleCandidate;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleTarget;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertRequest;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertResponse;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertCandidate;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertTarget;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -15,14 +15,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class AutoSwapRuleRepository {
+public class PriceAlertRepository {
+  // Table names are retained for compatibility with already-applied migrations.
   private final JdbcTemplate jdbcTemplate;
 
-  public AutoSwapRuleRepository(JdbcTemplate jdbcTemplate) {
+  public PriceAlertRepository(JdbcTemplate jdbcTemplate) {
     this.jdbcTemplate = jdbcTemplate;
   }
 
-  public List<AutoSwapRuleResponse> listForWallet(String walletAddress) {
+  public List<PriceAlertResponse> listForWallet(String walletAddress) {
     return jdbcTemplate.query(
         """
         SELECT *
@@ -42,9 +43,9 @@ public class AutoSwapRuleRepository {
     return count == null ? 0 : count;
   }
 
-  public AutoSwapRuleResponse insert(
+  public PriceAlertResponse insert(
       String walletAddress,
-      AutoSwapRuleRequest request,
+      PriceAlertRequest request,
       String executionMode,
       String executionReadiness) {
     UUID id = UUID.randomUUID();
@@ -79,7 +80,7 @@ public class AutoSwapRuleRepository {
         executionReadiness);
   }
 
-  public List<AutoSwapRuleTarget> listTargetsForPair(String walletAddress, AutoSwapRuleRequest request) {
+  public List<PriceAlertTarget> listTargetsForPair(String walletAddress, PriceAlertRequest request) {
     return jdbcTemplate.query(
         """
         SELECT id, threshold_rate
@@ -91,7 +92,7 @@ public class AutoSwapRuleRepository {
           AND alert_direction = ?
           AND status = 'active'
         """,
-        (rs, rowNum) -> new AutoSwapRuleTarget(rs.getObject("id", UUID.class), rs.getBigDecimal("threshold_rate")),
+        (rs, rowNum) -> new PriceAlertTarget(rs.getObject("id", UUID.class), rs.getBigDecimal("threshold_rate")),
         walletAddress,
         request.chainId(),
         request.sellTokenAddress().trim(),
@@ -99,7 +100,7 @@ public class AutoSwapRuleRepository {
         normalizeDirection(request.alertDirection()));
   }
 
-  public List<AutoSwapRuleCandidate> findNotificationCandidates(int limit) {
+  public List<PriceAlertCandidate> findNotificationCandidates(int limit) {
     return jdbcTemplate.query(
         """
         SELECT
@@ -189,8 +190,8 @@ public class AutoSwapRuleRepository {
         id);
   }
 
-  private AutoSwapRuleResponse mapRow(ResultSet rs) throws SQLException {
-    return new AutoSwapRuleResponse(
+  private PriceAlertResponse mapRow(ResultSet rs) throws SQLException {
+    return new PriceAlertResponse(
         rs.getObject("id", UUID.class),
         rs.getString("wallet_address"),
         rs.getLong("chain_id"),
@@ -217,8 +218,8 @@ public class AutoSwapRuleRepository {
     return direction == null || direction.isBlank() ? "above" : direction.trim().toLowerCase(Locale.ROOT);
   }
 
-  private AutoSwapRuleCandidate mapCandidateRow(ResultSet rs) throws SQLException {
-    return new AutoSwapRuleCandidate(
+  private PriceAlertCandidate mapCandidateRow(ResultSet rs) throws SQLException {
+    return new PriceAlertCandidate(
         rs.getObject("id", UUID.class),
         rs.getString("wallet_address"),
         rs.getLong("chain_id"),

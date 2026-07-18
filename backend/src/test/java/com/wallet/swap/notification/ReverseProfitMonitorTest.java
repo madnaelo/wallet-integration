@@ -8,8 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.wallet.swap.autoswap.AutoSwapCalculator;
-import com.wallet.swap.autoswap.AutoSwapRuleRepository;
+import com.wallet.swap.pricealert.PriceAlertCalculator;
+import com.wallet.swap.pricealert.PriceAlertRepository;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.feature.FeatureFlagService;
 import com.wallet.swap.ops.JobLockService;
@@ -26,11 +26,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ReverseProfitMonitorTest {
   @Mock private ReverseProfitCandidateRepository candidateRepository;
   @Mock private FavoritePairCandidateRepository favoritePairCandidateRepository;
-  @Mock private AutoSwapRuleRepository autoSwapRuleRepository;
+  @Mock private PriceAlertRepository priceAlertRepository;
   @Mock private CoinGeckoPriceClient priceClient;
   @Mock private ReverseProfitCalculator calculator;
   @Mock private FavoritePairCalculator favoritePairCalculator;
-  @Mock private AutoSwapCalculator autoSwapCalculator;
+  @Mock private PriceAlertCalculator priceAlertCalculator;
   @Mock private NotificationDeliveryService deliveryService;
   @Mock private OperationalMetricsService metricsService;
   @Mock private JobLockService jobLockService;
@@ -53,11 +53,11 @@ class ReverseProfitMonitorTest {
         properties,
         candidateRepository,
         favoritePairCandidateRepository,
-        autoSwapRuleRepository,
+        priceAlertRepository,
         priceClient,
         calculator,
         favoritePairCalculator,
-        autoSwapCalculator,
+        priceAlertCalculator,
         deliveryService,
         metricsService,
         jobLockService,
@@ -70,18 +70,18 @@ class ReverseProfitMonitorTest {
 
     monitor.checkReverseProfitOpportunities();
 
-    verify(autoSwapRuleRepository, never()).findNotificationCandidates(anyInt());
+    verify(priceAlertRepository, never()).findNotificationCandidates(anyInt());
     verify(metricsService).recordMonitorCompleted(0, 0, 0, 0);
   }
 
   @Test
   void evaluatesSavedPriceAlertsWhenTheFeatureIsEnabled() {
     when(featureFlagService.isPriceAlertsEnabled()).thenReturn(true);
-    when(autoSwapRuleRepository.findNotificationCandidates(properties.getCandidateLimit())).thenReturn(List.of());
+    when(priceAlertRepository.findNotificationCandidates(properties.getCandidateLimit())).thenReturn(List.of());
 
     monitor.checkReverseProfitOpportunities();
 
-    verify(autoSwapRuleRepository).findNotificationCandidates(properties.getCandidateLimit());
+    verify(priceAlertRepository).findNotificationCandidates(properties.getCandidateLimit());
     verify(metricsService).recordMonitorCompleted(0, 0, 0, 0);
   }
 }

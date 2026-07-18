@@ -2,8 +2,8 @@ package com.wallet.swap.notification;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wallet.swap.autoswap.AutoSwapAlertRepository;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
+import com.wallet.swap.pricealert.PriceAlertDeliveryRepository;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertOpportunity;
 import com.wallet.swap.common.SafeErrorDetails;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
@@ -29,7 +29,7 @@ public class NotificationOutboxWorker {
   private final NotificationMessageFormatter messageFormatter;
   private final ReverseProfitAlertRepository reverseProfitAlertRepository;
   private final FavoritePairAlertRepository favoritePairAlertRepository;
-  private final AutoSwapAlertRepository autoSwapAlertRepository;
+  private final PriceAlertDeliveryRepository priceAlertDeliveryRepository;
   private final OperationalMetricsService metricsService;
   private final ObjectMapper objectMapper;
   private final AtomicBoolean running = new AtomicBoolean(false);
@@ -43,7 +43,7 @@ public class NotificationOutboxWorker {
       NotificationMessageFormatter messageFormatter,
       ReverseProfitAlertRepository reverseProfitAlertRepository,
       FavoritePairAlertRepository favoritePairAlertRepository,
-      AutoSwapAlertRepository autoSwapAlertRepository,
+      PriceAlertDeliveryRepository priceAlertDeliveryRepository,
       OperationalMetricsService metricsService,
       ObjectMapper objectMapper) {
     this.properties = properties;
@@ -54,7 +54,7 @@ public class NotificationOutboxWorker {
     this.messageFormatter = messageFormatter;
     this.reverseProfitAlertRepository = reverseProfitAlertRepository;
     this.favoritePairAlertRepository = favoritePairAlertRepository;
-    this.autoSwapAlertRepository = autoSwapAlertRepository;
+    this.priceAlertDeliveryRepository = priceAlertDeliveryRepository;
     this.metricsService = metricsService;
     this.objectMapper = objectMapper;
   }
@@ -122,9 +122,9 @@ public class NotificationOutboxWorker {
       case "favorite_pair" -> pushSender.send(
           item.target(),
           messageFormatter.pushPayload(objectMapper.readValue(item.payloadJson(), FavoritePairOpportunity.class)));
-      case "auto_swap" -> pushSender.send(
+      case "price_alert", "auto_swap" -> pushSender.send(
           item.target(),
-          messageFormatter.pushPayload(objectMapper.readValue(item.payloadJson(), AutoSwapOpportunity.class)));
+          messageFormatter.pushPayload(objectMapper.readValue(item.payloadJson(), PriceAlertOpportunity.class)));
       default -> throw new IllegalArgumentException("Unsupported notification kind: " + item.notificationKind());
     }
   }
@@ -144,8 +144,8 @@ public class NotificationOutboxWorker {
           item.target(),
           sent,
           errorMessage);
-      case "auto_swap" -> autoSwapAlertRepository.saveDelivery(
-          objectMapper.readValue(item.payloadJson(), AutoSwapOpportunity.class),
+      case "price_alert", "auto_swap" -> priceAlertDeliveryRepository.saveDelivery(
+          objectMapper.readValue(item.payloadJson(), PriceAlertOpportunity.class),
           item.channel(),
           item.target(),
           sent,

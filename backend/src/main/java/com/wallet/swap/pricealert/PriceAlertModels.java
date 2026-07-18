@@ -1,4 +1,4 @@
-package com.wallet.swap.autoswap;
+package com.wallet.swap.pricealert;
 
 import com.wallet.swap.common.SafeText;
 import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
@@ -13,10 +13,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-public final class AutoSwapRuleModels {
-  private AutoSwapRuleModels() {}
+public final class PriceAlertModels {
+  private PriceAlertModels() {}
 
-  public record AutoSwapRuleRequest(
+  public record PriceAlertRequest(
       @NotNull @Min(1) Long chainId,
       @NotBlank @Size(max = 128) @Pattern(regexp = SafeText.IDENTIFIER_PATTERN) String sellTokenAddress,
       @NotBlank @Size(max = 32) @Pattern(regexp = SafeText.DISPLAY_LABEL_PATTERN) String sellTokenSymbol,
@@ -31,7 +31,7 @@ public final class AutoSwapRuleModels {
       @NotBlank @Size(max = 256) @Pattern(regexp = SafeText.IDENTIFIER_PATTERN) String recipientAddress,
       @Size(max = 32) String executionMode) {}
 
-  public record AutoSwapRuleResponse(
+  public record PriceAlertResponse(
       UUID id,
       String walletAddress,
       long chainId,
@@ -53,9 +53,9 @@ public final class AutoSwapRuleModels {
       Instant createdAt,
       Instant updatedAt) {}
 
-  public record AutoSwapRuleTarget(UUID id, BigDecimal thresholdRate) {}
+  public record PriceAlertTarget(UUID id, BigDecimal thresholdRate) {}
 
-  public record AutoSwapRuleCandidate(
+  public record PriceAlertCandidate(
       UUID id,
       String walletAddress,
       long chainId,
@@ -90,8 +90,8 @@ public final class AutoSwapRuleModels {
     }
   }
 
-  public record AutoSwapOpportunity(
-      AutoSwapRuleCandidate candidate,
+  public record PriceAlertOpportunity(
+      PriceAlertCandidate candidate,
       BigDecimal currentRate,
       BigDecimal sellTokenUsd,
       BigDecimal buyTokenUsd) {}

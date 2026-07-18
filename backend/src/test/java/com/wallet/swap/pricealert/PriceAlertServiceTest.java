@@ -1,4 +1,4 @@
-package com.wallet.swap.autoswap;
+package com.wallet.swap.pricealert;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -8,8 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleRequest;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleTarget;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertRequest;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertTarget;
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.feature.FeatureFlagService;
@@ -18,20 +18,20 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class AutoSwapRuleServiceTest {
+class PriceAlertServiceTest {
   private static final String WALLET = "0x0000000000000000000000000000000000000001";
 
   private final FeatureFlagService featureFlagService = mock(FeatureFlagService.class);
-  private final AutoSwapRuleRepository repository = mock(AutoSwapRuleRepository.class);
+  private final PriceAlertRepository repository = mock(PriceAlertRepository.class);
   private final WalletMutationLock walletMutationLock = mock(WalletMutationLock.class);
-  private final AutoSwapRuleService service = new AutoSwapRuleService(
+  private final PriceAlertService service = new PriceAlertService(
       featureFlagService,
       repository,
       walletMutationLock);
 
   @Test
   void checksFeatureFlagBeforeSaving() {
-    AutoSwapRuleRequest request = evmRequest("2500", "above", "notify_to_confirm");
+    PriceAlertRequest request = evmRequest("2500", "above", "notify_to_confirm");
 
     service.save(WALLET, request);
 
@@ -40,9 +40,9 @@ class AutoSwapRuleServiceTest {
 
   @Test
   void rejectsTargetTooCloseToExistingActiveRule() {
-    AutoSwapRuleRequest request = evmRequest("2509", "above", "notify_to_confirm");
+    PriceAlertRequest request = evmRequest("2509", "above", "notify_to_confirm");
     when(repository.listTargetsForPair(eq(WALLET), any()))
-        .thenReturn(List.of(new AutoSwapRuleTarget(UUID.randomUUID(), new BigDecimal("2500"))));
+        .thenReturn(List.of(new PriceAlertTarget(UUID.randomUUID(), new BigDecimal("2500"))));
 
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
@@ -51,7 +51,7 @@ class AutoSwapRuleServiceTest {
 
   @Test
   void storesEvmContractPairsAsConfirmationRules() {
-    AutoSwapRuleRequest request = evmRequest("2525", "above", "notify_to_confirm");
+    PriceAlertRequest request = evmRequest("2525", "above", "notify_to_confirm");
 
     service.save(WALLET, request);
 
@@ -60,7 +60,7 @@ class AutoSwapRuleServiceTest {
 
   @Test
   void rejectsAutomaticExecutionMode() {
-    AutoSwapRuleRequest request = nativeRequest("2525", "above", "auto_when_supported");
+    PriceAlertRequest request = nativeRequest("2525", "above", "auto_when_supported");
 
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
@@ -69,7 +69,7 @@ class AutoSwapRuleServiceTest {
 
   @Test
   void rejectsSlippageAboveTenPercent() {
-    AutoSwapRuleRequest request = evmRequest("2525", "above", "notify_to_confirm", 1_001);
+    PriceAlertRequest request = evmRequest("2525", "above", "notify_to_confirm", 1_001);
 
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
@@ -78,7 +78,7 @@ class AutoSwapRuleServiceTest {
 
   @Test
   void rejectsNewAlertsAtThePerWalletLimit() {
-    AutoSwapRuleRequest request = evmRequest("2525", "above", "notify_to_confirm");
+    PriceAlertRequest request = evmRequest("2525", "above", "notify_to_confirm");
     when(repository.countForWallet(WALLET)).thenReturn(250);
 
     assertThatThrownBy(() -> service.save(WALLET, request))
@@ -89,16 +89,16 @@ class AutoSwapRuleServiceTest {
     verify(repository, never()).insert(any(), any(), any(), any());
   }
 
-  private AutoSwapRuleRequest evmRequest(String thresholdRate, String direction, String executionMode) {
+  private PriceAlertRequest evmRequest(String thresholdRate, String direction, String executionMode) {
     return evmRequest(thresholdRate, direction, executionMode, 100);
   }
 
-  private AutoSwapRuleRequest evmRequest(
+  private PriceAlertRequest evmRequest(
       String thresholdRate,
       String direction,
       String executionMode,
       int slippageBps) {
-    return new AutoSwapRuleRequest(
+    return new PriceAlertRequest(
         1L,
         "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
         "WETH",
@@ -114,8 +114,8 @@ class AutoSwapRuleServiceTest {
         executionMode);
   }
 
-  private AutoSwapRuleRequest nativeRequest(String thresholdRate, String direction, String executionMode) {
-    return new AutoSwapRuleRequest(
+  private PriceAlertRequest nativeRequest(String thresholdRate, String direction, String executionMode) {
+    return new PriceAlertRequest(
         1L,
         "ETH",
         "ETH",

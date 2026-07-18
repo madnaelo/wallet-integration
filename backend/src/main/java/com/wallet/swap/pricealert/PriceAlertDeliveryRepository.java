@@ -1,8 +1,8 @@
-package com.wallet.swap.autoswap;
+package com.wallet.swap.pricealert;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertOpportunity;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
@@ -10,22 +10,23 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class AutoSwapAlertRepository {
+public class PriceAlertDeliveryRepository {
+  // Table names are retained for compatibility with already-applied migrations.
   private final JdbcTemplate jdbcTemplate;
   private final ObjectMapper objectMapper;
-  private final AutoSwapRuleRepository autoSwapRuleRepository;
+  private final PriceAlertRepository priceAlertRepository;
 
-  public AutoSwapAlertRepository(
+  public PriceAlertDeliveryRepository(
       JdbcTemplate jdbcTemplate,
       ObjectMapper objectMapper,
-      AutoSwapRuleRepository autoSwapRuleRepository) {
+      PriceAlertRepository priceAlertRepository) {
     this.jdbcTemplate = jdbcTemplate;
     this.objectMapper = objectMapper;
-    this.autoSwapRuleRepository = autoSwapRuleRepository;
+    this.priceAlertRepository = priceAlertRepository;
   }
 
   public void saveDelivery(
-      AutoSwapOpportunity opportunity,
+      PriceAlertOpportunity opportunity,
       String channel,
       String target,
       boolean sent,
@@ -56,11 +57,11 @@ public class AutoSwapAlertRepository {
         sent ? Timestamp.from(now) : null);
 
     if (sent) {
-      autoSwapRuleRepository.markTriggered(opportunity.candidate().id(), now);
+      priceAlertRepository.markTriggered(opportunity.candidate().id(), now);
     }
   }
 
-  private ObjectNode priceSnapshot(AutoSwapOpportunity opportunity) {
+  private ObjectNode priceSnapshot(PriceAlertOpportunity opportunity) {
     ObjectNode node = objectMapper.createObjectNode();
     node.put("source", "coingecko");
     node.put("priceCurrency", "usd");

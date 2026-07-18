@@ -2,7 +2,7 @@ package com.wallet.swap.notification;
 
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitOpportunity;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertOpportunity;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class NotificationDeliveryService {
   private static final Logger log = LoggerFactory.getLogger(NotificationDeliveryService.class);
+  private static final String PRICE_ALERT_KIND = "price_alert";
 
   private final EmailNotificationSender emailSender;
   private final TelegramNotificationSender telegramSender;
@@ -67,20 +68,20 @@ public class NotificationDeliveryService {
     }
   }
 
-  public void deliver(AutoSwapOpportunity opportunity) {
+  public void deliver(PriceAlertOpportunity opportunity) {
     if (opportunity.candidate().emailEnabled() && emailSender.isEnabled()
         && isCooldownElapsed(opportunity.candidate().lastEmailAlertAt(), opportunity.candidate().cooldownMinutes())) {
-      deliverAutoSwapEmail(opportunity);
+      deliverPriceAlertEmail(opportunity);
     }
 
     if (opportunity.candidate().telegramEnabled() && telegramSender.isEnabled()
         && isCooldownElapsed(opportunity.candidate().lastTelegramAlertAt(), opportunity.candidate().cooldownMinutes())) {
-      deliverAutoSwapTelegram(opportunity);
+      deliverPriceAlertTelegram(opportunity);
     }
 
     if (opportunity.candidate().pushEnabled() && pushSender.isEnabled()
         && isCooldownElapsed(opportunity.candidate().lastPushAlertAt(), opportunity.candidate().cooldownMinutes())) {
-      deliverAutoSwapPush(opportunity);
+      deliverPriceAlertPush(opportunity);
     }
   }
 
@@ -166,10 +167,10 @@ public class NotificationDeliveryService {
         opportunity.candidate().cooldownMinutes());
   }
 
-  private void deliverAutoSwapEmail(AutoSwapOpportunity opportunity) {
+  private void deliverPriceAlertEmail(PriceAlertOpportunity opportunity) {
     String target = opportunity.candidate().emailAddress();
     enqueue(
-        "auto_swap",
+        PRICE_ALERT_KIND,
         opportunity.candidate().id(),
         opportunity.candidate().alertDirection(),
         "email",
@@ -180,10 +181,10 @@ public class NotificationDeliveryService {
         opportunity.candidate().cooldownMinutes());
   }
 
-  private void deliverAutoSwapTelegram(AutoSwapOpportunity opportunity) {
+  private void deliverPriceAlertTelegram(PriceAlertOpportunity opportunity) {
     String target = opportunity.candidate().telegramChatId();
     enqueue(
-        "auto_swap",
+        PRICE_ALERT_KIND,
         opportunity.candidate().id(),
         opportunity.candidate().alertDirection(),
         "telegram",
@@ -194,9 +195,9 @@ public class NotificationDeliveryService {
         opportunity.candidate().cooldownMinutes());
   }
 
-  private void deliverAutoSwapPush(AutoSwapOpportunity opportunity) {
+  private void deliverPriceAlertPush(PriceAlertOpportunity opportunity) {
     enqueue(
-        "auto_swap",
+        PRICE_ALERT_KIND,
         opportunity.candidate().id(),
         opportunity.candidate().alertDirection(),
         "push",

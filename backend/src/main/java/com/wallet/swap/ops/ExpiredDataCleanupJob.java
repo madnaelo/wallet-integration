@@ -61,12 +61,12 @@ public class ExpiredDataCleanupJob {
         expiredDataRepository::deleteOldReverseProfitAlerts);
     int favoriteAlerts = deleteOlderThan(maintenanceProperties.getAlertRetentionDays(), now,
         expiredDataRepository::deleteOldFavoritePairAlerts);
-    int autoSwapAlerts = deleteOlderThan(maintenanceProperties.getAlertRetentionDays(), now,
-        expiredDataRepository::deleteOldAutoSwapAlerts);
+    int priceAlertDeliveries = deleteOlderThan(maintenanceProperties.getAlertRetentionDays(), now,
+        expiredDataRepository::deleteOldPriceAlertDeliveries);
     int outboxRows = deleteOlderThan(maintenanceProperties.getNotificationOutboxRetentionDays(), now,
         expiredDataRepository::deleteOldNotificationOutbox);
     int total = nonces + sessions + telegramCodes + rateLimitBuckets + dryRunHistory
-        + reverseAlerts + favoriteAlerts + autoSwapAlerts + outboxRows;
+        + reverseAlerts + favoriteAlerts + priceAlertDeliveries + outboxRows;
     if (total > 0) {
       log.info(
           "Cleaned up {} expired rows: {} nonces, {} sessions, {} Telegram link codes, {} rate-limit buckets, "
@@ -79,7 +79,7 @@ public class ExpiredDataCleanupJob {
           dryRunHistory,
           reverseAlerts,
           favoriteAlerts,
-          autoSwapAlerts,
+          priceAlertDeliveries,
           outboxRows);
     }
   }

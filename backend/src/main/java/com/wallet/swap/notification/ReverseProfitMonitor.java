@@ -1,8 +1,8 @@
 package com.wallet.swap.notification;
 
-import com.wallet.swap.autoswap.AutoSwapCalculator;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleCandidate;
-import com.wallet.swap.autoswap.AutoSwapRuleRepository;
+import com.wallet.swap.pricealert.PriceAlertCalculator;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertCandidate;
+import com.wallet.swap.pricealert.PriceAlertRepository;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.feature.FeatureFlagService;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairCandidate;
@@ -29,11 +29,11 @@ public class ReverseProfitMonitor {
   private final NotificationProperties properties;
   private final ReverseProfitCandidateRepository candidateRepository;
   private final FavoritePairCandidateRepository favoritePairCandidateRepository;
-  private final AutoSwapRuleRepository autoSwapRuleRepository;
+  private final PriceAlertRepository priceAlertRepository;
   private final CoinGeckoPriceClient priceClient;
   private final ReverseProfitCalculator calculator;
   private final FavoritePairCalculator favoritePairCalculator;
-  private final AutoSwapCalculator autoSwapCalculator;
+  private final PriceAlertCalculator priceAlertCalculator;
   private final NotificationDeliveryService deliveryService;
   private final OperationalMetricsService metricsService;
   private final JobLockService jobLockService;
@@ -44,11 +44,11 @@ public class ReverseProfitMonitor {
       NotificationProperties properties,
       ReverseProfitCandidateRepository candidateRepository,
       FavoritePairCandidateRepository favoritePairCandidateRepository,
-      AutoSwapRuleRepository autoSwapRuleRepository,
+      PriceAlertRepository priceAlertRepository,
       CoinGeckoPriceClient priceClient,
       ReverseProfitCalculator calculator,
       FavoritePairCalculator favoritePairCalculator,
-      AutoSwapCalculator autoSwapCalculator,
+      PriceAlertCalculator priceAlertCalculator,
       NotificationDeliveryService deliveryService,
       OperationalMetricsService metricsService,
       JobLockService jobLockService,
@@ -56,11 +56,11 @@ public class ReverseProfitMonitor {
     this.properties = properties;
     this.candidateRepository = candidateRepository;
     this.favoritePairCandidateRepository = favoritePairCandidateRepository;
-    this.autoSwapRuleRepository = autoSwapRuleRepository;
+    this.priceAlertRepository = priceAlertRepository;
     this.priceClient = priceClient;
     this.calculator = calculator;
     this.favoritePairCalculator = favoritePairCalculator;
-    this.autoSwapCalculator = autoSwapCalculator;
+    this.priceAlertCalculator = priceAlertCalculator;
     this.deliveryService = deliveryService;
     this.metricsService = metricsService;
     this.jobLockService = jobLockService;
@@ -95,8 +95,8 @@ public class ReverseProfitMonitor {
           properties.getCandidateLimit());
       List<FavoritePairCandidate> favoritePairCandidates = favoritePairCandidateRepository.findCandidates(
           properties.getCandidateLimit());
-      List<AutoSwapRuleCandidate> priceAlertCandidates = featureFlagService.isPriceAlertsEnabled()
-          ? autoSwapRuleRepository.findNotificationCandidates(properties.getCandidateLimit())
+      List<PriceAlertCandidate> priceAlertCandidates = featureFlagService.isPriceAlertsEnabled()
+          ? priceAlertRepository.findNotificationCandidates(properties.getCandidateLimit())
           : List.of();
       reverseCandidateCount = candidates.size();
       favoritePairCandidateCount = favoritePairCandidates.size();
@@ -115,7 +115,7 @@ public class ReverseProfitMonitor {
         tokenRefs.add(candidate.sellToken());
         tokenRefs.add(candidate.buyToken());
       }
-      for (AutoSwapRuleCandidate candidate : priceAlertCandidates) {
+      for (PriceAlertCandidate candidate : priceAlertCandidates) {
         tokenRefs.add(candidate.sellToken());
         tokenRefs.add(candidate.buyToken());
       }
@@ -142,8 +142,8 @@ public class ReverseProfitMonitor {
       }
 
       int priceAlertOpportunities = 0;
-      for (AutoSwapRuleCandidate candidate : priceAlertCandidates) {
-        priceAlertOpportunities += autoSwapCalculator.evaluate(candidate, prices)
+      for (PriceAlertCandidate candidate : priceAlertCandidates) {
+        priceAlertOpportunities += priceAlertCalculator.evaluate(candidate, prices)
             .map(opportunity -> {
               deliveryService.deliver(opportunity);
               return 1;

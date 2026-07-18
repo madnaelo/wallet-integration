@@ -1,8 +1,8 @@
-package com.wallet.swap.autoswap;
+package com.wallet.swap.pricealert;
 
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleRequest;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleResponse;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleTarget;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertRequest;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertResponse;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertTarget;
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.feature.FeatureFlagService;
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class AutoSwapRuleService {
+public class PriceAlertService {
   private static final Set<String> ALERT_DIRECTIONS = Set.of("above", "below");
   private static final String CONFIRMATION_REQUIRED = "confirmation_required";
   private static final String NOTIFY_TO_CONFIRM = "notify_to_confirm";
@@ -27,28 +27,28 @@ public class AutoSwapRuleService {
   private static final int MAX_ALERTS_PER_WALLET = 250;
 
   private final FeatureFlagService featureFlagService;
-  private final AutoSwapRuleRepository repository;
+  private final PriceAlertRepository repository;
   private final WalletMutationLock walletMutationLock;
 
-  public AutoSwapRuleService(
+  public PriceAlertService(
       FeatureFlagService featureFlagService,
-      AutoSwapRuleRepository repository,
+      PriceAlertRepository repository,
       WalletMutationLock walletMutationLock) {
     this.featureFlagService = featureFlagService;
     this.repository = repository;
     this.walletMutationLock = walletMutationLock;
   }
 
-  public List<AutoSwapRuleResponse> list(String walletAddress) {
+  public List<PriceAlertResponse> list(String walletAddress) {
     featureFlagService.requirePriceAlertsEnabled();
     return repository.listForWallet(walletAddress);
   }
 
   @Transactional
-  public AutoSwapRuleResponse save(String walletAddress, AutoSwapRuleRequest request) {
+  public PriceAlertResponse save(String walletAddress, PriceAlertRequest request) {
     featureFlagService.requirePriceAlertsEnabled();
     validate(request);
-    AutoSwapRuleRequest normalized = normalized(request);
+    PriceAlertRequest normalized = normalized(request);
     walletMutationLock.lock(walletAddress);
     if (repository.countForWallet(walletAddress) >= MAX_ALERTS_PER_WALLET) {
       throw new ApiException(HttpStatus.CONFLICT, "This wallet has reached its price-alert limit.");
@@ -63,7 +63,7 @@ public class AutoSwapRuleService {
     repository.delete(walletAddress, id);
   }
 
-  private void validate(AutoSwapRuleRequest request) {
+  private void validate(PriceAlertRequest request) {
     if (request.chainId() == null) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Network is required.");
     }
@@ -102,8 +102,8 @@ public class AutoSwapRuleService {
     }
   }
 
-  private void validateTargetSpacing(String walletAddress, AutoSwapRuleRequest request) {
-    for (AutoSwapRuleTarget existing : repository.listTargetsForPair(walletAddress, request)) {
+  private void validateTargetSpacing(String walletAddress, PriceAlertRequest request) {
+    for (PriceAlertTarget existing : repository.listTargetsForPair(walletAddress, request)) {
       BigDecimal existingTarget = existing.thresholdRate();
       BigDecimal minimumGap = existingTarget.min(request.thresholdRate())
           .multiply(MIN_TARGET_GAP_RATIO)
@@ -118,8 +118,8 @@ public class AutoSwapRuleService {
     }
   }
 
-  private AutoSwapRuleRequest normalized(AutoSwapRuleRequest request) {
-    return new AutoSwapRuleRequest(
+  private PriceAlertRequest normalized(PriceAlertRequest request) {
+    return new PriceAlertRequest(
         request.chainId(),
         request.sellTokenAddress().trim(),
         request.sellTokenSymbol().trim(),

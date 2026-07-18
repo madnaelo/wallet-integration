@@ -1,7 +1,7 @@
-package com.wallet.swap.autoswap;
+package com.wallet.swap.pricealert;
 
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapOpportunity;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleCandidate;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertOpportunity;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -10,11 +10,11 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 @Component
-public class AutoSwapCalculator {
+public class PriceAlertCalculator {
   private static final MathContext MC = MathContext.DECIMAL128;
 
-  public Optional<AutoSwapOpportunity> evaluate(
-      AutoSwapRuleCandidate candidate,
+  public Optional<PriceAlertOpportunity> evaluate(
+      PriceAlertCandidate candidate,
       Map<TokenRef, BigDecimal> prices) {
     BigDecimal sellTokenUsd = prices.get(candidate.sellToken());
     BigDecimal buyTokenUsd = prices.get(candidate.buyToken());
@@ -29,6 +29,6 @@ public class AutoSwapCalculator {
         : currentRate.compareTo(candidate.thresholdRate()) >= 0;
     if (!reached) return Optional.empty();
 
-    return Optional.of(new AutoSwapOpportunity(candidate, currentRate, sellTokenUsd, buyTokenUsd));
+    return Optional.of(new PriceAlertOpportunity(candidate, currentRate, sellTokenUsd, buyTokenUsd));
   }
 }

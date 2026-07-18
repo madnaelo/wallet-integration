@@ -59,7 +59,7 @@ public class ExpiredDataRepository {
         limit);
   }
 
-  public int deleteOldAutoSwapAlerts(Instant cutoff, int limit) {
+  public int deleteOldPriceAlertDeliveries(Instant cutoff, int limit) {
     return jdbcTemplate.update(
         """
         DELETE FROM auto_swap_alerts

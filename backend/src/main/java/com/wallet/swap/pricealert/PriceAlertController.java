@@ -1,8 +1,8 @@
-package com.wallet.swap.autoswap;
+package com.wallet.swap.pricealert;
 
 import com.wallet.swap.auth.AuthService;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleRequest;
-import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleResponse;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertRequest;
+import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -20,30 +20,30 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/price-alerts/rules")
-public class AutoSwapRuleController {
+public class PriceAlertController {
   private final AuthService authService;
-  private final AutoSwapRuleService autoSwapRuleService;
+  private final PriceAlertService priceAlertService;
 
-  public AutoSwapRuleController(AuthService authService, AutoSwapRuleService autoSwapRuleService) {
+  public PriceAlertController(AuthService authService, PriceAlertService priceAlertService) {
     this.authService = authService;
-    this.autoSwapRuleService = autoSwapRuleService;
+    this.priceAlertService = priceAlertService;
   }
 
   @GetMapping
-  public List<AutoSwapRuleResponse> list(
+  public List<PriceAlertResponse> list(
       @RequestHeader(name = "Authorization", required = false) String authorization,
       HttpServletRequest httpRequest) {
     String walletAddress = authService.authenticateRequest(authorization, httpRequest);
-    return autoSwapRuleService.list(walletAddress);
+    return priceAlertService.list(walletAddress);
   }
 
   @PostMapping
-  public AutoSwapRuleResponse save(
+  public PriceAlertResponse save(
       @RequestHeader(name = "Authorization", required = false) String authorization,
       HttpServletRequest httpRequest,
-      @Valid @RequestBody AutoSwapRuleRequest request) {
+      @Valid @RequestBody PriceAlertRequest request) {
     String walletAddress = authService.authenticateRequest(authorization, httpRequest);
-    return autoSwapRuleService.save(walletAddress, request);
+    return priceAlertService.save(walletAddress, request);
   }
 
   @DeleteMapping("/{id}")
@@ -53,6 +53,6 @@ public class AutoSwapRuleController {
       HttpServletRequest httpRequest,
       @PathVariable UUID id) {
     String walletAddress = authService.authenticateRequest(authorization, httpRequest);
-    autoSwapRuleService.delete(walletAddress, id);
+    priceAlertService.delete(walletAddress, id);
   }
 }
