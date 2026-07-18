@@ -124,7 +124,7 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob:",
   "font-src 'self' data:",
-  "connect-src 'self' http://localhost:8080 https: wss:",
+  `connect-src 'self'${isDevelopment ? " http://localhost:8080" : ""} https: wss:`,
   "frame-src 'self' https:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
