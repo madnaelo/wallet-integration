@@ -509,10 +509,12 @@ jobs:
 
       - name: Validate Vercel credentials
         shell: bash
+        env:
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
           missing=()
-          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_PROTECTION_BYPASS_SECRET; do
             if [ -z "${!name:-}" ]; then
               missing+=("$name")
             fi
@@ -532,28 +534,42 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.vercel.outputs.deployment_url }}
           EXPECTED_COMMIT: ${{ needs.prepare.outputs.release_sha }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
           vercel_cli=(npx --yes "vercel@56.3.1")
+          error_file="$(mktemp)"
+          trap 'rm -f "$error_file"' EXIT
+          last_failure="Protected deployment health request has not completed."
           for attempt in $(seq 1 18); do
+            : > "$error_file"
             if body="$(
               "${vercel_cli[@]}" curl /api/health \
                 --deployment "$DEPLOYMENT_URL" \
+                --protection-bypass "$VERCEL_PROTECTION_BYPASS_SECRET" \
                 --yes \
                 --token "$VERCEL_TOKEN" \
                 -- --fail --silent --show-error --max-time 20 \
-                2>/dev/null
-            )" \
-              && DEPLOY_BODY="$body" node -e '
+                2>"$error_file"
+            )"; then
+              if DEPLOY_BODY="$body" node -e '
                 const payload = JSON.parse(process.env.DEPLOY_BODY);
                 if (payload.status !== "ok" || payload.build?.commit !== process.env.EXPECTED_COMMIT) process.exit(1);
               '; then
-              exit 0
+                exit 0
+              fi
+              last_failure="Staged health payload did not match the expected healthy commit."
+            else
+              last_failure="Protected staged deployment request failed."
             fi
             echo "Waiting for Vercel build $EXPECTED_COMMIT ($attempt/18)."
             sleep 5
           done
           echo "Vercel deployment did not serve the expected healthy commit." >&2
+          echo "$last_failure" >&2
+          if [ -s "$error_file" ]; then
+            sed -E 's/[A-Za-z0-9_=.-]{24,}/[redacted]/g' "$error_file" | tail -n 20 >&2
+          fi
           exit 1
 
   frontend:

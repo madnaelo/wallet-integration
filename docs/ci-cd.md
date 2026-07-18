@@ -49,7 +49,13 @@ Frontend deployment:
 VERCEL_TOKEN
 VERCEL_ORG_ID
 VERCEL_PROJECT_ID
+VERCEL_PROTECTION_BYPASS_SECRET
 ```
+
+`VERCEL_PROTECTION_BYPASS_SECRET` must match a dedicated Protection Bypass for
+Automation entry on the Vercel project. It is used only to verify the protected
+staged deployment before promotion; keep it encrypted in GitHub and never add it
+to frontend environment variables.
 
 Backend deployment:
 
