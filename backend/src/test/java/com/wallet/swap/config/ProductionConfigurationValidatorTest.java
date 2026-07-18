@@ -118,6 +118,29 @@ class ProductionConfigurationValidatorTest {
   }
 
   @Test
+  void rejectsCorsValuesThatAreNotExactOrigins() {
+    var api = validApiProperties();
+    api.setCorsAllowedOrigins(
+        "https://swapassistant.example?redirect=https://attacker.example,"
+            + "https://swapassistant.example:443");
+    var configuration = new ProductionConfigurationValidator(
+        "production",
+        "jdbc:postgresql://wallet-postgres:5432/wallet",
+        "a-long-random-database-password",
+        "",
+        api,
+        validAuthProperties(),
+        validFeatureProperties(),
+        validLimitOrderProperties(),
+        validMaintenanceProperties(),
+        validNotificationProperties());
+
+    assertThatThrownBy(configuration::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("CORS_ALLOWED_ORIGINS");
+  }
+
+  @Test
   void rejectsUnrecognizedPushServicesAndCoinGeckoHeaders() {
     var notifications = validNotificationProperties();
     notifications.getPrice().setCoingeckoApiKeyHeader("Authorization");

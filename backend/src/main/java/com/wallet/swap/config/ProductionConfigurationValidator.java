@@ -338,6 +338,9 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     return origin.isBlank()
         || origin.equals("*")
         || uri == null
+        || uri.getPort() != -1
+        || uri.getRawQuery() != null
+        || uri.getRawFragment() != null
         || uri.getPath() != null && !uri.getPath().isBlank() && !uri.getPath().equals("/")
         || isLocalHost(uri.getHost());
   }
