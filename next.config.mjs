@@ -6,9 +6,8 @@ if (process.env.VERCEL_ENV === "production") {
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
   const walletConnectProjectId = (process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "").trim();
   const redisRequired = readBoolean(process.env.RATE_LIMIT_REDIS_REQUIRED, true);
-  const redisConfigured = Boolean(
-    process.env.UPSTASH_REDIS_REST_URL?.trim() && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
-  );
+  const redisRest = resolveRedisRestCredentials(process.env);
+  const redisConfigured = Boolean(redisRest.url && redisRest.token);
   const rateLimitPepper = (process.env.RATE_LIMIT_KEY_PEPPER ?? "").trim();
   const corsOrigins = (process.env.CORS_ALLOW_ORIGINS ?? "")
     .split(",")
@@ -47,9 +46,9 @@ if (process.env.VERCEL_ENV === "production") {
     throw new Error("Production distributed rate limiting requires the Upstash Redis REST URL and token.");
   }
   if (redisConfigured) {
-    assertTrustedUpstashUrl(process.env.UPSTASH_REDIS_REST_URL);
-    if (isWeakConfiguredValue(process.env.UPSTASH_REDIS_REST_TOKEN, 20)) {
-      throw new Error("UPSTASH_REDIS_REST_TOKEN must be a non-placeholder production secret.");
+    assertTrustedUpstashUrl(redisRest.url);
+    if (isWeakConfiguredValue(redisRest.token, 20)) {
+      throw new Error("The Redis REST token must be a non-placeholder production secret.");
     }
   }
   if (readBoolean(process.env.RATE_LIMIT_REDIS_FAIL_OPEN, false)) {
@@ -199,6 +198,18 @@ function assertHttpsOrigin(value, name) {
   }
 }
 
+function resolveRedisRestCredentials(source) {
+  const canonicalUrl = (source.UPSTASH_REDIS_REST_URL ?? "").trim();
+  const canonicalToken = (source.UPSTASH_REDIS_REST_TOKEN ?? "").trim();
+  if (canonicalUrl || canonicalToken) {
+    return { url: canonicalUrl, token: canonicalToken };
+  }
+  return {
+    url: (source.KV_REST_API_URL ?? "").trim(),
+    token: (source.KV_REST_API_TOKEN ?? "").trim()
+  };
+}
+
 function assertTrustedUpstashUrl(value) {
   try {
     const url = new URL(value);
@@ -215,7 +226,7 @@ function assertTrustedUpstashUrl(value) {
       throw new Error();
     }
   } catch {
-    throw new Error("UPSTASH_REDIS_REST_URL must use an Upstash HTTPS endpoint in production.");
+    throw new Error("The Redis REST URL must use an Upstash HTTPS endpoint in production.");
   }
 }
 

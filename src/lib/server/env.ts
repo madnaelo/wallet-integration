@@ -21,6 +21,20 @@ function normalizeLegacyBrandValue(value: string): string {
   return value.trim() === "thewallet" ? "swapassistant" : value;
 }
 
+function redisRestCredentials(): { url: string; token: string } {
+  const canonicalUrl = optional("UPSTASH_REDIS_REST_URL", "");
+  const canonicalToken = optional("UPSTASH_REDIS_REST_TOKEN", "");
+  if (canonicalUrl || canonicalToken) {
+    return { url: canonicalUrl, token: canonicalToken };
+  }
+  return {
+    url: optional("KV_REST_API_URL", ""),
+    token: optional("KV_REST_API_TOKEN", "")
+  };
+}
+
+const redisRest = redisRestCredentials();
+
 export const env = {
   ZEROX_API_KEY: optional("ZEROX_API_KEY", ""),
   ONEINCH_API_KEY: optional("ONEINCH_API_KEY", ""),
@@ -41,8 +55,8 @@ export const env = {
   REQUIRE_ALLOWED_ORIGIN: optionalBoolean("REQUIRE_ALLOWED_ORIGIN", false),
   RATE_LIMIT_WINDOW_MS: optionalNumber("RATE_LIMIT_WINDOW_MS", 60_000),
   RATE_LIMIT_MAX: optionalNumber("RATE_LIMIT_MAX", 30),
-  UPSTASH_REDIS_REST_URL: optional("UPSTASH_REDIS_REST_URL", ""),
-  UPSTASH_REDIS_REST_TOKEN: optional("UPSTASH_REDIS_REST_TOKEN", ""),
+  UPSTASH_REDIS_REST_URL: redisRest.url,
+  UPSTASH_REDIS_REST_TOKEN: redisRest.token,
   RATE_LIMIT_REDIS_PREFIX: optional("RATE_LIMIT_REDIS_PREFIX", "wallet"),
   RATE_LIMIT_REDIS_FAIL_OPEN: optionalBoolean("RATE_LIMIT_REDIS_FAIL_OPEN", false),
   RATE_LIMIT_REDIS_REQUIRED: optionalBoolean("RATE_LIMIT_REDIS_REQUIRED", false),

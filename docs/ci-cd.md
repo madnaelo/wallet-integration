@@ -209,8 +209,8 @@ CORS_ALLOW_ORIGINS=https://wallet-integration-theta.vercel.app
 REQUIRE_ALLOWED_ORIGIN=true
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=30
-UPSTASH_REDIS_REST_URL=...
-UPSTASH_REDIS_REST_TOKEN=...
+KV_REST_API_URL=...
+KV_REST_API_TOKEN=...
 RATE_LIMIT_REDIS_PREFIX=swap-assistant-prod
 RATE_LIMIT_REDIS_FAIL_OPEN=false
 RATE_LIMIT_REDIS_REQUIRED=true
@@ -218,6 +218,12 @@ RATE_LIMIT_KEY_PEPPER=<independent random secret of at least 32 characters>
 QUOTE_CACHE_TTL_MS=8000
 QUOTE_CACHE_MAX_ENTRIES=2000
 ```
+
+The Vercel Upstash Marketplace integration injects `KV_REST_API_URL` and
+`KV_REST_API_TOKEN`. Direct Upstash setups may instead use
+`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. Configure one
+complete pair only; the runtime deliberately refuses to combine credentials from
+different pairs.
 
 The provider keys stay server-side in Vercel because they are used by the
 Next.js route handler, not by browser code. `NEXT_PUBLIC_*` values are public by

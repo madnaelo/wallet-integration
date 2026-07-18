@@ -41,6 +41,53 @@ describe("distributed rate limiting", () => {
     expect(String(request.body)).not.toContain("0x1111111111111111111111111111111111111111");
   });
 
+  it("accepts credentials injected by the Vercel Upstash integration", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+    vi.stubEnv("KV_REST_API_URL", "https://vercel-redis.example");
+    vi.stubEnv("KV_REST_API_TOKEN", "vercel-redis-token");
+    vi.stubEnv("RATE_LIMIT_REDIS_REQUIRED", "true");
+    vi.stubEnv("RATE_LIMIT_KEY_PEPPER", "test-pepper-that-is-long-enough");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ result: [1, 0] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { rateLimitMany } = await import("@/lib/server/rateLimit");
+    await expect(rateLimitMany(["quote-ip:198.51.100.10"])).resolves.toEqual({
+      allowed: true,
+      retryAfterMs: 0
+    });
+
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://vercel-redis.example");
+    expect(request.headers).toMatchObject({
+      Authorization: "Bearer vercel-redis-token"
+    });
+  });
+
+  it("does not mix partial canonical credentials with Vercel credentials", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://canonical-redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+    vi.stubEnv("KV_REST_API_URL", "https://vercel-redis.example");
+    vi.stubEnv("KV_REST_API_TOKEN", "vercel-redis-token");
+    vi.stubEnv("RATE_LIMIT_REDIS_REQUIRED", "true");
+    vi.stubEnv("RATE_LIMIT_REDIS_FAIL_OPEN", "false");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { rateLimitMany } = await import("@/lib/server/rateLimit");
+    await expect(rateLimitMany(["quote-ip:198.51.100.10"])).resolves.toEqual({
+      allowed: false,
+      retryAfterMs: 60_000,
+      unavailable: true
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("fails closed when Redis returns an invalid decision", async () => {
     vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis-token");
