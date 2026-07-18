@@ -52,7 +52,7 @@ public class LimitOrderRepository {
           signed_payload_hash_version, next_submission_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'stored', ?, now(), ?, ?, ?, CAST(? AS jsonb), ?, now())
-        ON CONFLICT (order_hash) DO NOTHING
+        ON CONFLICT DO NOTHING
         RETURNING *
         """,
         (rs, rowNum) -> mapRow(rs),
@@ -104,6 +104,31 @@ public class LimitOrderRepository {
         Integer.class,
         walletAddress);
     return count == null ? 0 : count;
+  }
+
+  public boolean existsActiveInAllowanceScope(
+      String walletAddress,
+      long chainId,
+      String sellTokenAddress,
+      String executionProvider) {
+    Boolean exists = jdbcTemplate.queryForObject(
+        """
+        SELECT EXISTS (
+          SELECT 1
+          FROM limit_orders
+          WHERE wallet_address = ?
+            AND chain_id = ?
+            AND lower(sell_token_address) = lower(?)
+            AND lower(execution_provider) = lower(?)
+            AND execution_status IN ('stored', 'pending_submission', 'submitted', 'open', 'partially_filled', 'failed')
+        )
+        """,
+        Boolean.class,
+        walletAddress,
+        chainId,
+        sellTokenAddress.trim(),
+        executionProvider.trim());
+    return Boolean.TRUE.equals(exists);
   }
 
   public Optional<LimitOrderResponse> findByIdForWallet(UUID id, String walletAddress) {

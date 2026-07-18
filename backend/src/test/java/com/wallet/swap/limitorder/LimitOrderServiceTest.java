@@ -155,6 +155,23 @@ class LimitOrderServiceTest {
   }
 
   @Test
+  void rejectsASecondOrderThatWouldShareTheSameTokenAllowance() {
+    LimitOrderRequest request = validRequest(WALLET);
+    when(repository.existsActiveInAllowanceScope(
+        WALLET,
+        request.chainId(),
+        request.sellTokenAddress(),
+        request.executionProvider()))
+        .thenReturn(true);
+
+    assertThatThrownBy(() -> service.save(WALLET, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("existing active order");
+
+    verify(walletMutationLock).lock(WALLET);
+  }
+
+  @Test
   void persistsOrdersInsideAShortTransaction() throws Exception {
     assertThat(LimitOrderPersistenceService.class
         .getMethod("save", String.class, LimitOrderRequest.class, String.class, String.class)

@@ -43,6 +43,7 @@ public class LimitOrderPersistenceService {
       LimitOrderRequest request,
       String executionSupport,
       String payloadHash) {
+    requireAllowanceScopeAvailable(walletAddress, request);
     if (repository.countActiveForWallet(walletAddress) >= MAX_ACTIVE_ORDERS_PER_WALLET) {
       throw new ApiException(HttpStatus.CONFLICT, "This wallet has reached its active limit-order limit.");
     }
@@ -60,9 +61,26 @@ public class LimitOrderPersistenceService {
       String walletAddress,
       LimitOrderRequest request,
       String payloadHash) {
-    LimitOrderResponse existing = repository.findByOrderHash(request.orderHash())
-        .orElseThrow(() -> new IllegalStateException("Limit order conflict could not be resolved."));
-    return requireIdempotentMatch(existing, walletAddress, request, payloadHash);
+    return repository.findByOrderHash(request.orderHash())
+        .map(existing -> requireIdempotentMatch(existing, walletAddress, request, payloadHash))
+        .orElseGet(() -> {
+          requireAllowanceScopeAvailable(walletAddress, request);
+          throw new IllegalStateException("Limit order conflict could not be resolved.");
+        });
+  }
+
+  private void requireAllowanceScopeAvailable(
+      String walletAddress,
+      LimitOrderRequest request) {
+    if (repository.existsActiveInAllowanceScope(
+        walletAddress,
+        request.chainId(),
+        request.sellTokenAddress(),
+        request.executionProvider())) {
+      throw new ApiException(
+          HttpStatus.CONFLICT,
+          "Cancel the existing active order for this sell token before creating another with the same order service.");
+    }
   }
 
   private LimitOrderResponse requireIdempotentMatch(
