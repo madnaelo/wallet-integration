@@ -135,6 +135,41 @@ class ProductionConfigurationValidatorTest {
         .hasMessageContaining("PUSH_MAX_DEVICES_PER_WALLET");
   }
 
+  @Test
+  void rejectsOperationalSettingsThatCouldFloodOrStarveProduction() {
+    var api = validApiProperties();
+    api.setMaxRequestBodyBytes(100_000_000);
+    api.setTrustForwardedHeaders(false);
+    var limitOrders = validLimitOrderProperties();
+    limitOrders.setSubmissionRetryFixedDelayMs(0);
+    limitOrders.setStatusCheckBatchSize(10_000);
+    var notifications = validNotificationProperties();
+    notifications.setMonitorFixedDelayMs(0);
+    notifications.setOutboxBatchSize(10_000);
+    notifications.setEligibleStatuses(List.of("dry_run"));
+
+    var configuration = new ProductionConfigurationValidator(
+        "production",
+        "jdbc:postgresql://wallet-postgres:5432/wallet",
+        "a-long-random-database-password",
+        "",
+        api,
+        validAuthProperties(),
+        validFeatureProperties(),
+        limitOrders,
+        notifications);
+
+    assertThatThrownBy(configuration::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("API_MAX_REQUEST_BODY_BYTES")
+        .hasMessageContaining("proxy headers")
+        .hasMessageContaining("LIMIT_ORDER_SUBMISSION_RETRY_FIXED_DELAY_MS")
+        .hasMessageContaining("LIMIT_ORDER_STATUS_CHECK_BATCH_SIZE")
+        .hasMessageContaining("NOTIFICATIONS_MONITOR_FIXED_DELAY_MS")
+        .hasMessageContaining("NOTIFICATIONS_OUTBOX_BATCH_SIZE")
+        .hasMessageContaining("NOTIFICATIONS_ELIGIBLE_STATUSES");
+  }
+
   private ProductionConfigurationValidator validConfiguration() {
     return productionConfiguration(validLimitOrderProperties(), validNotificationProperties());
   }

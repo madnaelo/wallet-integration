@@ -85,6 +85,21 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     if (isWeakSecret(featureProperties.getAdminApiKey(), 32)) {
       problems.add("ADMIN_API_KEY must contain at least 32 characters");
     }
+    if (outside(apiProperties.getMaxRequestBodyBytes(), 32_768, 1_048_576)) {
+      problems.add("API_MAX_REQUEST_BODY_BYTES must be between 32768 and 1048576");
+    }
+    if (outside(apiProperties.getRateLimitWindowMs(), 1_000, 3_600_000)) {
+      problems.add("API_RATE_LIMIT_WINDOW_MS must be between 1000 and 3600000");
+    }
+    if (outside(apiProperties.getRateLimitMaxRequests(), 1, 10_000)) {
+      problems.add("API_RATE_LIMIT_MAX_REQUESTS must be between 1 and 10000");
+    }
+    if (outside(apiProperties.getAuthRateLimitMaxRequests(), 1, 1_000)) {
+      problems.add("API_AUTH_RATE_LIMIT_MAX_REQUESTS must be between 1 and 1000");
+    }
+    if (!apiProperties.isTrustForwardedHeaders() || !apiProperties.isTrustPrivateProxyHeaders()) {
+      problems.add("production proxy headers must be trusted for accurate client rate limits");
+    }
   }
 
   private void validateAuthentication(List<String> problems) {
@@ -135,6 +150,50 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
         && coinGeckoUri.getHost().equalsIgnoreCase("pro-api.coingecko.com")
         && !coinGeckoHeader.equals("x-cg-pro-api-key")) {
       problems.add("COINGECKO_API_KEY_HEADER must match the CoinGecko Pro host");
+    }
+    if (outside(notificationProperties.getMonitorFixedDelayMs(), 60_000, 86_400_000)) {
+      problems.add("NOTIFICATIONS_MONITOR_FIXED_DELAY_MS must be between 60000 and 86400000");
+    }
+    if (outside(notificationProperties.getCandidateLimit(), 1, 10_000)) {
+      problems.add("NOTIFICATIONS_CANDIDATE_LIMIT must be between 1 and 10000");
+    }
+    if (outside(notificationProperties.getLookbackDays(), 1, 3_650)) {
+      problems.add("NOTIFICATIONS_LOOKBACK_DAYS must be between 1 and 3650");
+    }
+    if (outside(notificationProperties.getDefaultProfitThresholdBps(), 0, 100_000)
+        || outside(notificationProperties.getDefaultLossThresholdBps(), 0, 100_000)) {
+      problems.add("notification threshold defaults must be between 0 and 100000 basis points");
+    }
+    if (outside(notificationProperties.getDefaultCooldownMinutes(), 5, 10_080)) {
+      problems.add("NOTIFICATIONS_DEFAULT_COOLDOWN_MINUTES must be between 5 and 10080");
+    }
+    if (outside(notificationProperties.getTelegramLinkTtlMinutes(), 1, 60)) {
+      problems.add("TELEGRAM_LINK_TTL_MINUTES must be between 1 and 60");
+    }
+    if (outside(notificationProperties.getOutboxFixedDelayMs(), 1_000, 600_000)) {
+      problems.add("NOTIFICATIONS_OUTBOX_FIXED_DELAY_MS must be between 1000 and 600000");
+    }
+    if (outside(notificationProperties.getOutboxBatchSize(), 1, 500)) {
+      problems.add("NOTIFICATIONS_OUTBOX_BATCH_SIZE must be between 1 and 500");
+    }
+    if (outside(notificationProperties.getOutboxMaxAttempts(), 1, 20)) {
+      problems.add("NOTIFICATIONS_OUTBOX_MAX_ATTEMPTS must be between 1 and 20");
+    }
+    if (outside(notificationProperties.getOutboxLockTtlSeconds(), 30, 3_600)) {
+      problems.add("NOTIFICATIONS_OUTBOX_LOCK_TTL_SECONDS must be between 30 and 3600");
+    }
+    List<String> eligibleStatuses = notificationProperties.getEligibleStatuses();
+    if (eligibleStatuses == null
+        || eligibleStatuses.isEmpty()
+        || eligibleStatuses.stream().map(this::text).anyMatch(
+            status -> !Set.of("submitted", "confirmed").contains(status.toLowerCase(Locale.ROOT)))) {
+      problems.add("NOTIFICATIONS_ELIGIBLE_STATUSES must contain only submitted and confirmed");
+    }
+    if (outside(notificationProperties.getPrice().getRequestTimeoutSeconds(), 1, 30)) {
+      problems.add("COINGECKO_REQUEST_TIMEOUT_SECONDS must be between 1 and 30");
+    }
+    if (outside(notificationProperties.getPrice().getContractBatchSize(), 1, 100)) {
+      problems.add("COINGECKO_CONTRACT_BATCH_SIZE must be between 1 and 100");
     }
 
     NotificationProperties.Telegram telegram = notificationProperties.getTelegram();
@@ -194,6 +253,37 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
         "COW_PARTNER_ORDERBOOK_BASE_URL",
         limitOrderProperties.getCowPartnerOrderbookBaseUrl(),
         COW_PARTNER_HOSTS);
+    if (outside(limitOrderProperties.getRequestTimeoutSeconds(), 1, 30)) {
+      problems.add("LIMIT_ORDER_REQUEST_TIMEOUT_SECONDS must be between 1 and 30");
+    }
+    if (outside(limitOrderProperties.getSubmissionRetryFixedDelayMs(), 5_000, 600_000)) {
+      problems.add("LIMIT_ORDER_SUBMISSION_RETRY_FIXED_DELAY_MS must be between 5000 and 600000");
+    }
+    if (outside(limitOrderProperties.getSubmissionBatchSize(), 1, 100)) {
+      problems.add("LIMIT_ORDER_SUBMISSION_BATCH_SIZE must be between 1 and 100");
+    }
+    if (outside(limitOrderProperties.getSubmissionMaxAttempts(), 1, 20)) {
+      problems.add("LIMIT_ORDER_SUBMISSION_MAX_ATTEMPTS must be between 1 and 20");
+    }
+    if (outside(limitOrderProperties.getSubmissionLockTtlSeconds(), 15, 3_600)) {
+      problems.add("LIMIT_ORDER_SUBMISSION_LOCK_TTL_SECONDS must be between 15 and 3600");
+    }
+    if (outside(limitOrderProperties.getStatusCheckFixedDelayMs(), 5_000, 600_000)) {
+      problems.add("LIMIT_ORDER_STATUS_CHECK_FIXED_DELAY_MS must be between 5000 and 600000");
+    }
+    if (outside(limitOrderProperties.getStatusCheckBatchSize(), 1, 200)) {
+      problems.add("LIMIT_ORDER_STATUS_CHECK_BATCH_SIZE must be between 1 and 200");
+    }
+    if (outside(limitOrderProperties.getStatusCheckLockTtlSeconds(), 15, 3_600)) {
+      problems.add("LIMIT_ORDER_STATUS_CHECK_LOCK_TTL_SECONDS must be between 15 and 3600");
+    }
+    if (outside(limitOrderProperties.getStatusCheckOpenIntervalSeconds(), 15, 3_600)
+        || outside(limitOrderProperties.getStatusCheckPartialIntervalSeconds(), 15, 3_600)) {
+      problems.add("limit-order active status intervals must be between 15 and 3600 seconds");
+    }
+    if (outside(limitOrderProperties.getStatusCheckMaxBackoffSeconds(), 60, 86_400)) {
+      problems.add("LIMIT_ORDER_STATUS_CHECK_MAX_BACKOFF_SECONDS must be between 60 and 86400");
+    }
   }
 
   private URI validateProviderUrl(
@@ -250,6 +340,10 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
         || normalized.contains("placeholder")
         || normalized.startsWith("your_")
         || normalized.startsWith("your-");
+  }
+
+  private boolean outside(long value, long minimum, long maximum) {
+    return value < minimum || value > maximum;
   }
 
   private String text(String value) {
