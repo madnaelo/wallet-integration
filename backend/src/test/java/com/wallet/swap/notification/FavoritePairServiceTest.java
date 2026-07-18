@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairRequest;
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,7 +20,8 @@ class FavoritePairServiceTest {
   private static final String WALLET = "0x0000000000000000000000000000000000000001";
 
   private final FavoritePairRepository repository = mock(FavoritePairRepository.class);
-  private final FavoritePairService service = new FavoritePairService(repository);
+  private final WalletMutationLock walletMutationLock = mock(WalletMutationLock.class);
+  private final FavoritePairService service = new FavoritePairService(repository, walletMutationLock);
 
   @Test
   void rejectsTargetTooCloseToExistingAlertForSamePairAndDirection() {
@@ -50,6 +53,19 @@ class FavoritePairServiceTest {
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("already saved");
+  }
+
+  @Test
+  void rejectsNewFavoritesAtThePerWalletLimit() {
+    FavoritePairRequest request = request("2525", "above", true);
+    when(repository.countForWallet(WALLET)).thenReturn(250);
+
+    assertThatThrownBy(() -> service.save(WALLET, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("saved-pair limit");
+
+    verify(walletMutationLock).lock(WALLET);
+    verify(repository, never()).insert(any(), any());
   }
 
   private FavoritePairRequest request(String targetRate, String direction, boolean alertsEnabled) {

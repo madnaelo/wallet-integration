@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionKeys;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
@@ -31,10 +32,17 @@ class PushSubscriptionServiceTest {
   private PushSubscriptionService service;
   private NotificationProperties properties;
 
+  @Mock
+  private WalletMutationLock walletMutationLock;
+
   @BeforeEach
   void setUp() {
     properties = new NotificationProperties();
-    service = new PushSubscriptionService(properties, pushSubscriptionRepository, preferenceService);
+    service = new PushSubscriptionService(
+        properties,
+        pushSubscriptionRepository,
+        preferenceService,
+        walletMutationLock);
   }
 
   @Test
@@ -92,6 +100,7 @@ class PushSubscriptionServiceTest {
 
     service.subscribe(WALLET, request, "Chrome");
 
+    verify(walletMutationLock).lock(WALLET);
     verify(pushSubscriptionRepository).upsert(WALLET, request, "Chrome");
     verify(pushSubscriptionRepository).retainMostRecentForWallet(WALLET, 10);
     verify(preferenceService).setPushEnabled(WALLET, true);

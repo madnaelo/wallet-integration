@@ -1,6 +1,7 @@
 package com.wallet.swap.notification;
 
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionDisableRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
@@ -18,14 +19,17 @@ public class PushSubscriptionService {
   private final NotificationProperties properties;
   private final PushSubscriptionRepository pushSubscriptionRepository;
   private final NotificationPreferenceService preferenceService;
+  private final WalletMutationLock walletMutationLock;
 
   public PushSubscriptionService(
       NotificationProperties properties,
       PushSubscriptionRepository pushSubscriptionRepository,
-      NotificationPreferenceService preferenceService) {
+      NotificationPreferenceService preferenceService,
+      WalletMutationLock walletMutationLock) {
     this.properties = properties;
     this.pushSubscriptionRepository = pushSubscriptionRepository;
     this.preferenceService = preferenceService;
+    this.walletMutationLock = walletMutationLock;
   }
 
   public boolean isAvailable() {
@@ -44,6 +48,7 @@ public class PushSubscriptionService {
       throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "Push notifications are not available right now.");
     }
     validate(request);
+    walletMutationLock.lock(walletAddress);
     pushSubscriptionRepository.upsert(walletAddress, request, userAgent);
     pushSubscriptionRepository.retainMostRecentForWallet(
         walletAddress,

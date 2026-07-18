@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleRequest;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleTarget;
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.feature.FeatureFlagService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,7 +23,11 @@ class AutoSwapRuleServiceTest {
 
   private final FeatureFlagService featureFlagService = mock(FeatureFlagService.class);
   private final AutoSwapRuleRepository repository = mock(AutoSwapRuleRepository.class);
-  private final AutoSwapRuleService service = new AutoSwapRuleService(featureFlagService, repository);
+  private final WalletMutationLock walletMutationLock = mock(WalletMutationLock.class);
+  private final AutoSwapRuleService service = new AutoSwapRuleService(
+      featureFlagService,
+      repository,
+      walletMutationLock);
 
   @Test
   void checksFeatureFlagBeforeSaving() {
@@ -68,6 +74,19 @@ class AutoSwapRuleServiceTest {
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
         .hasMessage("Slippage tolerance must be between 0% and 10%.");
+  }
+
+  @Test
+  void rejectsNewAlertsAtThePerWalletLimit() {
+    AutoSwapRuleRequest request = evmRequest("2525", "above", "notify_to_confirm");
+    when(repository.countForWallet(WALLET)).thenReturn(250);
+
+    assertThatThrownBy(() -> service.save(WALLET, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("price-alert limit");
+
+    verify(walletMutationLock).lock(WALLET);
+    verify(repository, never()).insert(any(), any(), any(), any());
   }
 
   private AutoSwapRuleRequest evmRequest(String thresholdRate, String direction, String executionMode) {

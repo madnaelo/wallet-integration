@@ -84,6 +84,14 @@ public class SwapHistoryRepository {
         limit);
   }
 
+  public int countForWallet(String walletAddress) {
+    Integer count = jdbcTemplate.queryForObject(
+        "SELECT count(*)::int FROM swap_history WHERE wallet_address = ?",
+        Integer.class,
+        walletAddress);
+    return count == null ? 0 : count;
+  }
+
   private SwapHistoryResponse findById(String walletAddress, UUID id) {
     return jdbcTemplate.queryForObject(
         "SELECT * FROM swap_history WHERE wallet_address = ? AND id = ?",

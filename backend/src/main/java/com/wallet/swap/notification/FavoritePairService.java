@@ -1,6 +1,7 @@
 package com.wallet.swap.notification;
 
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairRequest;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairResponse;
 import java.math.BigDecimal;
@@ -11,33 +12,44 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FavoritePairService {
   private static final Set<String> ALERT_DIRECTIONS = Set.of("above", "below");
   private static final BigDecimal MIN_TARGET_GAP_RATIO = new BigDecimal("0.01");
   private static final BigDecimal MIN_TARGET_GAP_FLOOR = new BigDecimal("0.000000000000000001");
+  private static final int MAX_FAVORITES_PER_WALLET = 250;
 
   private final FavoritePairRepository repository;
+  private final WalletMutationLock walletMutationLock;
 
-  public FavoritePairService(FavoritePairRepository repository) {
+  public FavoritePairService(FavoritePairRepository repository, WalletMutationLock walletMutationLock) {
     this.repository = repository;
+    this.walletMutationLock = walletMutationLock;
   }
 
   public List<FavoritePairResponse> list(String walletAddress) {
     return repository.listForWallet(walletAddress);
   }
 
+  @Transactional
   public FavoritePairResponse save(String walletAddress, FavoritePairRequest request) {
     validate(request);
     FavoritePairRequest normalized = normalized(request);
+    walletMutationLock.lock(walletAddress);
+    if (repository.countForWallet(walletAddress) >= MAX_FAVORITES_PER_WALLET) {
+      throw new ApiException(HttpStatus.CONFLICT, "This wallet has reached its saved-pair limit.");
+    }
     validateTargetSpacing(walletAddress, normalized, null);
     return repository.insert(walletAddress, normalized);
   }
 
+  @Transactional
   public FavoritePairResponse update(String walletAddress, UUID id, FavoritePairRequest request) {
     validate(request);
     FavoritePairRequest normalized = normalized(request);
+    walletMutationLock.lock(walletAddress);
     validateTargetSpacing(walletAddress, normalized, id);
     return repository.update(walletAddress, id, normalized);
   }

@@ -34,6 +34,14 @@ public class AutoSwapRuleRepository {
         walletAddress);
   }
 
+  public int countForWallet(String walletAddress) {
+    Integer count = jdbcTemplate.queryForObject(
+        "SELECT count(*)::int FROM auto_swap_rules WHERE wallet_address = ?",
+        Integer.class,
+        walletAddress);
+    return count == null ? 0 : count;
+  }
+
   public AutoSwapRuleResponse insert(
       String walletAddress,
       AutoSwapRuleRequest request,

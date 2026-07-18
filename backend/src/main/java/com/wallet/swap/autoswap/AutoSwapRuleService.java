@@ -4,6 +4,7 @@ import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleRequest;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleResponse;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleTarget;
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.feature.FeatureFlagService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -13,6 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AutoSwapRuleService {
@@ -22,13 +24,19 @@ public class AutoSwapRuleService {
   private static final Set<String> EXECUTION_MODES = Set.of(NOTIFY_TO_CONFIRM);
   private static final BigDecimal MIN_TARGET_GAP_RATIO = new BigDecimal("0.01");
   private static final BigDecimal MIN_TARGET_GAP_FLOOR = new BigDecimal("0.000000000000000001");
+  private static final int MAX_ALERTS_PER_WALLET = 250;
 
   private final FeatureFlagService featureFlagService;
   private final AutoSwapRuleRepository repository;
+  private final WalletMutationLock walletMutationLock;
 
-  public AutoSwapRuleService(FeatureFlagService featureFlagService, AutoSwapRuleRepository repository) {
+  public AutoSwapRuleService(
+      FeatureFlagService featureFlagService,
+      AutoSwapRuleRepository repository,
+      WalletMutationLock walletMutationLock) {
     this.featureFlagService = featureFlagService;
     this.repository = repository;
+    this.walletMutationLock = walletMutationLock;
   }
 
   public List<AutoSwapRuleResponse> list(String walletAddress) {
@@ -36,10 +44,15 @@ public class AutoSwapRuleService {
     return repository.listForWallet(walletAddress);
   }
 
+  @Transactional
   public AutoSwapRuleResponse save(String walletAddress, AutoSwapRuleRequest request) {
     featureFlagService.requirePriceAlertsEnabled();
     validate(request);
     AutoSwapRuleRequest normalized = normalized(request);
+    walletMutationLock.lock(walletAddress);
+    if (repository.countForWallet(walletAddress) >= MAX_ALERTS_PER_WALLET) {
+      throw new ApiException(HttpStatus.CONFLICT, "This wallet has reached its price-alert limit.");
+    }
     validateTargetSpacing(walletAddress, normalized);
 
     return repository.insert(walletAddress, normalized, NOTIFY_TO_CONFIRM, CONFIRMATION_REQUIRED);

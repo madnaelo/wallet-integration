@@ -33,6 +33,14 @@ public class FavoritePairRepository {
         walletAddress);
   }
 
+  public int countForWallet(String walletAddress) {
+    Integer count = jdbcTemplate.queryForObject(
+        "SELECT count(*)::int FROM favorite_pairs WHERE wallet_address = ?",
+        Integer.class,
+        walletAddress);
+    return count == null ? 0 : count;
+  }
+
   public FavoritePairResponse insert(String walletAddress, FavoritePairRequest request) {
     UUID id = UUID.randomUUID();
     return jdbcTemplate.queryForObject(

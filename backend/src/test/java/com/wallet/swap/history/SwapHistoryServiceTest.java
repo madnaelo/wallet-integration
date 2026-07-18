@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.history.SwapHistoryModels.SaveSwapHistoryRequest;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,8 @@ class SwapHistoryServiceTest {
   private static final String WALLET = "0x0000000000000000000000000000000000000001";
 
   private final SwapHistoryRepository repository = mock(SwapHistoryRepository.class);
-  private final SwapHistoryService service = new SwapHistoryService(repository);
+  private final WalletMutationLock walletMutationLock = mock(WalletMutationLock.class);
+  private final SwapHistoryService service = new SwapHistoryService(repository, walletMutationLock);
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Test
@@ -38,6 +40,19 @@ class SwapHistoryServiceTest {
     service.save(WALLET, request);
 
     verify(repository).save(WALLET, request);
+    verify(walletMutationLock).lock(WALLET);
+  }
+
+  @Test
+  void rejectsNewEntriesWhenWalletHistoryIsFull() {
+    SaveSwapHistoryRequest request = requestWithQuote(null);
+    org.mockito.Mockito.when(repository.countForWallet(WALLET)).thenReturn(10_000);
+
+    assertThatThrownBy(() -> service.save(WALLET, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessage("History storage for this wallet is full.");
+
+    verify(repository, never()).save(WALLET, request);
   }
 
   private SaveSwapHistoryRequest requestWithQuote(com.fasterxml.jackson.databind.JsonNode quote) {
