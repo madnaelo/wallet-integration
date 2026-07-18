@@ -8,7 +8,6 @@ on:
       - completed
     branches:
       - master
-      - main
   workflow_dispatch:
     inputs:
       release_sha:
@@ -64,15 +63,12 @@ jobs:
           git cat-file -e "$release_sha^{commit}"
 
           allowed=false
-          for branch in master main; do
-            if git show-ref --verify --quiet "refs/remotes/origin/$branch" \
-              && git merge-base --is-ancestor "$release_sha" "origin/$branch"; then
-              allowed=true
-              break
-            fi
-          done
+          if git show-ref --verify --quiet refs/remotes/origin/master \
+            && git merge-base --is-ancestor "$release_sha" origin/master; then
+            allowed=true
+          fi
           if [ "$allowed" != "true" ]; then
-            echo "Release SHA must belong to master or main." >&2
+            echo "Release SHA must belong to master." >&2
             exit 1
           fi
 
@@ -253,13 +249,10 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          case "$RELEASE_BRANCH" in
-            master|main) ;;
-            *)
-              echo "Unexpected automatic release branch: $RELEASE_BRANCH" >&2
-              exit 1
-              ;;
-          esac
+          if [ "$RELEASE_BRANCH" != "master" ]; then
+            echo "Unexpected automatic release branch: $RELEASE_BRANCH" >&2
+            exit 1
+          fi
           current_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$RELEASE_BRANCH" --jq '.object.sha')"
           if [ "$current_sha" != "$RELEASE_SHA" ]; then
             echo "::notice::Skipping superseded release $RELEASE_SHA; $RELEASE_BRANCH is now $current_sha."
