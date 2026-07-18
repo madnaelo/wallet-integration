@@ -19,8 +19,9 @@ platform fees in production.
 - Current EVM launch networks are Ethereum, Arbitrum, Optimism, Base, Polygon,
   BNB Smart Chain, and Avalanche.
 - `PARASWAP_API_KEY` is still missing. A Velora Pro API/rate-limit request was
-  submitted on May 27, 2026, using the public production URL and the
-  `madnaelo@yahoo.com` contact address.
+  submitted on May 27, 2026, using the public production URL and the project
+  owner's contact address. No response was found in the project mailbox as of
+  July 17, 2026.
 - Treasury receive addresses have been provided. Keep the actual values in
   deployment/provider configuration, not in committed docs, and verify them with
   small real swaps before relying on revenue collection.
@@ -83,10 +84,11 @@ Reference:
 
 ### 1inch
 
-Status: code wired but production-disabled. The May 8, 2026 approval email says
-the free plan is limited to non-commercial/internal testing and commercial API
-use requires a paid plan. The due-diligence form does not replace commercial
-approval.
+Status: code wired but production-disabled. A May 8, 2026 email confirms that
+the account's KYC/KYB verification was approved. It does not grant commercial
+or fee-collecting API use. A separate May 15, 2026 email requested
+Non-Commercial API Customer Security Due Diligence, so the account's commercial
+terms remain unresolved.
 
 The 1inch quote client sends:
 
@@ -132,7 +134,8 @@ Action remaining:
   Submitted values were: project name `Swap Assistant`, website
   `https://wallet-integration-theta.vercel.app`, GitHub profile
   `https://github.com/madnaelo`, initial target `5 requests per second`, and
-  contact `madnaelo@yahoo.com`.
+  the project owner's contact address. No response was found in the project
+  mailbox as of July 17, 2026.
 - Obtain the Velora/ParaSwap API key or confirmation of partner access.
 - Add `PARASWAP_API_KEY` to Vercel.
 - Run a small real swap and verify fee behavior.
@@ -160,6 +163,9 @@ when `referralFee` and `referralFeeRecipient` are supplied. On May 27, 2026, the
 configured API key accepted a Base quote request with those fee parameters and
 returned a route id. That confirms our request shape is accepted, but it does
 not prove payout until a real swap settles and the treasury receives its share.
+The project owner also emailed Odos sales on May 27, 2026, to request explicit
+monetization confirmation; no reply was found in the project mailbox as of
+July 17, 2026.
 
 Action remaining:
 
