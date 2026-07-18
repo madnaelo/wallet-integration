@@ -11,6 +11,7 @@ import java.net.URI;
 import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PushSubscriptionService {
@@ -34,6 +35,7 @@ public class PushSubscriptionService {
         && hasText(properties.getPush().getVapidSubject());
   }
 
+  @Transactional
   public NotificationPreferenceResponse subscribe(
       String walletAddress,
       PushSubscriptionRequest request,
@@ -43,6 +45,9 @@ public class PushSubscriptionService {
     }
     validate(request);
     pushSubscriptionRepository.upsert(walletAddress, request, userAgent);
+    pushSubscriptionRepository.retainMostRecentForWallet(
+        walletAddress,
+        Math.max(1, properties.getPush().getMaxDevicesPerWallet()));
     return preferenceService.setPushEnabled(walletAddress, true);
   }
 

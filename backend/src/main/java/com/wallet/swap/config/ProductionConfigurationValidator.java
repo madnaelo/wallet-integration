@@ -159,6 +159,12 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
               .anyMatch(value -> !ALLOWED_PUSH_HOST_PATTERNS.contains(value))) {
         problems.add("PUSH_ALLOWED_ENDPOINT_HOSTS must contain only supported browser push services");
       }
+      if (push.getRequestTimeoutSeconds() < 1 || push.getRequestTimeoutSeconds() > 30) {
+        problems.add("PUSH_REQUEST_TIMEOUT_SECONDS must be between 1 and 30");
+      }
+      if (push.getMaxDevicesPerWallet() < 1 || push.getMaxDevicesPerWallet() > 25) {
+        problems.add("PUSH_MAX_DEVICES_PER_WALLET must be between 1 and 25");
+      }
     }
 
     if (notificationProperties.getEmail().isEnabled()) {

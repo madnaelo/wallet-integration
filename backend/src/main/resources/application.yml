@@ -56,6 +56,9 @@ spring:
           auth: ${SMTP_AUTH:true}
           starttls:
             enable: ${SMTP_STARTTLS_ENABLE:true}
+          connectiontimeout: ${SMTP_CONNECTION_TIMEOUT_MS:10000}
+          timeout: ${SMTP_READ_TIMEOUT_MS:10000}
+          writetimeout: ${SMTP_WRITE_TIMEOUT_MS:10000}
 
 wallet:
   api:
@@ -140,3 +143,5 @@ wallet:
       vapid-private-key: ${PUSH_VAPID_PRIVATE_KEY:}
       vapid-subject: ${PUSH_VAPID_SUBJECT:mailto:alerts@swapassistant.app}
       allowed-endpoint-hosts: ${PUSH_ALLOWED_ENDPOINT_HOSTS:fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com,.notify.windows.com}
+      request-timeout-seconds: ${PUSH_REQUEST_TIMEOUT_SECONDS:15}
+      max-devices-per-wallet: ${PUSH_MAX_DEVICES_PER_WALLET:10}

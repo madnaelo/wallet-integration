@@ -14,6 +14,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import nl.martijndwars.webpush.Encoding;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
@@ -55,7 +58,9 @@ public class PushNotificationSender {
   public void send(String walletAddress, PushNotificationPayload payload) {
     if (!isEnabled()) throw new IllegalStateException("Push notifications are disabled.");
 
-    List<PushSubscriptionRecord> subscriptions = pushSubscriptionRepository.findActiveForWallet(walletAddress);
+    List<PushSubscriptionRecord> subscriptions = pushSubscriptionRepository.findActiveForWallet(
+        walletAddress,
+        Math.max(1, properties.getPush().getMaxDevicesPerWallet()));
     if (subscriptions.isEmpty()) throw new IllegalStateException("No push notification subscription is active.");
 
     PushService pushService = buildPushService();
@@ -64,13 +69,7 @@ public class PushNotificationSender {
 
     for (PushSubscriptionRecord subscription : subscriptions) {
       try {
-        HttpResponse response = pushService.send(
-            new Notification(
-                subscription.endpoint(),
-                subscription.p256dh(),
-                subscription.authSecret(),
-                payloadJson),
-            Encoding.AES128GCM);
+        HttpResponse response = sendWithTimeout(pushService, subscription, payloadJson);
         int status = response.getStatusLine().getStatusCode();
         if (status == 404 || status == 410) {
           pushSubscriptionRepository.disableEndpoint(subscription.endpoint());
@@ -84,6 +83,7 @@ public class PushNotificationSender {
               failure);
           failures.add(failure);
         }
+        EntityUtils.consumeQuietly(response.getEntity());
       } catch (InterruptedException exception) {
         Thread.currentThread().interrupt();
         throw new IllegalStateException("Push notification delivery was interrupted.", exception);
@@ -127,6 +127,28 @@ public class PushNotificationSender {
     }
   }
 
+  private HttpResponse sendWithTimeout(
+      PushService pushService,
+      PushSubscriptionRecord subscription,
+      String payloadJson)
+      throws GeneralSecurityException, IOException, JoseException, ExecutionException, InterruptedException {
+    Future<HttpResponse> request = pushService.sendAsync(
+        new Notification(
+            subscription.endpoint(),
+            subscription.p256dh(),
+            subscription.authSecret(),
+            payloadJson),
+        Encoding.AES128GCM);
+    try {
+      return request.get(
+          Math.max(1, properties.getPush().getRequestTimeoutSeconds()),
+          TimeUnit.SECONDS);
+    } catch (TimeoutException exception) {
+      request.cancel(true);
+      throw new IOException("Push service request timed out.", exception);
+    }
+  }
+
   private String toJson(PushNotificationPayload payload) {
     try {
       return objectMapper.writeValueAsString(payload);
@@ -144,9 +166,7 @@ public class PushNotificationSender {
   }
 
   private String pushFailure(HttpResponse response) {
-    String failure = "push service returned HTTP " + response.getStatusLine().getStatusCode();
-    EntityUtils.consumeQuietly(response.getEntity());
-    return failure;
+    return "push service returned HTTP " + response.getStatusLine().getStatusCode();
   }
 
   private String summarizeFailures(List<String> failures) {

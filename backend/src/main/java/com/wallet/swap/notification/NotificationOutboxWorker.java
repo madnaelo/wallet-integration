@@ -66,7 +66,14 @@ public class NotificationOutboxWorker {
       int maxAttempts = Math.max(1, properties.getOutboxMaxAttempts());
       outboxRepository.markExhaustedPending(maxAttempts);
       int batchSize = Math.max(1, properties.getOutboxBatchSize());
-      Duration lockTtl = Duration.ofSeconds(Math.max(10, properties.getOutboxLockTtlSeconds()));
+      long pushDeliveryBudget = properties.getPush().isEnabled()
+          ? properties.getPush().getRequestTimeoutSeconds()
+              * (long) properties.getPush().getMaxDevicesPerWallet()
+              + 30L
+          : 30L;
+      Duration lockTtl = Duration.ofSeconds(Math.max(
+          Math.max(10L, properties.getOutboxLockTtlSeconds()),
+          pushDeliveryBudget));
       for (int processed = 0; processed < batchSize; processed++) {
         var items = outboxRepository.claimPending(1, maxAttempts, lockTtl);
         if (items.isEmpty()) return;

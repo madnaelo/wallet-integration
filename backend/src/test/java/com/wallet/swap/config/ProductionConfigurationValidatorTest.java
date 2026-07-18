@@ -122,13 +122,17 @@ class ProductionConfigurationValidatorTest {
     notifications.getPush().setVapidPublicKey("A".repeat(87));
     notifications.getPush().setVapidPrivateKey("B".repeat(43));
     notifications.getPush().setAllowedEndpointHosts(List.of(".attacker.example"));
+    notifications.getPush().setRequestTimeoutSeconds(0);
+    notifications.getPush().setMaxDevicesPerWallet(100);
 
     var configuration = productionConfiguration(validLimitOrderProperties(), notifications);
 
     assertThatThrownBy(configuration::validate)
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("COINGECKO_API_KEY_HEADER")
-        .hasMessageContaining("PUSH_ALLOWED_ENDPOINT_HOSTS");
+        .hasMessageContaining("PUSH_ALLOWED_ENDPOINT_HOSTS")
+        .hasMessageContaining("PUSH_REQUEST_TIMEOUT_SECONDS")
+        .hasMessageContaining("PUSH_MAX_DEVICES_PER_WALLET");
   }
 
   private ProductionConfigurationValidator validConfiguration() {

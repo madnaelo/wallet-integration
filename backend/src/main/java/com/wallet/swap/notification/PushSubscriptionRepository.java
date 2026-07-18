@@ -91,7 +91,36 @@ public class PushSubscriptionRepository {
     return Boolean.TRUE.equals(linked);
   }
 
-  public List<PushSubscriptionRecord> findActiveForWallet(String walletAddress) {
+  public int retainMostRecentForWallet(String walletAddress, int limit) {
+    return jdbcTemplate.update(
+        """
+        WITH ranked AS (
+          SELECT
+            psw.push_subscription_id,
+            row_number() OVER (
+              ORDER BY GREATEST(ps.updated_at, psw.updated_at) DESC, psw.push_subscription_id
+            ) AS position
+          FROM push_subscription_wallets psw
+          JOIN push_subscriptions ps ON ps.id = psw.push_subscription_id
+          WHERE psw.wallet_address = ?
+            AND psw.disabled_at IS NULL
+            AND ps.disabled_at IS NULL
+        )
+        UPDATE push_subscription_wallets psw
+        SET disabled_at = now(),
+          updated_at = now()
+        FROM ranked
+        WHERE psw.wallet_address = ?
+          AND psw.push_subscription_id = ranked.push_subscription_id
+          AND ranked.position > ?
+          AND psw.disabled_at IS NULL
+        """,
+        walletAddress,
+        walletAddress,
+        Math.max(1, limit));
+  }
+
+  public List<PushSubscriptionRecord> findActiveForWallet(String walletAddress, int limit) {
     return jdbcTemplate.query(
         """
         SELECT
@@ -109,9 +138,11 @@ public class PushSubscriptionRepository {
           AND psw.disabled_at IS NULL
           AND ps.disabled_at IS NULL
         ORDER BY GREATEST(ps.updated_at, psw.updated_at) DESC
+        LIMIT ?
         """,
         (rs, rowNum) -> mapRow(rs),
-        walletAddress);
+        walletAddress,
+        Math.max(1, limit));
   }
 
   public int disableForWallet(String walletAddress) {

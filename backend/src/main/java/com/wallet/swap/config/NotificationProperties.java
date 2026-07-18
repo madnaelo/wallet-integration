@@ -288,6 +288,8 @@ public class NotificationProperties {
     private String vapidPrivateKey = "";
     private String vapidSubject = "mailto:alerts@swapassistant.app";
     private List<String> allowedEndpointHosts = DEFAULT_ALLOWED_ENDPOINT_HOSTS;
+    private int requestTimeoutSeconds = 15;
+    private int maxDevicesPerWallet = 10;
 
     public boolean isEnabled() {
       return enabled;
@@ -332,6 +334,22 @@ public class NotificationProperties {
       this.allowedEndpointHosts = allowedEndpointHosts == null || allowedEndpointHosts.isEmpty()
           ? DEFAULT_ALLOWED_ENDPOINT_HOSTS
           : List.copyOf(allowedEndpointHosts);
+    }
+
+    public int getRequestTimeoutSeconds() {
+      return requestTimeoutSeconds;
+    }
+
+    public void setRequestTimeoutSeconds(int requestTimeoutSeconds) {
+      this.requestTimeoutSeconds = requestTimeoutSeconds;
+    }
+
+    public int getMaxDevicesPerWallet() {
+      return maxDevicesPerWallet;
+    }
+
+    public void setMaxDevicesPerWallet(int maxDevicesPerWallet) {
+      this.maxDevicesPerWallet = maxDevicesPerWallet;
     }
   }
 }

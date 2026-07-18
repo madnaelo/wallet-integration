@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
+import com.wallet.swap.notification.NotificationModels.PushSubscriptionKeys;
+import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,10 +29,12 @@ class PushSubscriptionServiceTest {
   private NotificationPreferenceService preferenceService;
 
   private PushSubscriptionService service;
+  private NotificationProperties properties;
 
   @BeforeEach
   void setUp() {
-    service = new PushSubscriptionService(new NotificationProperties(), pushSubscriptionRepository, preferenceService);
+    properties = new NotificationProperties();
+    service = new PushSubscriptionService(properties, pushSubscriptionRepository, preferenceService);
   }
 
   @Test
@@ -73,5 +77,23 @@ class PushSubscriptionServiceTest {
     var response = service.status(WALLET, new PushSubscriptionStatusRequest(endpoint));
 
     assertThat(response.linked()).isTrue();
+  }
+
+  @Test
+  void keepsOnlyTheConfiguredNumberOfRecentDevicesAfterSubscribe() {
+    properties.getPush().setEnabled(true);
+    properties.getPush().setVapidPublicKey("A".repeat(87));
+    properties.getPush().setVapidPrivateKey("B".repeat(43));
+    properties.getPush().setMaxDevicesPerWallet(10);
+    PushSubscriptionRequest request = new PushSubscriptionRequest(
+        ENDPOINT,
+        new PushSubscriptionKeys("P".repeat(65), "A".repeat(16)),
+        null);
+
+    service.subscribe(WALLET, request, "Chrome");
+
+    verify(pushSubscriptionRepository).upsert(WALLET, request, "Chrome");
+    verify(pushSubscriptionRepository).retainMostRecentForWallet(WALLET, 10);
+    verify(preferenceService).setPushEnabled(WALLET, true);
   }
 }
