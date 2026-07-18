@@ -44,7 +44,7 @@ preference/rule storage, not autonomous private-key signing.
   `docs/known-issues/mobile-push-subscription.md`.
 - Set Alerts is currently alert-to-confirm only. True autonomous
   execution is blocked on a signed/delegated authorization model; see
-  `docs/architecture-decisions/backend-auto-swap-execution.md`.
+  `docs/architecture-decisions/price-alerts-and-limit-orders.md`.
 - Operations: health endpoint plus admin operations summary for monitor and
   notification counters.
 - Deployment: Vercel for frontend/quote route, OCI for backend/PostgreSQL/Caddy.
