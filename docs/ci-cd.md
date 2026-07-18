@@ -84,6 +84,9 @@ Required non-secret GitHub Environment variables:
 OCI_PROXY_NETWORK
 OCI_CADDYFILE_PATH
 OCI_CADDY_CONTAINER
+OCI_BACKUP_BUCKET
+OCI_BACKUP_NAMESPACE
+OCI_BACKUP_OBJECT_PREFIX
 ```
 
 Optional non-secret GitHub Environment variables:
@@ -147,14 +150,17 @@ commercial-use approval; enabling it also requires `ONEINCH_API_KEY`.
 `ssh-keyscan -p 22 <oci-host>` and verify the fingerprint in the OCI console
 before saving it as a GitHub secret.
 
-Production releases force `ENABLE_POSTGRES_BACKUP_TIMER=true`. The backend
-deploy workflow uploads the backup script and systemd timer assets, and the
-deploy fails unless `wallet-postgres-backup.timer` is enabled and active. Each
-custom-format dump is validated with `pg_restore`, checksummed, and pruned
-locally according to `BACKUP_RETENTION_DAYS`. Local VM backups are not disaster
-recovery: configure `OCI_BACKUP_BUCKET` and an OCI instance-principal policy so
-each dump and its checksum are also uploaded to Object Storage. Configure remote
-retention with an Object Storage lifecycle rule.
+Production releases force `ENABLE_POSTGRES_BACKUP_TIMER=true` and overlay the
+three non-secret Object Storage variables above. Before changing the live
+backend, deployment runs an immediate backup and fails unless the custom-format
+dump passes `pg_restore` validation, is checksummed, and uploads to Object
+Storage through the VM's instance principal. It then enables and verifies
+`wallet-postgres-backup.timer`. Local dumps are retained for 14 days. The
+private `swap-assistant-postgres-backups` bucket is isolated in the
+`SwapAssistant` compartment and deletes the
+`swap-assistant/postgres/` objects after 35 days through an OCI lifecycle rule.
+The VM policy is append-only: it can create backup objects but cannot read,
+overwrite, or delete existing backups.
 
 For the current OCI VM, these values match the manual deployment:
 

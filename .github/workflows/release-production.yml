@@ -298,10 +298,12 @@ jobs:
           OCI_PROXY_NETWORK: ${{ vars.OCI_PROXY_NETWORK || secrets.OCI_PROXY_NETWORK || secrets.OCI_CONTAINER_NETWORK }}
           OCI_CADDYFILE_PATH: ${{ vars.OCI_CADDYFILE_PATH || secrets.OCI_CADDYFILE_PATH }}
           OCI_CADDY_CONTAINER: ${{ vars.OCI_CADDY_CONTAINER || secrets.OCI_CADDY_CONTAINER }}
+          OCI_BACKUP_BUCKET: ${{ vars.OCI_BACKUP_BUCKET }}
+          OCI_BACKUP_NAMESPACE: ${{ vars.OCI_BACKUP_NAMESPACE }}
         run: |
           set -euo pipefail
           missing=()
-          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER; do
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER OCI_BACKUP_BUCKET OCI_BACKUP_NAMESPACE; do
             if [ -z "${!name:-}" ]; then
               missing+=("$name")
             fi
@@ -373,6 +375,13 @@ jobs:
               exit 1
             fi
           done
+          for name in OCI_BACKUP_BUCKET OCI_BACKUP_NAMESPACE OCI_BACKUP_OBJECT_PREFIX; do
+            value="${!name:-}"
+            if ! [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9_./-]*$ ]]; then
+              echo "$name contains unsupported characters." >&2
+              exit 1
+            fi
+          done
           ssh "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
             "mkdir -p '$OCI_DEPLOY_PATH/scripts/deploy' '$OCI_DEPLOY_PATH/infra/systemd'"
           scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
@@ -400,6 +409,12 @@ jobs:
             printf 'COINGECKO_MAX_ATTEMPTS=2\n'
             printf 'COINGECKO_RETRY_DELAY_MS=1000\n'
             printf 'ENABLE_POSTGRES_BACKUP_TIMER=true\n'
+            printf 'BACKUP_DIR=%s/backups/postgres\n' "$OCI_DEPLOY_PATH"
+            printf 'BACKUP_RETENTION_DAYS=14\n'
+            printf 'OCI_BACKUP_BUCKET=%s\n' "$OCI_BACKUP_BUCKET"
+            printf 'OCI_BACKUP_NAMESPACE=%s\n' "$OCI_BACKUP_NAMESPACE"
+            printf 'OCI_BACKUP_OBJECT_PREFIX=%s\n' "$OCI_BACKUP_OBJECT_PREFIX"
+            printf 'OCI_BACKUP_AUTH_MODE=instance_principal\n'
             printf 'LIMIT_ORDERS_DEFAULT_ENABLED=true\n'
             printf 'ONEINCH_ORDERBOOK_ENABLED=false\n'
             printf 'ONEINCH_API_KEY=\n'
@@ -429,6 +444,9 @@ jobs:
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
           OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
           COW_API_KEY: ${{ secrets.COW_API_KEY }}
+          OCI_BACKUP_BUCKET: ${{ vars.OCI_BACKUP_BUCKET }}
+          OCI_BACKUP_NAMESPACE: ${{ vars.OCI_BACKUP_NAMESPACE }}
+          OCI_BACKUP_OBJECT_PREFIX: ${{ vars.OCI_BACKUP_OBJECT_PREFIX || 'swap-assistant/postgres' }}
 
       - name: Deploy backend
         shell: bash

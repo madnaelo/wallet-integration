@@ -644,6 +644,37 @@ run_container exec "$caddy_container" caddy validate --config /etc/caddy/Caddyfi
   || fail "Caddy rejected its current configuration."
 run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null
 
+enable_backups="$(read_env_value ENABLE_POSTGRES_BACKUP_TIMER || printf 'false')"
+if [ "$enable_backups" = "true" ]; then
+  backup_script="$deploy_path/scripts/deploy/backup-oci-postgres.sh"
+  backup_service_template="$deploy_path/infra/systemd/wallet-postgres-backup.service"
+  backup_timer_template="$deploy_path/infra/systemd/wallet-postgres-backup.timer"
+  if [ ! -f "$backup_script" ] || [ ! -f "$backup_service_template" ] || [ ! -f "$backup_timer_template" ]; then
+    fail "Backup timer requested, but backup assets were not uploaded."
+  fi
+  command -v systemctl >/dev/null 2>&1 || fail "Backup timer requested, but systemctl is unavailable."
+
+  chmod +x "$backup_script"
+  escaped_deploy_path="$(printf '%s' "$deploy_path" | sed 's/[&|\\]/\\&/g')"
+  sudo sed "s|__WALLET_DEPLOY_PATH__|$escaped_deploy_path|g" "$backup_service_template" \
+    | sudo tee /etc/systemd/system/wallet-postgres-backup.service >/dev/null
+  sudo cp "$backup_timer_template" /etc/systemd/system/wallet-postgres-backup.timer
+  sudo systemctl daemon-reload
+  sudo systemctl reset-failed wallet-postgres-backup.service >/dev/null 2>&1 || true
+  if ! sudo systemctl start wallet-postgres-backup.service; then
+    if command -v journalctl >/dev/null 2>&1; then
+      sudo journalctl -u wallet-postgres-backup.service --no-pager -n 80 >&2 || true
+    fi
+    fail "The immediate PostgreSQL backup verification failed."
+  fi
+  sudo systemctl enable --now wallet-postgres-backup.timer >/dev/null
+  sudo systemctl is-enabled --quiet wallet-postgres-backup.timer \
+    || fail "PostgreSQL backup timer was not enabled."
+  sudo systemctl is-active --quiet wallet-postgres-backup.timer \
+    || fail "PostgreSQL backup timer is not active."
+  echo "PostgreSQL backup upload was verified; the daily timer is enabled and active."
+fi
+
 run_container pull "$backend_image" >/dev/null
 
 declare -a backend_log_args=(--log-opt max-size=10m)
@@ -742,29 +773,5 @@ for legacy_network in wallet-internal wallet-db; do
   detach_container_network "$legacy_network" "$backend_container"
   run_container network rm "$legacy_network" >/dev/null 2>&1 || true
 done
-
-enable_backups="$(read_env_value ENABLE_POSTGRES_BACKUP_TIMER || printf 'false')"
-if [ "$enable_backups" = "true" ]; then
-  backup_script="$deploy_path/scripts/deploy/backup-oci-postgres.sh"
-  backup_service_template="$deploy_path/infra/systemd/wallet-postgres-backup.service"
-  backup_timer_template="$deploy_path/infra/systemd/wallet-postgres-backup.timer"
-  if [ ! -f "$backup_script" ] || [ ! -f "$backup_service_template" ] || [ ! -f "$backup_timer_template" ]; then
-    fail "Backup timer requested, but backup assets were not uploaded."
-  fi
-  command -v systemctl >/dev/null 2>&1 || fail "Backup timer requested, but systemctl is unavailable."
-
-  chmod +x "$backup_script"
-  escaped_deploy_path="$(printf '%s' "$deploy_path" | sed 's/[&|\\]/\\&/g')"
-  sudo sed "s|__WALLET_DEPLOY_PATH__|$escaped_deploy_path|g" "$backup_service_template" \
-    | sudo tee /etc/systemd/system/wallet-postgres-backup.service >/dev/null
-  sudo cp "$backup_timer_template" /etc/systemd/system/wallet-postgres-backup.timer
-  sudo systemctl daemon-reload
-  sudo systemctl enable --now wallet-postgres-backup.timer >/dev/null
-  sudo systemctl is-enabled --quiet wallet-postgres-backup.timer \
-    || fail "PostgreSQL backup timer was not enabled."
-  sudo systemctl is-active --quiet wallet-postgres-backup.timer \
-    || fail "PostgreSQL backup timer is not active."
-  echo "PostgreSQL backup timer is enabled and active."
-fi
 
 echo "Backend is healthy at $health_url and serves commit $git_commit."

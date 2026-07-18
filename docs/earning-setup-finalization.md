@@ -225,14 +225,17 @@ Before public launch:
 - Keep clear alert wording that notifications are estimates, not financial
   advice.
 - Verify CORS origins after the final custom domain is attached.
-- Verify the production-enforced OCI PostgreSQL backup timer after each release.
+- Verify the production-enforced OCI PostgreSQL backup upload and timer after
+  each release.
 - Configure production monitor secrets so GitHub Actions can send uptime/error
   alerts to Telegram after the bot token is rotated.
 - Monitor `/api/health` and `/api/admin/ops/summary` after each deployment.
 - Run small real swaps through each provider and record the fee receipt result.
 - Confirm the operating legal entity, jurisdiction, privacy contact, and
   counsel-reviewed Terms/Privacy language before broad commercial launch.
-- Confirm an off-host PostgreSQL backup and perform a documented restore test.
+- Repeat the documented off-host restore drill at least quarterly. The
+  production release now creates and verifies an Object Storage backup before
+  promoting the backend.
 - Attach the final branded domain before public marketing.
 - Treat Limit Orders as a separate monetization track: current CoW/1inch signed
   order adapters do not add the normal swap platform fee.
