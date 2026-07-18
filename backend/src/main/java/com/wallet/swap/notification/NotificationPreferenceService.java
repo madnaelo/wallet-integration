@@ -13,10 +13,15 @@ public class NotificationPreferenceService {
   private static final Pattern BASIC_EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
   private final NotificationPreferenceRepository repository;
+  private final PushSubscriptionRepository pushSubscriptionRepository;
   private final NotificationProperties properties;
 
-  public NotificationPreferenceService(NotificationPreferenceRepository repository, NotificationProperties properties) {
+  public NotificationPreferenceService(
+      NotificationPreferenceRepository repository,
+      PushSubscriptionRepository pushSubscriptionRepository,
+      NotificationProperties properties) {
     this.repository = repository;
+    this.pushSubscriptionRepository = pushSubscriptionRepository;
     this.properties = properties;
   }
 
@@ -39,12 +44,14 @@ public class NotificationPreferenceService {
   public NotificationPreferenceResponse save(String walletAddress, NotificationPreferenceRequest request) {
     NotificationPreferenceResponse current = get(walletAddress);
     validate(request, current.telegramChatId());
+    boolean pushEnabled = Boolean.TRUE.equals(request.pushEnabled())
+        && pushSubscriptionRepository.countActive(walletAddress) > 0;
     return repository.upsert(
         walletAddress,
         request,
         current.telegramChatId(),
         Boolean.TRUE.equals(request.telegramEnabled()),
-        Boolean.TRUE.equals(request.pushEnabled()),
+        pushEnabled,
         properties.getDefaultProfitThresholdBps(),
         properties.getDefaultLossThresholdBps(),
         properties.getDefaultCooldownMinutes());

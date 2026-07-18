@@ -9,6 +9,7 @@ import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusResponse;
 import java.net.URI;
+import java.util.Base64;
 import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -84,6 +85,30 @@ public class PushSubscriptionService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Push notification setup was incomplete. Please try again.");
     }
     validateEndpoint(request.endpoint());
+    validateSubscriptionKeys(request.keys().p256dh(), request.keys().auth());
+  }
+
+  private void validateSubscriptionKeys(String p256dhValue, String authValue) {
+    byte[] p256dh = decodeBase64Url(p256dhValue);
+    byte[] auth = decodeBase64Url(authValue);
+    if (p256dh.length != 65 || p256dh[0] != 0x04 || auth.length != 16) {
+      throw invalidSubscription();
+    }
+  }
+
+  private byte[] decodeBase64Url(String value) {
+    if (!hasText(value)) throw invalidSubscription();
+    try {
+      return Base64.getUrlDecoder().decode(value.trim());
+    } catch (IllegalArgumentException exception) {
+      throw invalidSubscription();
+    }
+  }
+
+  private ApiException invalidSubscription() {
+    return new ApiException(
+        HttpStatus.BAD_REQUEST,
+        "Push notification setup was incomplete. Please try again.");
   }
 
   private void validateEndpoint(String endpointValue) {

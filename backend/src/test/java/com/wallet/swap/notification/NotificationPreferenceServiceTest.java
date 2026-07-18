@@ -28,11 +28,17 @@ class NotificationPreferenceServiceTest {
   @Mock
   private NotificationPreferenceRepository repository;
 
+  @Mock
+  private PushSubscriptionRepository pushSubscriptionRepository;
+
   private NotificationPreferenceService service;
 
   @BeforeEach
   void setUp() {
-    service = new NotificationPreferenceService(repository, new NotificationProperties());
+    service = new NotificationPreferenceService(
+        repository,
+        pushSubscriptionRepository,
+        new NotificationProperties());
   }
 
   @Test
@@ -73,12 +79,53 @@ class NotificationPreferenceServiceTest {
     assertThat(result.telegramEnabled()).isTrue();
   }
 
+  @Test
+  void doesNotEnablePushWithoutAnActiveDeviceSubscription() {
+    NotificationPreferenceRequest request = request(false, true);
+    when(repository.find(WALLET)).thenReturn(Optional.empty());
+    when(pushSubscriptionRepository.countActive(WALLET)).thenReturn(0);
+    when(repository.upsert(eq(WALLET), eq(request), eq(null), eq(false), eq(false), anyInt(), anyInt(), anyInt()))
+        .thenReturn(response(null, false));
+
+    NotificationPreferenceResponse result = service.save(WALLET, request);
+
+    assertThat(result.pushEnabled()).isFalse();
+    verify(repository).upsert(
+        eq(WALLET),
+        eq(request),
+        eq(null),
+        eq(false),
+        eq(false),
+        anyInt(),
+        anyInt(),
+        anyInt());
+  }
+
+  @Test
+  void enablesPushWhenAtLeastOneDeviceSubscriptionIsActive() {
+    NotificationPreferenceRequest request = request(false, true);
+    NotificationPreferenceResponse saved = new NotificationPreferenceResponse(
+        WALLET, null, false, null, false, true, 1, 100, false, 500, 360);
+    when(repository.find(WALLET)).thenReturn(Optional.empty());
+    when(pushSubscriptionRepository.countActive(WALLET)).thenReturn(1);
+    when(repository.upsert(eq(WALLET), eq(request), eq(null), eq(false), eq(true), anyInt(), anyInt(), anyInt()))
+        .thenReturn(saved);
+
+    NotificationPreferenceResponse result = service.save(WALLET, request);
+
+    assertThat(result.pushEnabled()).isTrue();
+  }
+
   private NotificationPreferenceRequest request(boolean telegramEnabled) {
+    return request(telegramEnabled, false);
+  }
+
+  private NotificationPreferenceRequest request(boolean telegramEnabled, boolean pushEnabled) {
     return new NotificationPreferenceRequest(
         null,
         false,
         telegramEnabled,
-        false,
+        pushEnabled,
         100,
         false,
         500,

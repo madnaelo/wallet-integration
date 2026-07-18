@@ -12,6 +12,7 @@ import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionKeys;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
+import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -95,7 +96,7 @@ class PushSubscriptionServiceTest {
     properties.getPush().setMaxDevicesPerWallet(10);
     PushSubscriptionRequest request = new PushSubscriptionRequest(
         ENDPOINT,
-        new PushSubscriptionKeys("P".repeat(65), "A".repeat(16)),
+        validKeys(),
         null);
 
     service.subscribe(WALLET, request, "Chrome");
@@ -104,5 +105,51 @@ class PushSubscriptionServiceTest {
     verify(pushSubscriptionRepository).upsert(WALLET, request, "Chrome");
     verify(pushSubscriptionRepository).retainMostRecentForWallet(WALLET, 10);
     verify(preferenceService).setPushEnabled(WALLET, true);
+  }
+
+  @Test
+  void rejectsMalformedSubscriptionKeyMaterialBeforePersistence() {
+    properties.getPush().setEnabled(true);
+    properties.getPush().setVapidPublicKey("A".repeat(87));
+    properties.getPush().setVapidPrivateKey("B".repeat(43));
+    PushSubscriptionRequest request = new PushSubscriptionRequest(
+        ENDPOINT,
+        new PushSubscriptionKeys("not-base64!", "also-not-base64!"),
+        null);
+
+    assertThatThrownBy(() -> service.subscribe(WALLET, request, "Chrome"))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("incomplete");
+
+    verify(pushSubscriptionRepository, never()).upsert(WALLET, request, "Chrome");
+  }
+
+  @Test
+  void rejectsCompressedOrWrongLengthSubscriptionKeys() {
+    properties.getPush().setEnabled(true);
+    properties.getPush().setVapidPublicKey("A".repeat(87));
+    properties.getPush().setVapidPrivateKey("B".repeat(43));
+    byte[] compressedKey = new byte[33];
+    compressedKey[0] = 0x02;
+    PushSubscriptionRequest request = new PushSubscriptionRequest(
+        ENDPOINT,
+        new PushSubscriptionKeys(encode(compressedKey), encode(new byte[16])),
+        null);
+
+    assertThatThrownBy(() -> service.subscribe(WALLET, request, "Chrome"))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("incomplete");
+
+    verify(pushSubscriptionRepository, never()).upsert(WALLET, request, "Chrome");
+  }
+
+  private PushSubscriptionKeys validKeys() {
+    byte[] publicKey = new byte[65];
+    publicKey[0] = 0x04;
+    return new PushSubscriptionKeys(encode(publicKey), encode(new byte[16]));
+  }
+
+  private String encode(byte[] value) {
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
   }
 }
