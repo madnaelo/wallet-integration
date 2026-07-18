@@ -65,11 +65,12 @@ public class NotificationOutboxWorker {
     try {
       int maxAttempts = Math.max(1, properties.getOutboxMaxAttempts());
       outboxRepository.markExhaustedPending(maxAttempts);
-      for (NotificationOutboxItem item : outboxRepository.claimPending(
-          Math.max(1, properties.getOutboxBatchSize()),
-          maxAttempts,
-          Duration.ofSeconds(Math.max(10, properties.getOutboxLockTtlSeconds())))) {
-        deliver(item, maxAttempts);
+      int batchSize = Math.max(1, properties.getOutboxBatchSize());
+      Duration lockTtl = Duration.ofSeconds(Math.max(10, properties.getOutboxLockTtlSeconds()));
+      for (int processed = 0; processed < batchSize; processed++) {
+        var items = outboxRepository.claimPending(1, maxAttempts, lockTtl);
+        if (items.isEmpty()) return;
+        deliver(items.get(0), maxAttempts);
       }
     } finally {
       running.set(false);

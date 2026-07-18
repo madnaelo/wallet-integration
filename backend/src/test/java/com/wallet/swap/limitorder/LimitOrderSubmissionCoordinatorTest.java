@@ -6,8 +6,10 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,6 +20,7 @@ import com.wallet.swap.limitorder.LimitOrderRepository.SubmissionCandidate;
 import com.wallet.swap.limitorder.LimitOrderSubmissionClient.LimitOrderSubmissionResult;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -154,6 +157,31 @@ class LimitOrderSubmissionCoordinatorTest {
 
     verify(repository).markExpiredPending();
     verify(repository, never()).claimDue(anyInt(), anyInt(), any());
+  }
+
+  @Test
+  void leasesEachBatchItemImmediatelyBeforeSubmission() {
+    properties.setSubmissionBatchSize(2);
+    SubmissionCandidate first = candidate(1);
+    SubmissionCandidate second = candidate(1);
+    when(repository.claimDue(eq(1), anyInt(), any()))
+        .thenReturn(List.of(first), List.of(second));
+    when(client.submit(anyLong(), any(), any(), any(), any()))
+        .thenReturn(LimitOrderSubmissionResult.success("provider-order"));
+    when(repository.completeSubmission(
+        any(SubmissionCandidate.class),
+        any(String.class),
+        nullable(String.class),
+        nullable(String.class),
+        nullable(Instant.class),
+        any(String.class),
+        anyInt()))
+        .thenReturn(Optional.of(response("submitted")));
+
+    coordinator.submitDue();
+
+    verify(repository, times(2)).claimDue(eq(1), anyInt(), any());
+    verify(client, times(2)).submit(anyLong(), any(), any(), any(), any());
   }
 
   private SubmissionCandidate candidate(int attempts) {

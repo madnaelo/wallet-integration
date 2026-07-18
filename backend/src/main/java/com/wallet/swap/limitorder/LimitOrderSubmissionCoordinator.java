@@ -47,12 +47,11 @@ public class LimitOrderSubmissionCoordinator {
   public void submitDue() {
     repository.markExpiredPending();
     if (!properties.isOrderbookSubmissionEnabled()) return;
-    List<SubmissionCandidate> candidates = repository.claimDue(
-        Math.max(1, properties.getSubmissionBatchSize()),
-        maxAttempts(),
-        lockTtl());
-    for (SubmissionCandidate candidate : candidates) {
-      submitClaimed(candidate);
+    int batchSize = Math.max(1, properties.getSubmissionBatchSize());
+    for (int processed = 0; processed < batchSize; processed++) {
+      List<SubmissionCandidate> candidates = repository.claimDue(1, maxAttempts(), lockTtl());
+      if (candidates.isEmpty()) return;
+      submitClaimed(candidates.get(0));
     }
   }
 
@@ -131,7 +130,7 @@ public class LimitOrderSubmissionCoordinator {
   }
 
   private Duration lockTtl() {
-    int minimum = Math.max(10, properties.getRequestTimeoutSeconds() * 2);
+    long minimum = Math.max(15L, properties.getRequestTimeoutSeconds() * 3L + 5L);
     return Duration.ofSeconds(Math.max(minimum, properties.getSubmissionLockTtlSeconds()));
   }
 

@@ -28,10 +28,13 @@ public class LimitOrderStatusCoordinator {
 
   public void reconcileDue() {
     repository.markExpiredPending();
-    Duration lockTtl = Duration.ofSeconds(Math.max(10, properties.getStatusCheckLockTtlSeconds()));
-    for (StatusCheckCandidate candidate : repository.claimDueStatusChecks(
-        Math.max(1, properties.getStatusCheckBatchSize()), lockTtl)) {
-      reconcile(candidate);
+    long minimumLockSeconds = Math.max(15L, properties.getRequestTimeoutSeconds() * 3L + 5L);
+    Duration lockTtl = Duration.ofSeconds(Math.max(minimumLockSeconds, properties.getStatusCheckLockTtlSeconds()));
+    int batchSize = Math.max(1, properties.getStatusCheckBatchSize());
+    for (int processed = 0; processed < batchSize; processed++) {
+      var candidates = repository.claimDueStatusChecks(1, lockTtl);
+      if (candidates.isEmpty()) return;
+      reconcile(candidates.get(0));
     }
   }
 
