@@ -253,21 +253,25 @@ assert_project_container() {
 
 assert_project_network() {
   local network_name="$1"
+  local expected_role="$2"
   if ! network_exists "$network_name"; then
     return 0
   fi
-  if [ "$(network_label "$network_name" com.swapassistant.role)" = "database" ]; then
+  if [ "$(network_label "$network_name" com.swapassistant.app)" = "backend" ] \
+    && [ "$(network_label "$network_name" com.swapassistant.role)" = "$expected_role" ]; then
     return 0
   fi
 
-  for project_container in \
-    "$postgres_container" "$legacy_postgres_container" \
-    "$backend_container" "$candidate_container" "$rollback_container" "$failed_container"; do
-    if container_exists "$project_container" && container_uses_network "$project_container" "$network_name"; then
-      echo "Using legacy project network verified through owned container $project_container: $network_name" >&2
-      return 0
-    fi
-  done
+  if [ "$expected_role" = "database" ]; then
+    for project_container in \
+      "$postgres_container" "$legacy_postgres_container" \
+      "$backend_container" "$candidate_container" "$rollback_container" "$failed_container"; do
+      if container_exists "$project_container" && container_uses_network "$project_container" "$network_name"; then
+        echo "Using legacy project network verified through owned container $project_container: $network_name" >&2
+        return 0
+      fi
+    done
+  fi
   fail "Refusing to reuse network not owned by Swap Assistant: $network_name"
 }
 
@@ -336,6 +340,13 @@ create_database_network() {
   fi
 }
 
+create_proxy_network() {
+  run_container network create \
+    --label com.swapassistant.app=backend \
+    --label com.swapassistant.role=proxy \
+    "$proxy_network" >/dev/null
+}
+
 cleanup() {
   if [ -n "$postgres_env_file" ]; then
     rm -f "$postgres_env_file"
@@ -372,11 +383,21 @@ done
 for database_container in "$postgres_container" "$legacy_postgres_container"; do
   assert_project_container "$database_container" database
 done
-assert_project_network "$internal_network"
+assert_project_network "$internal_network" database
 assert_project_volume "$postgres_volume"
 
-network_exists "$proxy_network" || fail "The configured Caddy proxy network does not exist: $proxy_network"
 container_exists "$caddy_container" || fail "The configured Caddy container does not exist: $caddy_container"
+if ! network_exists "$proxy_network"; then
+  if [ "$engine_kind" = "podman" ]; then
+    install_podman_dns_plugin
+  fi
+  create_proxy_network
+fi
+assert_project_network "$proxy_network" proxy
+if [ "$engine_kind" = "podman" ]; then
+  network_supports_container_dns "$proxy_network" \
+    || fail "Proxy network $proxy_network must support container DNS."
+fi
 attach_container_network "$proxy_network" "$caddy_container" \
   || fail "Caddy container $caddy_container could not join proxy network $proxy_network."
 [ -f "$caddyfile_path" ] || fail "Configured Caddyfile does not exist: $caddyfile_path"
@@ -588,7 +609,7 @@ if ! postgres_reachable_by_name; then
 fi
 
 detach_container_network "$proxy_network" "$postgres_container" \
-  || fail "PostgreSQL could not be detached from the shared proxy network."
+  || fail "PostgreSQL could not be detached from the proxy network."
 
 extract_site_block() {
   awk -v domain="$api_domain" '
