@@ -544,11 +544,10 @@ jobs:
           for attempt in $(seq 1 18); do
             : > "$error_file"
             if body="$(
-              "${vercel_cli[@]}" curl /api/health \
+              "${vercel_cli[@]}" --token "$VERCEL_TOKEN" curl /api/health \
                 --deployment "$DEPLOYMENT_URL" \
                 --protection-bypass "$VERCEL_PROTECTION_BYPASS_SECRET" \
                 --yes \
-                --token "$VERCEL_TOKEN" \
                 -- --fail --silent --show-error --max-time 20 \
                 2>"$error_file"
             )"; then
