@@ -272,6 +272,7 @@ jobs:
       - prepare
       - build
       - release-gate
+      - frontend-stage
     if: needs.release-gate.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -467,21 +468,24 @@ jobs:
           OCI_CADDYFILE_PATH: ${{ vars.OCI_CADDYFILE_PATH || secrets.OCI_CADDYFILE_PATH }}
           OCI_CADDY_CONTAINER: ${{ vars.OCI_CADDY_CONTAINER || secrets.OCI_CADDY_CONTAINER }}
 
-  frontend:
-    name: Deploy on Vercel
+  frontend-stage:
+    name: Stage production frontend
     needs:
       - prepare
-      - deploy
+      - release-gate
+    if: needs.release-gate.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      deployment_url: ${{ steps.vercel.outputs.deployment_url }}
     environment:
       name: production
-      url: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://wallet-integration-theta.vercel.app' }}
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_APP_VERSION: ${{ needs.prepare.outputs.release_sha }}
       NEXT_PUBLIC_COMMIT_TIMESTAMP: ${{ needs.prepare.outputs.committed_at }}
       VERCEL_ENVIRONMENT: production
+      VERCEL_DEPLOY_MODE: staged-production
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -515,12 +519,12 @@ jobs:
             exit 1
           fi
 
-      - name: Build and deploy exact frontend release
+      - name: Build staged production frontend
         id: vercel
         shell: bash
         run: ./scripts/deploy/deploy-vercel-frontend.sh
 
-      - name: Verify deployed frontend build
+      - name: Verify staged frontend build
         shell: bash
         env:
           DEPLOYMENT_URL: ${{ steps.vercel.outputs.deployment_url }}
@@ -541,6 +545,39 @@ jobs:
           done
           echo "Vercel deployment did not serve the expected healthy commit." >&2
           exit 1
+
+  frontend:
+    name: Promote frontend on Vercel
+    needs:
+      - prepare
+      - deploy
+      - frontend-stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://wallet-integration-theta.vercel.app' }}
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      VERCEL_DEPLOY_MODE: promote
+      VERCEL_PROMOTE_URL: ${{ needs.frontend-stage.outputs.deployment_url }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout exact release
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Promote verified deployment
+        shell: bash
+        run: ./scripts/deploy/deploy-vercel-frontend.sh
 
   verify:
     name: Verify production release

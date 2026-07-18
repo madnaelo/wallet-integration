@@ -3,13 +3,30 @@ set -Eeuo pipefail
 
 cd "$(dirname "$0")/../.."
 
-environment="${VERCEL_ENVIRONMENT:-production}"
+deployment_mode="${VERCEL_DEPLOY_MODE:-production}"
 vercel_cli_version="56.3.1"
 vercel_cli=(npx --yes "vercel@$vercel_cli_version")
-prod_flag=()
-if [ "$environment" = "production" ]; then
-  prod_flag=(--prod)
-fi
+deployment_flags=()
+case "$deployment_mode" in
+  production)
+    environment=production
+    deployment_flags=(--prod)
+    ;;
+  staged-production)
+    environment=production
+    deployment_flags=(--prod --skip-domain)
+    ;;
+  preview)
+    environment="${VERCEL_ENVIRONMENT:-preview}"
+    ;;
+  promote)
+    environment=production
+    ;;
+  *)
+    echo "VERCEL_DEPLOY_MODE must be production, staged-production, preview, or promote." >&2
+    exit 1
+    ;;
+esac
 
 export NEXT_TELEMETRY_DISABLED=1
 export VERCEL_TELEMETRY_DISABLED=1
@@ -45,13 +62,30 @@ if (project.orgId !== process.env.VERCEL_ORG_ID || project.projectId !== process
 }
 NODE
 
+if [ "$deployment_mode" = "promote" ]; then
+  deployment_url="${VERCEL_PROMOTE_URL:-}"
+  if ! [[ "$deployment_url" =~ ^https://[A-Za-z0-9.-]+[.]vercel[.]app$ ]]; then
+    echo "VERCEL_PROMOTE_URL must be a Vercel deployment URL." >&2
+    exit 1
+  fi
+  "${vercel_cli[@]}" promote "$deployment_url" \
+    --yes \
+    --timeout=5m \
+    --token "$VERCEL_TOKEN"
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+  fi
+  echo "Frontend promoted from $deployment_url"
+  exit 0
+fi
+
 # Sensitive Vercel variables cannot be decrypted by `vercel pull`. Build on
 # Vercel so those values remain server-side and are available to Next.js.
 deployment_url="$("${vercel_cli[@]}" deploy \
   --yes \
   --force \
   --archive=tgz \
-  "${prod_flag[@]}" \
+  "${deployment_flags[@]}" \
   --build-env "NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION" \
   --build-env "NEXT_PUBLIC_COMMIT_TIMESTAMP=$NEXT_PUBLIC_COMMIT_TIMESTAMP" \
   --token "$VERCEL_TOKEN" \

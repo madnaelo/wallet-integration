@@ -10,16 +10,19 @@ The workflows are in `.github/workflows`.
 ## Workflows
 
 - `CI`: tests, audits, typechecks, lints, and builds the frontend; tests the
-  backend; applies every Flyway migration to PostgreSQL 17; starts the packaged
+  backend; applies every Flyway migration to PostgreSQL 16; starts the packaged
   backend and checks its database-backed health endpoint; and validates all
   Compose files.
-- `Security`: runs dependency review, CodeQL, Gitleaks, and Trivy filesystem
-  vulnerability scans.
+- `Security`: runs dependency review, CodeQL when GitHub Advanced Security is
+  available, mandatory Semgrep OSS analysis for Java and TypeScript, Gitleaks,
+  and Trivy filesystem vulnerability scans.
 - `Release Production`: starts only after CI succeeds for `master`/`main`,
   then waits for Security to pass for that exact commit. It publishes one
-  immutable GHCR image, promotes the backend on OCI with automatic rollback,
-  deploys the same commit through the Vercel CLI to the configured project, and
-  verifies that both public health endpoints serve the selected commit.
+  immutable GHCR image and builds a production Vercel deployment without
+  assigning the public domain. After that staged frontend passes its health
+  check, the workflow promotes the backend on OCI with automatic rollback,
+  promotes the already-verified Vercel deployment, and verifies that both
+  public health endpoints serve the selected commit.
   `workflow_dispatch` can release or roll back to a full commit SHA that
   belongs to `master`/`main` and has passing CI/Security runs.
 - `Monitor Production`: checks the frontend, backend health, and optional
