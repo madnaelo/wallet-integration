@@ -34,7 +34,7 @@ export const CHAINS: Record<number, ChainConfig> = {
     zeroXBaseUrl: "https://api.0x.org",
     rpcUrls: ["https://polygon-rpc.com"],
     blockExplorerUrls: ["https://polygonscan.com"],
-    nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 }
+    nativeCurrency: { name: "Polygon Ecosystem Token", symbol: "POL", decimals: 18 }
   },
   8453: {
     chainId: 8453,

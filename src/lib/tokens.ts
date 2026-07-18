@@ -65,7 +65,7 @@ export const DEFAULT_TOKENS_BY_CHAIN: Record<number, TokenInfo[]> = {
     { symbol: "UNI", address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", decimals: 18, name: "Uniswap" }
   ],
   137: [
-    { symbol: "MATIC", address: "ETH", decimals: 18, isNative: true, name: "Polygon native token", searchAliases: ["POL", "Polygon"] },
+    { symbol: "POL", address: "ETH", decimals: 18, isNative: true, name: "Polygon Ecosystem Token", searchAliases: ["MATIC", "Polygon"] },
     { symbol: "USDT", address: "0xc2132D05D31c914a87C6611C10748AaCBa0CbFfC", decimals: 6, name: "Tether USD" },
     { symbol: "USDC", address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", decimals: 6, name: "USD Coin" },
     NATIVE_BITCOIN_TOKEN,
