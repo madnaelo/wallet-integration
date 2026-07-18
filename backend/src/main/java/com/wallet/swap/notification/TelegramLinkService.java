@@ -9,7 +9,6 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Locale;
 import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,6 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class TelegramLinkService {
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
   private static final char[] CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
+  private static final int CODE_LENGTH = 12;
 
   private final NotificationProperties properties;
   private final TelegramLinkCodeRepository linkCodeRepository;
@@ -64,10 +64,12 @@ public class TelegramLinkService {
 
     List<TelegramIncomingMessage> messages = telegramSender.getRecentMessages();
     for (TelegramLinkCode code : activeCodes) {
-      Pattern codePattern = Pattern.compile("(^|\\s)" + Pattern.quote(code.code()) + "($|\\s)", Pattern.CASE_INSENSITIVE);
+      Pattern startPattern = Pattern.compile(
+          "^/start(?:@[A-Za-z0-9_]+)?\\s+" + Pattern.quote(code.code()) + "$",
+          Pattern.CASE_INSENSITIVE);
       for (TelegramIncomingMessage message : messages) {
-        String text = message.text().trim().toUpperCase(Locale.ROOT);
-        if (!codePattern.matcher(text).find()) continue;
+        String text = message.text().trim();
+        if (!startPattern.matcher(text).matches()) continue;
 
         linkCodeRepository.markConsumed(code.id());
         return preferenceService.connectTelegram(walletAddress, message.chatId());
@@ -78,8 +80,8 @@ public class TelegramLinkService {
   }
 
   private String generateCode() {
-    StringBuilder code = new StringBuilder(8);
-    for (int i = 0; i < 8; i += 1) {
+    StringBuilder code = new StringBuilder(CODE_LENGTH);
+    for (int i = 0; i < CODE_LENGTH; i += 1) {
       code.append(CODE_ALPHABET[SECURE_RANDOM.nextInt(CODE_ALPHABET.length)]);
     }
     return code.toString();

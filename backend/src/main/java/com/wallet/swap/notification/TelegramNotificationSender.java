@@ -86,6 +86,7 @@ public class TelegramNotificationSender {
     URI uri = UriComponentsBuilder
         .fromUriString(properties.getTelegram().getBaseUrl())
         .path("/bot{token}/getUpdates")
+        .queryParam("offset", -100)
         .queryParam("timeout", 0)
         .queryParam("limit", 100)
         .build(properties.getTelegram().getBotToken().trim());
@@ -103,6 +104,10 @@ public class TelegramNotificationSender {
     for (JsonNode update : body.path("result")) {
       JsonNode message = update.path("message");
       if (message.isMissingNode()) continue;
+      if (!"private".equals(message.path("chat").path("type").asText(""))
+          || message.path("from").path("is_bot").asBoolean(false)) {
+        continue;
+      }
       String text = message.path("text").asText("");
       String chatId = message.path("chat").path("id").asText("");
       if (text.isBlank() || chatId.isBlank()) continue;
