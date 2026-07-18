@@ -53,13 +53,19 @@ public class DatabaseApiRateLimiter implements ApiRateLimiter {
     return ApiRateLimitDecision.reject(retryAfter);
   }
 
-  public int deleteExpiredBuckets(Instant now) {
+  public int deleteExpiredBuckets(Instant now, int limit) {
     return jdbcTemplate.update(
         """
         DELETE FROM api_rate_limit_buckets
-        WHERE reset_at <= ?
+        WHERE ctid IN (
+          SELECT ctid FROM api_rate_limit_buckets
+          WHERE reset_at <= ?
+          ORDER BY reset_at
+          LIMIT ?
+        )
         """,
-        Timestamp.from(now));
+        Timestamp.from(now),
+        limit);
   }
 
   private record BucketState(int requestCount, Instant resetAt) {}

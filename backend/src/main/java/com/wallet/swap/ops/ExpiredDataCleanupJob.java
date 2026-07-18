@@ -51,10 +51,10 @@ public class ExpiredDataCleanupJob {
 
   private void deleteExpiredRows() {
     Instant now = Instant.now();
-    int nonces = authRepository.deleteExpiredNonces(now);
-    int sessions = authRepository.deleteExpiredSessions(now);
-    int telegramCodes = telegramLinkCodeRepository.deleteExpired(now);
-    int rateLimitBuckets = apiRateLimiter.deleteExpiredBuckets(now);
+    int nonces = deleteInBatches(limit -> authRepository.deleteExpiredNonces(now, limit));
+    int sessions = deleteInBatches(limit -> authRepository.deleteExpiredSessions(now, limit));
+    int telegramCodes = deleteInBatches(limit -> telegramLinkCodeRepository.deleteExpired(now, limit));
+    int rateLimitBuckets = deleteInBatches(limit -> apiRateLimiter.deleteExpiredBuckets(now, limit));
     int dryRunHistory = deleteOlderThan(maintenanceProperties.getDryRunHistoryRetentionDays(), now,
         expiredDataRepository::deleteOldDryRunSwapHistory);
     int reverseAlerts = deleteOlderThan(maintenanceProperties.getAlertRetentionDays(), now,
@@ -86,11 +86,29 @@ public class ExpiredDataCleanupJob {
 
   private int deleteOlderThan(int retentionDays, Instant now, ExpiredRowDeleter deleter) {
     if (retentionDays <= 0) return 0;
-    return deleter.delete(now.minus(Duration.ofDays(retentionDays)));
+    Instant cutoff = now.minus(Duration.ofDays(retentionDays));
+    return deleteInBatches(limit -> deleter.delete(cutoff, limit));
+  }
+
+  private int deleteInBatches(BatchDeleter deleter) {
+    int batchSize = maintenanceProperties.getDeleteBatchSize();
+    int maxBatches = maintenanceProperties.getMaxDeleteBatchesPerRun();
+    int total = 0;
+    for (int batch = 0; batch < maxBatches; batch++) {
+      int deleted = deleter.delete(batchSize);
+      total += deleted;
+      if (deleted < batchSize) break;
+    }
+    return total;
   }
 
   @FunctionalInterface
   private interface ExpiredRowDeleter {
-    int delete(Instant cutoff);
+    int delete(Instant cutoff, int limit);
+  }
+
+  @FunctionalInterface
+  private interface BatchDeleter {
+    int delete(int limit);
   }
 }

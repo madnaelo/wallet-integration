@@ -4,6 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "wallet.maintenance")
 public class MaintenanceProperties {
+  private long cleanupFixedDelayMs = 3_600_000;
+  private int deleteBatchSize = 2_000;
+  private int maxDeleteBatchesPerRun = 5;
   private int dryRunHistoryRetentionDays = 180;
   private int alertRetentionDays = 365;
   private int notificationOutboxRetentionDays = 30;
@@ -30,5 +33,28 @@ public class MaintenanceProperties {
 
   public void setNotificationOutboxRetentionDays(int notificationOutboxRetentionDays) {
     this.notificationOutboxRetentionDays = notificationOutboxRetentionDays;
+  }
+  public long getCleanupFixedDelayMs() {
+    return cleanupFixedDelayMs;
+  }
+
+  public void setCleanupFixedDelayMs(long cleanupFixedDelayMs) {
+    this.cleanupFixedDelayMs = cleanupFixedDelayMs;
+  }
+
+  public int getDeleteBatchSize() {
+    return deleteBatchSize;
+  }
+
+  public void setDeleteBatchSize(int deleteBatchSize) {
+    this.deleteBatchSize = deleteBatchSize;
+  }
+
+  public int getMaxDeleteBatchesPerRun() {
+    return maxDeleteBatchesPerRun;
+  }
+
+  public void setMaxDeleteBatchesPerRun(int maxDeleteBatchesPerRun) {
+    this.maxDeleteBatchesPerRun = maxDeleteBatchesPerRun;
   }
 }

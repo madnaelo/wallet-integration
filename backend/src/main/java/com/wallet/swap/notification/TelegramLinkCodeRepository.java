@@ -55,8 +55,19 @@ public class TelegramLinkCodeRepository {
         id);
   }
 
-  public int deleteExpired(Instant now) {
-    return jdbcTemplate.update("DELETE FROM telegram_link_codes WHERE expires_at <= ?", Timestamp.from(now));
+  public int deleteExpired(Instant now, int limit) {
+    return jdbcTemplate.update(
+        """
+        DELETE FROM telegram_link_codes
+        WHERE ctid IN (
+          SELECT ctid FROM telegram_link_codes
+          WHERE expires_at <= ?
+          ORDER BY expires_at
+          LIMIT ?
+        )
+        """,
+        Timestamp.from(now),
+        limit);
   }
 
   private TelegramLinkCode mapRow(ResultSet rs) throws SQLException {

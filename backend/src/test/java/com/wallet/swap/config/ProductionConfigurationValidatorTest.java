@@ -32,6 +32,7 @@ class ProductionConfigurationValidatorTest {
         auth,
         validFeatureProperties(),
         validLimitOrderProperties(),
+        validMaintenanceProperties(),
         validNotificationProperties());
 
     assertThatThrownBy(configuration::validate)
@@ -64,6 +65,7 @@ class ProductionConfigurationValidatorTest {
         validAuthProperties(),
         features,
         limitOrders,
+        validMaintenanceProperties(),
         notifications);
 
     assertThatThrownBy(configuration::validate)
@@ -89,6 +91,7 @@ class ProductionConfigurationValidatorTest {
         validAuthProperties(),
         validFeatureProperties(),
         limitOrders,
+        validMaintenanceProperties(),
         validNotificationProperties());
 
     assertThatCode(configuration::validate).doesNotThrowAnyException();
@@ -147,6 +150,8 @@ class ProductionConfigurationValidatorTest {
     notifications.setMonitorFixedDelayMs(0);
     notifications.setOutboxBatchSize(10_000);
     notifications.setEligibleStatuses(List.of("dry_run"));
+    var maintenance = validMaintenanceProperties();
+    maintenance.setDeleteBatchSize(100_000);
 
     var configuration = new ProductionConfigurationValidator(
         "production",
@@ -157,6 +162,7 @@ class ProductionConfigurationValidatorTest {
         validAuthProperties(),
         validFeatureProperties(),
         limitOrders,
+        maintenance,
         notifications);
 
     assertThatThrownBy(configuration::validate)
@@ -165,6 +171,7 @@ class ProductionConfigurationValidatorTest {
         .hasMessageContaining("proxy headers")
         .hasMessageContaining("LIMIT_ORDER_SUBMISSION_RETRY_FIXED_DELAY_MS")
         .hasMessageContaining("LIMIT_ORDER_STATUS_CHECK_BATCH_SIZE")
+        .hasMessageContaining("MAINTENANCE_DELETE_BATCH_SIZE")
         .hasMessageContaining("NOTIFICATIONS_MONITOR_FIXED_DELAY_MS")
         .hasMessageContaining("NOTIFICATIONS_OUTBOX_BATCH_SIZE")
         .hasMessageContaining("NOTIFICATIONS_ELIGIBLE_STATUSES");
@@ -186,6 +193,7 @@ class ProductionConfigurationValidatorTest {
         validAuthProperties(),
         validFeatureProperties(),
         limitOrders,
+        validMaintenanceProperties(),
         notifications);
   }
 
@@ -219,6 +227,10 @@ class ProductionConfigurationValidatorTest {
     properties.setOneinchOrderbookEnabled(true);
     properties.setOneinchApiKey("1234567890123456");
     return properties;
+  }
+
+  private MaintenanceProperties validMaintenanceProperties() {
+    return new MaintenanceProperties();
   }
 
   private NotificationProperties validNotificationProperties() {

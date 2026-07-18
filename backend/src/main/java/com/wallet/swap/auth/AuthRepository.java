@@ -146,12 +146,34 @@ public class AuthRepository {
     jdbcTemplate.update("DELETE FROM wallet_sessions WHERE token_hash = ?", tokenHash);
   }
 
-  public int deleteExpiredNonces(Instant now) {
-    return jdbcTemplate.update("DELETE FROM wallet_nonces WHERE expires_at <= ?", Timestamp.from(now));
+  public int deleteExpiredNonces(Instant now, int limit) {
+    return jdbcTemplate.update(
+        """
+        DELETE FROM wallet_nonces
+        WHERE ctid IN (
+          SELECT ctid FROM wallet_nonces
+          WHERE expires_at <= ?
+          ORDER BY expires_at
+          LIMIT ?
+        )
+        """,
+        Timestamp.from(now),
+        limit);
   }
 
-  public int deleteExpiredSessions(Instant now) {
-    return jdbcTemplate.update("DELETE FROM wallet_sessions WHERE expires_at <= ?", Timestamp.from(now));
+  public int deleteExpiredSessions(Instant now, int limit) {
+    return jdbcTemplate.update(
+        """
+        DELETE FROM wallet_sessions
+        WHERE ctid IN (
+          SELECT ctid FROM wallet_sessions
+          WHERE expires_at <= ?
+          ORDER BY expires_at
+          LIMIT ?
+        )
+        """,
+        Timestamp.from(now),
+        limit);
   }
 
   public void markLastLogin(String walletAddress) {

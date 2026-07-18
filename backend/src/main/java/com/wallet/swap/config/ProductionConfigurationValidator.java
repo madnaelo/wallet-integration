@@ -30,6 +30,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
   private final AuthProperties authProperties;
   private final FeatureProperties featureProperties;
   private final LimitOrderProperties limitOrderProperties;
+  private final MaintenanceProperties maintenanceProperties;
   private final NotificationProperties notificationProperties;
 
   public ProductionConfigurationValidator(
@@ -41,6 +42,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
       AuthProperties authProperties,
       FeatureProperties featureProperties,
       LimitOrderProperties limitOrderProperties,
+      MaintenanceProperties maintenanceProperties,
       NotificationProperties notificationProperties) {
     this.appEnvironment = appEnvironment;
     this.databaseUrl = databaseUrl;
@@ -50,6 +52,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     this.authProperties = authProperties;
     this.featureProperties = featureProperties;
     this.limitOrderProperties = limitOrderProperties;
+    this.maintenanceProperties = maintenanceProperties;
     this.notificationProperties = notificationProperties;
   }
 
@@ -65,6 +68,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     validateApi(problems);
     validateAuthentication(problems);
     validateDatabase(problems);
+    validateMaintenance(problems);
     validateNotifications(problems);
     validateLimitOrders(problems);
 
@@ -134,6 +138,27 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     String password = text(databasePassword);
     if (isWeakSecret(password, 16) || password.equalsIgnoreCase("wallet")) {
       problems.add("DATABASE_PASSWORD must be a non-default secret of at least 16 characters");
+    }
+  }
+
+  private void validateMaintenance(List<String> problems) {
+    if (outside(maintenanceProperties.getCleanupFixedDelayMs(), 60_000, 86_400_000)) {
+      problems.add("MAINTENANCE_CLEANUP_FIXED_DELAY_MS must be between 60000 and 86400000");
+    }
+    if (outside(maintenanceProperties.getDeleteBatchSize(), 100, 10_000)) {
+      problems.add("MAINTENANCE_DELETE_BATCH_SIZE must be between 100 and 10000");
+    }
+    if (outside(maintenanceProperties.getMaxDeleteBatchesPerRun(), 1, 20)) {
+      problems.add("MAINTENANCE_MAX_DELETE_BATCHES_PER_RUN must be between 1 and 20");
+    }
+    if (outside(maintenanceProperties.getDryRunHistoryRetentionDays(), 1, 3_650)) {
+      problems.add("DRY_RUN_HISTORY_RETENTION_DAYS must be between 1 and 3650");
+    }
+    if (outside(maintenanceProperties.getAlertRetentionDays(), 1, 3_650)) {
+      problems.add("ALERT_RETENTION_DAYS must be between 1 and 3650");
+    }
+    if (outside(maintenanceProperties.getNotificationOutboxRetentionDays(), 1, 365)) {
+      problems.add("NOTIFICATION_OUTBOX_RETENTION_DAYS must be between 1 and 365");
     }
   }
 

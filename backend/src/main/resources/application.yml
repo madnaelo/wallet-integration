@@ -106,6 +106,8 @@ wallet:
     status-check-max-backoff-seconds: ${LIMIT_ORDER_STATUS_CHECK_MAX_BACKOFF_SECONDS:1800}
   maintenance:
     cleanup-fixed-delay-ms: ${MAINTENANCE_CLEANUP_FIXED_DELAY_MS:3600000}
+    delete-batch-size: ${MAINTENANCE_DELETE_BATCH_SIZE:2000}
+    max-delete-batches-per-run: ${MAINTENANCE_MAX_DELETE_BATCHES_PER_RUN:5}
     dry-run-history-retention-days: ${DRY_RUN_HISTORY_RETENTION_DAYS:180}
     alert-retention-days: ${ALERT_RETENTION_DAYS:365}
     notification-outbox-retention-days: ${NOTIFICATION_OUTBOX_RETENTION_DAYS:30}
