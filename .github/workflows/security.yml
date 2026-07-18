@@ -65,6 +65,33 @@ jobs:
       - name: Analyze
         uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4
 
+  semgrep:
+    name: Semgrep OSS SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Scan Java and TypeScript source
+        run: >-
+          docker run --rm
+          -v "$PWD:/src:ro"
+          -w /src
+          semgrep/semgrep:1.131.0@sha256:6bd07d7b166b097e1384f41b94a62d8c8a26a4fff8713992c296e053310da01f
+          semgrep scan
+          --oss-only
+          --jobs 2
+          --config p/owasp-top-ten
+          --config p/java
+          --config p/typescript
+          --error
+          --metrics=off
+          src
+          backend/src
+
   secret-scan:
     name: Secret Scan
     runs-on: ubuntu-latest
