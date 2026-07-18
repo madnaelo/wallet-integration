@@ -654,7 +654,13 @@ if [ "$enable_backups" = "true" ]; then
   fi
   command -v systemctl >/dev/null 2>&1 || fail "Backup timer requested, but systemctl is unavailable."
 
-  chmod +x "$backup_script"
+  # systemd cannot execute user_home_t files when SELinux is enforcing. Install
+  # the runner in a standard executable location and restore its platform label.
+  backup_executable="/usr/local/bin/swap-assistant-postgres-backup"
+  sudo install -o root -g root -m 0755 "$backup_script" "$backup_executable"
+  if command -v restorecon >/dev/null 2>&1; then
+    sudo restorecon -F "$backup_executable"
+  fi
   escaped_deploy_path="$(printf '%s' "$deploy_path" | sed 's/[&|\\]/\\&/g')"
   sudo sed "s|__WALLET_DEPLOY_PATH__|$escaped_deploy_path|g" "$backup_service_template" \
     | sudo tee /etc/systemd/system/wallet-postgres-backup.service >/dev/null
