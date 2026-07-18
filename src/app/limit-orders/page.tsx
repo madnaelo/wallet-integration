@@ -34,6 +34,14 @@ import { isAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
 import { ensureExactTokenAllowance } from "@/lib/tokenAllowance";
 import {
+  clearStoredBackendSession,
+  isExpiredBackendSessionError,
+  isSessionForWallet,
+  readStoredBackendSession,
+  writeStoredBackendSession
+} from "@/lib/backendSession";
+import { isUserRejectedWalletRequest, signPersonalMessage } from "@/lib/walletSigning";
+import {
   COW_PROTOCOL_PROVIDER,
   ONEINCH_ORDERBOOK_PROVIDER,
   resolveTrustedLimitOrderSpender
@@ -48,7 +56,6 @@ import {
 
 const WalletBridge = dynamic(() => import("@/components/WalletBridge"), { ssr: false });
 
-const BACKEND_SESSION_STORAGE_KEY = "wallet.swapAssistant.backendSession.v1";
 const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
 const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
 const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
@@ -765,7 +772,14 @@ export default function LimitOrdersPage() {
     const request = (async () => {
       const nonce = await requestAuthNonce(envPublic.BACKEND_BASE_URL, address);
       setOrderNotice(`Open ${walletName} and approve sign-in. This only proves the wallet is yours.`);
-      const signature = await signMessage(walletProvider, address, nonce.message, providerKind);
+      const signature = await signPersonalMessage({
+        provider: walletProvider,
+        walletAddress: address,
+        message: nonce.message,
+        providerKind,
+        walletName,
+        setNotice: setOrderNotice
+      });
       const session = await verifyAuthSignature(envPublic.BACKEND_BASE_URL, address, nonce.nonceId, signature);
       writeStoredBackendSession(session);
       setBackendSession(session);
@@ -1982,82 +1996,6 @@ async function signTypedData(
   return signature;
 }
 
-async function signMessage(
-  provider: Eip1193Provider,
-  walletAddress: string,
-  message: string,
-  providerKind: ProviderKind
-): Promise<string> {
-  const hexMessage = utf8ToHex(message);
-  const attempts = providerKind === "walletconnect"
-    ? [[message, walletAddress], [hexMessage, walletAddress]]
-    : [[hexMessage, walletAddress], [message, walletAddress]];
-  let lastError: unknown = null;
-  for (const params of attempts) {
-    try {
-      const request = providerKind === "walletconnect"
-        ? provider.request({ method: "personal_sign", params }, undefined, SIGNING_ATTEMPT_EXPIRY_SECONDS)
-        : provider.request({ method: "personal_sign", params });
-      const signature = await requestWithTimeout(
-        request,
-        providerKind === "walletconnect" ? WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS : SIGNING_ATTEMPT_TIMEOUT_MS,
-        "Your wallet did not return a sign-in signature."
-      );
-      if (typeof signature !== "string" || !signature.startsWith("0x")) {
-        throw new Error("Wallet did not return a valid sign-in signature.");
-      }
-      return signature;
-    } catch (error) {
-      if (isUserRejectedWalletRequest(error)) throw error;
-      lastError = error;
-    }
-  }
-  throw new Error(normalizeWalletError(lastError));
-}
-
-function readStoredBackendSession(): BackendSession | null {
-  try {
-    window.localStorage.removeItem(BACKEND_SESSION_STORAGE_KEY);
-    const raw = window.sessionStorage.getItem(BACKEND_SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as BackendSession;
-    if (!parsed.walletAddress || !parsed.expiresAt || new Date(parsed.expiresAt).getTime() <= Date.now() + 60_000) {
-      clearStoredBackendSession();
-      return null;
-    }
-    return parsed;
-  } catch {
-    clearStoredBackendSession();
-    return null;
-  }
-}
-
-function writeStoredBackendSession(session: BackendSession) {
-  try {
-    window.localStorage.removeItem(BACKEND_SESSION_STORAGE_KEY);
-    window.sessionStorage.setItem(BACKEND_SESSION_STORAGE_KEY, JSON.stringify(session));
-  } catch {
-    // React state still carries the session while this page is open.
-  }
-}
-
-function clearStoredBackendSession() {
-  try {
-    window.localStorage.removeItem(BACKEND_SESSION_STORAGE_KEY);
-    window.sessionStorage.removeItem(BACKEND_SESSION_STORAGE_KEY);
-  } catch {
-    // Storage access can fail in strict browser privacy modes.
-  }
-}
-
-function isSessionForWallet(session: BackendSession, walletAddress: string): boolean {
-  return session.walletAddress.toLowerCase() === walletAddress.toLowerCase();
-}
-
-function isExpiredBackendSessionError(error: unknown): boolean {
-  return error instanceof BackendClientError && error.status === 401;
-}
-
 function requestWithTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeoutId = window.setTimeout(() => {
@@ -2165,13 +2103,6 @@ function getWalletDisplayName(walletName?: string, providerType?: string): strin
   return "Wallet";
 }
 
-function utf8ToHex(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  return `0x${Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("")}`;
-}
-
 function normalizeWalletError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (/reject|denied|cancel/i.test(message)) return "Request cancelled in wallet.";
@@ -2187,10 +2118,4 @@ function normalizeRecipientImportError(error: unknown): string {
     return "Could not complete wallet import. Try again, or paste the address.";
   }
   return message || "Could not import the wallet address.";
-}
-
-function isUserRejectedWalletRequest(error: unknown): boolean {
-  const item = error as { code?: number; message?: string } | null;
-  const message = String(item?.message ?? error ?? "");
-  return item?.code === 4001 || /reject|denied|cancel/i.test(message);
 }

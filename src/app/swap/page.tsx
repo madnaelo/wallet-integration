@@ -20,6 +20,14 @@ import { isAddress, isBitcoinMainnetAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
 import { ensureExactTokenAllowance } from "@/lib/tokenAllowance";
 import { validateSwapTransaction } from "@/lib/swapTransaction";
+import {
+  clearStoredBackendSession,
+  isExpiredBackendSessionError,
+  isSessionForWallet,
+  readStoredBackendSession,
+  writeStoredBackendSession
+} from "@/lib/backendSession";
+import { isUserRejectedWalletRequest, signPersonalMessage } from "@/lib/walletSigning";
 import type {
   WalletBridgeActions,
   WalletBridgeOpenOptions,
@@ -39,7 +47,6 @@ import {
 } from "@/lib/tokenPickerOptions";
 import {
   type AutoSwapRule,
-  BackendClientError,
   type FavoritePair,
   type BackendSession,
   type NotificationPreference,
@@ -76,12 +83,8 @@ const WalletBridge = dynamic(() => import("@/components/WalletBridge"), { ssr: f
 type TxStatus = "idle" | "pending" | "submitted" | "confirmed" | "failed";
 type ActiveView = "swap" | "alerts" | "favorites" | "preferences";
 const QUOTE_TTL_SECONDS = 20;
-const BACKEND_SESSION_STORAGE_KEY = "wallet.swapAssistant.backendSession.v1";
 const SWAP_TOUR_STORAGE_KEY = "wallet.swapAssistant.swapTour.v1";
-const SIGNING_ATTEMPT_TIMEOUT_MS = 90_000;
 const ACTIVE_VIEWS: ActiveView[] = ["swap", "alerts", "favorites", "preferences"];
-const WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS = 300_000;
-const SIGNING_ATTEMPT_EXPIRY_SECONDS = 300;
 const PUSH_DENIED_MESSAGE =
   "Push notifications are blocked for this site. Open your device or site settings, allow notifications, then try again.";
 
@@ -1304,14 +1307,14 @@ export default function Page() {
       await confirmWalletSignIn(noticeTarget);
       try {
         setAuthNotice(buildWalletApprovalNotice(connectedWalletName, "signIn"));
-        const signature = await signMessageWithProvider(
-          p,
+        const signature = await signPersonalMessage({
+          provider: p,
           walletAddress,
-          nonce.message,
-          walletKind,
-          setAuthNotice,
-          connectedWalletName
-        );
+          message: nonce.message,
+          providerKind: walletKind,
+          setNotice: setAuthNotice,
+          walletName: connectedWalletName
+        });
         setAuthNotice("Thanks. Loading your saved data...");
         const session = await verifyAuthSignature(
           envPublic.BACKEND_BASE_URL,
@@ -4452,165 +4455,6 @@ function formatQuoteOption(quote: QuoteResponse, buyToken: DisplayToken): string
   const amount = stringValue(quote.netBuyAmount) || stringValue(quote.buyAmount);
   const formattedAmount = amount ? formatTokenAmount(amount, buyToken) : "Quote";
   return `${rankLabel}${providerName} - ${formattedAmount}`;
-}
-
-function readStoredBackendSession(): BackendSession | null {
-  try {
-    removeBackendSessionCopy(window.localStorage);
-    const raw = window.sessionStorage.getItem(BACKEND_SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as BackendSession;
-    if (!parsed.walletAddress || !parsed.expiresAt) {
-      clearStoredBackendSession();
-      return null;
-    }
-    if (new Date(parsed.expiresAt).getTime() <= Date.now() + 60_000) {
-      clearStoredBackendSession();
-      return null;
-    }
-    return parsed;
-  } catch {
-    clearStoredBackendSession();
-    return null;
-  }
-}
-
-function writeStoredBackendSession(session: BackendSession) {
-  removeBackendSessionCopy(window.localStorage);
-  try {
-    window.sessionStorage.setItem(BACKEND_SESSION_STORAGE_KEY, JSON.stringify(session));
-  } catch {
-    // The in-memory React state still carries the session for the current view.
-  }
-}
-
-function clearStoredBackendSession() {
-  removeBackendSessionCopy(window.localStorage);
-  removeBackendSessionCopy(window.sessionStorage);
-}
-
-function removeBackendSessionCopy(storage: Storage) {
-  try {
-    storage.removeItem(BACKEND_SESSION_STORAGE_KEY);
-  } catch {
-    // Storage access can fail in strict browser privacy modes.
-  }
-}
-
-function isSessionForWallet(session: BackendSession, walletAddress: string): boolean {
-  return session.walletAddress.toLowerCase() === walletAddress.toLowerCase();
-}
-
-function isExpiredBackendSessionError(e: any): boolean {
-  return e instanceof BackendClientError && e.status === 401;
-}
-
-async function signMessageWithProvider(
-  provider: Eip1193Provider,
-  walletAddress: string,
-  message: string,
-  providerKind: "injected" | "walletconnect" | null,
-  setNotice: (message: string) => void,
-  walletName: string
-): Promise<string> {
-  const hexMessage = utf8ToHex(message);
-  const supportsPersonalSign = walletSessionSupportsMethod(provider, "personal_sign");
-  if (providerKind === "walletconnect" && supportsPersonalSign === false) {
-    throw new Error(
-      "The connected WalletConnect session did not approve personal_sign. Disconnect, reconnect, and approve message signing."
-    );
-  }
-
-  const attempts =
-    providerKind === "walletconnect"
-      ? [
-          { label: "wallet text signature", params: [message, walletAddress] },
-          { label: "wallet hex signature", params: [hexMessage, walletAddress] }
-        ]
-      : [
-          { label: "wallet hex signature", params: [hexMessage, walletAddress] },
-          { label: "wallet text signature", params: [message, walletAddress] }
-        ];
-
-  let lastError: unknown = null;
-  for (const [index, attempt] of attempts.entries()) {
-    try {
-      setNotice(buildWalletApprovalNotice(walletName, "signIn"));
-      const signature = await requestWithTimeout(
-        requestWalletSignature(provider, attempt.params, providerKind),
-        providerKind === "walletconnect" ? WALLETCONNECT_SIGNING_ATTEMPT_TIMEOUT_MS : SIGNING_ATTEMPT_TIMEOUT_MS,
-        `${attempt.label} did not return a signature.`
-      );
-
-      if (typeof signature !== "string" || !signature.startsWith("0x")) {
-        throw new Error("Wallet did not return a valid signature.");
-      }
-
-      return signature;
-    } catch (e: any) {
-      if (isUserRejectedWalletRequest(e)) throw e;
-      if (isWalletRequestTimeout(e)) {
-        throw new Error(
-          "The connected wallet did not return a signature. Reopen the wallet request, or disconnect/reconnect WalletConnect and try again."
-        );
-      }
-      lastError = e;
-      if (index === 0) {
-        setNotice("The wallet did not accept the first signing format. Trying the alternate signing format...");
-      }
-    }
-  }
-
-  throw new Error(normalizeWalletError(lastError) || "Wallet did not return a signature.");
-}
-
-function walletSessionSupportsMethod(provider: Eip1193Provider | null, method: string): boolean | null {
-  const p: any = provider;
-  const methods = p?.session?.namespaces?.eip155?.methods;
-  if (!Array.isArray(methods)) return null;
-  return methods.includes(method);
-}
-
-function requestWalletSignature(
-  provider: Eip1193Provider,
-  params: string[],
-  providerKind: "injected" | "walletconnect" | null
-): Promise<unknown> {
-  const args = {
-    method: "personal_sign",
-    params
-  };
-  if (providerKind === "walletconnect") {
-    return provider.request(args, undefined, SIGNING_ATTEMPT_EXPIRY_SECONDS);
-  }
-  return provider.request(args);
-}
-
-function requestWithTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = window.setTimeout(() => {
-      const error = new Error(message);
-      error.name = "WalletRequestTimeout";
-      reject(error);
-    }, timeoutMs);
-    promise.then(resolve, reject).finally(() => window.clearTimeout(timeoutId));
-  });
-}
-
-function isWalletRequestTimeout(e: any): boolean {
-  return e?.name === "WalletRequestTimeout";
-}
-
-function isUserRejectedWalletRequest(e: any): boolean {
-  const message = String(e?.message ?? e ?? "");
-  return e?.code === 4001 || /reject|denied|cancel/i.test(message);
-}
-
-function utf8ToHex(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  return `0x${Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("")}`;
 }
 
 function getQuoteValidationErrors(params: {
