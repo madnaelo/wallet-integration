@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Swap Assistant",
     short_name: "Swap Assistant",
-    description: "Your Personal Swap Assistant. Get the best price for your swaps.",
+    description: "Compare available swap prices, set alerts, and keep your wallet in control.",
     id: "/swap",
     start_url: "/swap",
     scope: "/",

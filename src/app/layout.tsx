@@ -88,11 +88,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     operatingSystem: "Any",
     url: siteUrl.toString(),
     description,
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD"
-    }
+    featureList: [
+      "Compare non-custodial swap quotes",
+      "Create wallet-signed limit orders",
+      "Set price and reverse-swap alerts",
+      "Receive Telegram and push notifications"
+    ]
   };
 
   return (
