@@ -1,0 +1,89 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.resetModules();
+});
+
+describe("distributed rate limiting", () => {
+  it("checks multiple dimensions in one atomic Redis command", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis-token");
+    vi.stubEnv("RATE_LIMIT_REDIS_REQUIRED", "true");
+    vi.stubEnv("RATE_LIMIT_REDIS_FAIL_OPEN", "false");
+    vi.stubEnv("RATE_LIMIT_REDIS_PREFIX", "swap-assistant-prod");
+    vi.stubEnv("RATE_LIMIT_KEY_PEPPER", "test-pepper-that-is-long-enough");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ result: [1, 0] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { rateLimitMany } = await import("@/lib/server/rateLimit");
+    const decision = await rateLimitMany([
+      "quote-ip:198.51.100.10",
+      "quote-wallet:0x1111111111111111111111111111111111111111"
+    ]);
+
+    expect(decision).toEqual({ allowed: true, retryAfterMs: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://redis.example");
+    const command = JSON.parse(String(request.body)) as unknown[];
+    expect(command[0]).toBe("EVAL");
+    expect(command[2]).toBe(2);
+    expect(command[3]).toMatch(/^swap-assistant-prod:rl:[a-f0-9]{64}$/);
+    expect(command[4]).toMatch(/^swap-assistant-prod:rl:[a-f0-9]{64}$/);
+    expect(String(request.body)).not.toContain("198.51.100.10");
+    expect(String(request.body)).not.toContain("0x1111111111111111111111111111111111111111");
+  });
+
+  it("fails closed when Redis returns an invalid decision", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis-token");
+    vi.stubEnv("RATE_LIMIT_REDIS_REQUIRED", "true");
+    vi.stubEnv("RATE_LIMIT_REDIS_FAIL_OPEN", "false");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ result: null }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+
+    const { rateLimitMany } = await import("@/lib/server/rateLimit");
+
+    await expect(rateLimitMany(["quote-ip:198.51.100.10"])).resolves.toEqual({
+      allowed: false,
+      retryAfterMs: 60_000,
+      unavailable: true
+    });
+  });
+
+  it("returns the provider retry window when a dimension is limited", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis-token");
+    vi.stubEnv("RATE_LIMIT_REDIS_REQUIRED", "true");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ result: [0, 1_250] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+
+    const { rateLimitMany } = await import("@/lib/server/rateLimit");
+
+    await expect(rateLimitMany(["quote-ip:198.51.100.10"])).resolves.toEqual({
+      allowed: false,
+      retryAfterMs: 1_250
+    });
+  });
+});

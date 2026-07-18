@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/server/ip";
-import { rateLimit } from "@/lib/server/rateLimit";
+import { rateLimitMany } from "@/lib/server/rateLimit";
 import { quoteCache } from "@/lib/server/cache";
 import { getChainById, isChainAllowed } from "@/lib/chains";
 import { isAddress, isBitcoinMainnetAddress, isPositiveIntegerString } from "@/lib/validation";
@@ -25,7 +25,12 @@ export async function GET(req: NextRequest) {
   }
   const corsOrigin = originDecision.responseOrigin;
 
-  const rl = await rateLimit(ip);
+  const { searchParams } = new URL(req.url);
+  const takerAddress = searchParams.get("takerAddress") ?? "";
+  const rl = await rateLimitMany([
+    `quote-ip:${ip}`,
+    `quote-wallet:${normalizeTokenKey(takerAddress) || "missing"}`
+  ]);
   if (rl.unavailable) {
     return withCors(
       NextResponse.json({ error: "Quotes are temporarily unavailable. Please try again shortly." }, { status: 503 }),
@@ -42,13 +47,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { searchParams } = new URL(req.url);
-
   const chainIdStr = searchParams.get("chainId") ?? "";
   const sellToken = searchParams.get("sellToken") ?? "";
   const buyToken = searchParams.get("buyToken") ?? "";
   const sellAmount = searchParams.get("sellAmount") ?? "";
-  const takerAddress = searchParams.get("takerAddress") ?? "";
   const toAddress = (searchParams.get("toAddress") ?? "").trim();
   const slippageBpsStr = searchParams.get("slippageBps") ?? "";
 
@@ -113,23 +115,6 @@ export async function GET(req: NextRequest) {
     return withCors(NextResponse.json({ error: "Invalid receive address." }, { status: 400 }), corsOrigin);
   } else if (isNativeBitcoinToken(sellToken) && !toAddress) {
     return withCors(NextResponse.json({ error: "Choose a receive address." }, { status: 400 }), corsOrigin);
-  }
-
-  const walletLimit = await rateLimit(`quote-wallet:${normalizeTokenKey(takerAddress)}`);
-  if (walletLimit.unavailable) {
-    return withCors(
-      NextResponse.json({ error: "Quotes are temporarily unavailable. Please try again shortly." }, { status: 503 }),
-      corsOrigin
-    );
-  }
-  if (!walletLimit.allowed) {
-    return withCors(
-      NextResponse.json(
-        { error: "Quotes are being refreshed too quickly. Wait a moment and try again." },
-        { status: 429, headers: { "Retry-After": String(Math.ceil(walletLimit.retryAfterMs / 1000)) } }
-      ),
-      corsOrigin
-    );
   }
 
   const slippage = parseQuoteSlippageBps(slippageBpsStr);
