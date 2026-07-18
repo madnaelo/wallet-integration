@@ -173,6 +173,8 @@ class ProductionConfigurationValidatorTest {
     notifications.setMonitorFixedDelayMs(0);
     notifications.setOutboxBatchSize(10_000);
     notifications.setEligibleStatuses(List.of("dry_run"));
+    notifications.getPrice().setMaxAttempts(0);
+    notifications.getPrice().setRetryDelayMs(0);
     var maintenance = validMaintenanceProperties();
     maintenance.setDeleteBatchSize(100_000);
 
@@ -197,7 +199,9 @@ class ProductionConfigurationValidatorTest {
         .hasMessageContaining("MAINTENANCE_DELETE_BATCH_SIZE")
         .hasMessageContaining("NOTIFICATIONS_MONITOR_FIXED_DELAY_MS")
         .hasMessageContaining("NOTIFICATIONS_OUTBOX_BATCH_SIZE")
-        .hasMessageContaining("NOTIFICATIONS_ELIGIBLE_STATUSES");
+        .hasMessageContaining("NOTIFICATIONS_ELIGIBLE_STATUSES")
+        .hasMessageContaining("COINGECKO_MAX_ATTEMPTS")
+        .hasMessageContaining("COINGECKO_RETRY_DELAY_MS");
   }
 
   private ProductionConfigurationValidator validConfiguration() {

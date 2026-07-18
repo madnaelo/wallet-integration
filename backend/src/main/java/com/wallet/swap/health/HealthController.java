@@ -56,6 +56,7 @@ public class HealthController {
     response.put("notifications", Map.of(
         "monitorRuns", snapshot.monitorRuns(),
         "monitorFailures", snapshot.monitorFailures(),
+        "priceFetchBatchesFailed", snapshot.priceFetchBatchesFailed(),
         "lastMonitorCompletedAt", snapshot.lastMonitorCompletedAt() == null ? "" : snapshot.lastMonitorCompletedAt()));
     return ResponseEntity.status(healthy ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).body(response);
   }

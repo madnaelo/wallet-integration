@@ -172,8 +172,10 @@ public class NotificationProperties {
     private String coingeckoBaseUrl = "https://api.coingecko.com/api/v3";
     private String coingeckoApiKey = "";
     private String coingeckoApiKeyHeader = "x-cg-demo-api-key";
-    private int requestTimeoutSeconds = 8;
+    private int requestTimeoutSeconds = 15;
     private int contractBatchSize = 100;
+    private int maxAttempts = 2;
+    private long retryDelayMs = 1_000;
 
     public String getCoingeckoBaseUrl() {
       return coingeckoBaseUrl;
@@ -213,6 +215,22 @@ public class NotificationProperties {
 
     public void setContractBatchSize(int contractBatchSize) {
       this.contractBatchSize = contractBatchSize;
+    }
+
+    public int getMaxAttempts() {
+      return maxAttempts;
+    }
+
+    public void setMaxAttempts(int maxAttempts) {
+      this.maxAttempts = maxAttempts;
+    }
+
+    public long getRetryDelayMs() {
+      return retryDelayMs;
+    }
+
+    public void setRetryDelayMs(long retryDelayMs) {
+      this.retryDelayMs = retryDelayMs;
     }
   }
 

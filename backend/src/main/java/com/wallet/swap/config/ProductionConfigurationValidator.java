@@ -223,6 +223,12 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     if (outside(notificationProperties.getPrice().getContractBatchSize(), 1, 100)) {
       problems.add("COINGECKO_CONTRACT_BATCH_SIZE must be between 1 and 100");
     }
+    if (outside(notificationProperties.getPrice().getMaxAttempts(), 1, 5)) {
+      problems.add("COINGECKO_MAX_ATTEMPTS must be between 1 and 5");
+    }
+    if (outside(notificationProperties.getPrice().getRetryDelayMs(), 100, 30_000)) {
+      problems.add("COINGECKO_RETRY_DELAY_MS must be between 100 and 30000");
+    }
 
     NotificationProperties.Telegram telegram = notificationProperties.getTelegram();
     if (telegram.isEnabled()) {

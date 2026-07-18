@@ -130,8 +130,10 @@ wallet:
       coingecko-base-url: ${COINGECKO_BASE_URL:https://api.coingecko.com/api/v3}
       coingecko-api-key: ${COINGECKO_API_KEY:}
       coingecko-api-key-header: ${COINGECKO_API_KEY_HEADER:x-cg-demo-api-key}
-      request-timeout-seconds: ${COINGECKO_REQUEST_TIMEOUT_SECONDS:8}
+      request-timeout-seconds: ${COINGECKO_REQUEST_TIMEOUT_SECONDS:15}
       contract-batch-size: ${COINGECKO_CONTRACT_BATCH_SIZE:100}
+      max-attempts: ${COINGECKO_MAX_ATTEMPTS:2}
+      retry-delay-ms: ${COINGECKO_RETRY_DELAY_MS:1000}
     email:
       enabled: ${EMAIL_NOTIFICATIONS_ENABLED:false}
       from: ${EMAIL_FROM:}

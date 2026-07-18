@@ -15,12 +15,15 @@ public class OperationalMetricsService {
   private final AtomicLong reverseCandidatesChecked = new AtomicLong();
   private final AtomicLong favoriteCandidatesChecked = new AtomicLong();
   private final AtomicLong priceAlertCandidatesChecked = new AtomicLong();
+  private final AtomicLong priceFetchBatchesAttempted = new AtomicLong();
+  private final AtomicLong priceFetchBatchesFailed = new AtomicLong();
   private final AtomicLong opportunitiesFound = new AtomicLong();
   private final AtomicLong notificationDeliveriesSucceeded = new AtomicLong();
   private final AtomicLong notificationDeliveriesFailed = new AtomicLong();
   private final AtomicReference<Instant> lastMonitorStartedAt = new AtomicReference<>();
   private final AtomicReference<Instant> lastMonitorCompletedAt = new AtomicReference<>();
   private final AtomicReference<String> lastMonitorError = new AtomicReference<>("");
+  private final AtomicReference<String> lastPriceFetchError = new AtomicReference<>("");
   private final AtomicReference<String> lastDeliveryError = new AtomicReference<>("");
 
   public void recordMonitorStarted() {
@@ -47,6 +50,16 @@ public class OperationalMetricsService {
     lastMonitorError.set(SafeErrorDetails.summarize(exception));
   }
 
+  public void recordPriceFetchBatches(int attempted, int failed, Exception lastFailure) {
+    priceFetchBatchesAttempted.addAndGet(Math.max(0, attempted));
+    priceFetchBatchesFailed.addAndGet(Math.max(0, failed));
+    if (failed > 0) {
+      lastPriceFetchError.set(SafeErrorDetails.summarize(lastFailure));
+    } else if (attempted > 0) {
+      lastPriceFetchError.set("");
+    }
+  }
+
   public void recordDelivery(boolean sent, Exception exception) {
     if (sent) {
       notificationDeliveriesSucceeded.incrementAndGet();
@@ -66,12 +79,15 @@ public class OperationalMetricsService {
         reverseCandidatesChecked.get(),
         favoriteCandidatesChecked.get(),
         priceAlertCandidatesChecked.get(),
+        priceFetchBatchesAttempted.get(),
+        priceFetchBatchesFailed.get(),
         opportunitiesFound.get(),
         notificationDeliveriesSucceeded.get(),
         notificationDeliveriesFailed.get(),
         lastMonitorStartedAt.get(),
         lastMonitorCompletedAt.get(),
         lastMonitorError.get(),
+        lastPriceFetchError.get(),
         lastDeliveryError.get());
   }
 
@@ -83,11 +99,14 @@ public class OperationalMetricsService {
       long reverseCandidatesChecked,
       long favoriteCandidatesChecked,
       long priceAlertCandidatesChecked,
+      long priceFetchBatchesAttempted,
+      long priceFetchBatchesFailed,
       long opportunitiesFound,
       long notificationDeliveriesSucceeded,
       long notificationDeliveriesFailed,
       Instant lastMonitorStartedAt,
       Instant lastMonitorCompletedAt,
       String lastMonitorError,
+      String lastPriceFetchError,
       String lastDeliveryError) {}
 }

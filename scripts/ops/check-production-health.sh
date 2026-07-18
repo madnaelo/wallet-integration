@@ -163,11 +163,15 @@ with open(sys.argv[1], "r", encoding="utf-8") as handle:
 last_monitor_error = str(data.get("lastMonitorError") or "").strip()
 if last_monitor_error:
     raise SystemExit(f"last monitor error: {last_monitor_error[:300]}")
+last_price_fetch_error = str(data.get("lastPriceFetchError") or "").strip()
+if last_price_fetch_error:
+    raise SystemExit(f"last price fetch error: {last_price_fetch_error[:300]}")
 
 print(
     "ops ok; "
     f"monitorRuns={data.get('monitorRuns', '')}; "
     f"monitorFailures={data.get('monitorFailures', '')}; "
+    f"priceFetchBatchesFailed={data.get('priceFetchBatchesFailed', '')}; "
     f"notificationDeliveriesFailed={data.get('notificationDeliveriesFailed', '')}"
 )
 PY

@@ -167,7 +167,7 @@ public class ReverseProfitMonitor {
       }
     } catch (RuntimeException exception) {
       metricsService.recordMonitorFailure(exception);
-      log.warn("Reverse profit monitor failed.", exception);
+      log.warn("Notification monitor failed.", exception);
     }
   }
 }
