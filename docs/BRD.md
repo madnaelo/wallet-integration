@@ -29,7 +29,7 @@ transactions for users.
 
 Fee collection must be transparent in product/legal copy before public launch.
 
-## MVP Scope
+## Current Production Scope
 
 - Wallet connection through installed wallets and WalletConnect/Reown flows.
 - Quote aggregation through configured providers.
@@ -38,7 +38,7 @@ Fee collection must be transparent in product/legal copy before public launch.
 - Wallet-authenticated swap history.
 - Favorite pairs with target-rate alerts.
 - Reverse-swap profit and loss-protection monitoring.
-- Telegram/email notification plumbing.
+- Telegram, email, and browser push notification channels.
 - Limit Orders for supported EVM contract-token pairs using protocol-verifiable
   signed terms and backend submission through a supported orderbook adapter.
 - Trade-summary risk cues for high slippage, large fee ratio, and partial route
@@ -61,7 +61,9 @@ Fee collection must be transparent in product/legal copy before public launch.
 - Do not store seed phrases, private keys, or signing material.
 - Validate and normalize all quote and token inputs server-side.
 - Keep provider API keys server-side.
-- Treat wallet signatures as authentication only, not transaction approval.
+- Treat wallet sign-in signatures as authentication only. Treat a limit-order
+  typed signature as authorization solely for the exact provider-verifiable
+  order terms the user reviewed.
 - Scope history, favorites, and preferences to the authenticated wallet.
 - Keep fee-recipient, provider, Telegram, SMTP, and database secrets out of git.
 
@@ -79,7 +81,7 @@ Fee collection must be transparent in product/legal copy before public launch.
 
 ## Launch Readiness
 
-Before public launch:
+Before broad commercial launch:
 
 - Confirm fee-recipient and affiliate wallet setup.
 - Confirm provider terms for fee-generating use.

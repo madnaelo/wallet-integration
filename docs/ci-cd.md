@@ -16,7 +16,7 @@ The workflows are in `.github/workflows`.
 - `Security`: runs dependency review, CodeQL when GitHub Advanced Security is
   available, mandatory Semgrep OSS analysis for Java and TypeScript, Gitleaks,
   and Trivy filesystem vulnerability scans.
-- `Release Production`: starts only after CI succeeds for `master`/`main`,
+- `Release Production`: starts only after CI succeeds for `master`,
   then waits for Security to pass for that exact commit. It publishes one
   immutable GHCR image and builds a production Vercel deployment without
   assigning the public domain. After that staged frontend passes its health
@@ -24,7 +24,7 @@ The workflows are in `.github/workflows`.
   promotes the already-verified Vercel deployment, and verifies that both
   public health endpoints serve the selected commit.
   `workflow_dispatch` can release or roll back to a full commit SHA that
-  belongs to `master`/`main` and has passing CI/Security runs.
+  belongs to `master` and has passing CI/Security runs.
 - `Monitor Production`: checks the frontend, backend health, and optional
   admin operations summary every 15 minutes. It also ensures frontend and
   backend serve the same commit and can send a Telegram alert on failure.

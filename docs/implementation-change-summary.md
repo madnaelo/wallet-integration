@@ -52,7 +52,7 @@ provider/earning checklist.
 - Added split production deployment: Vercel for frontend/quote route, OCI for
   backend/PostgreSQL/Caddy.
 - Added GitHub Actions CI and automatic deployments for frontend and backend on
-  pushes to `master`/`main`.
+  pushes to `master`.
 - Added backend health and admin operations summaries for database, monitor,
   and notification-delivery visibility.
 

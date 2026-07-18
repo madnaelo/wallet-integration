@@ -38,18 +38,20 @@ preference/rule storage, not autonomous private-key signing.
   Odos, and LI.FI.
 - Wallet connection: Reown AppKit plus provider-specific signing handling.
 - Backend: Spring Boot, Flyway, PostgreSQL.
-- Notifications: scheduled monitor with email and Telegram adapters.
+- Notifications: scheduled monitor with email, Telegram, and browser push
+  adapters.
 - Browser push notifications are implemented, but a mobile subscription issue
   is paused and documented in
   `docs/known-issues/mobile-push-subscription.md`.
-- Set Alerts is currently alert-to-confirm only. True autonomous
-  execution is blocked on a signed/delegated authorization model; see
+- Set Alerts is alert-to-confirm only. Separately, Limit Orders can submit exact
+  provider-verifiable signed orders for supported EVM pairs; unsupported pairs
+  remain alert-only. See
   `docs/architecture-decisions/price-alerts-and-limit-orders.md`.
 - Operations: health endpoint plus admin operations summary for monitor and
   notification counters.
 - Deployment: Vercel for frontend/quote route, OCI for backend/PostgreSQL/Caddy.
 - CI/CD: GitHub Actions deploys both frontend and backend on pushes to
-  `master`/`main`.
+  `master`.
 
 ## Local Workflow
 

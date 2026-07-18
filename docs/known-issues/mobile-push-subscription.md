@@ -135,9 +135,9 @@ they already did it.
    but mismatched production config can confuse later send testing.
 4. Test whether changing the app origin/domain affects mobile subscription
    creation. Current origin is the Vercel subdomain.
-5. Consider adding a generated PNG icon set to the web manifest. Current
-   manifest icons are SVG; this should not normally block subscription, but
-   Android PWA behavior is more reliable with PNG icons.
+5. The generated PNG icon set and maskable manifest icon are now present. Do
+   not repeat that remediation; verify a different origin/device push service
+   path when investigation resumes.
 6. If still failing, add a user-facing fallback state: keep Telegram as the
    recommended mobile alert channel and mark mobile push as unavailable on this
    device after repeated `AbortError` failures.
