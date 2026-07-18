@@ -2,7 +2,7 @@ name: swap-assistant-dev
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     restart: unless-stopped
     environment:
       POSTGRES_DB: wallet
@@ -91,6 +91,9 @@ services:
         NEXT_PUBLIC_DISALLOW_MAINNET: ${NEXT_PUBLIC_DISALLOW_MAINNET:-true}
         NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-http://localhost:8080}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-local}
+        NEXT_PUBLIC_COMMIT_TIMESTAMP: ${NEXT_PUBLIC_COMMIT_TIMESTAMP:-}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
     environment:
       ZEROX_API_KEY: ${ZEROX_API_KEY:-}
       ONEINCH_API_KEY: ${ONEINCH_API_KEY:-}
