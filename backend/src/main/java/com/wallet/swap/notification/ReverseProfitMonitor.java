@@ -4,6 +4,7 @@ import com.wallet.swap.autoswap.AutoSwapCalculator;
 import com.wallet.swap.autoswap.AutoSwapRuleModels.AutoSwapRuleCandidate;
 import com.wallet.swap.autoswap.AutoSwapRuleRepository;
 import com.wallet.swap.config.NotificationProperties;
+import com.wallet.swap.feature.FeatureFlagService;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitCandidate;
 import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
@@ -36,6 +37,7 @@ public class ReverseProfitMonitor {
   private final NotificationDeliveryService deliveryService;
   private final OperationalMetricsService metricsService;
   private final JobLockService jobLockService;
+  private final FeatureFlagService featureFlagService;
   private final AtomicBoolean running = new AtomicBoolean(false);
 
   public ReverseProfitMonitor(
@@ -49,7 +51,8 @@ public class ReverseProfitMonitor {
       AutoSwapCalculator autoSwapCalculator,
       NotificationDeliveryService deliveryService,
       OperationalMetricsService metricsService,
-      JobLockService jobLockService) {
+      JobLockService jobLockService,
+      FeatureFlagService featureFlagService) {
     this.properties = properties;
     this.candidateRepository = candidateRepository;
     this.favoritePairCandidateRepository = favoritePairCandidateRepository;
@@ -61,6 +64,7 @@ public class ReverseProfitMonitor {
     this.deliveryService = deliveryService;
     this.metricsService = metricsService;
     this.jobLockService = jobLockService;
+    this.featureFlagService = featureFlagService;
   }
 
   @Scheduled(fixedDelayString = "${wallet.notifications.monitor-fixed-delay-ms:900000}")
@@ -81,7 +85,7 @@ public class ReverseProfitMonitor {
   private void runMonitorCycle() {
     int reverseCandidateCount = 0;
     int favoritePairCandidateCount = 0;
-    int autoSwapCandidateCount = 0;
+    int priceAlertCandidateCount = 0;
     int totalOpportunities = 0;
     try {
       metricsService.recordMonitorStarted();
@@ -91,12 +95,13 @@ public class ReverseProfitMonitor {
           properties.getCandidateLimit());
       List<FavoritePairCandidate> favoritePairCandidates = favoritePairCandidateRepository.findCandidates(
           properties.getCandidateLimit());
-      List<AutoSwapRuleCandidate> autoSwapCandidates = autoSwapRuleRepository.findNotificationCandidates(
-          properties.getCandidateLimit());
+      List<AutoSwapRuleCandidate> priceAlertCandidates = featureFlagService.isPriceAlertsEnabled()
+          ? autoSwapRuleRepository.findNotificationCandidates(properties.getCandidateLimit())
+          : List.of();
       reverseCandidateCount = candidates.size();
       favoritePairCandidateCount = favoritePairCandidates.size();
-      autoSwapCandidateCount = autoSwapCandidates.size();
-      if (candidates.isEmpty() && favoritePairCandidates.isEmpty() && autoSwapCandidates.isEmpty()) {
+      priceAlertCandidateCount = priceAlertCandidates.size();
+      if (candidates.isEmpty() && favoritePairCandidates.isEmpty() && priceAlertCandidates.isEmpty()) {
         metricsService.recordMonitorCompleted(0, 0, 0, 0);
         return;
       }
@@ -110,7 +115,7 @@ public class ReverseProfitMonitor {
         tokenRefs.add(candidate.sellToken());
         tokenRefs.add(candidate.buyToken());
       }
-      for (AutoSwapRuleCandidate candidate : autoSwapCandidates) {
+      for (AutoSwapRuleCandidate candidate : priceAlertCandidates) {
         tokenRefs.add(candidate.sellToken());
         tokenRefs.add(candidate.buyToken());
       }
@@ -136,9 +141,9 @@ public class ReverseProfitMonitor {
             .orElse(0);
       }
 
-      int autoSwapOpportunities = 0;
-      for (AutoSwapRuleCandidate candidate : autoSwapCandidates) {
-        autoSwapOpportunities += autoSwapCalculator.evaluate(candidate, prices)
+      int priceAlertOpportunities = 0;
+      for (AutoSwapRuleCandidate candidate : priceAlertCandidates) {
+        priceAlertOpportunities += autoSwapCalculator.evaluate(candidate, prices)
             .map(opportunity -> {
               deliveryService.deliver(opportunity);
               return 1;
@@ -146,18 +151,18 @@ public class ReverseProfitMonitor {
             .orElse(0);
       }
 
-      totalOpportunities = reverseOpportunities + favoritePairOpportunities + autoSwapOpportunities;
+      totalOpportunities = reverseOpportunities + favoritePairOpportunities + priceAlertOpportunities;
       metricsService.recordMonitorCompleted(
           reverseCandidateCount,
           favoritePairCandidateCount,
-          autoSwapCandidateCount,
+          priceAlertCandidateCount,
           totalOpportunities);
       if (totalOpportunities > 0) {
         log.info(
             "Notification monitor processed {} reverse candidates, {} favorite pairs, and {} price-alert rules; found {} opportunities.",
             candidates.size(),
             favoritePairCandidates.size(),
-            autoSwapCandidates.size(),
+            priceAlertCandidates.size(),
             totalOpportunities);
       }
     } catch (RuntimeException exception) {

@@ -14,7 +14,7 @@ public class OperationalMetricsService {
   private final AtomicLong monitorFailures = new AtomicLong();
   private final AtomicLong reverseCandidatesChecked = new AtomicLong();
   private final AtomicLong favoriteCandidatesChecked = new AtomicLong();
-  private final AtomicLong autoSwapCandidatesChecked = new AtomicLong();
+  private final AtomicLong priceAlertCandidatesChecked = new AtomicLong();
   private final AtomicLong opportunitiesFound = new AtomicLong();
   private final AtomicLong notificationDeliveriesSucceeded = new AtomicLong();
   private final AtomicLong notificationDeliveriesFailed = new AtomicLong();
@@ -31,11 +31,11 @@ public class OperationalMetricsService {
   public void recordMonitorCompleted(
       int reverseCandidates,
       int favoriteCandidates,
-      int autoSwapCandidates,
+      int priceAlertCandidates,
       int opportunities) {
     reverseCandidatesChecked.addAndGet(Math.max(0, reverseCandidates));
     favoriteCandidatesChecked.addAndGet(Math.max(0, favoriteCandidates));
-    autoSwapCandidatesChecked.addAndGet(Math.max(0, autoSwapCandidates));
+    priceAlertCandidatesChecked.addAndGet(Math.max(0, priceAlertCandidates));
     opportunitiesFound.addAndGet(Math.max(0, opportunities));
     lastMonitorCompletedAt.set(Instant.now());
     lastMonitorError.set("");
@@ -65,7 +65,7 @@ public class OperationalMetricsService {
         monitorFailures.get(),
         reverseCandidatesChecked.get(),
         favoriteCandidatesChecked.get(),
-        autoSwapCandidatesChecked.get(),
+        priceAlertCandidatesChecked.get(),
         opportunitiesFound.get(),
         notificationDeliveriesSucceeded.get(),
         notificationDeliveriesFailed.get(),
@@ -82,7 +82,7 @@ public class OperationalMetricsService {
       long monitorFailures,
       long reverseCandidatesChecked,
       long favoriteCandidatesChecked,
-      long autoSwapCandidatesChecked,
+      long priceAlertCandidatesChecked,
       long opportunitiesFound,
       long notificationDeliveriesSucceeded,
       long notificationDeliveriesFailed,
