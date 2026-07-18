@@ -15,12 +15,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.GeneralSecurityException;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -294,12 +295,15 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
 
   private String rateLimitKey(String group, String clientIp) {
     try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-256");
       String pepper = apiProperties.getRateLimitKeyPepper() == null ? "" : apiProperties.getRateLimitKeyPepper();
-      byte[] hash = digest.digest((pepper + ":" + group + ":" + clientIp).getBytes(StandardCharsets.UTF_8));
+      byte[] secret = (pepper.isBlank() ? "development-only-rate-limit-key" : pepper)
+          .getBytes(StandardCharsets.UTF_8);
+      Mac mac = Mac.getInstance("HmacSHA256");
+      mac.init(new SecretKeySpec(secret, "HmacSHA256"));
+      byte[] hash = mac.doFinal((group + ":" + clientIp).getBytes(StandardCharsets.UTF_8));
       return group + ":" + HexFormat.of().formatHex(hash);
-    } catch (NoSuchAlgorithmException exception) {
-      throw new IllegalStateException("SHA-256 is not available.", exception);
+    } catch (GeneralSecurityException exception) {
+      throw new IllegalStateException("HMAC-SHA256 is not available.", exception);
     }
   }
 

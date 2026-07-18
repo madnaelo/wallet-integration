@@ -170,6 +170,28 @@ class ApiRequestGuardFilterTest {
     assertThat(thirdResponse.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
   }
 
+  @Test
+  void storesOnlyKeyedHashesForRateLimitIdentities() throws Exception {
+    ApiProperties properties = new ApiProperties();
+    properties.setRateLimitKeyPepper("test-pepper-with-more-than-thirty-two-characters");
+    AtomicReference<String> capturedKey = new AtomicReference<>();
+    ApiRequestGuardFilter filter = new ApiRequestGuardFilter(
+        properties,
+        (key, maxRequests, windowMs) -> {
+          capturedKey.set(key);
+          return ApiRateLimitDecision.permit();
+        });
+
+    filter.doFilter(
+        apiRequest("GET", "/api/swap-history", "203.0.113.50"),
+        new MockHttpServletResponse(),
+        flaggingChain(new AtomicBoolean(false)));
+
+    assertThat(capturedKey.get())
+        .matches("^api:[0-9a-f]{64}$")
+        .doesNotContain("203.0.113.50");
+  }
+
   private MockHttpServletRequest apiRequest(String method, String path, String remoteAddr) {
     MockHttpServletRequest request = new MockHttpServletRequest(method, path);
     request.setRemoteAddr(remoteAddr);
