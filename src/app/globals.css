@@ -2711,18 +2711,18 @@ body {
   gap: 12px;
 }
 
-.autoSwapComposer {
+.priceAlertComposer {
   display: grid;
   gap: 14px;
 }
 
-.autoSwapSummary {
+.priceAlertSummary {
   display: grid;
   gap: 6px;
   align-content: start;
 }
 
-.autoSwapModePill {
+.priceAlertModePill {
   width: max-content;
   display: inline-flex;
   align-items: center;
@@ -2734,18 +2734,13 @@ body {
   padding: 4px 9px;
 }
 
-.autoSwapModePillReady {
-  border-color: rgba(34, 197, 94, 0.45);
-  color: var(--ok);
-}
-
 @media (min-width: 820px) {
   .favoriteComposer {
     align-items: end;
     grid-template-columns: minmax(0, 1fr) minmax(260px, 1fr) auto;
   }
 
-  .autoSwapComposer {
+  .priceAlertComposer {
     align-items: end;
     grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.1fr) minmax(160px, 0.7fr) minmax(180px, 0.8fr) auto;
   }

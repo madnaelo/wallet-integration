@@ -125,7 +125,7 @@ export type SaveFavoritePairRequest = {
   alertsEnabled?: boolean;
 };
 
-export type AutoSwapRule = {
+export type PriceAlertRule = {
   id: string;
   walletAddress: string;
   chainId: number;
@@ -148,7 +148,7 @@ export type AutoSwapRule = {
   updatedAt: string;
 };
 
-export type SaveAutoSwapRuleRequest = {
+export type SavePriceAlertRuleRequest = {
   chainId: number;
   sellTokenAddress: string;
   sellTokenSymbol: string;
@@ -435,29 +435,29 @@ export async function deleteFavoritePair(
   });
 }
 
-export async function listAutoSwapRules(
+export async function listPriceAlertRules(
   backendBaseUrl: string,
   session: BackendSession
-): Promise<AutoSwapRule[]> {
-  return backendFetch<AutoSwapRule[]>(backendBaseUrl, "/api/price-alerts/rules", {
+): Promise<PriceAlertRule[]> {
+  return backendFetch<PriceAlertRule[]>(backendBaseUrl, "/api/price-alerts/rules", {
     method: "GET",
     headers: authHeaders(session)
   });
 }
 
-export async function saveAutoSwapRule(
+export async function savePriceAlertRule(
   backendBaseUrl: string,
   session: BackendSession,
-  request: SaveAutoSwapRuleRequest
-): Promise<AutoSwapRule> {
-  return backendFetch<AutoSwapRule>(backendBaseUrl, "/api/price-alerts/rules", {
+  request: SavePriceAlertRuleRequest
+): Promise<PriceAlertRule> {
+  return backendFetch<PriceAlertRule>(backendBaseUrl, "/api/price-alerts/rules", {
     method: "POST",
     headers: authHeaders(session),
     body: JSON.stringify(request)
   });
 }
 
-export async function deleteAutoSwapRule(
+export async function deletePriceAlertRule(
   backendBaseUrl: string,
   session: BackendSession,
   id: string

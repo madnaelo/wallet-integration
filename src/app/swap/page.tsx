@@ -46,30 +46,30 @@ import {
   buildTokenPickerOptions
 } from "@/lib/tokenPickerOptions";
 import {
-  type AutoSwapRule,
+  type PriceAlertRule,
   type FavoritePair,
   type BackendSession,
   type NotificationPreference,
   type PushSubscriptionPayload,
-  type SaveAutoSwapRuleRequest,
+  type SavePriceAlertRuleRequest,
   type SaveFavoritePairRequest,
   type SaveSwapHistoryRequest,
   type TelegramLinkStart,
   type SwapHistoryRecord,
   completeTelegramLink,
-  deleteAutoSwapRule,
+  deletePriceAlertRule,
   deleteFavoritePair,
   disablePushSubscriptions,
   getPushSubscriptionStatus,
   getFeatureFlags,
   getNotificationPreferences,
   getPushNotificationConfig,
-  listAutoSwapRules,
+  listPriceAlertRules,
   listFavoritePairs,
   listSwapHistory,
   logoutBackendSession,
   requestAuthNonce,
-  saveAutoSwapRule,
+  savePriceAlertRule,
   saveFavoritePair,
   saveNotificationPreferences,
   savePushSubscription,
@@ -323,17 +323,17 @@ export default function Page() {
   const [favoritePopoverOpen, setFavoritePopoverOpen] = useState<boolean>(false);
   const [favoritePopoverPosition, setFavoritePopoverPosition] = useState<{ x: number; y: number }>({ x: 24, y: 24 });
   const favoritePairsRequestInFlightRef = useRef<boolean>(false);
-  const [autoSwapRules, setAutoSwapRules] = useState<AutoSwapRule[]>([]);
-  const [autoSwapRulesLoaded, setAutoSwapRulesLoaded] = useState<boolean>(false);
-  const [autoSwapRulesLoading, setAutoSwapRulesLoading] = useState<boolean>(false);
-  const [autoSwapRuleSaving, setAutoSwapRuleSaving] = useState<boolean>(false);
-  const [autoSwapRuleDeletingId, setAutoSwapRuleDeletingId] = useState<string>("");
-  const [autoSwapRuleError, setAutoSwapRuleError] = useState<string>("");
-  const [autoSwapRuleNotice, setAutoSwapRuleNotice] = useState<string>("");
-  const [autoSwapDirectionDraft, setAutoSwapDirectionDraft] = useState<"above" | "below">("above");
-  const [autoSwapThresholdRateDraft, setAutoSwapThresholdRateDraft] = useState<string>("");
-  const [autoSwapSlippagePctDraft, setAutoSwapSlippagePctDraft] = useState<string>("1");
-  const autoSwapRulesRequestInFlightRef = useRef<boolean>(false);
+  const [priceAlertRules, setPriceAlertRules] = useState<PriceAlertRule[]>([]);
+  const [priceAlertRulesLoaded, setPriceAlertRulesLoaded] = useState<boolean>(false);
+  const [priceAlertRulesLoading, setPriceAlertRulesLoading] = useState<boolean>(false);
+  const [priceAlertRuleSaving, setPriceAlertRuleSaving] = useState<boolean>(false);
+  const [priceAlertRuleDeletingId, setPriceAlertRuleDeletingId] = useState<string>("");
+  const [priceAlertRuleError, setPriceAlertRuleError] = useState<string>("");
+  const [priceAlertRuleNotice, setPriceAlertRuleNotice] = useState<string>("");
+  const [priceAlertDirectionDraft, setPriceAlertDirectionDraft] = useState<"above" | "below">("above");
+  const [priceAlertThresholdRateDraft, setPriceAlertThresholdRateDraft] = useState<string>("");
+  const [priceAlertSlippagePctDraft, setPriceAlertSlippagePctDraft] = useState<string>("1");
+  const priceAlertRulesRequestInFlightRef = useRef<boolean>(false);
   const [pendingSwapLink, setPendingSwapLink] = useState<PendingSwapLink | null>(null);
   const [pendingAutoQuoteLink, setPendingAutoQuoteLink] = useState<PendingSwapLink | null>(null);
   const [tourOpen, setTourOpen] = useState<boolean>(false);
@@ -628,14 +628,14 @@ export default function Page() {
   }, [activeView]);
 
   useEffect(() => {
-    if (activeView !== "alerts" || !featureFlags.priceAlertsEnabled || !walletAddress || autoSwapRulesLoaded) return;
+    if (activeView !== "alerts" || !featureFlags.priceAlertsEnabled || !walletAddress || priceAlertRulesLoaded) return;
     const stored = backendSession ?? readStoredBackendSession();
     if (stored && isSessionForWallet(stored, walletAddress)) {
-      void refreshAutoSwapRules();
+      void refreshPriceAlertRules();
     }
     // Load exactly when the Set Alerts view becomes active with an existing session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeView, autoSwapRulesLoaded, backendSession, featureFlags.priceAlertsEnabled, walletAddress]);
+  }, [activeView, priceAlertRulesLoaded, backendSession, featureFlags.priceAlertsEnabled, walletAddress]);
 
   useEffect(() => {
     if (activeView !== "favorites" || !walletAddress || favoritePairsLoaded) return;
@@ -723,7 +723,7 @@ export default function Page() {
       setHistoryLoading(false);
       resetNotificationPreferenceState();
       resetFavoritePairsState();
-      resetAutoSwapRulesState();
+      resetPriceAlertRulesState();
       return;
     }
 
@@ -737,7 +737,7 @@ export default function Page() {
       setHistoryLoading(false);
       resetNotificationPreferenceState();
       resetFavoritePairsState();
-      resetAutoSwapRulesState();
+      resetPriceAlertRulesState();
       return;
     }
 
@@ -748,7 +748,7 @@ export default function Page() {
     setHistoryNotice("");
     resetNotificationPreferenceState();
     resetFavoritePairsState();
-    resetAutoSwapRulesState();
+    resetPriceAlertRulesState();
   }, [walletAddress, provider]);
 
   const sellTokenInfo = useMemo(
@@ -1422,18 +1422,18 @@ export default function Page() {
     favoritePairsRequestInFlightRef.current = false;
   }
 
-  function resetAutoSwapRulesState() {
-    setAutoSwapRules([]);
-    setAutoSwapRulesLoaded(false);
-    setAutoSwapRulesLoading(false);
-    setAutoSwapRuleSaving(false);
-    setAutoSwapRuleDeletingId("");
-    setAutoSwapRuleError("");
-    setAutoSwapRuleNotice("");
-    setAutoSwapDirectionDraft("above");
-    setAutoSwapThresholdRateDraft("");
-    setAutoSwapSlippagePctDraft("1");
-    autoSwapRulesRequestInFlightRef.current = false;
+  function resetPriceAlertRulesState() {
+    setPriceAlertRules([]);
+    setPriceAlertRulesLoaded(false);
+    setPriceAlertRulesLoading(false);
+    setPriceAlertRuleSaving(false);
+    setPriceAlertRuleDeletingId("");
+    setPriceAlertRuleError("");
+    setPriceAlertRuleNotice("");
+    setPriceAlertDirectionDraft("above");
+    setPriceAlertThresholdRateDraft("");
+    setPriceAlertSlippagePctDraft("1");
+    priceAlertRulesRequestInFlightRef.current = false;
   }
 
   async function refreshNotificationPreferences() {
@@ -1721,72 +1721,72 @@ export default function Page() {
     }
   }
 
-  async function refreshAutoSwapRules() {
-    if (autoSwapRulesRequestInFlightRef.current) return;
-    autoSwapRulesRequestInFlightRef.current = true;
-    setAutoSwapRulesLoading(true);
-    setAutoSwapRuleError("");
-    setAutoSwapRuleNotice("");
+  async function refreshPriceAlertRules() {
+    if (priceAlertRulesRequestInFlightRef.current) return;
+    priceAlertRulesRequestInFlightRef.current = true;
+    setPriceAlertRulesLoading(true);
+    setPriceAlertRuleError("");
+    setPriceAlertRuleNotice("");
     try {
       const session = await ensureBackendSession();
-      const rules = await listAutoSwapRules(envPublic.BACKEND_BASE_URL, session);
-      setAutoSwapRules(rules);
-      setAutoSwapRulesLoaded(true);
+      const rules = await listPriceAlertRules(envPublic.BACKEND_BASE_URL, session);
+      setPriceAlertRules(rules);
+      setPriceAlertRulesLoaded(true);
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
         setBackendSession(null);
       }
-      setAutoSwapRuleError(normalizeWalletError(e));
+      setPriceAlertRuleError(normalizeWalletError(e));
     } finally {
-      setAutoSwapRulesLoading(false);
-      autoSwapRulesRequestInFlightRef.current = false;
+      setPriceAlertRulesLoading(false);
+      priceAlertRulesRequestInFlightRef.current = false;
     }
   }
 
-  async function saveCurrentAutoSwapRule() {
-    setAutoSwapRuleSaving(true);
-    setAutoSwapRuleError("");
-    setAutoSwapRuleNotice("");
+  async function saveCurrentPriceAlertRule() {
+    setPriceAlertRuleSaving(true);
+    setPriceAlertRuleError("");
+    setPriceAlertRuleNotice("");
     try {
-      const request = buildAutoSwapRuleRequest();
+      const request = buildPriceAlertRuleRequest();
       const session = await ensureBackendSession();
-      const saved = await saveAutoSwapRule(envPublic.BACKEND_BASE_URL, session, request);
-      setAutoSwapRules((rules) => [saved, ...rules.filter((rule) => rule.id !== saved.id)]);
-      setAutoSwapRulesLoaded(true);
-      setAutoSwapRuleNotice(`${saved.sellTokenSymbol} to ${saved.buyTokenSymbol} alert saved.`);
+      const saved = await savePriceAlertRule(envPublic.BACKEND_BASE_URL, session, request);
+      setPriceAlertRules((rules) => [saved, ...rules.filter((rule) => rule.id !== saved.id)]);
+      setPriceAlertRulesLoaded(true);
+      setPriceAlertRuleNotice(`${saved.sellTokenSymbol} to ${saved.buyTokenSymbol} alert saved.`);
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
         setBackendSession(null);
       }
-      setAutoSwapRuleError(normalizeWalletError(e));
+      setPriceAlertRuleError(normalizeWalletError(e));
     } finally {
-      setAutoSwapRuleSaving(false);
+      setPriceAlertRuleSaving(false);
     }
   }
 
-  async function removeAutoSwapRule(rule: AutoSwapRule) {
-    setAutoSwapRuleDeletingId(rule.id);
-    setAutoSwapRuleError("");
-    setAutoSwapRuleNotice("");
+  async function removePriceAlertRule(rule: PriceAlertRule) {
+    setPriceAlertRuleDeletingId(rule.id);
+    setPriceAlertRuleError("");
+    setPriceAlertRuleNotice("");
     try {
       const session = await ensureBackendSession();
-      await deleteAutoSwapRule(envPublic.BACKEND_BASE_URL, session, rule.id);
-      setAutoSwapRules((rules) => rules.filter((item) => item.id !== rule.id));
-      setAutoSwapRuleNotice(`${rule.sellTokenSymbol} to ${rule.buyTokenSymbol} alert removed.`);
+      await deletePriceAlertRule(envPublic.BACKEND_BASE_URL, session, rule.id);
+      setPriceAlertRules((rules) => rules.filter((item) => item.id !== rule.id));
+      setPriceAlertRuleNotice(`${rule.sellTokenSymbol} to ${rule.buyTokenSymbol} alert removed.`);
     } catch (e: any) {
       if (isExpiredBackendSessionError(e)) {
         clearStoredBackendSession();
         setBackendSession(null);
       }
-      setAutoSwapRuleError(normalizeWalletError(e));
+      setPriceAlertRuleError(normalizeWalletError(e));
     } finally {
-      setAutoSwapRuleDeletingId("");
+      setPriceAlertRuleDeletingId("");
     }
   }
 
-  function buildAutoSwapRuleRequest(): SaveAutoSwapRuleRequest {
+  function buildPriceAlertRuleRequest(): SavePriceAlertRuleRequest {
     if (!featureFlags.priceAlertsEnabled) throw new Error("Set Alerts is not available.");
     if (!sellTokenInfo || !buyTokenInfo) throw new Error("Select a pair before saving an alert.");
     if (normalizeTokenKey(sellTokenInfo.address) === normalizeTokenKey(buyTokenInfo.address)) {
@@ -1795,10 +1795,10 @@ export default function Page() {
 
     const sellAmountRaw = parseUnitsSafe(amountHuman, sellTokenInfo.decimals);
     if (!sellAmountRaw) throw new Error("Enter an amount before saving an alert.");
-    const thresholdRate = normalizePositiveDecimal(autoSwapThresholdRateDraft);
+    const thresholdRate = normalizePositiveDecimal(priceAlertThresholdRateDraft);
     if (!thresholdRate) throw new Error("Set a target rate before saving an alert.");
-    const autoSlippageBps = parseSlippagePctToBps(autoSwapSlippagePctDraft);
-    if (autoSlippageBps === null) throw new Error("Enter a slippage tolerance from 0% to 10%.");
+    const alertSlippageBps = parseSlippagePctToBps(priceAlertSlippagePctDraft);
+    if (alertSlippageBps === null) throw new Error("Enter a slippage tolerance from 0% to 10%.");
     const recipientAddressConfig = getAddressFamilyConfig(buyTokenInfo);
     if (!recipientAddressConfig.isValid(recipientAddress)) {
       throw new Error(`Enter a valid ${recipientAddressConfig.recipientLabel}.`);
@@ -1814,8 +1814,8 @@ export default function Page() {
       buyTokenDecimals: buyTokenInfo.decimals,
       sellAmountRaw,
       thresholdRate,
-      alertDirection: autoSwapDirectionDraft,
-      slippageBps: autoSlippageBps,
+      alertDirection: priceAlertDirectionDraft,
+      slippageBps: alertSlippageBps,
       recipientAddress: recipientAddress.trim(),
       executionMode: "notify_to_confirm"
     };
@@ -2407,13 +2407,13 @@ export default function Page() {
     const buyAmount = stringValue(quote.netBuyAmount) || stringValue(quote.grossBuyAmount) || quote.buyAmount;
     return calculatePairRate(quote.sellAmount, tokenInfoToDisplay(sellTokenInfo), buyAmount, tokenInfoToDisplay(buyTokenInfo));
   }, [buyTokenInfo, quote, sellTokenInfo]);
-  const autoSwapCurrentAmount = useMemo(() => {
+  const priceAlertCurrentAmount = useMemo(() => {
     if (!sellTokenInfo) return "";
     const amountRaw = parseUnitsSafe(amountHuman, sellTokenInfo.decimals);
     if (!amountRaw) return "";
     return `${formatTokenAmount(amountRaw, tokenInfoToDisplay(sellTokenInfo))}`;
   }, [amountHuman, sellTokenInfo]);
-  const autoSwapModeHelper = "You will receive an alert with a prefilled swap link when the target is reached.";
+  const priceAlertModeHelper = "You will receive an alert with a prefilled swap link when the target is reached.";
   const currentFavoritePairCount = useMemo(
     () =>
       favoritePairs.filter(
@@ -2446,24 +2446,24 @@ export default function Page() {
     setFavoritePairError("");
     setFavoritePairNotice("");
     setFavoritePopoverOpen(false);
-    setAutoSwapThresholdRateDraft("");
-    setAutoSwapDirectionDraft("above");
-    setAutoSwapRuleError("");
-    setAutoSwapRuleNotice("");
+    setPriceAlertThresholdRateDraft("");
+    setPriceAlertDirectionDraft("above");
+    setPriceAlertRuleError("");
+    setPriceAlertRuleNotice("");
   }, [selectedChainId, sellToken, buyToken]);
 
   useEffect(() => {
     if (currentFavoriteRate && !favoriteTargetRateDraft.trim()) {
       setFavoriteTargetRateDraft(currentFavoriteRate);
     }
-    if (currentFavoriteRate && !autoSwapThresholdRateDraft.trim()) {
-      setAutoSwapThresholdRateDraft(currentFavoriteRate);
+    if (currentFavoriteRate && !priceAlertThresholdRateDraft.trim()) {
+      setPriceAlertThresholdRateDraft(currentFavoriteRate);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFavoriteRate, favoriteTargetRateDraft]);
 
   useEffect(() => {
-    if (slippageBps !== null) setAutoSwapSlippagePctDraft(formatSlippageBpsAsPercent(slippageBps));
+    if (slippageBps !== null) setPriceAlertSlippagePctDraft(formatSlippageBpsAsPercent(slippageBps));
   }, [slippageBps]);
 
   function startSwapTour() {
@@ -3291,7 +3291,7 @@ export default function Page() {
       ) : null}
 
       {activeView === "alerts" && featureFlags.priceAlertsEnabled ? (
-        <section className="panel pagePanel autoSwapPanel" aria-labelledby="alerts-title">
+        <section className="panel pagePanel priceAlertPanel" aria-labelledby="alerts-title">
           <div className="pageHeader">
             <div>
               <h2 id="alerts-title">Set Alerts</h2>
@@ -3301,31 +3301,31 @@ export default function Page() {
                   : "Connect your wallet to create price alerts."}
               </div>
             </div>
-            <span className="badge">{autoSwapRulesLoading ? "Loading alerts" : "Alerts"}</span>
+            <span className="badge">{priceAlertRulesLoading ? "Loading alerts" : "Alerts"}</span>
           </div>
 
           <div className="settingsContent">
             <div className="quoteHeader">
               <div className="subtle">
                 {sellTokenInfo && buyTokenInfo
-                  ? `${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}${autoSwapCurrentAmount ? ` - ${autoSwapCurrentAmount}` : ""}`
+                  ? `${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}${priceAlertCurrentAmount ? ` - ${priceAlertCurrentAmount}` : ""}`
                   : "Select a pair in the swap form, then save an alert here."}
               </div>
-              <button className="btn" type="button" onClick={refreshAutoSwapRules} disabled={!walletAddress || autoSwapRulesLoading}>
-                {autoSwapRulesLoading ? "Loading..." : autoSwapRulesLoaded ? "Refresh" : "Load Alerts"}
+              <button className="btn" type="button" onClick={refreshPriceAlertRules} disabled={!walletAddress || priceAlertRulesLoading}>
+                {priceAlertRulesLoading ? "Loading..." : priceAlertRulesLoaded ? "Refresh" : "Load Alerts"}
               </button>
             </div>
 
-            <div className="autoSwapComposer">
-              <div className="autoSwapSummary">
+            <div className="priceAlertComposer">
+              <div className="priceAlertSummary">
                 <div className="label">Selected pair</div>
                 <strong>
                   {sellTokenInfo && buyTokenInfo ? `${sellTokenInfo.symbol} to ${buyTokenInfo.symbol}` : "No pair selected"}
                 </strong>
                 <span className="subtle">
-                  {autoSwapCurrentAmount || "Enter an amount on the swap page."}
+                  {priceAlertCurrentAmount || "Enter an amount on the swap page."}
                 </span>
-                <span className="autoSwapModePill">
+                <span className="priceAlertModePill">
                   Confirm in wallet
                 </span>
               </div>
@@ -3335,8 +3335,8 @@ export default function Page() {
                 <div className="targetRateRow">
                   <select
                     className="select"
-                    value={autoSwapDirectionDraft}
-                    onChange={(event) => setAutoSwapDirectionDraft(event.target.value as "above" | "below")}
+                    value={priceAlertDirectionDraft}
+                    onChange={(event) => setPriceAlertDirectionDraft(event.target.value as "above" | "below")}
                     disabled={!walletAddress}
                   >
                     <option value="above">At or above</option>
@@ -3344,8 +3344,8 @@ export default function Page() {
                   </select>
                   <input
                     className="input"
-                    value={autoSwapThresholdRateDraft}
-                    onChange={(event) => setAutoSwapThresholdRateDraft(event.target.value)}
+                    value={priceAlertThresholdRateDraft}
+                    onChange={(event) => setPriceAlertThresholdRateDraft(event.target.value)}
                     placeholder={currentFavoriteRate || "Target rate"}
                     inputMode="decimal"
                     disabled={!walletAddress}
@@ -3362,8 +3362,8 @@ export default function Page() {
                 <div className="label">Slippage tolerance</div>
                 <input
                   className="input"
-                  value={autoSwapSlippagePctDraft}
-                  onChange={(event) => setAutoSwapSlippagePctDraft(event.target.value)}
+                  value={priceAlertSlippagePctDraft}
+                  onChange={(event) => setPriceAlertSlippagePctDraft(event.target.value)}
                   placeholder="1"
                   inputMode="decimal"
                   disabled={!walletAddress}
@@ -3373,8 +3373,8 @@ export default function Page() {
 
               <div>
                 <div className="label">Execution</div>
-                <div className="autoSwapModePill">Wallet confirmation required</div>
-                <div className="small" style={{ marginTop: 6 }}>{autoSwapModeHelper}</div>
+                <div className="priceAlertModePill">Wallet confirmation required</div>
+                <div className="small" style={{ marginTop: 6 }}>{priceAlertModeHelper}</div>
               </div>
 
               <div className="settingsActions">
@@ -3382,21 +3382,21 @@ export default function Page() {
                   className="btn btnPrimary"
                   type="button"
                   onClick={() => {
-                    void saveCurrentAutoSwapRule();
+                    void saveCurrentPriceAlertRule();
                   }}
-                  disabled={!walletAddress || !sellTokenInfo || !buyTokenInfo || autoSwapRuleSaving}
+                  disabled={!walletAddress || !sellTokenInfo || !buyTokenInfo || priceAlertRuleSaving}
                 >
-                  {autoSwapRuleSaving ? "Saving..." : "Save Alert"}
+                  {priceAlertRuleSaving ? "Saving..." : "Save Alert"}
                 </button>
               </div>
             </div>
 
-            {autoSwapRuleNotice ? <div className="ok" style={{ marginTop: 10 }}>{autoSwapRuleNotice}</div> : null}
-            {autoSwapRuleError ? <div className="error" style={{ marginTop: 10 }}>{autoSwapRuleError}</div> : null}
+            {priceAlertRuleNotice ? <div className="ok" style={{ marginTop: 10 }}>{priceAlertRuleNotice}</div> : null}
+            {priceAlertRuleError ? <div className="error" style={{ marginTop: 10 }}>{priceAlertRuleError}</div> : null}
 
-            {!autoSwapRulesLoaded && autoSwapRules.length === 0 ? (
+            {!priceAlertRulesLoaded && priceAlertRules.length === 0 ? (
               <div className="small">Alerts have not been loaded yet.</div>
-            ) : autoSwapRules.length === 0 ? (
+            ) : priceAlertRules.length === 0 ? (
               <div className="small">No alerts yet.</div>
             ) : (
               <div className="historyTableWrap">
@@ -3413,27 +3413,27 @@ export default function Page() {
                     </tr>
                   </thead>
                   <tbody>
-                    {autoSwapRules.map((rule) => (
+                    {priceAlertRules.map((rule) => (
                       <tr key={rule.id}>
                         <td>
                           <div>{rule.sellTokenSymbol} to {rule.buyTokenSymbol}</div>
                           <div className="small">{getChainById(rule.chainId)?.name ?? `Chain ${rule.chainId}`}</div>
                         </td>
-                        <td>{formatAutoSwapAmount(rule)}</td>
-                        <td>{formatAutoSwapTarget(rule)}</td>
+                        <td>{formatPriceAlertAmount(rule)}</td>
+                        <td>{formatPriceAlertTarget(rule)}</td>
                         <td>{formatSlippageBps(rule.slippageBps)}</td>
-                        <td>{formatAutoSwapExecution()}</td>
-                        <td>{formatAutoSwapStatus(rule.status)}</td>
+                        <td>{formatPriceAlertExecution()}</td>
+                        <td>{formatPriceAlertStatus(rule.status)}</td>
                         <td>
                           <button
                             className="tableActionButton"
                             type="button"
                             onClick={() => {
-                              void removeAutoSwapRule(rule);
+                              void removePriceAlertRule(rule);
                             }}
-                            disabled={autoSwapRuleDeletingId === rule.id}
+                            disabled={priceAlertRuleDeletingId === rule.id}
                           >
-                            {autoSwapRuleDeletingId === rule.id ? "Removing..." : "Remove"}
+                            {priceAlertRuleDeletingId === rule.id ? "Removing..." : "Remove"}
                           </button>
                         </td>
                       </tr>
@@ -4367,7 +4367,7 @@ function formatFavoriteTarget(pair: FavoritePair): string {
   return `${direction} ${formatDecimal(String(pair.targetRate), 8)} ${pair.buyTokenSymbol} per ${pair.sellTokenSymbol}`;
 }
 
-function formatAutoSwapAmount(rule: AutoSwapRule): string {
+function formatPriceAlertAmount(rule: PriceAlertRule): string {
   return formatTokenAmount(rule.sellAmountRaw, {
     address: rule.sellTokenAddress,
     symbol: rule.sellTokenSymbol,
@@ -4375,16 +4375,16 @@ function formatAutoSwapAmount(rule: AutoSwapRule): string {
   });
 }
 
-function formatAutoSwapTarget(rule: AutoSwapRule): string {
+function formatPriceAlertTarget(rule: PriceAlertRule): string {
   const direction = rule.alertDirection === "below" ? "At or below" : "At or above";
   return `${direction} ${formatDecimal(String(rule.thresholdRate), 8)} ${rule.buyTokenSymbol} per ${rule.sellTokenSymbol}`;
 }
 
-function formatAutoSwapExecution(): string {
+function formatPriceAlertExecution(): string {
   return "Wallet confirmation";
 }
 
-function formatAutoSwapStatus(status: AutoSwapRule["status"]): string {
+function formatPriceAlertStatus(status: PriceAlertRule["status"]): string {
   switch (status) {
     case "active":
       return "Active";
