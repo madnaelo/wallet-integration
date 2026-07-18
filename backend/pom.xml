@@ -15,7 +15,7 @@
   <artifactId>swap-backend</artifactId>
   <version>0.1.0</version>
   <name>swap-backend</name>
-  <description>Wallet swap assistant backend</description>
+  <description>Swap Assistant backend</description>
 
   <properties>
     <java.version>17</java.version>
