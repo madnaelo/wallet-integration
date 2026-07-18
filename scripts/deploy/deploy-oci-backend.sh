@@ -204,11 +204,89 @@ detach_container_network() {
 }
 
 container_label() {
-  run_container inspect -f "{{index .Config.Labels \"$2\"}}" "$1" 2>/dev/null || true
+  local container_name="$1"
+  local label_name="$2"
+  run_container inspect -f "{{index .Config.Labels \"$label_name\"}}" "$container_name" 2>/dev/null || true
 }
 
 network_label() {
-  run_container network inspect -f "{{index .Labels \$2\}}" "$1" 2>/dev/null || true
+  local network_name="$1"
+  local label_name="$2"
+  run_container network inspect -f "{{index .Labels \"$label_name\"}}" "$network_name" 2>/dev/null || true
+}
+
+volume_label() {
+  local volume_name="$1"
+  local label_name="$2"
+  run_container volume inspect -f "{{index .Labels \"$label_name\"}}" "$volume_name" 2>/dev/null || true
+}
+
+container_uses_volume() {
+  local container_name="$1"
+  local volume_name="$2"
+  run_container inspect -f \
+    '{{range .Mounts}}{{if eq .Type "volume"}}{{println .Name}}{{end}}{{end}}' \
+    "$container_name" 2>/dev/null | grep -Fxq "$volume_name"
+}
+
+container_uses_network() {
+  local container_name="$1"
+  local network_name="$2"
+  # Dollar-prefixed names in this expression belong to the Go template.
+  # shellcheck disable=SC2016
+  run_container inspect -f \
+    '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' \
+    "$container_name" 2>/dev/null | grep -Fxq "$network_name"
+}
+
+assert_project_container() {
+  local container_name="$1"
+  local expected_role="$2"
+  if ! container_exists "$container_name"; then
+    return 0
+  fi
+  if [ "$(container_label "$container_name" com.swapassistant.app)" != "backend" ] \
+    || [ "$(container_label "$container_name" com.swapassistant.role)" != "$expected_role" ]; then
+    fail "Refusing to modify container not owned by Swap Assistant: $container_name"
+  fi
+}
+
+assert_project_network() {
+  local network_name="$1"
+  if ! network_exists "$network_name"; then
+    return 0
+  fi
+  if [ "$(network_label "$network_name" com.swapassistant.role)" = "database" ]; then
+    return 0
+  fi
+
+  for project_container in \
+    "$postgres_container" "$legacy_postgres_container" \
+    "$backend_container" "$candidate_container" "$rollback_container" "$failed_container"; do
+    if container_exists "$project_container" && container_uses_network "$project_container" "$network_name"; then
+      echo "Using legacy project network verified through owned container $project_container: $network_name" >&2
+      return 0
+    fi
+  done
+  fail "Refusing to reuse network not owned by Swap Assistant: $network_name"
+}
+
+assert_project_volume() {
+  local volume_name="$1"
+  if ! volume_exists "$volume_name"; then
+    return 0
+  fi
+  if [ "$(volume_label "$volume_name" com.swapassistant.role)" = "database" ]; then
+    return 0
+  fi
+
+  for database_container in "$postgres_container" "$legacy_postgres_container"; do
+    if container_exists "$database_container" && container_uses_volume "$database_container" "$volume_name"; then
+      echo "Using legacy project volume verified through owned container $database_container: $volume_name" >&2
+      return 0
+    fi
+  done
+  fail "Refusing to reuse volume not owned by Swap Assistant: $volume_name"
 }
 
 network_supports_container_dns() {
@@ -245,9 +323,16 @@ create_database_network() {
   if [ "$engine_kind" = "podman" ]; then
     # CNI-based Podman disables container DNS on --internal networks. The
     # database remains private because it publishes no host ports.
-    run_container network create --label com.swapassistant.role=database "$internal_network" >/dev/null
+    run_container network create \
+      --label com.swapassistant.app=backend \
+      --label com.swapassistant.role=database \
+      "$internal_network" >/dev/null
   else
-    run_container network create --internal --label com.swapassistant.role=database "$internal_network" >/dev/null
+    run_container network create \
+      --internal \
+      --label com.swapassistant.app=backend \
+      --label com.swapassistant.role=database \
+      "$internal_network" >/dev/null
   fi
 }
 
@@ -280,6 +365,15 @@ unset GHCR_TOKEN
 if [ -n "$registry_token_file" ]; then
   rm -f "$registry_token_file"
 fi
+
+for api_container in "$backend_container" "$candidate_container" "$rollback_container" "$failed_container"; do
+  assert_project_container "$api_container" api
+done
+for database_container in "$postgres_container" "$legacy_postgres_container"; do
+  assert_project_container "$database_container" database
+done
+assert_project_network "$internal_network"
+assert_project_volume "$postgres_volume"
 
 network_exists "$proxy_network" || fail "The configured Caddy proxy network does not exist: $proxy_network"
 container_exists "$caddy_container" || fail "The configured Caddy container does not exist: $caddy_container"
@@ -320,7 +414,10 @@ if [ "$engine_kind" = "podman" ] && [ "$network_is_internal" = "true" ]; then
 fi
 
 if ! volume_exists "$postgres_volume"; then
-  run_container volume create --label com.swapassistant.role=database "$postgres_volume" >/dev/null
+  run_container volume create \
+    --label com.swapassistant.app=backend \
+    --label com.swapassistant.role=database \
+    "$postgres_volume" >/dev/null
 fi
 
 umask 077
