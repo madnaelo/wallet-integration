@@ -318,3 +318,17 @@ Manual PostgreSQL backup on the OCI VM:
 cd /home/opc/wallet
 ./scripts/deploy/backup-oci-postgres.sh
 ```
+
+Validate that a selected backup can be restored without exposing a database
+port or touching the live database:
+
+```bash
+cd /home/opc/wallet
+./scripts/deploy/verify-postgres-restore.sh \
+  /home/opc/wallet/backups/postgres/wallet-postgres-YYYYMMDDTHHMMSSZ.dump
+```
+
+Run this drill after first configuring off-host backups and at least quarterly.
+It verifies the checksum when present, restores into a temporary isolated
+PostgreSQL container, checks the required schema, and removes its container and
+volume on exit.

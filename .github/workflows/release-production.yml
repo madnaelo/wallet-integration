@@ -378,6 +378,7 @@ jobs:
           scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             scripts/deploy/deploy-oci-backend.sh \
             scripts/deploy/backup-oci-postgres.sh \
+            scripts/deploy/verify-postgres-restore.sh \
             "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/scripts/deploy/"
           scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             infra/systemd/wallet-postgres-backup.service \
@@ -418,7 +419,7 @@ jobs:
           scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             "$backend_env_file" "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/backend.env.next"
           ssh "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "chmod 600 '$OCI_DEPLOY_PATH/backend.env.next' && mv '$OCI_DEPLOY_PATH/backend.env.next' '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh' '$OCI_DEPLOY_PATH/scripts/deploy/backup-oci-postgres.sh'"
+            "chmod 600 '$OCI_DEPLOY_PATH/backend.env.next' && mv '$OCI_DEPLOY_PATH/backend.env.next' '$OCI_DEPLOY_PATH/backend.env' && chmod +x '$OCI_DEPLOY_PATH/scripts/deploy/deploy-oci-backend.sh' '$OCI_DEPLOY_PATH/scripts/deploy/backup-oci-postgres.sh' '$OCI_DEPLOY_PATH/scripts/deploy/verify-postgres-restore.sh'"
         env:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
