@@ -7,8 +7,22 @@ type RecipientImportClient = {
       methods: string[];
       events: string[];
     }>;
-  }) => Promise<{ uri?: string; approval: () => Promise<any> }>;
+  }) => Promise<{ uri?: string; approval: () => Promise<RecipientImportSession> }>;
   disconnect: (params: { topic: string; reason: { code: number; message: string } }) => Promise<void>;
+};
+
+type RecipientImportSession = {
+  topic: string;
+  namespaces?: {
+    eip155?: {
+      accounts?: unknown;
+    };
+  };
+  peer?: {
+    metadata?: {
+      name?: unknown;
+    };
+  };
 };
 
 type RecipientWalletImportParams = {
@@ -40,15 +54,7 @@ export async function createRecipientWalletImport({
   if (!normalizedProjectId) throw new Error("Wallet import is unavailable right now.");
 
   const client = await getRecipientImportClient(normalizedProjectId, origin);
-  const { uri, approval } = await client.connect({
-    requiredNamespaces: {
-      eip155: {
-        chains: [`eip155:${chainId}`],
-        methods: ["eth_sendTransaction", "personal_sign"],
-        events: ["accountsChanged", "chainChanged"]
-      }
-    }
-  });
+  const { uri, approval } = await client.connect({ requiredNamespaces: recipientAddressNamespaces(chainId) });
 
   if (!uri) throw new Error("Could not start wallet import.");
 
@@ -118,7 +124,18 @@ async function createQrDataUrl(
   return qrCode.toDataURL(uri, options);
 }
 
-function getEvmAccountFromSession(session: any, chainId: number): string {
+export function recipientAddressNamespaces(chainId: number) {
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("Choose a valid network.");
+  return {
+    eip155: {
+      chains: [`eip155:${chainId}`],
+      methods: [],
+      events: []
+    }
+  };
+}
+
+function getEvmAccountFromSession(session: RecipientImportSession, chainId: number): string {
   const accounts = session?.namespaces?.eip155?.accounts;
   if (!Array.isArray(accounts)) return "";
 
@@ -129,7 +146,7 @@ function getEvmAccountFromSession(session: any, chainId: number): string {
   );
 }
 
-function getWalletNameFromSession(session: any): string | undefined {
+function getWalletNameFromSession(session: RecipientImportSession): string | undefined {
   const name = session?.peer?.metadata?.name;
   return typeof name === "string" && name.trim() ? name.trim() : undefined;
 }

@@ -85,7 +85,7 @@ export function getAllowedChainIds(): number[] {
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => Number(s))
-    .filter((n) => Number.isFinite(n));
+    .filter((n) => Number.isSafeInteger(n) && n > 0 && Boolean(CHAINS[n]));
 
   return ids.length ? ids : [11155111];
 }

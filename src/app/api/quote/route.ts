@@ -4,23 +4,26 @@ import { rateLimit } from "@/lib/server/rateLimit";
 import { quoteCache } from "@/lib/server/cache";
 import { getChainById, isChainAllowed } from "@/lib/chains";
 import { isAddress, isBitcoinMainnetAddress, isPositiveIntegerString } from "@/lib/validation";
-import { env } from "@/lib/server/env";
 import type { QuoteResponse } from "@/lib/types";
 import { createNativeBitcoinQuoteClient, createQuoteClient } from "@/lib/server/quoteProvider";
 import { getProviderErrorStatus } from "@/lib/server/quoteNormalization";
 import { isNativeBitcoinToken, type TokenInfo } from "@/lib/tokens";
 import { getTokensForChain } from "@/lib/server/tokenRegistry";
 import { parseQuoteSlippageBps } from "@/lib/server/quoteRequestValidation";
+import { applyCorsHeaders, evaluateRequestOrigin } from "@/lib/server/requestOrigin";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const ip = getClientIp(req) ?? "unknown";
-
-  const corsOrigin = req.headers.get("origin");
-  if (!isOriginAllowed(corsOrigin)) {
-    return withCors(NextResponse.json({ error: "This request cannot be completed from this site." }, { status: 403 }), corsOrigin);
+  const originDecision = evaluateRequestOrigin(req);
+  if (!originDecision.allowed) {
+    return withCors(
+      NextResponse.json({ error: "This request cannot be completed from this site." }, { status: 403 }),
+      originDecision.responseOrigin
+    );
   }
+  const corsOrigin = originDecision.responseOrigin;
 
   const rl = await rateLimit(ip);
   if (rl.unavailable) {
@@ -199,15 +202,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-function isOriginAllowed(origin: string | null): boolean {
-  const allow = env.CORS_ALLOW_ORIGINS;
-  if (!allow || allow.trim().length === 0) return true;
-  const parts = allow.split(",").map((s) => s.trim()).filter(Boolean);
-  if (parts.includes("*")) return true;
-  if (!origin) return !env.REQUIRE_ALLOWED_ORIGIN;
-  return parts.includes(origin);
-}
-
 async function resolveTokenInfo(chainId: number, address: string): Promise<TokenInfo | null> {
   const tokens = await getTokensForChain(chainId);
   const normalized = normalizeTokenKey(address);
@@ -219,16 +213,9 @@ function normalizeTokenKey(address: string): string {
 }
 
 function withCors(res: NextResponse, origin: string | null) {
-  const allow = env.CORS_ALLOW_ORIGINS;
-  const parts = allow.split(",").map((s) => s.trim()).filter(Boolean);
-  const allowOrigin = parts.includes("*") ? "*" : origin && parts.includes(origin) ? origin : "";
-
-  if (allowOrigin) {
-    res.headers.set("Access-Control-Allow-Origin", allowOrigin);
-    res.headers.set("Vary", "Origin");
-  }
+  applyCorsHeaders(res.headers, origin);
   res.headers.set("Access-Control-Allow-Methods", "GET,OPTIONS");
-  res.headers.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type");
   res.headers.set("Cache-Control", "private, no-store, max-age=0");
   res.headers.set("Pragma", "no-cache");
   return res;

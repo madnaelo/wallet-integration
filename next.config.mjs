@@ -3,6 +3,8 @@ const backendProxyTarget = normalizeBackendProxyTarget(process.env.BACKEND_PROXY
 
 if (process.env.VERCEL_ENV === "production") {
   const publicBackendBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "").trim();
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
+  const walletConnectProjectId = (process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "").trim();
   const redisRequired = readBoolean(process.env.RATE_LIMIT_REDIS_REQUIRED, true);
   const redisConfigured = Boolean(
     process.env.UPSTASH_REDIS_REST_URL?.trim() && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
@@ -18,6 +20,11 @@ if (process.env.VERCEL_ENV === "production") {
     process.env.AFFILIATE_ADDRESS ??
     ""
   ).trim();
+  const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS ?? "60000");
+  const rateLimitMax = Number(process.env.RATE_LIMIT_MAX ?? "30");
+  const quoteCacheTtlMs = Number(process.env.QUOTE_CACHE_TTL_MS ?? "8000");
+  const quoteCacheMaxEntries = Number(process.env.QUOTE_CACHE_MAX_ENTRIES ?? "2000");
+  const rateLimitPrefix = (process.env.RATE_LIMIT_REDIS_PREFIX ?? "").trim();
 
   if (!backendProxyTarget) {
     throw new Error("BACKEND_PROXY_TARGET is required for a production Vercel build.");
@@ -32,7 +39,7 @@ if (process.env.VERCEL_ENV === "production") {
     throw new Error("Production distributed rate limiting requires the Upstash Redis REST URL and token.");
   }
   if (redisConfigured) {
-    assertHttpsOrigin(process.env.UPSTASH_REDIS_REST_URL, "UPSTASH_REDIS_REST_URL");
+    assertTrustedUpstashUrl(process.env.UPSTASH_REDIS_REST_URL);
     if (isWeakConfiguredValue(process.env.UPSTASH_REDIS_REST_TOKEN, 20)) {
       throw new Error("UPSTASH_REDIS_REST_TOKEN must be a non-placeholder production secret.");
     }
@@ -48,6 +55,22 @@ if (process.env.VERCEL_ENV === "production") {
   }
   if (!corsOrigins.length || corsOrigins.some((origin) => !isExplicitHttpsOrigin(origin))) {
     throw new Error("CORS_ALLOW_ORIGINS must contain only explicit production HTTPS origins.");
+  }
+  if (
+    !isExplicitHttpsOrigin(siteUrl)
+    || !corsOrigins.some((origin) => new URL(origin).origin === new URL(siteUrl).origin)
+  ) {
+    throw new Error("CORS_ALLOW_ORIGINS must include NEXT_PUBLIC_SITE_URL in production.");
+  }
+  if (!/^[0-9a-f]{32}$/i.test(walletConnectProjectId)) {
+    throw new Error("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID must be a valid Reown project ID in production.");
+  }
+  assertIntegerRange(rateLimitWindowMs, 1_000, 3_600_000, "RATE_LIMIT_WINDOW_MS");
+  assertIntegerRange(rateLimitMax, 1, 10_000, "RATE_LIMIT_MAX");
+  assertIntegerRange(quoteCacheTtlMs, 250, 60_000, "QUOTE_CACHE_TTL_MS");
+  assertIntegerRange(quoteCacheMaxEntries, 100, 20_000, "QUOTE_CACHE_MAX_ENTRIES");
+  if (!/^[a-zA-Z0-9:_-]{1,64}$/.test(rateLimitPrefix)) {
+    throw new Error("RATE_LIMIT_REDIS_PREFIX must contain 1-64 safe key-prefix characters.");
   }
   assertTrustedProviderBaseUrl(
     process.env.PARASWAP_BASE_URL ?? "https://api.paraswap.io",
@@ -70,7 +93,7 @@ if (process.env.VERCEL_ENV === "production") {
   ) {
     throw new Error("PARASWAP_API_KEY_HEADER must be X-API-Key in production.");
   }
-  assertHttpsOrigin(process.env.NEXT_PUBLIC_SITE_URL, "NEXT_PUBLIC_SITE_URL");
+  assertHttpsOrigin(siteUrl, "NEXT_PUBLIC_SITE_URL");
   if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 300) {
     throw new Error("PLATFORM_FEE_BPS must be an integer between 0 and 300.");
   }
@@ -164,6 +187,32 @@ function readBoolean(value, fallback) {
 function assertHttpsOrigin(value, name) {
   if (!isExplicitHttpsOrigin((value ?? "").trim())) {
     throw new Error(`${name} must be an explicit HTTPS origin in production.`);
+  }
+}
+
+function assertTrustedUpstashUrl(value) {
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol !== "https:"
+      || url.username
+      || url.password
+      || url.search
+      || url.hash
+      || (url.port && url.port !== "443")
+      || url.pathname !== "/"
+      || !url.hostname.toLowerCase().endsWith(".upstash.io")
+    ) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error("UPSTASH_REDIS_REST_URL must use an Upstash HTTPS endpoint in production.");
+  }
+}
+
+function assertIntegerRange(value, minimum, maximum, name) {
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}.`);
   }
 }
 

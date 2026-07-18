@@ -1149,7 +1149,7 @@ export default function Page() {
     chooseRecipientDialogMode("wallet");
 
     if (getTokenAddressFamily(buyTokenInfo) !== "evm") {
-      setRecipientDialogError("Wallet import is available for 0x recipient addresses. Paste or scan this address instead.");
+      setRecipientDialogError("Wallet import is available for Ethereum-compatible wallets. Paste or scan this address instead.");
       return;
     }
 

@@ -3,10 +3,15 @@ import { isChainAllowed } from "@/lib/chains";
 import { getClientIp } from "@/lib/server/ip";
 import { rateLimit } from "@/lib/server/rateLimit";
 import { getTokensForChain } from "@/lib/server/tokenRegistry";
+import { evaluateRequestOrigin } from "@/lib/server/requestOrigin";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  if (!evaluateRequestOrigin(req).allowed) {
+    return NextResponse.json({ error: "This request cannot be completed from this site." }, { status: 403 });
+  }
+
   const rl = await rateLimit(`tokens:${getClientIp(req) ?? "unknown"}`);
   if (rl.unavailable) {
     return NextResponse.json(
