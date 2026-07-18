@@ -86,6 +86,7 @@ deployment_url="$("${vercel_cli[@]}" deploy \
   --force \
   --archive=tgz \
   "${deployment_flags[@]}" \
+  --build-env "NEXT_TELEMETRY_DISABLED=1" \
   --build-env "NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION" \
   --build-env "NEXT_PUBLIC_COMMIT_TIMESTAMP=$NEXT_PUBLIC_COMMIT_TIMESTAMP" \
   --token "$VERCEL_TOKEN" \

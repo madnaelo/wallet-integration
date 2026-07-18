@@ -534,9 +534,16 @@ jobs:
           EXPECTED_COMMIT: ${{ needs.prepare.outputs.release_sha }}
         run: |
           set -euo pipefail
-          health_url="${DEPLOYMENT_URL%/}/api/health"
+          vercel_cli=(npx --yes "vercel@56.3.1")
           for attempt in $(seq 1 18); do
-            if body="$(curl --fail --silent --show-error --max-time 20 "$health_url" 2>/dev/null)" \
+            if body="$(
+              "${vercel_cli[@]}" curl /api/health \
+                --deployment "$DEPLOYMENT_URL" \
+                --yes \
+                --token "$VERCEL_TOKEN" \
+                -- --fail --silent --show-error --max-time 20 \
+                2>/dev/null
+            )" \
               && DEPLOY_BODY="$body" node -e '
                 const payload = JSON.parse(process.env.DEPLOY_BODY);
                 if (payload.status !== "ok" || payload.build?.commit !== process.env.EXPECTED_COMMIT) process.exit(1);
