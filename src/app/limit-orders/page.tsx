@@ -97,6 +97,7 @@ const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
   capabilityChecking: string;
   capabilityReady: string;
   capabilityAlertsOnly: string;
+  capabilityUnavailable: string;
   capabilityDefault: string;
   readyBody: (provider: string) => string;
   warningTitle: string;
@@ -114,6 +115,7 @@ const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
     capabilityChecking: "Checking this pair...",
     capabilityReady: "This pair can be ordered",
     capabilityAlertsOnly: "Alert only for now",
+    capabilityUnavailable: "Order check unavailable",
     capabilityDefault: "Choose two tokens on the same network to see if this can be placed as an order.",
     readyBody: (provider) => `${provider} can watch this order and fill it only at the price you approve.`,
     warningTitle: "Before You Create An Order",
@@ -140,6 +142,7 @@ const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
     capabilityChecking: "Checking order support...",
     capabilityReady: "Signed execution available",
     capabilityAlertsOnly: "Signed execution unavailable",
+    capabilityUnavailable: "Support check unavailable",
     capabilityDefault: "Choose a same-network token pair to check signed limit-order support.",
     readyBody: (provider) => `${provider} can accept a wallet-signed order for this pair.`,
     warningTitle: "Limit Order Risks",
@@ -165,6 +168,7 @@ const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
     capabilityChecking: "Checking adapter capability...",
     capabilityReady: "Order adapter available",
     capabilityAlertsOnly: "No signed-order adapter",
+    capabilityUnavailable: "Adapter check unavailable",
     capabilityDefault: "Select a same-chain contract-token pair to resolve adapter support.",
     readyBody: (provider) => `${provider} is selected for this order.`,
     warningTitle: "Execution Constraints",
@@ -451,6 +455,7 @@ export default function LimitOrdersPage() {
       return;
     }
     let cancelled = false;
+    setCapability(null);
     setCapabilityLoading(true);
     setCapabilityError("");
     checkLimitOrderCapability(envPublic.BACKEND_BASE_URL, {
@@ -673,9 +678,11 @@ export default function LimitOrdersPage() {
     : "Choose a pair";
   const capabilityTitle = capabilityLoading
     ? languageCopy.capabilityChecking
-    : capability?.automaticExecutionSupported
-      ? languageCopy.capabilityReady
-      : languageCopy.capabilityAlertsOnly;
+    : capabilityError
+      ? languageCopy.capabilityUnavailable
+      : capability?.automaticExecutionSupported
+        ? languageCopy.capabilityReady
+        : languageCopy.capabilityAlertsOnly;
   const capabilityBody = capability?.automaticExecutionSupported
     ? languageCopy.readyBody(formatExecutionProvider(capability.executionProvider))
     : formatCapabilityReason(capabilityError || capability?.reason || languageCopy.capabilityDefault, languageMode);
@@ -1736,7 +1743,7 @@ function formatCapabilityReason(reason: string, languageMode: LimitOrderLanguage
 }
 
 function formatCapabilityCheckError(error: unknown): string {
-  if (error instanceof BackendClientError && error.message) return error.message;
+  if (error instanceof BackendClientError && error.status < 500 && error.message) return error.message;
   return "Could not check this pair right now. Try again in a moment.";
 }
 
