@@ -647,12 +647,19 @@ run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile
 enable_backups="$(read_env_value ENABLE_POSTGRES_BACKUP_TIMER || printf 'false')"
 if [ "$enable_backups" = "true" ]; then
   backup_script="$deploy_path/scripts/deploy/backup-oci-postgres.sh"
+  oci_cli_installer="$deploy_path/scripts/deploy/install-oci-cli.sh"
   backup_service_template="$deploy_path/infra/systemd/wallet-postgres-backup.service"
   backup_timer_template="$deploy_path/infra/systemd/wallet-postgres-backup.timer"
-  if [ ! -f "$backup_script" ] || [ ! -f "$backup_service_template" ] || [ ! -f "$backup_timer_template" ]; then
+  if [ ! -f "$backup_script" ] || [ ! -f "$oci_cli_installer" ] \
+    || [ ! -f "$backup_service_template" ] || [ ! -f "$backup_timer_template" ]; then
     fail "Backup timer requested, but backup assets were not uploaded."
   fi
   command -v systemctl >/dev/null 2>&1 || fail "Backup timer requested, but systemctl is unavailable."
+
+  if [ -n "$(read_env_value OCI_BACKUP_BUCKET || true)" ] && ! command -v oci >/dev/null 2>&1; then
+    chmod +x "$oci_cli_installer"
+    "$oci_cli_installer"
+  fi
 
   # systemd cannot execute user_home_t files when SELinux is enforcing. Install
   # the runner in a standard executable location and restore its platform label.

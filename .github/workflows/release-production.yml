@@ -387,6 +387,7 @@ jobs:
           scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             scripts/deploy/deploy-oci-backend.sh \
             scripts/deploy/backup-oci-postgres.sh \
+            scripts/deploy/install-oci-cli.sh \
             scripts/deploy/verify-postgres-restore.sh \
             "$OCI_SSH_USER@$OCI_SSH_HOST:$OCI_DEPLOY_PATH/scripts/deploy/"
           scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \

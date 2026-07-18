@@ -161,6 +161,10 @@ private `swap-assistant-postgres-backups` bucket is isolated in the
 `swap-assistant/postgres/` objects after 35 days through an OCI lifecycle rule.
 The VM policy is append-only: it can create backup objects but cannot read,
 overwrite, or delete existing backups.
+When offsite backups are enabled, deployment idempotently installs Oracle's
+signed OCI CLI package on supported Oracle Linux 8/9 hosts before verifying the
+first upload. Unsupported host operating systems fail closed with installation
+guidance instead of skipping offsite backups.
 
 For the current OCI VM, these values match the manual deployment:
 
