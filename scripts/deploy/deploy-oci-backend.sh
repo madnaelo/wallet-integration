@@ -451,7 +451,12 @@ run_postgres() {
 
 wait_for_postgres() {
   for attempt in $(seq 1 60); do
-    if run_container exec "$postgres_container" pg_isready -U "$postgres_user" -d "$postgres_db" >/dev/null 2>&1; then
+    if readiness="$(
+      run_container exec "$postgres_container" \
+        psql -U "$postgres_user" -d "$postgres_db" -Atq \
+        -v ON_ERROR_STOP=1 \
+        -c "SELECT 1;" 2>/dev/null
+    )" && [ "$readiness" = "1" ]; then
       return 0
     fi
     if [ "$attempt" = "60" ]; then
