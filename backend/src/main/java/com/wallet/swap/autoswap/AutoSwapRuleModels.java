@@ -1,5 +1,6 @@
 package com.wallet.swap.autoswap;
 
+import com.wallet.swap.common.SafeText;
 import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
@@ -17,17 +18,17 @@ public final class AutoSwapRuleModels {
 
   public record AutoSwapRuleRequest(
       @NotNull @Min(1) Long chainId,
-      @NotBlank @Size(max = 128) String sellTokenAddress,
-      @NotBlank @Size(max = 32) String sellTokenSymbol,
+      @NotBlank @Size(max = 128) @Pattern(regexp = SafeText.IDENTIFIER_PATTERN) String sellTokenAddress,
+      @NotBlank @Size(max = 32) @Pattern(regexp = SafeText.DISPLAY_LABEL_PATTERN) String sellTokenSymbol,
       @Min(0) @Max(30) Integer sellTokenDecimals,
-      @NotBlank @Size(max = 128) String buyTokenAddress,
-      @NotBlank @Size(max = 32) String buyTokenSymbol,
+      @NotBlank @Size(max = 128) @Pattern(regexp = SafeText.IDENTIFIER_PATTERN) String buyTokenAddress,
+      @NotBlank @Size(max = 32) @Pattern(regexp = SafeText.DISPLAY_LABEL_PATTERN) String buyTokenSymbol,
       @Min(0) @Max(30) Integer buyTokenDecimals,
       @NotBlank @Size(max = 78) @Pattern(regexp = "^[0-9]+$") String sellAmountRaw,
       @NotNull @Digits(integer = 20, fraction = 18) BigDecimal thresholdRate,
       @Size(max = 16) String alertDirection,
       @NotNull @Min(0) @Max(1000) Integer slippageBps,
-      @NotBlank @Size(max = 256) String recipientAddress,
+      @NotBlank @Size(max = 256) @Pattern(regexp = SafeText.IDENTIFIER_PATTERN) String recipientAddress,
       @Size(max = 32) String executionMode) {}
 
   public record AutoSwapRuleResponse(

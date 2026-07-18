@@ -1,11 +1,13 @@
 package com.wallet.swap.notification;
 
+import com.wallet.swap.common.SafeText;
 import com.wallet.swap.notification.ReverseProfitModels.TokenRef;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -16,11 +18,11 @@ public final class FavoritePairModels {
 
   public record FavoritePairRequest(
       @NotNull @Min(1) Long chainId,
-      @NotBlank @Size(max = 128) String sellTokenAddress,
-      @NotBlank @Size(max = 32) String sellTokenSymbol,
+      @NotBlank @Size(max = 128) @Pattern(regexp = SafeText.IDENTIFIER_PATTERN) String sellTokenAddress,
+      @NotBlank @Size(max = 32) @Pattern(regexp = SafeText.DISPLAY_LABEL_PATTERN) String sellTokenSymbol,
       @Min(0) @Max(30) Integer sellTokenDecimals,
-      @NotBlank @Size(max = 128) String buyTokenAddress,
-      @NotBlank @Size(max = 32) String buyTokenSymbol,
+      @NotBlank @Size(max = 128) @Pattern(regexp = SafeText.IDENTIFIER_PATTERN) String buyTokenAddress,
+      @NotBlank @Size(max = 32) @Pattern(regexp = SafeText.DISPLAY_LABEL_PATTERN) String buyTokenSymbol,
       @Min(0) @Max(30) Integer buyTokenDecimals,
       @Digits(integer = 20, fraction = 18) BigDecimal targetRate,
       @Size(max = 16) String alertDirection,
