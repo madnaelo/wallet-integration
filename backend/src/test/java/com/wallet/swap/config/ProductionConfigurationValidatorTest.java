@@ -203,6 +203,7 @@ class ProductionConfigurationValidatorTest {
     properties.setSigningUri("https://swapassistant.example");
     properties.setSessionCookieSecure(true);
     properties.setSessionCookieSameSite("Lax");
+    properties.setSessionCookiePath("/backend");
     properties.setExposeAccessToken(false);
     return properties;
   }

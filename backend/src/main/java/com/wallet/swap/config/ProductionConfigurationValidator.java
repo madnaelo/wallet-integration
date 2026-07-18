@@ -111,6 +111,9 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     }
     if (!authProperties.isSessionCookieSecure()) problems.add("AUTH_SESSION_COOKIE_SECURE must be true");
     if (authProperties.isExposeAccessToken()) problems.add("AUTH_EXPOSE_ACCESS_TOKEN must be false");
+    if (!"/backend".equals(text(authProperties.getSessionCookiePath()))) {
+      problems.add("AUTH_SESSION_COOKIE_PATH must be /backend");
+    }
     String sameSite = text(authProperties.getSessionCookieSameSite()).toLowerCase(Locale.ROOT);
     if (!(sameSite.equals("lax") || sameSite.equals("strict"))) {
       problems.add("AUTH_SESSION_COOKIE_SAME_SITE must be Lax or Strict");

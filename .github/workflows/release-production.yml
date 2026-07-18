@@ -388,6 +388,7 @@ jobs:
             printf '%s\n' "$OCI_BACKEND_ENV"
             printf '\nAPP_ENVIRONMENT=production\n'
             printf 'AUTH_SESSION_COOKIE_SAME_SITE=Lax\n'
+            printf 'AUTH_SESSION_COOKIE_PATH=/backend\n'
             printf 'AUTH_SESSION_COOKIE_SECURE=true\n'
             printf 'AUTH_EXPOSE_ACCESS_TOKEN=false\n'
             printf 'API_RATE_LIMIT_KEY_PEPPER=%s\n' "$rate_limit_key_pepper"

@@ -115,7 +115,7 @@ never placed in the remote command line.
 `OCI_BACKEND_ENV` is the full contents of `infra/oci-backend.env.example` with
 real production values. Keep `APP_ENVIRONMENT=production`,
 `ADMIN_API_KEY` as a long random secret, `AUTH_SESSION_COOKIE_SECURE=true`,
-`AUTH_SESSION_COOKIE_SAME_SITE=Lax`, and
+`AUTH_SESSION_COOKIE_SAME_SITE=Lax`, `AUTH_SESSION_COOKIE_PATH=/backend`, and
 `AUTH_EXPOSE_ACCESS_TOKEN=false`. The frontend proxies backend calls through
 `/backend`, so the browser uses a Secure, HttpOnly first-party cookie.
 The release workflow derives `API_RATE_LIMIT_KEY_PEPPER` with HMAC-SHA256

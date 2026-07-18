@@ -9,6 +9,7 @@ public class AuthProperties {
   private String signingDomain = "localhost:3000";
   private String signingUri = "http://localhost:3000";
   private String sessionCookieSameSite = "Lax";
+  private String sessionCookiePath = "/";
   private boolean sessionCookieSecure = false;
   private boolean exposeAccessToken = false;
 
@@ -50,6 +51,14 @@ public class AuthProperties {
 
   public void setSessionCookieSameSite(String sessionCookieSameSite) {
     this.sessionCookieSameSite = sessionCookieSameSite;
+  }
+
+  public String getSessionCookiePath() {
+    return sessionCookiePath;
+  }
+
+  public void setSessionCookiePath(String sessionCookiePath) {
+    this.sessionCookiePath = sessionCookiePath;
   }
 
   public boolean isSessionCookieSecure() {

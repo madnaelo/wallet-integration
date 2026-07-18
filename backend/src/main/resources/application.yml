@@ -78,6 +78,7 @@ wallet:
     signing-domain: ${AUTH_SIGNING_DOMAIN:localhost:3000}
     signing-uri: ${AUTH_SIGNING_URI:http://localhost:3000}
     session-cookie-same-site: ${AUTH_SESSION_COOKIE_SAME_SITE:Lax}
+    session-cookie-path: ${AUTH_SESSION_COOKIE_PATH:/}
     session-cookie-secure: ${AUTH_SESSION_COOKIE_SECURE:false}
     expose-access-token: ${AUTH_EXPOSE_ACCESS_TOKEN:false}
   features:

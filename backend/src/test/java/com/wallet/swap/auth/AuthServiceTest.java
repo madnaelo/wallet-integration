@@ -101,4 +101,12 @@ class AuthServiceTest {
         .isInstanceOf(com.wallet.swap.common.ApiException.class)
         .hasMessage("Please sign in with your wallet to continue.");
   }
+
+  @Test
+  void scopesSessionAndLogoutCookiesToConfiguredPath() {
+    properties.setSessionCookiePath("/backend");
+
+    assertThat(service.sessionCookie("token", Instant.now().plusSeconds(60)).getPath()).isEqualTo("/backend");
+    assertThat(service.expiredSessionCookie().getPath()).isEqualTo("/backend");
+  }
 }

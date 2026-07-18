@@ -109,7 +109,7 @@ public class AuthService {
         .httpOnly(true)
         .secure(authProperties.isSessionCookieSecure())
         .sameSite(sameSite())
-        .path("/")
+        .path(cookiePath())
         .maxAge(Duration.ofSeconds(maxAgeSeconds))
         .build();
   }
@@ -119,7 +119,7 @@ public class AuthService {
         .httpOnly(true)
         .secure(authProperties.isSessionCookieSecure())
         .sameSite(sameSite())
-        .path("/")
+        .path(cookiePath())
         .maxAge(Duration.ZERO)
         .build();
   }
@@ -215,5 +215,10 @@ public class AuthService {
       case "Strict", "Lax", "None" -> normalized;
       default -> "Lax";
     };
+  }
+
+  private String cookiePath() {
+    String path = nonBlank(authProperties.getSessionCookiePath(), "/");
+    return path.startsWith("/") ? path : "/";
   }
 }
