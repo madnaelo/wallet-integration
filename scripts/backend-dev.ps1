@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$jdk17 = "C:\Program Files\Java\jdk-17"
+. (Join-Path $PSScriptRoot "dev-toolchain.ps1")
 
 function Import-LocalEnvFile {
   param([string]$Path)
@@ -35,15 +35,9 @@ function Import-LocalEnvFile {
 
 Import-LocalEnvFile (Join-Path $repoRoot ".env.development")
 
-if (Test-Path $jdk17) {
-  $env:JAVA_HOME = $jdk17
-  $env:Path = "$env:JAVA_HOME\bin;$env:Path"
-}
-
-$mavenRepo = $env:MAVEN_REPO_LOCAL
-if (-not $mavenRepo) {
-  $mavenRepo = "E:\dev-cache\maven\repository"
-}
+Initialize-ProjectDependencyCaches -RepoRoot $repoRoot
+Initialize-ProjectJava17
+$mavenExe = Get-ProjectMavenExecutable
 
 if (-not $env:DATABASE_URL) {
   $env:DATABASE_URL = "jdbc:postgresql://localhost:56434/wallet"
@@ -60,7 +54,7 @@ if (-not $env:CORS_ALLOWED_ORIGINS) {
 
 Push-Location (Join-Path $repoRoot "backend")
 try {
-  mvn "-Dmaven.repo.local=$mavenRepo" spring-boot:run
+  & $mavenExe "-Dmaven.repo.local=$env:MAVEN_REPO_LOCAL" spring-boot:run
 } finally {
   Pop-Location
 }

@@ -16,6 +16,9 @@ $backendHealthUrl = "http://localhost:8080/api/health"
 $frontendUrl = "http://localhost:3000"
 $script:composeKind = $null
 
+. (Join-Path $PSScriptRoot "dev-toolchain.ps1")
+. (Join-Path $PSScriptRoot "dev-lifecycle.ps1")
+
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
 
@@ -188,39 +191,12 @@ function Wait-ForService {
 }
 
 function Initialize-ProjectCaches {
-  $hasEDrive = Test-Path "E:\"
-
-  if (-not $env:npm_config_cache) {
-    if ($hasEDrive) {
-      $env:npm_config_cache = "E:\dev-cache\npm"
-    } elseif ($env:LOCALAPPDATA) {
-      $env:npm_config_cache = Join-Path $env:LOCALAPPDATA "npm-cache"
-    } else {
-      $env:npm_config_cache = Join-Path $HOME ".cache\npm"
-    }
-  }
-
-  if (-not $env:MAVEN_REPO_LOCAL) {
-    if ($hasEDrive) {
-      $env:MAVEN_REPO_LOCAL = "E:\dev-cache\maven\repository"
-    } else {
-      $env:MAVEN_REPO_LOCAL = Join-Path $HOME ".m2\repository"
-    }
-  }
-
-  New-Item -ItemType Directory -Force -Path $env:npm_config_cache | Out-Null
-  New-Item -ItemType Directory -Force -Path $env:MAVEN_REPO_LOCAL | Out-Null
+  Initialize-ProjectDependencyCaches -RepoRoot $repoRoot
 }
 
 function Initialize-Java {
-  $jdk17 = "C:\Program Files\Java\jdk-17"
-  if ((Test-IsWindows) -and (Test-Path $jdk17)) {
-    $env:JAVA_HOME = $jdk17
-    $env:Path = "$env:JAVA_HOME\bin;$env:Path"
-  }
-
-  Get-RequiredCommand "java" | Out-Null
-  Get-RequiredCommand "mvn" | Out-Null
+  Initialize-ProjectJava17
+  Get-ProjectMavenExecutable | Out-Null
 }
 
 function Ensure-LocalEnvFile {
@@ -366,7 +342,7 @@ function Ensure-Database {
 }
 
 function Install-FrontendDependencies {
-  Get-RequiredCommand "node" | Out-Null
+  Assert-ProjectNodeVersion
   $npmExe = Get-NpmExecutable
 
   if ($SkipInstall) {
@@ -405,7 +381,8 @@ function Install-FrontendDependencies {
 
   Write-Step "Installing frontend dependencies"
   if (Test-TcpPort -HostName "localhost" -Port 3000) {
-    if (-not (Stop-ManagedProcess -Name "frontend" -Port 3000) -and (Test-TcpPort -HostName "localhost" -Port 3000)) {
+    Stop-ProjectManagedProcess -StateDir $stateDir -Name "frontend" -ScriptPath (Join-Path $PSScriptRoot "frontend-dev.ps1") | Out-Null
+    if (Test-TcpPort -HostName "localhost" -Port 3000) {
       throw "Frontend dependencies need to be installed, but port 3000 is in use. Stop the frontend and run this script again."
     }
   }
@@ -425,6 +402,7 @@ function Install-FrontendDependencies {
 
 function Install-BackendDependencies {
   Initialize-Java
+  $mavenExe = Get-ProjectMavenExecutable
 
   if ($SkipInstall) {
     Write-Host "Skipping backend dependency download."
@@ -446,19 +424,29 @@ function Install-BackendDependencies {
   $storedMavenRepoFingerprint = Get-StoredFingerprint $mavenRepoFingerprintPath
 
   if ($mavenFingerprint -and $mavenFingerprint -eq $storedMavenRepoFingerprint) {
-    if ($mavenFingerprint -ne $storedMavenStateFingerprint) {
-      Set-StoredFingerprint -Path $mavenStateFingerprintPath -Value $mavenFingerprint
+    Push-Location $repoRoot
+    try {
+      $dependenciesHealthy = Invoke-NativeSuccess {
+        & $mavenExe "-Dmaven.repo.local=$env:MAVEN_REPO_LOCAL" -o -q -f backend/pom.xml -DskipTests package
+      }
+    } finally {
+      Pop-Location
     }
-    Write-Host "Backend Maven dependencies are already prepared."
-    return
+    if ($dependenciesHealthy) {
+      if ($mavenFingerprint -ne $storedMavenStateFingerprint) {
+        Set-StoredFingerprint -Path $mavenStateFingerprintPath -Value $mavenFingerprint
+      }
+      Write-Host "Backend Maven dependencies are already prepared."
+      return
+    }
   }
 
   Write-Step "Preparing backend dependencies"
   Push-Location $repoRoot
   try {
     Invoke-Checked {
-      mvn "-Dmaven.repo.local=$env:MAVEN_REPO_LOCAL" -f backend/pom.xml -DskipTests dependency:go-offline
-    } "Maven dependency download"
+      & $mavenExe "-Dmaven.repo.local=$env:MAVEN_REPO_LOCAL" -f backend/pom.xml -DskipTests package
+    } "Maven dependency preparation"
     Set-StoredFingerprint -Path $mavenStateFingerprintPath -Value $mavenFingerprint
     Set-StoredFingerprint -Path $mavenRepoFingerprintPath -Value $mavenFingerprint
   } finally {
@@ -475,14 +463,7 @@ function Get-PowerShellExecutable {
 }
 
 function Get-NpmExecutable {
-  if (Test-IsWindows) {
-    $npmCmd = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
-    if ($npmCmd) {
-      return $npmCmd.Source
-    }
-  }
-
-  return (Get-RequiredCommand "npm").Source
+  return Get-ProjectNpmExecutable
 }
 
 function Start-ManagedScript {
@@ -490,12 +471,24 @@ function Start-ManagedScript {
     [string]$Name,
     [string]$ScriptPath,
     [scriptblock]$Ready,
-    [int]$TimeoutSeconds
+    [int]$TimeoutSeconds,
+    [int]$Port
   )
 
+  $managedProcessId = Get-ProjectManagedProcessId -StateDir $stateDir -Name $Name -ScriptPath $ScriptPath
   if (& $Ready) {
+    if ($managedProcessId -le 0) {
+      throw "$Name is responding on port $Port, but it was not started by this project. Stop that service or configure a different port."
+    }
     Write-Host "$Name is already running."
     return
+  }
+
+  if ($managedProcessId -gt 0) {
+    Stop-ProjectManagedProcess -StateDir $stateDir -Name $Name -ScriptPath $ScriptPath | Out-Null
+  }
+  if (Test-TcpPort -HostName "localhost" -Port $Port) {
+    throw "Port $Port is already in use by a process that this project does not own."
   }
 
   $powershellExe = Get-PowerShellExecutable
@@ -529,81 +522,6 @@ function Start-ManagedScript {
     -LogHint "$stdoutLog and $stderrLog"
 }
 
-function Stop-ProcessTree {
-  param([int]$ProcessId)
-
-  $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-  if (-not $process) {
-    return $false
-  }
-
-  if (Get-Command Get-CimInstance -ErrorAction SilentlyContinue) {
-    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId = $ProcessId" -ErrorAction SilentlyContinue
-    foreach ($child in $children) {
-      Stop-ProcessTree -ProcessId ([int]$child.ProcessId) | Out-Null
-    }
-  }
-
-  Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
-  try {
-    Wait-Process -Id $ProcessId -Timeout 15 -ErrorAction SilentlyContinue
-  } catch {
-    # The process may have already exited.
-  }
-  return $true
-}
-
-function Get-ProcessIdsUsingPort {
-  param([int]$Port)
-
-  if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
-    return @(
-      Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty OwningProcess -Unique |
-        Where-Object { $_ -and $_ -ne 0 }
-    )
-  }
-
-  if (Get-Command lsof -ErrorAction SilentlyContinue) {
-    return @(
-      & lsof -ti "tcp:$Port" -sTCP:LISTEN 2> $null |
-        ForEach-Object { if ($_ -match "^\d+$") { [int]$_ } }
-    )
-  }
-
-  return @()
-}
-
-function Stop-ManagedProcess {
-  param(
-    [string]$Name,
-    [int]$Port = 0
-  )
-
-  $pidFile = Join-Path $stateDir "$Name.pid"
-  $stopped = $false
-  if (-not (Test-Path -LiteralPath $pidFile -PathType Leaf)) {
-    $processId = ""
-  } else {
-    $processId = (Get-Content -LiteralPath $pidFile -Raw).Trim()
-  }
-
-  if ($processId) {
-    Write-Host "Stopping existing $Name before dependency install..."
-    $stopped = (Stop-ProcessTree -ProcessId ([int]$processId)) -or $stopped
-  }
-
-  if ($Port -gt 0) {
-    foreach ($portProcessId in (Get-ProcessIdsUsingPort -Port $Port)) {
-      Write-Host "Stopping process $portProcessId using port $Port..."
-      $stopped = (Stop-ProcessTree -ProcessId ([int]$portProcessId)) -or $stopped
-    }
-  }
-
-  Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
-  return $stopped
-}
-
 Write-Step "Preparing local environment"
 Initialize-ProjectCaches
 Ensure-LocalEnvFile
@@ -619,14 +537,16 @@ Start-ManagedScript `
   -Name "backend" `
   -ScriptPath (Join-Path $PSScriptRoot "backend-dev.ps1") `
   -Ready { Test-BackendReady } `
-  -TimeoutSeconds $BackendTimeoutSeconds
+  -TimeoutSeconds $BackendTimeoutSeconds `
+  -Port 8080
 
 Write-Step "Starting frontend"
 Start-ManagedScript `
   -Name "frontend" `
   -ScriptPath (Join-Path $PSScriptRoot "frontend-dev.ps1") `
   -Ready { Test-HttpReady $frontendUrl } `
-  -TimeoutSeconds $FrontendTimeoutSeconds
+  -TimeoutSeconds $FrontendTimeoutSeconds `
+  -Port 3000
 
 Write-Host ""
 Write-Host "Development stack is ready." -ForegroundColor Green

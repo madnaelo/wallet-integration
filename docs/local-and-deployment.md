@@ -4,7 +4,7 @@
 
 Already detected on this machine:
 
-- Node.js 20
+- Node.js 22
 - npm 10
 - Maven 3.9
 - JDK 17 installed at `C:\Program Files\Java\jdk-17`
@@ -14,7 +14,8 @@ Current local notes:
 
 - Maven defaults to Java 8 in the global environment. The scripts set `JAVA_HOME` to JDK 17 for backend commands.
 - `psql` is not on PATH. This is fine for the default workflow because Postgres runs through Docker.
-- Docker Desktop must be running before Compose commands work.
+- Docker Desktop is installed; the combined startup script starts it when the
+  Windows Docker daemon is not already available.
 
 ## Local Native Workflow
 
@@ -28,7 +29,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\start-dev.ps1'
 This script:
 
 - installs frontend dependencies with `npm ci` when needed,
-- downloads backend Maven dependencies when needed,
+- builds the backend without running tests when Maven dependencies need to be
+  prepared,
 - starts Docker Desktop on Windows if Docker is installed but the daemon is not
   running,
 - starts local Postgres through Docker Compose,
@@ -45,7 +47,13 @@ script fingerprints dependency inputs and stores markers in `.dev`:
 
 If those inputs change, the script prepares dependencies again. If the inputs
 did not change, it also checks the existing Node install with `npm ls` before
-skipping npm work.
+skipping npm work and performs an offline Maven package build before skipping
+backend dependency downloads.
+
+On this machine, dependency caches remain on `E:\dev-cache`. On other
+machines, the scripts use the repository drive, `DEV_CACHE_ROOT`, or the
+operating system's normal user cache directory. Java 17 and supported Node.js
+versions are checked before any service starts.
 
 The script installs project dependencies only. It still expects the global
 tools to exist on the machine:
@@ -99,6 +107,10 @@ Stop local services started by the scripts:
 Set-Location 'E:\assignments\wallet'
 powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\stop-dev.ps1'
 ```
+
+The stop script validates project-owned PID files before terminating processes.
+It does not stop unrelated applications merely because they use the same port.
+Local Compose resources use the `swap-assistant-dev` project namespace.
 
 Default local URLs:
 

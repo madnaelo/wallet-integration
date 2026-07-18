@@ -1,14 +1,18 @@
 $ErrorActionPreference = "Stop"
 
-Push-Location (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+. (Join-Path $PSScriptRoot "dev-toolchain.ps1")
+
+Initialize-ProjectDependencyCaches -RepoRoot $repoRoot
+Assert-ProjectNodeVersion
+$npmExe = Get-ProjectNpmExecutable
+
+Push-Location $repoRoot
 try {
-  if (-not $env:npm_config_cache) {
-    $env:npm_config_cache = "E:\dev-cache\npm"
-  }
   if (-not $env:NEXT_PUBLIC_BACKEND_BASE_URL) {
     $env:NEXT_PUBLIC_BACKEND_BASE_URL = "http://localhost:8080"
   }
-  npm run dev
+  & $npmExe run dev
 } finally {
   Pop-Location
 }

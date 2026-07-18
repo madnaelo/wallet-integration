@@ -1,3 +1,5 @@
+name: swap-assistant-dev
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -121,3 +123,4 @@ services:
 
 volumes:
   wallet_postgres_data:
+    name: swap_assistant_dev_postgres_data

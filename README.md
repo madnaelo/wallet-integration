@@ -132,7 +132,9 @@ This starts the local database, Spring Boot backend, and Next.js frontend. It
 also installs project dependencies when needed. Dependency checks fingerprint
 `package.json`, `package-lock.json`, `.npmrc`, backend `pom.xml` files, and
 `.mvn` config so newly added project dependencies are picked up without running
-a full install every time.
+a full install every time. The scripts require Node.js 22-24, select Java 17,
+keep this machine's dependency caches on `E:\`, and stop only verified
+project-owned processes.
 
 For manual debugging, the individual component scripts are still available:
 

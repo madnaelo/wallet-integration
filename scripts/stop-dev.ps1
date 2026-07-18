@@ -1,21 +1,24 @@
 $ErrorActionPreference = "Stop"
 
-$ports = @(3000, 8080)
-foreach ($port in $ports) {
-  Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
-    Select-Object -ExpandProperty OwningProcess -Unique |
-    ForEach-Object {
-      if ($_ -and $_ -ne 0) {
-        Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
-      }
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$stateDir = Join-Path $repoRoot ".dev"
+. (Join-Path $PSScriptRoot "dev-lifecycle.ps1")
+
+Stop-ProjectManagedProcess -StateDir $stateDir -Name "frontend" -ScriptPath (Join-Path $PSScriptRoot "frontend-dev.ps1") | Out-Null
+Stop-ProjectManagedProcess -StateDir $stateDir -Name "backend" -ScriptPath (Join-Path $PSScriptRoot "backend-dev.ps1") | Out-Null
+
+if (Get-Command docker -ErrorAction SilentlyContinue) {
+  Push-Location $repoRoot
+  try {
+    docker compose stop postgres
+    if ($LASTEXITCODE -ne 0) {
+      throw "Could not stop this project's Docker Postgres service."
     }
+  } finally {
+    Pop-Location
+  }
+} else {
+  Write-Warning "Docker is unavailable; no Docker-managed database was stopped."
 }
 
-Push-Location (Join-Path $PSScriptRoot "..")
-try {
-  docker compose stop postgres
-} finally {
-  Pop-Location
-}
-
-Write-Host "Stopped frontend/backend processes on ports 3000/8080 and Docker Postgres."
+Write-Host "Stopped this project's managed frontend, backend, and Docker Postgres services."
