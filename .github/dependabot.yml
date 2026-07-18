@@ -8,9 +8,12 @@ updates:
       default-days: 7
     open-pull-requests-limit: 5
     groups:
-      frontend:
+      frontend-minor-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: maven
     directory: /backend
@@ -20,9 +23,12 @@ updates:
       default-days: 7
     open-pull-requests-limit: 5
     groups:
-      backend:
+      backend-minor-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
