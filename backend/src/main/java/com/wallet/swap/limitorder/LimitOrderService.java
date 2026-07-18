@@ -57,6 +57,7 @@ public class LimitOrderService {
   private final LimitOrderCapabilityService capabilityService;
   private final FeatureFlagService featureFlagService;
   private final LimitOrderRepository repository;
+  private final LimitOrderPersistenceService persistenceService;
   private final LimitOrderSubmissionCoordinator submissionCoordinator;
   private final LimitOrderSignatureVerifier signatureVerifier;
   private final ObjectMapper objectMapper;
@@ -65,12 +66,14 @@ public class LimitOrderService {
       LimitOrderCapabilityService capabilityService,
       FeatureFlagService featureFlagService,
       LimitOrderRepository repository,
+      LimitOrderPersistenceService persistenceService,
       LimitOrderSubmissionCoordinator submissionCoordinator,
       LimitOrderSignatureVerifier signatureVerifier,
       ObjectMapper objectMapper) {
     this.capabilityService = capabilityService;
     this.featureFlagService = featureFlagService;
     this.repository = repository;
+    this.persistenceService = persistenceService;
     this.submissionCoordinator = submissionCoordinator;
     this.signatureVerifier = signatureVerifier;
     this.objectMapper = objectMapper;
@@ -99,42 +102,12 @@ public class LimitOrderService {
 
     JsonNode signedPayload = validateSignedPayload(walletAddress, request);
     String payloadHash = LimitOrderPayloadIntegrity.sha256(signedPayload, objectMapper);
-    LimitOrderResponse saved = repository.findByOrderHash(request.orderHash())
-        .map(existing -> requireIdempotentMatch(existing, walletAddress, request, payloadHash))
-        .orElseGet(() -> repository
-            .insertIfAbsent(
-                walletAddress,
-                request,
-                capability.executionSupport(),
-                LimitOrderTerms.CURRENT_VERSION,
-                payloadHash)
-            .orElseGet(() -> existingIdempotentOrder(walletAddress, request, payloadHash)));
-    if (saved.executionStatus().equals("stored") || saved.executionStatus().equals("failed")) {
-      repository.scheduleManualRetry(saved.id());
-    }
+    LimitOrderResponse saved = persistenceService.save(
+        walletAddress,
+        request,
+        capability.executionSupport(),
+        payloadHash);
     return submissionCoordinator.submitNow(saved.id()).orElse(saved);
-  }
-
-  private LimitOrderResponse existingIdempotentOrder(
-      String walletAddress,
-      LimitOrderRequest request,
-      String payloadHash) {
-    LimitOrderResponse existing = repository.findByOrderHash(request.orderHash())
-        .orElseThrow(() -> new IllegalStateException("Limit order conflict could not be resolved."));
-    return requireIdempotentMatch(existing, walletAddress, request, payloadHash);
-  }
-
-  private LimitOrderResponse requireIdempotentMatch(
-      LimitOrderResponse existing,
-      String walletAddress,
-      LimitOrderRequest request,
-      String payloadHash) {
-    if (!existing.walletAddress().equalsIgnoreCase(walletAddress)
-        || !existing.signedPayloadHash().equalsIgnoreCase(payloadHash)
-        || !existing.executionProvider().equals(request.executionProvider().trim())) {
-      throw new ApiException(HttpStatus.CONFLICT, "This signed limit order conflicts with an existing order.");
-    }
-    return existing;
   }
 
   private void validate(LimitOrderRequest request) {

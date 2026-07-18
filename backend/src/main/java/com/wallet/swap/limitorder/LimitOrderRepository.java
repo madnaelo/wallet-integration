@@ -93,6 +93,19 @@ public class LimitOrderRepository {
     return queryOne("SELECT * FROM limit_orders WHERE id = ?", id);
   }
 
+  public int countActiveForWallet(String walletAddress) {
+    Integer count = jdbcTemplate.queryForObject(
+        """
+        SELECT count(*)::int
+        FROM limit_orders
+        WHERE wallet_address = ?
+          AND execution_status IN ('stored', 'pending_submission', 'submitted', 'open', 'partially_filled', 'failed')
+        """,
+        Integer.class,
+        walletAddress);
+    return count == null ? 0 : count;
+  }
+
   public Optional<LimitOrderResponse> findByIdForWallet(UUID id, String walletAddress) {
     List<LimitOrderResponse> rows = jdbcTemplate.query(
         "SELECT * FROM limit_orders WHERE id = ? AND wallet_address = ?",

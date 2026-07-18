@@ -1,6 +1,7 @@
 package com.wallet.swap.limitorder;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.config.LimitOrderProperties;
 import com.wallet.swap.feature.FeatureFlagService;
 import com.wallet.swap.limitorder.LimitOrderModels.LimitOrderRequest;
@@ -20,6 +22,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Transactional;
 
 class LimitOrderServiceTest {
   private static final long ONEINCH_FALLBACK_CHAIN = 10L;
@@ -32,12 +35,16 @@ class LimitOrderServiceTest {
       new LimitOrderCapabilityService(enabledOneInchProperties());
   private final FeatureFlagService featureFlagService = mock(FeatureFlagService.class);
   private final LimitOrderRepository repository = mock(LimitOrderRepository.class);
+  private final WalletMutationLock walletMutationLock = mock(WalletMutationLock.class);
+  private final LimitOrderPersistenceService persistenceService =
+      new LimitOrderPersistenceService(repository, walletMutationLock);
   private final LimitOrderSubmissionCoordinator submissionCoordinator = mock(LimitOrderSubmissionCoordinator.class);
   private final LimitOrderSignatureVerifier signatureVerifier = mock(LimitOrderSignatureVerifier.class);
   private final LimitOrderService service = new LimitOrderService(
       capabilityService,
       featureFlagService,
       repository,
+      persistenceService,
       submissionCoordinator,
       signatureVerifier,
       objectMapper);
@@ -133,6 +140,26 @@ class LimitOrderServiceTest {
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("terms have changed");
+  }
+
+  @Test
+  void rejectsNewOrdersAtTheActivePerWalletLimit() {
+    LimitOrderRequest request = validRequest(WALLET);
+    when(repository.countActiveForWallet(WALLET)).thenReturn(100);
+
+    assertThatThrownBy(() -> service.save(WALLET, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("active limit-order limit");
+
+    verify(walletMutationLock).lock(WALLET);
+  }
+
+  @Test
+  void persistsOrdersInsideAShortTransaction() throws Exception {
+    assertThat(LimitOrderPersistenceService.class
+        .getMethod("save", String.class, LimitOrderRequest.class, String.class, String.class)
+        .isAnnotationPresent(Transactional.class))
+        .isTrue();
   }
 
   private LimitOrderRequest withTermsVersion(LimitOrderRequest request, String termsVersion) {
