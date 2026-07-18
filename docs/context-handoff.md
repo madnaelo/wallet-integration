@@ -2,6 +2,17 @@
 
 Use this file first when restarting in a fresh context.
 
+## Project And Account Boundary
+
+- This repository is a personal project. Work only from
+  `E:\assignments\wallet`; `F:` is reserved for office work.
+- Use the personal GitHub account `madnaelo` (`madnaelo@yahoo.com`) for this
+  repository. Do not use the `aqeel-datacell` account.
+- Existing signed-in browser and connected-email sessions may be used for
+  project authentication when the user has authorized the account action.
+- Never write passwords, one-time authorization codes, API tokens, wallet
+  private keys, or seed phrases into the repository or handoff documents.
+
 ## Read Order
 
 1. `README.md`
