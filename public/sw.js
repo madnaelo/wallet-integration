@@ -1,4 +1,4 @@
-const CACHE_NAME = "swap-assistant-pwa-v1";
+const CACHE_NAME = "swap-assistant-pwa-v2";
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = [OFFLINE_URL, "/favicon.svg", "/apple-touch-icon.svg"];
 
@@ -30,7 +30,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (["image", "style", "script", "font"].includes(request.destination)) {
+  if (["style", "script"].includes(request.destination)) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  if (["image", "font"].includes(request.destination)) {
     event.respondWith(cacheFirst(request));
   }
 });
@@ -81,6 +86,21 @@ async function cacheFirst(request) {
     cache.put(request, response.clone());
   }
   return response;
+}
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw new Error("Network request failed and no cached response is available.");
+  }
 }
 
 function readPushPayload(event) {

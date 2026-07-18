@@ -8,15 +8,20 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 const INSTALL_DISMISSED_KEY = "wallet.pwaInstall.dismissed.v1";
+const DEVELOPMENT_RELOAD_KEY = "swap-assistant.pwa.dev-cleanup.v1";
+const PWA_CACHE_PREFIX = "swap-assistant-pwa-";
 
 export function PwaClient() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState<boolean>(true);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
     if (!isServiceWorkerSupported()) return;
-    void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
+    if (process.env.NODE_ENV === "production") {
+      void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
+      return;
+    }
+    void removeDevelopmentServiceWorker().catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -80,4 +85,29 @@ function isServiceWorkerSupported() {
 function isStandaloneDisplay() {
   return window.matchMedia("(display-mode: standalone)").matches
     || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+
+async function removeDevelopmentServiceWorker() {
+  const expectedScope = new URL("/", window.location.origin).href;
+  const registrations = await navigator.serviceWorker.getRegistrations().catch(() => []);
+  const projectRegistrations = registrations.filter((registration) => registration.scope === expectedScope);
+  const hadProjectWorker = projectRegistrations.length > 0 || Boolean(navigator.serviceWorker.controller);
+
+  await Promise.all(projectRegistrations.map((registration) => registration.unregister().catch(() => false)));
+
+  if ("caches" in window) {
+    const cacheNames = await window.caches.keys().catch(() => []);
+    await Promise.all(
+      cacheNames
+        .filter((cacheName) => cacheName.startsWith(PWA_CACHE_PREFIX))
+        .map((cacheName) => window.caches.delete(cacheName))
+    );
+  }
+
+  if (hadProjectWorker && sessionStorage.getItem(DEVELOPMENT_RELOAD_KEY) !== "true") {
+    sessionStorage.setItem(DEVELOPMENT_RELOAD_KEY, "true");
+    window.location.reload();
+    return;
+  }
+  if (!hadProjectWorker) sessionStorage.removeItem(DEVELOPMENT_RELOAD_KEY);
 }
