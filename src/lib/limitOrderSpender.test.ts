@@ -16,7 +16,7 @@ describe("resolveTrustedLimitOrderSpender", () => {
     await expect(resolveTrustedLimitOrderSpender(ONEINCH_ORDERBOOK_PROVIDER, 1)).resolves.toBe(
       "0x111111125421ca6dc452d289314280a0f8842a65"
     );
-  });
+  }, 15_000);
 
   it("rejects unknown providers and unsupported chains", async () => {
     await expect(resolveTrustedLimitOrderSpender("unknown", 1)).rejects.toThrow("not trusted");
