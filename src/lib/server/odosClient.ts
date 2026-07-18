@@ -63,7 +63,7 @@ export class OdosClient implements DexAggregatorClient {
       platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
-    assertExecutableQuote(fields);
+    assertExecutableQuote(params, fields);
     if (!fields.buyAmount) throw new Error("Odos did not return an output amount.");
 
     return normalizeQuote(params, this, fields);

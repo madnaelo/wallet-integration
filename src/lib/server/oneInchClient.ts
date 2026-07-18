@@ -79,7 +79,7 @@ export class OneInchClient implements DexAggregatorClient {
       platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
-    assertExecutableQuote(fields);
+    assertExecutableQuote(params, fields);
     if (!fields.buyAmount) throw new Error("1inch did not return an output amount.");
 
     return normalizeQuote(params, this, fields);

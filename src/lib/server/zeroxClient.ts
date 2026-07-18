@@ -86,7 +86,7 @@ export class ZeroXClient implements DexAggregatorClient {
       platformFeeBps: this.cfg.platformFee.enabled ? this.cfg.platformFee.feeBps : undefined
     };
 
-    assertExecutableQuote(fields);
+    assertExecutableQuote(params, fields);
 
     return normalizeQuote(params, this, fields);
   }

@@ -1,12 +1,29 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertExecutableQuote,
   getProviderErrorStatus,
   normalizeQuote,
   normalizeProviderError,
   providerError,
   readProviderResponse
 } from "@/lib/server/quoteNormalization";
+import type { QuoteParams } from "@/lib/server/aggregator";
+
+const ROUTER = "0x1111111111111111111111111111111111111111";
+const ALLOWANCE_TARGET = "0x2222222222222222222222222222222222222222";
+const TOKEN = "0x3333333333333333333333333333333333333333";
+const baseParams: QuoteParams = {
+  chainId: 1,
+  sellToken: TOKEN,
+  sellTokenSymbol: "SELL",
+  sellTokenDecimals: 18,
+  buyToken: "0x4444444444444444444444444444444444444444",
+  buyTokenSymbol: "BUY",
+  buyTokenDecimals: 6,
+  sellAmount: "100",
+  takerAddress: "0x5555555555555555555555555555555555555555"
+};
 
 describe("quote provider errors", () => {
   it("does not expose upstream messages or credentials", () => {
@@ -133,5 +150,54 @@ describe("provider response limits", () => {
   it("rejects an oversized streamed response without a content length", async () => {
     const response = new Response("x".repeat(2 * 1024 * 1024 + 1));
     await expect(readProviderResponse(response, "Provider")).rejects.toMatchObject({ status: 502 });
+  });
+});
+
+describe("executable quote validation", () => {
+  it("accepts a bounded token transaction", () => {
+    expect(() => assertExecutableQuote(baseParams, {
+      buyAmount: "200",
+      minBuyAmount: "190",
+      to: ROUTER,
+      data: "0x1234",
+      value: "0",
+      gas: "100000",
+      allowanceTarget: ALLOWANCE_TARGET
+    })).not.toThrow();
+  });
+
+  it("requires the exact native sell amount as transaction value", () => {
+    const nativeParams = { ...baseParams, sellToken: "ETH" };
+    expect(() => assertExecutableQuote(nativeParams, {
+      buyAmount: "200",
+      to: ROUTER,
+      data: "0x1234",
+      value: "100"
+    })).not.toThrow();
+    expect(() => assertExecutableQuote(nativeParams, {
+      buyAmount: "200",
+      to: ROUTER,
+      data: "0x1234",
+      value: "101"
+    })).toThrow(/unexpected transaction value/i);
+  });
+
+  it.each([
+    { fields: { buyAmount: "0", to: ROUTER, data: "0x1234", value: "0" }, message: /output amount/i },
+    { fields: { buyAmount: "200", minBuyAmount: "201", to: ROUTER, data: "0x1234", value: "0" }, message: /minimum output/i },
+    { fields: { buyAmount: "200", to: "0x0000000000000000000000000000000000000000", data: "0x1234", value: "0" }, message: /swap contract/i },
+    { fields: { buyAmount: "200", to: ROUTER, data: "0x123", value: "0" }, message: /transaction data/i },
+    { fields: { buyAmount: "200", to: ROUTER, data: "0x1234", value: "1" }, message: /transaction value/i },
+    { fields: { buyAmount: "200", to: ROUTER, data: "0x1234", value: "0", allowanceTarget: "0x0000000000000000000000000000000000000000" }, message: /approval contract/i }
+  ])("rejects unsafe provider fields", ({ fields, message }) => {
+    expect(() => assertExecutableQuote(baseParams, fields)).toThrow(message);
+  });
+
+  it("validates quote amounts without requiring EVM transaction fields for quote-only routes", () => {
+    expect(() => assertExecutableQuote(
+      { ...baseParams, sellToken: "bitcoin" },
+      { buyAmount: "200" },
+      { quoteOnly: true }
+    )).not.toThrow();
   });
 });

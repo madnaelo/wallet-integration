@@ -94,7 +94,7 @@ export class LifiBitcoinClient implements DexAggregatorClient {
       platformFeeBps: hasPlatformFee ? this.cfg.platformFee.feeBps : undefined
     };
 
-    assertExecutableQuote(fields);
+    assertExecutableQuote(params, fields, { quoteOnly: isBitcoinToken(params.sellToken) });
     if (!fields.buyAmount) throw new Error("LI.FI did not return a Bitcoin output amount.");
 
     return normalizeQuote(params, this, {

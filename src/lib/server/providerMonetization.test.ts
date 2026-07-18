@@ -10,6 +10,8 @@ import { ZeroXClient } from "@/lib/server/zeroxClient";
 const FEE_RECIPIENT = "0x18a5bAABfD3a5a7f6ca30B74b6A60fFe5454454D";
 const BUY_TOKEN = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 const SELL_TOKEN = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+const ROUTER = "0x1111111111111111111111111111111111111111";
+const ALLOWANCE_TARGET = "0x2222222222222222222222222222222222222222";
 const feeConfig: PlatformFeeConfig = {
   enabled: true,
   recipient: FEE_RECIPIENT,
@@ -48,8 +50,8 @@ describe("provider monetization requests", () => {
       route: {
         fills: [{ source: "Uniswap_V3", proportionBps: "10000", from: SELL_TOKEN, to: BUY_TOKEN }]
       },
-      issues: { allowance: { spender: "0xallowance" } },
-      transaction: { to: "0xrouter", data: "0x1234", value: "0", gas: "100000" }
+      issues: { allowance: { spender: ALLOWANCE_TARGET } },
+      transaction: { to: ROUTER, data: "0x1234", value: "0", gas: "100000" }
     }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -76,7 +78,7 @@ describe("provider monetization requests", () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
       dstAmount: "1000",
       minReturnAmount: "950",
-      tx: { to: "0xrouter", data: "0x1234", value: "0", gas: "100000" }
+      tx: { to: ROUTER, data: "0x1234", value: params.sellAmount, gas: "100000" }
     }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -93,10 +95,10 @@ describe("provider monetization requests", () => {
       priceRoute: {
         destAmount: "1000",
         destAmountWithSlippage: "950",
-        tokenTransferProxy: "0xallowance",
+        tokenTransferProxy: ALLOWANCE_TARGET,
         bestRoute: []
       },
-      txParams: { to: "0xrouter", data: "0x1234", value: "0", gas: "100000" }
+      txParams: { to: ROUTER, data: "0x1234", value: "0", gas: "100000" }
     }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -120,11 +122,11 @@ describe("provider monetization requests", () => {
       estimate: {
         toAmount: "1000",
         toAmountMin: "950",
-        approvalAddress: "0xallowance",
+        approvalAddress: ALLOWANCE_TARGET,
         feeCosts: [{ name: "Integrator fee", amount: "2", token: { address: "bitcoin" } }],
         gasCosts: []
       },
-      transactionRequest: { to: "0xrouter", data: "0x1234", value: "0", gasLimit: "100000" }
+      transactionRequest: { to: ROUTER, data: "0x1234", value: "0", gasLimit: "100000" }
     }));
     vi.stubGlobal("fetch", fetchMock);
 

@@ -4,6 +4,9 @@ import type { QuoteParams } from "@/lib/server/aggregator";
 export const NATIVE_TOKEN_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_CALLDATA_HEX_LENGTH = 256 * 1024;
+const MAX_GAS_UNITS = 100_000_000n;
+const UINT256_MAX = (1n << 256n) - 1n;
 
 export type ProviderMeta = {
   providerId: string;
@@ -112,8 +115,57 @@ export function getProviderErrorStatus(error: unknown): number | undefined {
   return Number.isInteger(status) && status >= 400 && status <= 599 ? status : undefined;
 }
 
-export function assertExecutableQuote(fields: { to?: string; data?: string }) {
-  if (!fields.to || !fields.data) throw new Error("Provider did not return executable swap data.");
+export function assertExecutableQuote(
+  params: QuoteParams,
+  fields: {
+    buyAmount?: string;
+    minBuyAmount?: string;
+    to?: string;
+    data?: string;
+    value?: string;
+    gas?: string;
+    gasPrice?: string;
+    totalNetworkFee?: string;
+    allowanceTarget?: string;
+  },
+  options: { quoteOnly?: boolean } = {}
+) {
+  const buyAmount = requireUint(fields.buyAmount, "output amount", true);
+  if (fields.minBuyAmount) {
+    const minBuyAmount = requireUint(fields.minBuyAmount, "minimum output amount", true);
+    if (minBuyAmount > buyAmount) {
+      throw new Error("Provider returned a minimum output above its quoted output.");
+    }
+  }
+
+  if (options.quoteOnly) return;
+
+  if (!isEvmAddress(fields.to) || isZeroAddress(fields.to)) {
+    throw new Error("Provider did not return a valid swap contract.");
+  }
+  if (!isHexData(fields.data) || fields.data!.length > MAX_CALLDATA_HEX_LENGTH) {
+    throw new Error("Provider did not return valid swap transaction data.");
+  }
+
+  const sellAmount = requireUint(params.sellAmount, "sell amount", true);
+  const transactionValue = requireUint(fields.value ?? "0", "transaction value");
+  const expectedValue = params.sellToken === "ETH" ? sellAmount : 0n;
+  if (transactionValue !== expectedValue) {
+    throw new Error("Provider returned an unexpected transaction value.");
+  }
+  if (params.sellToken !== "ETH" && fields.data === "0x") {
+    throw new Error("Provider did not return token swap transaction data.");
+  }
+
+  if (fields.allowanceTarget && (!isEvmAddress(fields.allowanceTarget) || isZeroAddress(fields.allowanceTarget))) {
+    throw new Error("Provider returned an invalid token approval contract.");
+  }
+  if (fields.gas) {
+    const gas = requireUint(fields.gas, "gas estimate", true);
+    if (gas > MAX_GAS_UNITS) throw new Error("Provider returned an unsafe gas estimate.");
+  }
+  if (fields.gasPrice) requireUint(fields.gasPrice, "gas price");
+  if (fields.totalNetworkFee) requireUint(fields.totalNetworkFee, "network fee");
 }
 
 export function parseJsonBody(text: string): Record<string, unknown> {
@@ -269,4 +321,27 @@ function normalizeTokenKey(token: string): string {
 
 function trimDecimal(value: string): string {
   return value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+}
+
+function requireUint(value: string | undefined, label: string, positive = false): bigint {
+  if (!value || !/^\d{1,78}$/.test(value)) {
+    throw new Error(`Provider returned an invalid ${label}.`);
+  }
+  const parsed = BigInt(value);
+  if (parsed > UINT256_MAX || (positive && parsed === 0n)) {
+    throw new Error(`Provider returned an invalid ${label}.`);
+  }
+  return parsed;
+}
+
+function isEvmAddress(value: string | undefined): value is string {
+  return typeof value === "string" && /^0x[0-9a-fA-F]{40}$/.test(value);
+}
+
+function isZeroAddress(value: string): boolean {
+  return /^0x0{40}$/i.test(value);
+}
+
+function isHexData(value: string | undefined): value is string {
+  return typeof value === "string" && /^0x(?:[0-9a-fA-F]{2})*$/.test(value);
 }

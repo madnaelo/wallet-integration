@@ -19,6 +19,7 @@ import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress, isBitcoinMainnetAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
 import { ensureExactTokenAllowance } from "@/lib/tokenAllowance";
+import { validateSwapTransaction } from "@/lib/swapTransaction";
 import type {
   WalletBridgeActions,
   WalletBridgeOpenOptions,
@@ -2266,19 +2267,30 @@ export default function Page() {
         return;
       }
 
-      await ensureAllowanceAndApproveIfNeeded();
-
+      if (!walletAddress || !sellTokenInfo) {
+        throw new Error("Reconnect your wallet and refresh the quote before continuing.");
+      }
+      const expectedSellAmountRaw = parseUnitsSafe(amountHuman, sellTokenInfo.decimals);
+      if (!expectedSellAmountRaw) throw new Error("Enter a valid swap amount and refresh the quote.");
       const p = getProviderOrThrow();
       const { BrowserProvider } = await import("ethers");
       const provider = new BrowserProvider(p);
       const signer = await provider.getSigner();
+      const signerAddress = await signer.getAddress();
+      const transaction = validateSwapTransaction({
+        quote,
+        expectedSellAmountRaw,
+        sellTokenIsNative: Boolean(sellTokenInfo.isNative),
+        expectedWalletAddress: walletAddress,
+        signerAddress
+      });
 
-      // Optional recommended: simulate via eth_call before sending
+      await ensureAllowanceAndApproveIfNeeded();
+
       try {
         await provider.call({
-          to: quote.to,
-          data: quote.data,
-          value: BigInt(quote.value ?? "0")
+          from: signerAddress,
+          ...transaction
         });
       } catch (e: any) {
         throw new Error(`This swap could not be prepared safely: ${normalizeWalletError(e)}`);
@@ -2286,11 +2298,7 @@ export default function Page() {
 
       let gasLimit: bigint | null = null;
       try {
-        const estimated = await signer.estimateGas({
-          to: quote.to,
-          data: quote.data,
-          value: BigInt(quote.value ?? "0")
-        });
+        const estimated = await signer.estimateGas(transaction);
         gasLimit = (estimated * 120n) / 100n;
       } catch {
         if (quote.gas) gasLimit = (BigInt(quote.gas) * 120n) / 100n;
@@ -2299,9 +2307,7 @@ export default function Page() {
       setSwapStatus("pending");
       setWalletRequestNotice(buildWalletApprovalNotice(connectedWalletName, "swap"));
       const tx = await signer.sendTransaction({
-        to: quote.to,
-        data: quote.data,
-        value: BigInt(quote.value ?? "0"),
+        ...transaction,
         gasLimit: gasLimit ?? undefined
       });
 

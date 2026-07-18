@@ -24,7 +24,14 @@ export function buildExactApprovalPlan(currentAllowance: bigint, requiredAmount:
 }
 
 export async function ensureExactTokenAllowance(params: EnsureTokenAllowanceParams): Promise<boolean> {
-  if (!isAddress(params.ownerAddress) || !isAddress(params.tokenAddress) || !isAddress(params.spenderAddress)) {
+  if (
+    !isAddress(params.ownerAddress)
+    || !isAddress(params.tokenAddress)
+    || !isAddress(params.spenderAddress)
+    || isZeroAddress(params.ownerAddress)
+    || isZeroAddress(params.tokenAddress)
+    || isZeroAddress(params.spenderAddress)
+  ) {
     throw new Error("Token approval could not be prepared safely.");
   }
   if (params.requiredAmount <= 0n) throw new Error("Token approval amount must be greater than zero.");
@@ -64,4 +71,8 @@ export async function ensureExactTokenAllowance(params: EnsureTokenAllowancePara
     }
   }
   return approvalPlan.length > 0;
+}
+
+function isZeroAddress(value: string): boolean {
+  return /^0x0{40}$/i.test(value);
 }
