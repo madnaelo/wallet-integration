@@ -178,6 +178,12 @@ Important quote and wallet variables:
 - `ODOS_BASE_URL`, `ODOS_API_KEY`
 - `LIFI_BASE_URL`, `LIFI_API_KEY`, `LIFI_INTEGRATOR`
 
+Production builds validate `SWAP_PROVIDERS` before deployment. Every enabled
+provider except ParaSwap must have its API key configured, LI.FI must also have
+its registered integrator identifier, and at least one same-chain provider must
+remain enabled. ParaSwap can use its public API while partner-key approval is
+pending, with the corresponding lower rate limit.
+
 Important fee variables:
 
 - `FEE_RECIPIENT_ADDRESS`

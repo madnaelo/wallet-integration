@@ -220,6 +220,12 @@ design. Production builds fail if the backend proxy, distributed limiter,
 explicit HTTPS origins, fee recipient, or anti-abuse secrets are missing or
 still contain example placeholders.
 
+The production build also fails closed when an enabled provider is misspelled
+or is missing its required credential. `0x`, Odos, and LI.FI therefore require
+the keys shown above; LI.FI also requires its registered integrator identifier.
+ParaSwap is the only enabled production provider allowed to use its public API
+without a key while partner approval is pending.
+
 ## OCI VM Requirements
 
 Required on the VM:
