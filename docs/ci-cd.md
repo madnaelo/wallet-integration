@@ -172,28 +172,31 @@ For the current OCI VM, these values match the manual deployment:
 OCI_SSH_HOST=84.235.254.97
 OCI_SSH_USER=opc
 OCI_DEPLOY_PATH=/home/opc/wallet
-OCI_PROXY_NETWORK=swap-assistant-proxy
+OCI_PROXY_NETWORK=uk-property-check
 OCI_DATABASE_NETWORK=wallet-database
 OCI_CADDYFILE_PATH=/home/opc/uk-property-check-middleware/Caddyfile
 OCI_CADDY_CONTAINER=uk-property-check-caddy
 WALLET_API_DOMAIN=wallet-api.84-235-254-97.sslip.io
 ```
 
-The deploy script creates and ownership-labels the dedicated
-`swap-assistant-proxy` network, then attaches the existing shared Caddy
-container without restarting it or disconnecting any of its other networks.
-It refuses to reuse a foreign network with the configured name. The Caddy
-process and the explicit Swap Assistant site block remain shared edge
-infrastructure; the script validates and atomically reloads the existing
-configuration but never edits it.
+The deploy script verifies that the configured ingress network already contains
+the shared Caddy container before attaching Swap Assistant's backend. It never
+creates, deletes, or reconfigures that externally managed network. If a future
+single-application host uses a missing network name, the script can create an
+ownership-labelled Swap Assistant proxy network instead. The Caddy process and
+the explicit Swap Assistant site block remain shared edge infrastructure; the
+script validates and atomically reloads the existing configuration but never
+edits it.
 
 PostgreSQL is attached only to the dedicated `wallet-database` network and
-never publishes a host port; the backend joins both dedicated Swap Assistant
-networks. The shared Caddy container is not given the database network.
+never publishes a host port; the backend joins that private network and the
+existing Caddy ingress network. The shared Caddy container is not given the
+database network.
 Docker uses an internal database network. Podman uses a dedicated DNS-enabled
 bridge because CNI-based Podman disables container name resolution on internal
 networks. No other application receives the Swap Assistant backend environment
-or database network.
+or database network, and Caddy remains single-homed on its own ingress network
+so host-port routing is deterministic.
 
 ## Vercel Environment
 

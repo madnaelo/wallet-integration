@@ -262,6 +262,13 @@ assert_project_network() {
     return 0
   fi
 
+  if [ "$expected_role" = "proxy" ] \
+    && container_exists "$caddy_container" \
+    && container_uses_network "$caddy_container" "$network_name"; then
+    echo "Using externally managed Caddy ingress network: $network_name" >&2
+    return 0
+  fi
+
   if [ "$expected_role" = "database" ]; then
     for project_container in \
       "$postgres_container" "$legacy_postgres_container" \
@@ -272,7 +279,7 @@ assert_project_network() {
       fi
     done
   fi
-  fail "Refusing to reuse network not owned by Swap Assistant: $network_name"
+  fail "Refusing to reuse an unverified network: $network_name"
 }
 
 assert_project_volume() {
@@ -745,9 +752,15 @@ attach_container_network "$proxy_network" "$backend_container" "$backend_contain
 run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null
 
 health_url="${BACKEND_HEALTH_URL:-https://$api_domain/api/health}"
+health_curl_args=(--fail --silent --show-error --max-time 15)
+if [ -z "${BACKEND_HEALTH_URL:-}" ]; then
+  # Some OCI networks cannot hairpin through the instance's public address.
+  # Resolve the production hostname locally so this still validates Caddy and TLS.
+  health_curl_args+=(--resolve "$api_domain:443:127.0.0.1")
+fi
 external_healthy=false
 for attempt in $(seq 1 30); do
-  if health_body="$(curl --fail --silent --show-error --max-time 15 "$health_url" 2>/dev/null)" \
+  if health_body="$(curl "${health_curl_args[@]}" "$health_url" 2>/dev/null)" \
     && printf '%s' "$health_body" | grep -qF "$git_commit"; then
     external_healthy=true
     break
