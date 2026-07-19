@@ -9,10 +9,11 @@ The workflows are in `.github/workflows`.
 
 ## Workflows
 
-- `CI`: tests, audits, typechecks, lints, and builds the frontend; tests the
-  backend; applies every Flyway migration to PostgreSQL 16; starts the packaged
-  backend and checks its database-backed health endpoint; and validates all
-  Compose files.
+- `CI`: tests, audits, typechecks, lints, and builds the frontend; runs
+  Playwright acceptance tests against the standalone production artifact on
+  desktop and mobile viewports; tests the backend; applies every Flyway
+  migration to PostgreSQL 16; starts the packaged backend and checks its
+  database-backed health endpoint; and validates all Compose files.
 - `Security`: runs dependency review, CodeQL when GitHub Advanced Security is
   available, mandatory Semgrep OSS analysis for Java and TypeScript, Gitleaks,
   and Trivy filesystem vulnerability scans.
@@ -31,6 +32,10 @@ The workflows are in `.github/workflows`.
 - `Monitor Production`: checks the frontend, backend health, and optional
   admin operations summary every 15 minutes. It also ensures frontend and
   backend serve the same commit and can send a Telegram alert on failure.
+- `Verify Production Backups`: checks backup freshness and integrity daily and
+  restores the latest backup into an isolated temporary database every Sunday.
+  It shares a concurrency group with production releases so the two cannot
+  change or exercise OCI infrastructure at the same time.
 
 `vercel.json` disables direct Vercel Git auto-deploys so the GitHub Actions
 workflow is the single production deployment trigger.

@@ -42,9 +42,13 @@ function Initialize-ProjectDependencyCaches {
   if (-not $env:MAVEN_REPO_LOCAL) {
     $env:MAVEN_REPO_LOCAL = Join-Path $cacheRoot 'maven/repository'
   }
+  if (-not $env:PLAYWRIGHT_BROWSERS_PATH) {
+    $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $cacheRoot 'playwright'
+  }
 
   New-Item -ItemType Directory -Force -Path $env:npm_config_cache | Out-Null
   New-Item -ItemType Directory -Force -Path $env:MAVEN_REPO_LOCAL | Out-Null
+  New-Item -ItemType Directory -Force -Path $env:PLAYWRIGHT_BROWSERS_PATH | Out-Null
 }
 
 function Get-ProjectJavaMajorVersion {

@@ -50,10 +50,10 @@ did not change, it also checks the existing Node install with `npm ls` before
 skipping npm work and performs an offline Maven package build before skipping
 backend dependency downloads.
 
-On this machine, dependency caches remain on `E:\dev-cache`. On other
-machines, the scripts use the repository drive, `DEV_CACHE_ROOT`, or the
-operating system's normal user cache directory. Java 17 and supported Node.js
-versions are checked before any service starts.
+On this machine, npm, Maven, and Playwright browser caches remain on
+`E:\dev-cache`. On other machines, the scripts use the repository drive,
+`DEV_CACHE_ROOT`, or the operating system's normal user cache directory. Java
+17 and supported Node.js versions are checked before any service starts.
 
 The script installs project dependencies only. It still expects the global
 tools to exist on the machine:

@@ -16,6 +16,8 @@ try {
   & $npmExe run typecheck
   & $npmExe run lint
   & $npmExe run build
+  & $npmExe exec -- playwright install --only-shell chromium
+  & $npmExe run test:e2e
   & $mavenExe "-Dmaven.repo.local=$env:MAVEN_REPO_LOCAL" -f backend/pom.xml clean verify
 
   if (Get-Command docker -ErrorAction SilentlyContinue) {
