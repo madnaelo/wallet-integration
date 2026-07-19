@@ -133,7 +133,8 @@ services:
     environment:
       ZEROX_API_KEY: ${ZEROX_API_KEY:?ZEROX_API_KEY is required}
       ONEINCH_API_KEY: ${ONEINCH_API_KEY:-}
-      SWAP_PROVIDERS: ${SWAP_PROVIDERS:-0x,1inch,paraswap,odos}
+      SWAP_PROVIDERS: ${SWAP_PROVIDERS:-0x,1inch,paraswap,odos,lifi}
+      MONETIZED_SWAP_PROVIDERS: ${MONETIZED_SWAP_PROVIDERS:-0x,lifi}
       PARASWAP_BASE_URL: ${PARASWAP_BASE_URL:-https://api.paraswap.io}
       PARASWAP_API_KEY: ${PARASWAP_API_KEY:-}
       PARASWAP_API_KEY_HEADER: ${PARASWAP_API_KEY_HEADER:-X-API-Key}

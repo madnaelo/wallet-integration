@@ -223,6 +223,7 @@ LIFI_BASE_URL=https://li.quest
 LIFI_API_KEY=...
 LIFI_INTEGRATOR=...
 SWAP_PROVIDERS=0x,paraswap,odos,lifi
+MONETIZED_SWAP_PROVIDERS=0x,lifi
 
 AFFILIATE_ADDRESS=...
 FEE_RECIPIENT_ADDRESS=...
@@ -258,6 +259,14 @@ or is missing its required credential. `0x`, Odos, and LI.FI therefore require
 the keys shown above; LI.FI also requires its registered integrator identifier.
 ParaSwap is the only enabled production provider allowed to use its public API
 without a key while partner approval is pending.
+
+Quote access and fee collection are configured separately.
+`MONETIZED_SWAP_PROVIDERS` must be a subset of `SWAP_PROVIDERS`, and every item
+must have `monetization: confirmed` in
+`config/provider-commercial-policy.json`. A production build fails if a pending
+provider is added. As of July 19, 2026, fee parameters are enabled only for 0x
+and LI.FI; ParaSwap/Velora and Odos remain quote-only while written commercial
+confirmation is pending, and 1inch remains disabled in production.
 
 ## OCI VM Requirements
 

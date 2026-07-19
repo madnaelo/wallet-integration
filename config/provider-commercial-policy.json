@@ -1,0 +1,25 @@
+{
+  "lastReviewed": "2026-07-19",
+  "providers": {
+    "0x": {
+      "monetization": "confirmed",
+      "basis": "Official 0x documentation states affiliate fees are available on all pricing plans."
+    },
+    "1inch": {
+      "monetization": "pending",
+      "basis": "The account has an active Dev Plan, but written confirmation for commercial fee-collecting use is pending."
+    },
+    "paraswap": {
+      "monetization": "pending",
+      "basis": "Velora Partnership API and fee-sharing approval is pending."
+    },
+    "odos": {
+      "monetization": "pending",
+      "basis": "Odos documents delegated fees, but its pricing page also requires team enablement; written confirmation is pending."
+    },
+    "lifi": {
+      "monetization": "confirmed",
+      "basis": "The LI.FI Partner Portal integration and chain-specific fee wallets are configured."
+    }
+  }
+}

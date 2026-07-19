@@ -172,6 +172,7 @@ Important quote and wallet variables:
 - `NEXT_PUBLIC_ALLOWED_CHAIN_IDS`
 - `NEXT_PUBLIC_DISALLOW_MAINNET`
 - `SWAP_PROVIDERS`
+- `MONETIZED_SWAP_PROVIDERS`
 - `ZEROX_API_KEY`
 - `ONEINCH_API_KEY`
 - `PARASWAP_BASE_URL`, `PARASWAP_API_KEY`, `PARASWAP_API_KEY_HEADER`
@@ -182,7 +183,10 @@ Production builds validate `SWAP_PROVIDERS` before deployment. Every enabled
 provider except ParaSwap must have its API key configured, LI.FI must also have
 its registered integrator identifier, and at least one same-chain provider must
 remain enabled. ParaSwap can use its public API while partner-key approval is
-pending, with the corresponding lower rate limit.
+pending, with the corresponding lower rate limit. `MONETIZED_SWAP_PROVIDERS`
+is a separate fail-closed allowlist: fee parameters are sent only for providers
+whose approval is recorded as confirmed in
+`config/provider-commercial-policy.json`.
 
 Important fee variables:
 

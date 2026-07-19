@@ -1,3 +1,5 @@
+import { DEFAULT_MONETIZED_SWAP_PROVIDERS } from "@/lib/server/providerCommercialPolicy";
+
 function optional(name: string, fallback: string): string {
   const v = process.env[name];
   if (!v || v.trim().length === 0) return fallback;
@@ -39,6 +41,10 @@ export const env = {
   ZEROX_API_KEY: optional("ZEROX_API_KEY", ""),
   ONEINCH_API_KEY: optional("ONEINCH_API_KEY", ""),
   SWAP_PROVIDERS: optional("SWAP_PROVIDERS", "0x,1inch,paraswap,odos,lifi"),
+  MONETIZED_SWAP_PROVIDERS: optional(
+    "MONETIZED_SWAP_PROVIDERS",
+    DEFAULT_MONETIZED_SWAP_PROVIDERS.join(",")
+  ),
   PARASWAP_BASE_URL: optional("PARASWAP_BASE_URL", "https://api.paraswap.io"),
   PARASWAP_API_KEY: optional("PARASWAP_API_KEY", ""),
   PARASWAP_API_KEY_HEADER: optional("PARASWAP_API_KEY_HEADER", "X-API-Key"),

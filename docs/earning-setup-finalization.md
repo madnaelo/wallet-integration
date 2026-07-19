@@ -1,6 +1,6 @@
 # Earning Setup Finalization
 
-Last reviewed: July 17, 2026
+Last reviewed: July 19, 2026
 
 This checklist tracks what is required before Swap Assistant can reliably collect
 platform fees in production.
@@ -9,9 +9,10 @@ platform fees in production.
 
 - Production frontend is live on Vercel.
 - Production backend health is live on OCI.
-- The quote route has provider-side fee parameters wired for 0x, 1inch,
-  Velora/ParaSwap, Odos, and LI.FI, but provider-side commercial approval and
-  live fee receipt still need to be verified provider by provider.
+- The quote route supports provider-side fee parameters for 0x, 1inch,
+  Velora/ParaSwap, Odos, and LI.FI. Runtime policy now separates quote access
+  from fee collection: only 0x and LI.FI receive fee parameters until the
+  remaining providers give written commercial approval.
 - Vercel production environment variable names exist for provider keys, fee
   addresses, CORS, and cache/rate-limit settings.
 - LI.FI Partner Portal fee collection is enabled for integration `the-wallet`
@@ -64,7 +65,8 @@ requirements, and withdrawal behavior with a small test first.
 
 ### 0x
 
-Status: code wired.
+Status: commercial affiliate-fee use confirmed by current official 0x
+documentation; code wired; live payout verification pending.
 
 The 0x quote client sends:
 
@@ -80,7 +82,8 @@ Action remaining:
 
 Reference:
 
-- https://docs.0x.org/docs/0x-swap-api/guides/monetize-your-app-using-swap
+- https://docs.0x.org/evm/0x-swap-api/guides/monetize-your-app-using-swap
+- https://0x.org/legal/api-license-agreement
 
 ### 1inch
 
@@ -89,6 +92,12 @@ the account's KYC/KYB verification was approved. It does not grant commercial
 or fee-collecting API use. A separate May 15, 2026 email requested
 Non-Commercial API Customer Security Due Diligence, so the account's commercial
 terms remain unresolved.
+
+The signed-in 1inch Business portal showed an active Dev Plan on July 19,
+2026. A support inquiry was submitted that day asking whether the public,
+revenue-generating app may use the Dev Plan, fee/referrer fields, and Orderbook
+API, and whether a commercial agreement, revenue share, billing change, or
+account change is required. Written confirmation is pending.
 
 The 1inch quote client sends:
 
@@ -116,7 +125,9 @@ Reference:
 
 ### Velora / ParaSwap
 
-Status: code wired, API key pending.
+Status: quote integration wired; API key and Partnership API/fee-sharing
+approval pending. Fee parameters are disabled by runtime policy in the
+meantime.
 
 The Velora/ParaSwap client sends:
 
@@ -136,6 +147,9 @@ Action remaining:
   `https://github.com/madnaelo`, initial target `5 requests per second`, and
   the project owner's contact address. No response was found in the project
   mailbox as of July 17, 2026.
+- A follow-up was sent to Velora support on July 19, 2026, asking explicitly
+  for Partnership API approval, an API key/rate-limit decision, and the
+  commercial terms for fee sharing.
 - Obtain the Velora/ParaSwap API key or confirmation of partner access.
 - Add `PARASWAP_API_KEY` to Vercel.
 - Run a small real swap and verify fee behavior.
@@ -150,8 +164,9 @@ Reference:
 
 ### Odos
 
-Status: code wired, delegated-fee quote accepted; live payout verification
-pending.
+Status: quote integration wired. Delegated-fee request shape is documented and
+was accepted in a test quote, but Odos account/plan enablement is unresolved.
+Fee parameters are disabled by runtime policy until written confirmation.
 
 The Odos V3 client sends:
 
@@ -164,11 +179,16 @@ configured API key accepted a Base quote request with those fee parameters and
 returned a route id. That confirms our request shape is accepted, but it does
 not prove payout until a real swap settles and the treasury receives its share.
 The project owner also emailed Odos sales on May 27, 2026, to request explicit
-monetization confirmation; no reply was found in the project mailbox as of
-July 17, 2026.
+monetization confirmation; no reply was found by July 19. A corrected follow-up
+was sent on July 19 with the exact V3 fields and fee value, asking Odos to
+resolve the apparent difference between its delegated-fee and pricing pages
+and confirm whether the current key/account is enabled.
 
 Action remaining:
 
+- Wait for written account/plan confirmation, then update
+  `config/provider-commercial-policy.json` and `MONETIZED_SWAP_PROVIDERS` in a
+  reviewed change.
 - Run a small real Odos swap and verify that the expected fee reaches the
   treasury.
 - Contact Odos if the fee does not appear or if their dashboard indicates that
@@ -231,6 +251,9 @@ Before public launch:
   alerts to Telegram after the bot token is rotated.
 - Monitor `/api/health` and `/api/admin/ops/summary` after each deployment.
 - Run small real swaps through each provider and record the fee receipt result.
+- Keep `MONETIZED_SWAP_PROVIDERS` limited to providers with written or
+  unambiguous official commercial approval. Do not treat a successful quote as
+  payout approval.
 - Confirm the operating legal entity, jurisdiction, privacy contact, and
   counsel-reviewed Terms/Privacy language before broad commercial launch.
 - Repeat the documented off-host restore drill at least quarterly. The

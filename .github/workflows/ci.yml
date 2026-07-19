@@ -81,6 +81,7 @@ jobs:
       ODOS_API_KEY: ""
       LIFI_API_KEY: ""
       SWAP_PROVIDERS: "0x,1inch,paraswap,odos,lifi"
+      MONETIZED_SWAP_PROVIDERS: "0x,lifi"
       CORS_ALLOW_ORIGINS: "http://localhost:3000"
       REQUIRE_ALLOWED_ORIGIN: "false"
       RATE_LIMIT_WINDOW_MS: "60000"

@@ -1,5 +1,14 @@
+import { readFileSync } from "node:fs";
+
 const isDevelopment = process.env.NODE_ENV !== "production";
 const backendProxyTarget = normalizeBackendProxyTarget(process.env.BACKEND_PROXY_TARGET);
+const providerCommercialPolicy = JSON.parse(
+  readFileSync(new URL("./config/provider-commercial-policy.json", import.meta.url), "utf8")
+);
+const supportedProviders = new Set(Object.keys(providerCommercialPolicy.providers));
+const defaultMonetizedProviders = Object.entries(providerCommercialPolicy.providers)
+  .filter(([, provider]) => provider.monetization === "confirmed")
+  .map(([provider]) => provider);
 
 if (process.env.VERCEL_ENV === "production") {
   const publicBackendBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "").trim();
@@ -24,13 +33,9 @@ if (process.env.VERCEL_ENV === "production") {
   const quoteCacheTtlMs = Number(process.env.QUOTE_CACHE_TTL_MS ?? "8000");
   const quoteCacheMaxEntries = Number(process.env.QUOTE_CACHE_MAX_ENTRIES ?? "2000");
   const rateLimitPrefix = (process.env.RATE_LIMIT_REDIS_PREFIX ?? "").trim();
-  const enabledProviders = Array.from(
-    new Set(
-      (process.env.SWAP_PROVIDERS ?? "")
-        .split(",")
-        .map((provider) => provider.trim().toLowerCase())
-        .filter(Boolean)
-    )
+  const enabledProviders = parseProviderList(process.env.SWAP_PROVIDERS ?? "");
+  const monetizedProviders = parseProviderList(
+    process.env.MONETIZED_SWAP_PROVIDERS ?? defaultMonetizedProviders.join(",")
   );
 
   if (!backendProxyTarget) {
@@ -80,6 +85,7 @@ if (process.env.VERCEL_ENV === "production") {
     throw new Error("RATE_LIMIT_REDIS_PREFIX must contain 1-64 safe key-prefix characters.");
   }
   assertProductionProviders(enabledProviders);
+  assertProductionMonetization(enabledProviders, monetizedProviders, feeBps);
   assertTrustedProviderBaseUrl(
     process.env.PARASWAP_BASE_URL ?? "https://api.paraswap.io",
     "PARASWAP_BASE_URL",
@@ -237,7 +243,6 @@ function assertIntegerRange(value, minimum, maximum, name) {
 }
 
 function assertProductionProviders(enabledProviders) {
-  const supportedProviders = new Set(["0x", "1inch", "paraswap", "odos", "lifi"]);
   const unknownProviders = enabledProviders.filter((provider) => !supportedProviders.has(provider));
   if (unknownProviders.length) {
     throw new Error(`SWAP_PROVIDERS contains unsupported providers: ${unknownProviders.join(", ")}.`);
@@ -265,6 +270,46 @@ function assertProductionProviders(enabledProviders) {
   if (enabledProviders.includes("paraswap")) {
     assertProviderIdentifier(process.env.PARASWAP_PARTNER ?? "swapassistant", "PARASWAP_PARTNER");
   }
+}
+
+function assertProductionMonetization(enabledProviders, monetizedProviders, feeBps) {
+  const unknownProviders = monetizedProviders.filter((provider) => !supportedProviders.has(provider));
+  if (unknownProviders.length) {
+    throw new Error(
+      `MONETIZED_SWAP_PROVIDERS contains unsupported providers: ${unknownProviders.join(", ")}.`
+    );
+  }
+
+  const disabledProviders = monetizedProviders.filter((provider) => !enabledProviders.includes(provider));
+  if (disabledProviders.length) {
+    throw new Error(
+      `MONETIZED_SWAP_PROVIDERS must be a subset of SWAP_PROVIDERS; disable monetization for: ${disabledProviders.join(", ")}.`
+    );
+  }
+
+  const unconfirmedProviders = monetizedProviders.filter(
+    (provider) => providerCommercialPolicy.providers[provider]?.monetization !== "confirmed"
+  );
+  if (unconfirmedProviders.length) {
+    throw new Error(
+      `MONETIZED_SWAP_PROVIDERS contains providers without confirmed commercial approval: ${unconfirmedProviders.join(", ")}.`
+    );
+  }
+
+  if (feeBps > 0 && monetizedProviders.length === 0) {
+    throw new Error("MONETIZED_SWAP_PROVIDERS must enable an approved provider when platform fees are enabled.");
+  }
+}
+
+function parseProviderList(value) {
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((provider) => provider.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
 }
 
 function assertProviderIdentifier(value, name) {
