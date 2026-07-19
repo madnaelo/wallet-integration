@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TokenInfo } from "@/lib/tokens";
 
 const MAX_VISIBLE_TOKENS = 100;
@@ -42,6 +42,8 @@ export function TokenPicker({
   onChange
 }: TokenPickerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [networkFilter, setNetworkFilter] = useState<string | "all">(selectedNetworkId);
@@ -64,7 +66,11 @@ export function TokenPicker({
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        window.requestAnimationFrame(() => triggerRef.current?.focus());
+      }
     };
 
     document.addEventListener("mousedown", onPointerDown);
@@ -96,9 +102,12 @@ export function TokenPicker({
     <div className={`tokenPicker${open ? " tokenPickerOpen" : ""}`} ref={rootRef}>
       <div className="label">{label}</div>
       <button
+        ref={triggerRef}
         className="tokenPickerButton"
         type="button"
         aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-controls={open ? panelId : undefined}
         aria-label={`${label}: ${selectedToken?.symbol ?? "select token"}`}
         aria-describedby={describedBy}
         data-invalid={invalid ? "true" : undefined}
@@ -116,6 +125,7 @@ export function TokenPicker({
       </button>
       {open ? (
         <div
+          id={panelId}
           className="tokenPickerPanel"
           role="dialog"
           aria-label={`${label} options`}
@@ -130,6 +140,7 @@ export function TokenPicker({
             <button
               className={`tokenNetworkTab${networkFilter === "all" ? " tokenNetworkTabActive" : ""}`}
               type="button"
+              aria-pressed={networkFilter === "all"}
               onClick={() => setNetworkFilter("all")}
             >
               All
@@ -138,6 +149,7 @@ export function TokenPicker({
               <button
                 className={`tokenNetworkTab${networkFilter === network.id ? " tokenNetworkTabActive" : ""}`}
                 type="button"
+                aria-pressed={networkFilter === network.id}
                 key={network.id}
                 onClick={() => setNetworkFilter(network.id)}
               >
@@ -162,6 +174,7 @@ export function TokenPicker({
                 onClick={() => {
                   onChange(token);
                   setOpen(false);
+                  window.requestAnimationFrame(() => triggerRef.current?.focus());
                 }}
               >
                 <span className="tokenPickerOptionSymbol">{token.symbol}</span>
