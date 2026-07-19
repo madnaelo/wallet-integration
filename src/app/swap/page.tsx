@@ -3972,12 +3972,13 @@ function formatBuildTimestamp(value: string): string {
   if (!trimmed) return "";
   const date = new Date(trimmed);
   if (Number.isNaN(date.getTime())) return trimmed;
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  const month = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  ][date.getUTCMonth()];
+  const hour = date.getUTCHours().toString().padStart(2, "0");
+  const minute = date.getUTCMinutes().toString().padStart(2, "0");
+  return `${month} ${date.getUTCDate()}, ${hour}:${minute} UTC`;
 }
 
 function parseSwapLinkParams(search: string): PendingSwapLink | null {
