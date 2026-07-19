@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { TokenInfo } from "@/lib/tokens";
 
 const MAX_VISIBLE_TOKENS = 100;
@@ -42,6 +43,7 @@ export function TokenPicker({
   onChange
 }: TokenPickerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
   const [open, setOpen] = useState(false);
@@ -63,7 +65,8 @@ export function TokenPicker({
     updatePanelPosition();
 
     const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !panelRef.current?.contains(target)) setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -123,8 +126,9 @@ export function TokenPicker({
         </span>
         <span className="tokenPickerChevron" aria-hidden="true" />
       </button>
-      {open ? (
+      {open && typeof document !== "undefined" ? createPortal(
         <div
+          ref={panelRef}
           id={panelId}
           className="tokenPickerPanel"
           role="dialog"
@@ -190,7 +194,8 @@ export function TokenPicker({
           {matchingTokens.length > visibleTokens.length ? (
             <div className="small tokenPickerHint">Keep typing to narrow the list.</div>
           ) : null}
-        </div>
+        </div>,
+        document.body
       ) : null}
     </div>
   );
