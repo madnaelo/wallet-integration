@@ -121,12 +121,12 @@ export default function IntroPage() {
         </div>
       </section>
 
-      <section className="introSection introComingSoon" aria-labelledby="coming-soon-title">
+      <section className="introSection introLimitOrders" aria-labelledby="limit-orders-title">
         <div>
-          <h2 id="coming-soon-title">Limit Orders With Guardrails</h2>
+          <h2 id="limit-orders-title">Limit Orders With Guardrails</h2>
           <p>
-            Limit Orders use explicit risk acceptance and signed terms. Unsupported pairs stay on alerts until a safe
-            protocol-specific execution adapter exists.
+            Limit Orders use clear risk acceptance and exact terms approved in your wallet. If a pair cannot be handled
+            safely as an automatic order, Swap Assistant keeps it as an alert for you to review and approve yourself.
           </p>
         </div>
       </section>

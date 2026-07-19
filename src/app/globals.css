@@ -823,7 +823,7 @@ body {
 }
 
 .introFeature,
-.introComingSoon {
+.introLimitOrders {
   background: rgba(18, 26, 42, 0.84);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -888,7 +888,7 @@ body {
 }
 
 .introSectionHeader p,
-.introComingSoon p,
+.introLimitOrders p,
 .introFeature p {
   color: var(--muted);
   font-size: 14px;
@@ -917,18 +917,18 @@ body {
   text-decoration: none;
 }
 
-.introComingSoon {
+.introLimitOrders {
   align-items: center;
   display: grid;
   gap: 14px;
   padding: 18px;
 }
 
-.introComingSoon h2 {
+.introLimitOrders h2 {
   margin-top: 0;
 }
 
-.introComingSoon a {
+.introLimitOrders a {
   justify-self: start;
   text-decoration: none;
 }
