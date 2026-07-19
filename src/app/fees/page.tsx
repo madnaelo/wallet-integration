@@ -24,7 +24,7 @@ export default function FeesPage() {
           Back to swap
         </Link>
         <h1>Fees & Risks</h1>
-        <p>Effective July 17, 2026.</p>
+        <p>Effective July 19, 2026.</p>
         <p>
           Swap Assistant is a non-custodial swap assistant. Your wallet signs and
           submits transactions. Swap Assistant does not hold private keys, seed
@@ -62,9 +62,26 @@ export default function FeesPage() {
             by provider, chain, token, route, and provider account.
           </p>
           <p>
+            Swap Assistant can receive different compensation from different
+            providers. Quotes are ranked by the receiving amount returned for
+            the user after disclosed service fees, not by the compensation Swap
+            Assistant expects to receive. You can review and choose another
+            available route before approving a transaction.
+          </p>
+          <p>
             Signed limit orders use third-party order protocols and do not
             currently add this swap platform fee unless a fee is explicitly
             displayed before signing.
+          </p>
+        </section>
+
+        <section>
+          <h2>Price And Route Risk</h2>
+          <p>
+            A displayed quote is temporary. Price impact, slippage, transfer
+            taxes, token restrictions, bridge behavior, and changing liquidity
+            can reduce what is received or prevent execution. A token name or
+            symbol does not prove that its contract address is genuine.
           </p>
         </section>
 

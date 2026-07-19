@@ -22,7 +22,7 @@ export default function PrivacyPage() {
           Back to swap
         </Link>
         <h1>Privacy</h1>
-        <p>Effective July 17, 2026.</p>
+        <p>Effective July 19, 2026.</p>
         <p>
           Swap Assistant stores the minimum product data needed for your swap
           history, favorites, alerts, and notification preferences.
@@ -46,6 +46,17 @@ export default function PrivacyPage() {
         </section>
 
         <section>
+          <h2>How We Use Data</h2>
+          <p>
+            We use this data to authenticate your wallet, provide saved
+            features, request quotes, submit only the limit orders you sign,
+            deliver alerts, prevent abuse, investigate incidents, maintain
+            backups, and keep the service reliable. We do not sell personal
+            data or use it for third-party advertising.
+          </p>
+        </section>
+
+        <section>
           <h2>Data We Do Not Store</h2>
           <p>
             We do not store seed phrases, private keys, wallet passwords, or
@@ -65,6 +76,12 @@ export default function PrivacyPage() {
             can link more than one device, and each linked device can receive
             enabled alerts until it is disabled or the subscription expires.
           </p>
+          <p>
+            The app also uses essential browser storage for sign-in state,
+            installation prompts, and whether the introductory guide has been
+            completed. Production sign-in credentials are kept in a secure,
+            HttpOnly cookie that browser scripts cannot read.
+          </p>
         </section>
 
         <section>
@@ -83,12 +100,30 @@ export default function PrivacyPage() {
         <section>
           <h2>Retention And Choices</h2>
           <p>
-            Sessions, temporary sign-in requests, alerts, and operational
-            records are expired or cleaned up according to service retention
-            settings. You can disable notification channels, unlink push
-            devices, cancel eligible limit orders, and disconnect your wallet.
-            Onchain transactions and data retained by third parties may not be
-            erasable.
+            Sign-in requests normally expire after 10 minutes and sessions
+            after 7 days. Dry-run history is normally retained for up to 180
+            days, alert-delivery records for up to 365 days, and pending or
+            completed notification-delivery records for up to 30 days. Other
+            saved records remain while needed to provide the feature, preserve
+            order evidence, meet security or legal duties, or until they are
+            removed through an available control.
+          </p>
+          <p>
+            You can disable notification channels, unlink push devices, remove
+            favorites, cancel eligible limit orders, and disconnect your
+            wallet. Public blockchain records and data retained independently
+            by third parties may not be erasable.
+          </p>
+        </section>
+
+        <section>
+          <h2>Your Choices</h2>
+          <p>
+            Depending on applicable law, you may have rights to ask for access,
+            correction, deletion, restriction, portability, or an objection to
+            certain uses of personal data. Some requests can be limited when
+            records must be retained for security, fraud prevention, legal
+            duties, or an active signed order.
           </p>
         </section>
 

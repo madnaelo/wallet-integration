@@ -282,7 +282,9 @@ session cookie; Spring Boot remains on OCI behind Caddy. See
 [docs/ci-cd.md](docs/ci-cd.md)
 for GitHub Actions, Vercel, OCI, and secret setup. See
 [docs/earning-setup-finalization.md](docs/earning-setup-finalization.md) for
-the fee-recipient, provider monetization, and launch revenue checklist.
+the fee-recipient, provider monetization, and launch revenue checklist. The
+counsel handoff and unresolved regulatory launch gates are recorded in
+[docs/legal/production-legal-review.md](docs/legal/production-legal-review.md).
 
 ## Prompt Trail
 

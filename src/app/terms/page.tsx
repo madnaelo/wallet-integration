@@ -23,7 +23,7 @@ export default function TermsPage() {
         </Link>
         <h1>Terms</h1>
         <p>
-          Effective July 17, 2026. Limit Order Terms version 2026-07-17.1.
+          Effective July 19, 2026. Limit Order Terms version 2026-07-17.1.
         </p>
         <p>
           These terms describe the expected use of Swap Assistant. By using the
@@ -61,6 +61,16 @@ export default function TermsPage() {
         </section>
 
         <section>
+          <h2>Wallet And Token Safety</h2>
+          <p>
+            You control your wallet, balances, approvals, recovery details, and
+            device security. Token names and symbols can be copied, so verify
+            the network and contract address. Swap Assistant will never ask for
+            a seed phrase or private key.
+          </p>
+        </section>
+
+        <section>
           <h2>No Financial Advice</h2>
           <p>
             Swap Assistant does not provide investment, tax, legal, accounting, or
@@ -76,6 +86,12 @@ export default function TermsPage() {
             Swap Assistant platform fee on supported routes. Review the trade
             summary and your wallet confirmation before signing. Fee behavior
             can differ by provider and route.
+          </p>
+          <p>
+            Swap Assistant can receive different compensation from different
+            providers. Available routes are ranked by the receiving amount
+            returned for the user after disclosed service fees, and you remain
+            free to choose another route before signing.
           </p>
         </section>
 
@@ -112,6 +128,15 @@ export default function TermsPage() {
             fill while cancellation is pending. You are responsible for
             reviewing the wallet signature, keeping enough balance, monitoring
             open orders, and cancelling or revoking approvals when needed.
+          </p>
+        </section>
+
+        <section>
+          <h2>Taxes</h2>
+          <p>
+            You are responsible for determining and reporting taxes, duties,
+            and records that apply to your transactions. Swap Assistant does
+            not calculate or file them for you.
           </p>
         </section>
 
