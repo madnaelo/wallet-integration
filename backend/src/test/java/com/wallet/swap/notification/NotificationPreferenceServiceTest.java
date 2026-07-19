@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
@@ -31,6 +32,9 @@ class NotificationPreferenceServiceTest {
   @Mock
   private PushSubscriptionRepository pushSubscriptionRepository;
 
+  @Mock
+  private WalletMutationLock walletMutationLock;
+
   private NotificationPreferenceService service;
 
   @BeforeEach
@@ -38,7 +42,8 @@ class NotificationPreferenceServiceTest {
     service = new NotificationPreferenceService(
         repository,
         pushSubscriptionRepository,
-        new NotificationProperties());
+        new NotificationProperties(),
+        walletMutationLock);
   }
 
   @Test
@@ -65,6 +70,7 @@ class NotificationPreferenceServiceTest {
 
     assertThat(result.telegramChatId()).isEqualTo("12345");
     assertThat(result.telegramEnabled()).isTrue();
+    verify(walletMutationLock).lock(WALLET);
   }
 
   @Test
@@ -77,6 +83,7 @@ class NotificationPreferenceServiceTest {
 
     assertThat(result.telegramChatId()).isEqualTo("77777");
     assertThat(result.telegramEnabled()).isTrue();
+    verify(walletMutationLock).lock(WALLET);
   }
 
   @Test
@@ -114,6 +121,20 @@ class NotificationPreferenceServiceTest {
     NotificationPreferenceResponse result = service.save(WALLET, request);
 
     assertThat(result.pushEnabled()).isTrue();
+    verify(walletMutationLock).lock(WALLET);
+  }
+
+  @Test
+  void serializesDirectPushPreferenceChanges() {
+    NotificationPreferenceResponse saved = new NotificationPreferenceResponse(
+        WALLET, null, false, null, false, true, 1, 100, false, 500, 360);
+    when(repository.setPushEnabled(eq(WALLET), eq(true), anyInt(), anyInt(), anyInt()))
+        .thenReturn(saved);
+
+    NotificationPreferenceResponse result = service.setPushEnabled(WALLET, true);
+
+    assertThat(result.pushEnabled()).isTrue();
+    verify(walletMutationLock).lock(WALLET);
   }
 
   private NotificationPreferenceRequest request(boolean telegramEnabled) {

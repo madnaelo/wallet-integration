@@ -1,12 +1,14 @@
 package com.wallet.swap.notification;
 
 import com.wallet.swap.common.ApiException;
+import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
 import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class NotificationPreferenceService {
@@ -15,14 +17,17 @@ public class NotificationPreferenceService {
   private final NotificationPreferenceRepository repository;
   private final PushSubscriptionRepository pushSubscriptionRepository;
   private final NotificationProperties properties;
+  private final WalletMutationLock walletMutationLock;
 
   public NotificationPreferenceService(
       NotificationPreferenceRepository repository,
       PushSubscriptionRepository pushSubscriptionRepository,
-      NotificationProperties properties) {
+      NotificationProperties properties,
+      WalletMutationLock walletMutationLock) {
     this.repository = repository;
     this.pushSubscriptionRepository = pushSubscriptionRepository;
     this.properties = properties;
+    this.walletMutationLock = walletMutationLock;
   }
 
   public NotificationPreferenceResponse get(String walletAddress) {
@@ -41,7 +46,9 @@ public class NotificationPreferenceService {
             properties.getDefaultCooldownMinutes()));
   }
 
+  @Transactional
   public NotificationPreferenceResponse save(String walletAddress, NotificationPreferenceRequest request) {
+    walletMutationLock.lock(walletAddress);
     NotificationPreferenceResponse current = get(walletAddress);
     validate(request, current.telegramChatId());
     boolean pushEnabled = Boolean.TRUE.equals(request.pushEnabled())
@@ -57,7 +64,9 @@ public class NotificationPreferenceService {
         properties.getDefaultCooldownMinutes());
   }
 
+  @Transactional
   public NotificationPreferenceResponse connectTelegram(String walletAddress, String telegramChatId) {
+    walletMutationLock.lock(walletAddress);
     NotificationPreferenceResponse current = get(walletAddress);
     NotificationPreferenceRequest request = new NotificationPreferenceRequest(
         current.emailAddress(),
@@ -80,7 +89,9 @@ public class NotificationPreferenceService {
         properties.getDefaultCooldownMinutes());
   }
 
+  @Transactional
   public NotificationPreferenceResponse setPushEnabled(String walletAddress, boolean pushEnabled) {
+    walletMutationLock.lock(walletAddress);
     return repository.setPushEnabled(
         walletAddress,
         pushEnabled,

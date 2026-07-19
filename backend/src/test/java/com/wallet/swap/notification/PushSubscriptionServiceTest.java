@@ -10,6 +10,7 @@ import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
+import com.wallet.swap.notification.NotificationModels.PushSubscriptionDisableRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionKeys;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
 import java.util.Base64;
@@ -104,6 +105,18 @@ class PushSubscriptionServiceTest {
     verify(walletMutationLock).lock(WALLET);
     verify(pushSubscriptionRepository).upsert(WALLET, request, "Chrome");
     verify(pushSubscriptionRepository).retainMostRecentForWallet(WALLET, 10);
+    verify(preferenceService).setPushEnabled(WALLET, true);
+  }
+
+  @Test
+  void serializesDeviceDisableAndKeepsPushEnabledForRemainingDevices() {
+    PushSubscriptionDisableRequest request = new PushSubscriptionDisableRequest(ENDPOINT);
+    when(pushSubscriptionRepository.countActive(WALLET)).thenReturn(1);
+
+    service.disable(WALLET, request);
+
+    verify(walletMutationLock).lock(WALLET);
+    verify(pushSubscriptionRepository).disableForWalletEndpoint(WALLET, ENDPOINT);
     verify(preferenceService).setPushEnabled(WALLET, true);
   }
 

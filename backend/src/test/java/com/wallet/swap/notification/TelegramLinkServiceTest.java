@@ -19,12 +19,12 @@ class TelegramLinkServiceTest {
   void linksOnlyAnExactTelegramStartCommand() {
     TelegramLinkCodeRepository repository = mock(TelegramLinkCodeRepository.class);
     TelegramNotificationSender sender = mock(TelegramNotificationSender.class);
-    NotificationPreferenceService preferences = mock(NotificationPreferenceService.class);
+    TelegramLinkCompletionService completionService = mock(TelegramLinkCompletionService.class);
     TelegramLinkService service = new TelegramLinkService(
         new NotificationProperties(),
         repository,
         sender,
-        preferences);
+        completionService);
     UUID codeId = UUID.randomUUID();
     String wallet = "0x1111111111111111111111111111111111111111";
     TelegramLinkCode code = new TelegramLinkCode(
@@ -40,12 +40,11 @@ class TelegramLinkServiceTest {
     when(sender.getRecentMessages()).thenReturn(List.of(
         new TelegramIncomingMessage("11", "Please use ABCDEFGHJKLM"),
         new TelegramIncomingMessage("22", "/start ABCDEFGHJKLM")));
-    when(preferences.connectTelegram(wallet, "22")).thenReturn(expected);
+    when(completionService.complete(wallet, codeId, "22")).thenReturn(expected);
 
     NotificationPreferenceResponse response = service.complete(wallet);
 
     assertThat(response).isSameAs(expected);
-    verify(repository).markConsumed(codeId);
-    verify(preferences).connectTelegram(wallet, "22");
+    verify(completionService).complete(wallet, codeId, "22");
   }
 }

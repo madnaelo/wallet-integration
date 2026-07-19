@@ -57,7 +57,9 @@ public class PushSubscriptionService {
     return preferenceService.setPushEnabled(walletAddress, true);
   }
 
+  @Transactional
   public NotificationPreferenceResponse disable(String walletAddress, PushSubscriptionDisableRequest request) {
+    walletMutationLock.lock(walletAddress);
     String endpoint = request == null ? null : request.endpoint();
     if (hasText(endpoint)) {
       validateEndpoint(endpoint);

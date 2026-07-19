@@ -23,17 +23,17 @@ public class TelegramLinkService {
   private final NotificationProperties properties;
   private final TelegramLinkCodeRepository linkCodeRepository;
   private final TelegramNotificationSender telegramSender;
-  private final NotificationPreferenceService preferenceService;
+  private final TelegramLinkCompletionService completionService;
 
   public TelegramLinkService(
       NotificationProperties properties,
       TelegramLinkCodeRepository linkCodeRepository,
       TelegramNotificationSender telegramSender,
-      NotificationPreferenceService preferenceService) {
+      TelegramLinkCompletionService completionService) {
     this.properties = properties;
     this.linkCodeRepository = linkCodeRepository;
     this.telegramSender = telegramSender;
-    this.preferenceService = preferenceService;
+    this.completionService = completionService;
   }
 
   public TelegramLinkStartResponse start(String walletAddress) {
@@ -71,8 +71,7 @@ public class TelegramLinkService {
         String text = message.text().trim();
         if (!startPattern.matcher(text).matches()) continue;
 
-        linkCodeRepository.markConsumed(code.id());
-        return preferenceService.connectTelegram(walletAddress, message.chatId());
+        return completionService.complete(walletAddress, code.id(), message.chatId());
       }
     }
 
