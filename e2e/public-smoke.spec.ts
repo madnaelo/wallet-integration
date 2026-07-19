@@ -28,6 +28,13 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem("wallet.swapAssistant.swapTour.v1", "done");
   });
+  await page.route("**/backend/api/**", async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Endpoint is intentionally unavailable during browser acceptance tests." })
+    });
+  });
   await page.route("**/api/features", async (route) => {
     await route.fulfill({
       contentType: "application/json",
