@@ -256,9 +256,9 @@ Before public launch:
   payout approval.
 - Confirm the operating legal entity, jurisdiction, privacy contact, and
   counsel-reviewed Terms/Privacy language before broad commercial launch.
-- Repeat the documented off-host restore drill at least quarterly. The
-  production release now creates and verifies an Object Storage backup before
-  promoting the backend.
+- Keep the automated daily backup-freshness check and weekly isolated restore
+  drill passing. The production release also creates and verifies an Object
+  Storage backup before promoting the backend.
 - Attach the final branded domain before public marketing.
 - Treat Limit Orders as a separate monetization track: current CoW/1inch signed
   order adapters do not add the normal swap platform fee.

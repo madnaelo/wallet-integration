@@ -155,8 +155,9 @@ three non-secret Object Storage variables above. Before changing the live
 backend, deployment runs an immediate backup and fails unless the custom-format
 dump passes `pg_restore` validation, is checksummed, and uploads to Object
 Storage through the VM's instance principal. It then enables and verifies
-`wallet-postgres-backup.timer`. Local dumps are retained for 14 days. The
-private `swap-assistant-postgres-backups` bucket is isolated in the
+`wallet-postgres-backup.timer` and checks the new backup's age, permissions,
+checksum, archive structure, and timer state. Local dumps are retained for 14
+days. The private `swap-assistant-postgres-backups` bucket is isolated in the
 `SwapAssistant` compartment and deletes the
 `swap-assistant/postgres/` objects after 35 days through an OCI lifecycle rule.
 The VM policy is append-only: it can create backup objects but cannot read,
@@ -165,6 +166,12 @@ When offsite backups are enabled, deployment idempotently installs Oracle's
 signed OCI CLI package on supported Oracle Linux 8/9 hosts before verifying the
 first upload. Unsupported host operating systems fail closed with installation
 guidance instead of skipping offsite backups.
+
+The `Verify Production Backups` workflow checks backup freshness every day and
+performs a complete restore into an isolated temporary PostgreSQL database each
+Sunday. It shares the production-release concurrency group, so recovery drills
+cannot overlap an OCI deployment. A failed check is visible in GitHub Actions
+and is also sent to the configured operator Telegram chat.
 
 For the current OCI VM, these values match the manual deployment:
 
@@ -371,12 +378,18 @@ Validate that a selected backup can be restored without exposing a database
 port or touching the live database:
 
 ```bash
-cd /home/opc/wallet
-./scripts/deploy/verify-postgres-restore.sh \
+sudo /usr/local/bin/swap-assistant-postgres-restore-check \
   /home/opc/wallet/backups/postgres/wallet-postgres-YYYYMMDDTHHMMSSZ.dump
 ```
 
-Run this drill after first configuring off-host backups and at least quarterly.
-It verifies the checksum when present, restores into a temporary isolated
-PostgreSQL container, checks the required schema, and removes its container and
-volume on exit.
+Check freshness and integrity without performing a restore:
+
+```bash
+sudo env OCI_DEPLOY_PATH=/home/opc/wallet \
+  /usr/local/bin/swap-assistant-postgres-backup-check
+```
+
+The restore verifier requires a matching checksum, restores into a temporary
+isolated PostgreSQL container, checks the required schema, and removes its
+container and volume on exit. GitHub runs this drill weekly; run it manually as
+well after changing backup or database infrastructure.

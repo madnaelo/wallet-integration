@@ -48,27 +48,31 @@ run_container() {
   fi
 }
 
-if [ -f "$checksum_file" ]; then
-  expected_checksum="$(
-    awk '
-      NR == 1 { value = $1 }
-      NR > 1 { extra = 1 }
-      END {
-        if (extra || value !~ /^[0-9a-fA-F]{64}$/) exit 1
-        print tolower(value)
-      }
-    ' "$checksum_file"
-  )" || {
-    echo "Backup checksum file is invalid." >&2
-    exit 1
-  }
-  actual_checksum="$(sha256sum "$backup_file" | awk '{ print $1 }')"
-  if [ "$actual_checksum" != "$expected_checksum" ]; then
-    echo "Backup checksum verification failed." >&2
-    exit 1
-  fi
-else
-  echo "Warning: no checksum file found; continuing with the restore validation." >&2
+if [ ! -f "$checksum_file" ] || [ -L "$checksum_file" ]; then
+  echo "Backup checksum file is required: $checksum_file" >&2
+  exit 1
+fi
+expected_checksum="$(
+  awk -v expected_name="$backup_name" '
+    NR == 1 {
+      value = $1
+      name = $2
+      sub(/^\*/, "", name)
+    }
+    NR > 1 { extra = 1 }
+    END {
+      if (extra || value !~ /^[0-9a-fA-F]{64}$/ || name != expected_name) exit 1
+      print tolower(value)
+    }
+  ' "$checksum_file"
+)" || {
+  echo "Backup checksum file is invalid." >&2
+  exit 1
+}
+actual_checksum="$(sha256sum "$backup_file" | awk '{ print $1 }')"
+if [ "$actual_checksum" != "$expected_checksum" ]; then
+  echo "Backup checksum verification failed." >&2
+  exit 1
 fi
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"

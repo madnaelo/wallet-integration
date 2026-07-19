@@ -1,0 +1,123 @@
+name: Verify Production Backups
+
+on:
+  schedule:
+    - cron: "42 6 * * *"
+  workflow_dispatch:
+    inputs:
+      run_restore:
+        description: Restore the latest backup into an isolated temporary database
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Backup freshness and recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+    env:
+      OCI_SSH_PORT: ${{ secrets.OCI_SSH_PORT || '22' }}
+      OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH || '/home/opc/wallet' }}
+    steps:
+      - name: Validate connection settings
+        shell: bash
+        env:
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required production secret: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PORT OCI_DEPLOY_PATH; do
+            value="${!name:-}"
+            if ! [[ "$value" =~ ^[A-Za-z0-9_./:@-]+$ ]]; then
+              echo "$name contains unsupported characters." >&2
+              exit 1
+            fi
+          done
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OCI_SSH_PRIVATE_KEY" > ~/.ssh/oci_backup_key
+          chmod 600 ~/.ssh/oci_backup_key
+          printf '%s\n' "$OCI_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Verify latest backup
+        shell: bash
+        env:
+          OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
+          OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
+          RUN_RESTORE_INPUT: ${{ inputs.run_restore }}
+        run: |
+          set -euo pipefail
+          ssh_opts=(
+            -o ServerAliveInterval=30
+            -o ServerAliveCountMax=20
+            -o TCPKeepAlive=yes
+            -o ConnectTimeout=30
+            -o StrictHostKeyChecking=yes
+          )
+
+          restore_arg=""
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$RUN_RESTORE_INPUT" = "true" ]; then
+              restore_arg="--restore"
+            fi
+          elif [ "$(date -u +%u)" = "7" ]; then
+            restore_arg="--restore"
+          fi
+
+          ssh "${ssh_opts[@]}" \
+            -i ~/.ssh/oci_backup_key -p "$OCI_SSH_PORT" \
+            "$OCI_SSH_USER@$OCI_SSH_HOST" \
+            "sudo env OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' BACKUP_MAX_AGE_HOURS=30 /usr/local/bin/swap-assistant-postgres-backup-check $restore_arg"
+
+      - name: Notify operator on failure
+        if: failure()
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.PRODUCTION_MONITOR_TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.PRODUCTION_MONITOR_TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Operator Telegram alert is not configured." >&2
+            exit 0
+          fi
+          message="Swap Assistant backup verification failed. Review ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          curl --silent --show-error --fail --max-time 15 \
+            --request POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$message" >/dev/null || true
+
+      - name: Remove SSH key
+        if: always()
+        shell: bash
+        run: rm -f ~/.ssh/oci_backup_key

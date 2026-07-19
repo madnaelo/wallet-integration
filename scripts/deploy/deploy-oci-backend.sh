@@ -654,10 +654,13 @@ run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile
 enable_backups="$(read_env_value ENABLE_POSTGRES_BACKUP_TIMER || printf 'false')"
 if [ "$enable_backups" = "true" ]; then
   backup_script="$deploy_path/scripts/deploy/backup-oci-postgres.sh"
+  backup_check_script="$deploy_path/scripts/deploy/check-postgres-backup.sh"
+  restore_check_script="$deploy_path/scripts/deploy/verify-postgres-restore.sh"
   oci_cli_installer="$deploy_path/scripts/deploy/install-oci-cli.sh"
   backup_service_template="$deploy_path/infra/systemd/wallet-postgres-backup.service"
   backup_timer_template="$deploy_path/infra/systemd/wallet-postgres-backup.timer"
-  if [ ! -f "$backup_script" ] || [ ! -f "$oci_cli_installer" ] \
+  if [ ! -f "$backup_script" ] || [ ! -f "$backup_check_script" ] \
+    || [ ! -f "$restore_check_script" ] || [ ! -f "$oci_cli_installer" ] \
     || [ ! -f "$backup_service_template" ] || [ ! -f "$backup_timer_template" ]; then
     fail "Backup timer requested, but backup assets were not uploaded."
   fi
@@ -671,9 +674,15 @@ if [ "$enable_backups" = "true" ]; then
   # systemd cannot execute user_home_t files when SELinux is enforcing. Install
   # the runner in a standard executable location and restore its platform label.
   backup_executable="/usr/local/bin/swap-assistant-postgres-backup"
+  backup_check_executable="/usr/local/bin/swap-assistant-postgres-backup-check"
+  restore_check_executable="/usr/local/bin/swap-assistant-postgres-restore-check"
   sudo install -o root -g root -m 0755 "$backup_script" "$backup_executable"
+  sudo install -o root -g root -m 0755 "$backup_check_script" "$backup_check_executable"
+  sudo install -o root -g root -m 0755 "$restore_check_script" "$restore_check_executable"
   if command -v restorecon >/dev/null 2>&1; then
     sudo restorecon -F "$backup_executable"
+    sudo restorecon -F "$backup_check_executable"
+    sudo restorecon -F "$restore_check_executable"
   fi
   escaped_deploy_path="$(printf '%s' "$deploy_path" | sed 's/[&|\\]/\\&/g')"
   sudo sed "s|__WALLET_DEPLOY_PATH__|$escaped_deploy_path|g" "$backup_service_template" \
@@ -692,7 +701,10 @@ if [ "$enable_backups" = "true" ]; then
     || fail "PostgreSQL backup timer was not enabled."
   sudo systemctl is-active --quiet wallet-postgres-backup.timer \
     || fail "PostgreSQL backup timer is not active."
-  echo "PostgreSQL backup upload was verified; the daily timer is enabled and active."
+  sudo env OCI_DEPLOY_PATH="$deploy_path" OCI_CONTAINER_ENGINE="$engine" \
+    "$backup_check_executable" \
+    || fail "The freshly created PostgreSQL backup failed its health check."
+  echo "PostgreSQL backup upload and integrity were verified; the daily timer is enabled and active."
 fi
 
 run_container pull "$backend_image" >/dev/null
