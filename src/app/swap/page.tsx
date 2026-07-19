@@ -39,6 +39,13 @@ import { buildQuoteUrl } from "@/lib/quoteClient";
 import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import { swapLog } from "@/lib/swapLog";
 import { listTokens } from "@/lib/tokenClient";
+import {
+  type PreparedPushSubscription,
+  preparePushSubscription,
+  pushSubscriptionToPayload,
+  subscribeToPreparedPush,
+  withPushSubscription
+} from "@/lib/pushNotifications";
 import { TokenPicker, type TokenPickerOption } from "@/components/TokenPicker";
 import {
   buildFallbackTokensByChain,
@@ -50,7 +57,6 @@ import {
   type FavoritePair,
   type BackendSession,
   type NotificationPreference,
-  type PushSubscriptionPayload,
   type SavePriceAlertRuleRequest,
   type SaveFavoritePairRequest,
   type SaveSwapHistoryRequest,
@@ -302,6 +308,8 @@ export default function Page() {
   const [pushSupportMessage, setPushSupportMessage] = useState<string>("");
   const [pushDeviceState, setPushDeviceState] = useState<PushDeviceState>("unknown");
   const [currentPushEndpoint, setCurrentPushEndpoint] = useState<string>("");
+  const [pushPreparationReady, setPushPreparationReady] = useState<boolean>(false);
+  const preparedPushSubscriptionRef = useRef<PreparedPushSubscription | null>(null);
   const [reverseProfitThresholdPctDraft, setReverseProfitThresholdPctDraft] = useState<string>("1");
   const [reverseLossEnabledDraft, setReverseLossEnabledDraft] = useState<boolean>(false);
   const [reverseLossThresholdPctDraft, setReverseLossThresholdPctDraft] = useState<string>("5");
@@ -607,21 +615,40 @@ export default function Page() {
     if (activeView !== "preferences") return;
     let cancelled = false;
 
-    async function loadPushConfig() {
+    async function preparePushNotifications() {
+      let publicKey = envPublic.VAPID_PUBLIC_KEY;
       try {
         const config = await getPushNotificationConfig(envPublic.BACKEND_BASE_URL);
-        const publicKey = config.enabled ? config.vapidPublicKey.trim() : "";
-        if (cancelled) return;
-        setPushPublicKey(publicKey);
-        setPushSupportMessage(getPushSupportMessage(publicKey));
+        publicKey = config.enabled ? config.vapidPublicKey.trim() : "";
       } catch {
+        publicKey = envPublic.VAPID_PUBLIC_KEY;
+      }
+
+      if (cancelled) return;
+      setPushPublicKey(publicKey);
+      const supportMessage = getPushSupportMessage(publicKey);
+      setPushSupportMessage(supportMessage);
+      if (supportMessage) {
+        setPushPreparationReady(false);
+        preparedPushSubscriptionRef.current = null;
+        return;
+      }
+
+      try {
+        const prepared = await preparePushSubscription(publicKey);
         if (cancelled) return;
-        setPushPublicKey(envPublic.VAPID_PUBLIC_KEY);
-        setPushSupportMessage(getPushSupportMessage(envPublic.VAPID_PUBLIC_KEY));
+        preparedPushSubscriptionRef.current = prepared;
+        setPushPreparationReady(true);
+      } catch (error) {
+        if (cancelled) return;
+        preparedPushSubscriptionRef.current = null;
+        setPushPreparationReady(false);
+        setPushSupportMessage(normalizePushNotificationError(error));
       }
     }
 
-    void loadPushConfig();
+    setPushPreparationReady(false);
+    void preparePushNotifications();
     return () => {
       cancelled = true;
     };
@@ -1611,20 +1638,6 @@ export default function Page() {
     }
   }
 
-  async function getEffectivePushPublicKey(): Promise<string> {
-    if (pushPublicKey.trim()) return pushPublicKey.trim();
-    let publicKey = envPublic.VAPID_PUBLIC_KEY;
-    try {
-      const config = await getPushNotificationConfig(envPublic.BACKEND_BASE_URL);
-      publicKey = config.enabled ? config.vapidPublicKey.trim() : "";
-    } catch {
-      publicKey = envPublic.VAPID_PUBLIC_KEY;
-    }
-    setPushPublicKey(publicKey);
-    setPushSupportMessage(getPushSupportMessage(publicKey));
-    return publicKey;
-  }
-
   async function enablePushNotifications() {
     setPushPreferenceLoading(true);
     setNotificationPreferenceError("");
@@ -1634,25 +1647,28 @@ export default function Page() {
 
       const browserSupportMessage = getPushSupportMessage(pushPublicKey || envPublic.VAPID_PUBLIC_KEY || "configured");
       setPushSupportMessage(browserSupportMessage);
-      if (browserSupportMessage && browserSupportMessage !== PUSH_DENIED_MESSAGE) {
+      if (browserSupportMessage) {
         throw new Error(browserSupportMessage);
       }
 
-      const permission = await requestPushNotificationPermission();
-      if (permission !== "granted") {
-        throw new Error(PUSH_DENIED_MESSAGE);
-      }
-
-      const publicKey = await getEffectivePushPublicKey();
+      const publicKey = pushPublicKey.trim();
       const supportMessage = getPushSupportMessage(publicKey);
       setPushSupportMessage(supportMessage);
-      if (supportMessage && supportMessage !== PUSH_DENIED_MESSAGE) {
+      if (supportMessage) {
         throw new Error(supportMessage);
       }
 
-      const registration = await ensureServiceWorkerRegistration();
-      setNotificationPreferenceNotice("Push notifications are allowed. Connecting this device...");
-      const subscription = await getOrCreatePushSubscription(registration, publicKey);
+      const prepared = preparedPushSubscriptionRef.current;
+      if (!prepared || prepared.vapidPublicKey !== publicKey) {
+        throw new Error("Push notifications are still getting ready. Please try again.");
+      }
+
+      setNotificationPreferenceNotice(
+        Notification.permission === "default"
+          ? "Choose Allow when your browser asks, then keep this page open for a moment."
+          : "Connecting this device to push notifications..."
+      );
+      const subscription = await subscribeToPreparedPush(prepared);
       const payload = pushSubscriptionToPayload(subscription);
       const preference = await savePushSubscription(
         envPublic.BACKEND_BASE_URL,
@@ -1660,6 +1676,7 @@ export default function Page() {
         payload
       );
       applyNotificationPreference(preference);
+      preparedPushSubscriptionRef.current = withPushSubscription(prepared, subscription);
       setCurrentPushEndpoint(subscription.endpoint);
       setPushDeviceState("linked");
       setNotificationPreferenceNotice("Push notifications enabled on this device.");
@@ -1668,6 +1685,7 @@ export default function Page() {
         clearStoredBackendSession();
         setBackendSession(null);
       }
+      setPushSupportMessage(getPushSupportMessage(pushPublicKey || envPublic.VAPID_PUBLIC_KEY));
       await refreshCurrentPushDeviceStatus(getCurrentBackendSessionForWallet());
       setNotificationPreferenceError(normalizePushNotificationError(e));
     } finally {
@@ -1701,6 +1719,12 @@ export default function Page() {
       );
       if (scope === "all" || (scope === "device" && endpoint === subscription?.endpoint)) {
         await subscription?.unsubscribe().catch(() => false);
+        if (preparedPushSubscriptionRef.current) {
+          preparedPushSubscriptionRef.current = withPushSubscription(
+            preparedPushSubscriptionRef.current,
+            null
+          );
+        }
       }
       applyNotificationPreference(preference);
       await refreshCurrentPushDeviceStatus(session);
@@ -3591,9 +3615,18 @@ export default function Page() {
                           className="btn btnPrimary"
                           type="button"
                           onClick={enablePushNotifications}
-                          disabled={Boolean(pushSupportMessage) || pushPreferenceLoading || pushDeviceState === "checking"}
+                          disabled={
+                            Boolean(pushSupportMessage)
+                            || !pushPreparationReady
+                            || pushPreferenceLoading
+                            || pushDeviceState === "checking"
+                          }
                         >
-                          {pushPreferenceLoading ? "Enabling..." : "Enable Push Notifications"}
+                          {pushPreferenceLoading
+                            ? "Enabling..."
+                            : !pushPreparationReady && !pushSupportMessage
+                              ? "Getting Ready..."
+                              : "Enable Push Notifications"}
                         </button>
                       )}
                       {pushWalletEnabled && !pushDeviceLinked ? (
@@ -4657,159 +4690,6 @@ function isLikelyEmbeddedMobileBrowser(userAgent: string): boolean {
   return /; wv\)|\bwv\b|MetaMaskMobile|Binance|Trust|CoinbaseWallet|OKApp|Phantom|Rainbow|TokenPocket|imToken/i.test(userAgent);
 }
 
-function requestPushNotificationPermission(): Promise<NotificationPermission> {
-  if (!("Notification" in window)) return Promise.resolve("denied");
-  if (Notification.permission !== "default") return Promise.resolve(Notification.permission);
-
-  return new Promise((resolve) => {
-    const requestPermission = Notification.requestPermission;
-    if (requestPermission.length > 0) {
-      requestPermission.call(Notification, resolve);
-      return;
-    }
-    requestPermission.call(Notification).then(resolve, () => resolve("denied"));
-  });
-}
-
-async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
-  if (!("serviceWorker" in navigator)) {
-    throw new Error("This browser does not support push notifications.");
-  }
-  const existingRegistration = await navigator.serviceWorker.getRegistration("/");
-  if (!existingRegistration) {
-    await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-  } else {
-    await existingRegistration.update().catch(() => undefined);
-  }
-  return navigator.serviceWorker.ready;
-}
-
-async function resetServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
-  if (!("serviceWorker" in navigator)) {
-    throw new Error("This browser does not support push notifications.");
-  }
-  const existingRegistration = await navigator.serviceWorker.getRegistration("/");
-  await existingRegistration?.unregister().catch(() => false);
-  await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-  return navigator.serviceWorker.ready;
-}
-
-async function getOrCreatePushSubscription(
-  registration: ServiceWorkerRegistration,
-  vapidPublicKey: string
-): Promise<PushSubscription> {
-  const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
-  const existingSubscription = await registration.pushManager.getSubscription();
-  if (existingSubscription) {
-    const existingKey = existingSubscription.options.applicationServerKey;
-    if (!existingKey || arrayBufferToBase64Url(existingKey) === arrayBufferToBase64Url(applicationServerKey)) {
-      return existingSubscription;
-    }
-    await existingSubscription.unsubscribe().catch(() => false);
-  }
-
-  try {
-    return await subscribeToPushManager(registration, applicationServerKey);
-  } catch (firstError) {
-    await waitMs(700);
-    try {
-      return await subscribeToPushManager(registration, applicationServerKey);
-    } catch {
-      // Continue to stale subscription cleanup and service worker refresh.
-    }
-
-    const staleSubscription = await registration.pushManager.getSubscription();
-    if (staleSubscription) {
-      await staleSubscription.unsubscribe().catch(() => false);
-      try {
-        return await subscribeToPushManager(registration, applicationServerKey);
-      } catch {
-        // Continue to the registration refresh below.
-      }
-    }
-
-    try {
-      const refreshedRegistration = await resetServiceWorkerRegistration();
-      await waitMs(700);
-      return await subscribeToPushManager(refreshedRegistration, applicationServerKey);
-    } catch {
-      throw new PushSubscriptionSetupError(firstError);
-    }
-  }
-}
-
-function subscribeToPushManager(
-  registration: ServiceWorkerRegistration,
-  applicationServerKey: Uint8Array<ArrayBuffer>
-): Promise<PushSubscription> {
-  return registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey
-  }).then(async (subscription) => {
-    if (subscription) return subscription;
-    const existingSubscription = await registration.pushManager.getSubscription().catch(() => null);
-    if (existingSubscription) return existingSubscription;
-    throw new PushSubscriptionUnavailableError();
-  });
-}
-
-class PushSubscriptionUnavailableError extends Error {
-  constructor() {
-    super("The browser did not return a push subscription endpoint.");
-    this.name = "PushSubscriptionUnavailableError";
-  }
-}
-
-class PushSubscriptionSetupError extends Error {
-  constructor(cause: unknown) {
-    super(normalizeWalletError(cause));
-    this.name = "PushSubscriptionSetupError";
-    this.cause = cause;
-  }
-}
-
-function pushSubscriptionToPayload(subscription: PushSubscription): PushSubscriptionPayload {
-  const json = subscription.toJSON() as {
-    endpoint?: string;
-    expirationTime?: number | null;
-    keys?: { p256dh?: string; auth?: string };
-  };
-  const p256dh = json.keys?.p256dh ?? arrayBufferToBase64Url(subscription.getKey("p256dh"));
-  const auth = json.keys?.auth ?? arrayBufferToBase64Url(subscription.getKey("auth"));
-
-  if (!json.endpoint || !p256dh || !auth) {
-    throw new Error("Push notification setup was incomplete. Please try again.");
-  }
-
-  return {
-    endpoint: json.endpoint,
-    keys: { p256dh, auth },
-    expirationTime: json.expirationTime ?? null
-  };
-}
-
-function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
-  const padding = "=".repeat((4 - (value.length % 4)) % 4);
-  const base64 = `${value}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
-  const raw = window.atob(base64);
-  const output: Uint8Array<ArrayBuffer> = new Uint8Array(new ArrayBuffer(raw.length));
-  for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
-  return output;
-}
-
-function arrayBufferToBase64Url(buffer: ArrayBuffer | ArrayBufferView | null): string {
-  if (!buffer) return "";
-  const bytes = ArrayBuffer.isView(buffer)
-    ? new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
-    : new Uint8Array(buffer);
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.slice(i, i + chunkSize));
-  }
-  return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 function scrollQuoteIntoViewOnMobile(actionElement: HTMLElement | null, detailsElement: HTMLElement | null) {
   if (!window.matchMedia("(max-width: 859px)").matches) return;
 
@@ -5084,15 +4964,19 @@ function normalizeRecipientImportError(e: any): string {
 
 function normalizePushNotificationError(e: any): string {
   const message = normalizeWalletError(e);
+  if (e?.name === "NotAllowedError" || e?.cause?.name === "NotAllowedError") {
+    return PUSH_DENIED_MESSAGE;
+  }
   if (e?.name === "PushSubscriptionUnavailableError" || e?.cause?.name === "PushSubscriptionUnavailableError") {
     return "Your browser allowed notifications, but did not create a push endpoint for this device. Try the installed app or another browser; Telegram alerts will keep working meanwhile.";
   }
   if (e?.name === "PushSubscriptionSetupError") {
-    return "Chrome allowed notifications, but this phone did not finish connecting to push alerts. Open Swap Assistant directly in Chrome or the installed app, keep it in the foreground, and tap Enable again. If it still fails, update Chrome and Google Play Services, then restart the phone.";
+    return "Your browser could not connect this device to its push service. Telegram alerts remain available; try push notifications again later or on another device.";
   }
   if (/push service|registration failed|aborterror/i.test(message)) {
-    return "Chrome allowed notifications, but this phone did not finish connecting to push alerts. Open Swap Assistant directly in Chrome or the installed app, keep it in the foreground, and tap Enable again.";
+    return "Your browser could not connect this device to its push service. Telegram alerts remain available; try push notifications again later or on another device.";
   }
+  if (/configuration is invalid/i.test(message)) return "Push notifications are not available right now.";
   if (/permission|blocked|denied|not enabled/i.test(message)) return PUSH_DENIED_MESSAGE;
   if (/not available/i.test(message)) return "Push notifications are not available right now.";
   if (/not support/i.test(message)) return "This browser does not support push notifications.";

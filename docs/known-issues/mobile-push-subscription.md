@@ -1,6 +1,7 @@
 # Mobile Push Subscription Failure
 
-Status: paused on 2026-05-30.
+Status: application-side fix implemented on 2026-07-19; production mobile
+verification pending.
 
 ## Summary
 
@@ -124,25 +125,65 @@ visible from the current diagnostics.
 Do not ask the user to repeat the same clearing/update/restart cycle first;
 they already did it.
 
-## Next Resume Checklist
+## 2026-07-19 Application Fix
 
-1. Inspect production backend logs for `Push diagnostic report` and
-   `Push diagnostic entry` around the user's test time.
-2. Add one temporary diagnostic route/page if needed that performs the minimum
-   possible push subscription flow outside the large swap page.
-3. Verify the exact deployed VAPID public key matches the private key used by
-   the backend sender. Subscription creation should not require the private key,
-   but mismatched production config can confuse later send testing.
-4. Test whether changing the app origin/domain affects mobile subscription
-   creation. Current origin is the Vercel subdomain.
-5. The generated PNG icon set and maskable manifest icon are now present. Do
-   not repeat that remediation; verify a different origin/device push service
-   path when investigation resumes.
-6. If still failing, add a user-facing fallback state: keep Telegram as the
-   recommended mobile alert channel and mark mobile push as unavailable on this
-   device after repeated `AbortError` failures.
+The production VAPID configuration was verified without exposing key material:
 
-## Current Product Decision
+- the frontend and backend public keys are identical,
+- the deployed backend returns the same public key,
+- the private key derives that exact P-256 public key,
+- the decoded public key is a valid 65-byte uncompressed P-256 point,
+- desktop subscription and delivery already work.
 
-Pause deeper mobile push debugging for now. Telegram alerts are working and are
-the reliable mobile alert channel until this issue is resumed.
+The client flow did not follow the strongest mobile browser lifecycle. It
+requested notification permission separately, then fetched/prepared resources,
+then called `PushManager.subscribe()`. That can detach subscription from the
+user gesture required by mobile browsers. It also retried subscription several
+times and unregistered/re-registered the service worker after a push-service
+error.
+
+The replacement flow now:
+
+1. loads and validates the VAPID public key before the user can enable push,
+2. prepares the active service worker and existing subscription in advance,
+3. calls `PushManager.subscribe()` directly from the Enable action so that
+   the browser owns both its permission prompt and push registration,
+4. makes one registration attempt and never removes a healthy service worker
+   in response to an upstream push-service error,
+5. preserves an existing matching subscription and safely removes one tied to
+   an obsolete VAPID key,
+6. treats a subscription recovered by the browser as success, and
+7. keeps device state disabled unless a real endpoint is returned and saved.
+
+Focused tests enforce malformed-key rejection, existing-subscription reuse,
+key-rotation cleanup, one-call subscription behavior, and no retry/reset loop.
+
+This matches the platform guidance that `subscribe()` should run in response
+to a user gesture and use an active service-worker registration:
+
+- https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe
+- https://developer.chrome.com/docs/extensions/how-to/integrate/web-push
+
+If the same Chromium `SERVICE_ERROR` remains after this release, it is an
+internal failure of the browser's configured push service before our backend.
+Chrome documents that its push service is selected by the browser and is not
+controlled by the web application. In that case Telegram remains the reliable
+mobile fallback while a second device/network or a future native application
+path is evaluated.
+
+## Verification Checklist
+
+1. Deploy the application-side fix.
+2. On the same mobile browser, open Preferences and tap Enable Push
+   Notifications once.
+3. Confirm that the browser permission prompt and subscription complete as one
+   action and that the UI reports this device as connected.
+4. Trigger a testable alert and confirm delivery after the application is
+   backgrounded.
+5. If Chromium still reports `Registration failed - push service error`, test
+   one different physical device or network before changing application code.
+
+## Product Fallback
+
+Telegram alerts continue to work independently of browser push and remain
+available whenever a device's browser push service cannot create an endpoint.
