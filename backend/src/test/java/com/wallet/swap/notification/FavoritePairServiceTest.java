@@ -13,6 +13,7 @@ import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairRequest;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -66,6 +67,19 @@ class FavoritePairServiceTest {
 
     verify(walletMutationLock).lock(WALLET);
     verify(repository, never()).insert(any(), any());
+  }
+
+  @Test
+  void returnsNotFoundWhenFavoriteWasRemovedBeforeUpdate() {
+    UUID id = UUID.randomUUID();
+    FavoritePairRequest request = request("2525", "above", true);
+    when(repository.update(eq(WALLET), eq(id), any())).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.update(WALLET, id, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("not found");
+
+    verify(walletMutationLock).lock(WALLET);
   }
 
   private FavoritePairRequest request(String targetRate, String direction, boolean alertsEnabled) {

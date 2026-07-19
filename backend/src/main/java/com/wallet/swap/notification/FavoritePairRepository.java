@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -144,8 +145,8 @@ public class FavoritePairRepository {
     return count != null && count > 0;
   }
 
-  public FavoritePairResponse update(String walletAddress, UUID id, FavoritePairRequest request) {
-    return jdbcTemplate.queryForObject(
+  public Optional<FavoritePairResponse> update(String walletAddress, UUID id, FavoritePairRequest request) {
+    List<FavoritePairResponse> rows = jdbcTemplate.query(
         """
         UPDATE favorite_pairs SET
           chain_id = ?,
@@ -175,6 +176,7 @@ public class FavoritePairRepository {
         Boolean.TRUE.equals(request.alertsEnabled()),
         walletAddress,
         id);
+    return rows.stream().findFirst();
   }
 
   public void delete(String walletAddress, UUID id) {

@@ -51,7 +51,8 @@ public class FavoritePairService {
     FavoritePairRequest normalized = normalized(request);
     walletMutationLock.lock(walletAddress);
     validateTargetSpacing(walletAddress, normalized, id);
-    return repository.update(walletAddress, id, normalized);
+    return repository.update(walletAddress, id, normalized)
+        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Favorite pair was not found."));
   }
 
   public void delete(String walletAddress, UUID id) {
