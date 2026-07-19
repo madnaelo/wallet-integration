@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -70,6 +71,21 @@ class LimitOrderServiceTest {
     assertThatThrownBy(() -> service.save(WALLET, request))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("maker");
+  }
+
+  @Test
+  void rejectsUnsignedProviderFieldsBeforePersistence() throws Exception {
+    LimitOrderRequest valid = validRequest(WALLET);
+    var payload = objectMapper.readTree(valid.signedPayloadJson());
+    ((com.fasterxml.jackson.databind.node.ObjectNode) payload.path("data"))
+        .put("permit", "unsigned-provider-instruction");
+    LimitOrderRequest request = withSignedPayload(valid, objectMapper.writeValueAsString(payload));
+
+    assertThatThrownBy(() -> service.save(WALLET, request))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("unsupported fields");
+
+    verify(repository, never()).insertIfAbsent(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -198,6 +214,28 @@ class LimitOrderServiceTest {
         request.signature(),
         request.signedPayloadJson(),
         termsVersion,
+        request.termsAccepted());
+  }
+
+  private LimitOrderRequest withSignedPayload(LimitOrderRequest request, String signedPayloadJson) {
+    return new LimitOrderRequest(
+        request.chainId(),
+        request.sellTokenAddress(),
+        request.sellTokenSymbol(),
+        request.sellTokenDecimals(),
+        request.buyTokenAddress(),
+        request.buyTokenSymbol(),
+        request.buyTokenDecimals(),
+        request.sellAmountRaw(),
+        request.minBuyAmountRaw(),
+        request.targetRate(),
+        request.expiresAt(),
+        request.recipientAddress(),
+        request.executionProvider(),
+        request.orderHash(),
+        request.signature(),
+        signedPayloadJson,
+        request.termsVersion(),
         request.termsAccepted());
   }
 

@@ -15,6 +15,7 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -53,6 +54,31 @@ public class LimitOrderService {
       new Eip712Field("partiallyFillable", "bool"),
       new Eip712Field("sellTokenBalance", "string"),
       new Eip712Field("buyTokenBalance", "string"));
+  private static final Set<String> ONEINCH_DATA_FIELDS = Set.of(
+      "salt",
+      "maker",
+      "receiver",
+      "makerAsset",
+      "takerAsset",
+      "makingAmount",
+      "takingAmount",
+      "makerTraits",
+      "extension");
+  private static final Set<String> COW_DATA_FIELDS = Set.of(
+      "sellToken",
+      "buyToken",
+      "receiver",
+      "sellAmount",
+      "buyAmount",
+      "validTo",
+      "appData",
+      "feeAmount",
+      "kind",
+      "partiallyFillable",
+      "sellTokenBalance",
+      "buyTokenBalance",
+      "from",
+      "signingScheme");
 
   private final LimitOrderCapabilityService capabilityService;
   private final FeatureFlagService featureFlagService;
@@ -208,6 +234,7 @@ public class LimitOrderService {
       JsonNode typedData,
       JsonNode domain,
       JsonNode message) {
+    requireOnlyFields(data, ONEINCH_DATA_FIELDS);
     requireTypeSchema(typedData, message, domain, ONEINCH_ORDER_FIELDS);
     requireSameAddress(data.path("maker").asText(""), walletAddress, "Signed order maker must match the signed-in wallet.");
     requireSameAddress(data.path("makerAsset").asText(""), request.sellTokenAddress(), "Signed order sell token does not match.");
@@ -248,6 +275,7 @@ public class LimitOrderService {
       JsonNode typedData,
       JsonNode domain,
       JsonNode message) {
+    requireOnlyFields(data, COW_DATA_FIELDS);
     requireTypeSchema(typedData, message, domain, COW_ORDER_FIELDS);
     requireSameAddress(data.path("from").asText(""), walletAddress, "Signed order owner must match the signed-in wallet.");
     requireSameAddress(data.path("sellToken").asText(""), request.sellTokenAddress(), "Signed order sell token does not match.");
@@ -361,6 +389,22 @@ public class LimitOrderService {
         throw new ApiException(HttpStatus.BAD_REQUEST, "Signed order terms do not match the submitted order.");
       }
     }
+  }
+
+  private void requireOnlyFields(JsonNode object, Set<String> allowedFields) {
+    if (!object.isObject()
+        || object.size() != allowedFields.size()
+        || !allFieldsAllowed(object, allowedFields)) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Signed order contains unsupported fields.");
+    }
+  }
+
+  private boolean allFieldsAllowed(JsonNode object, Set<String> allowedFields) {
+    var fields = object.fieldNames();
+    while (fields.hasNext()) {
+      if (!allowedFields.contains(fields.next())) return false;
+    }
+    return true;
   }
 
   private void requireSameAddress(String actual, String expected, String message) {
