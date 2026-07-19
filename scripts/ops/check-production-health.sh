@@ -150,7 +150,9 @@ fi
 
 if [ -n "$admin_api_key" ] && [ -n "$admin_ops_url" ]; then
   ops_file="$tmp_dir/admin-ops.json"
-  if curl --fail-with-body --silent --show-error --location --max-time 20 --retry 2 --retry-delay 2 \
+  # Never follow redirects while sending the privileged admin key. A redirect
+  # to another host could otherwise disclose it outside the API origin.
+  if curl --fail-with-body --silent --show-error --max-time 20 --retry 2 --retry-delay 2 \
     --header "X-Admin-Key: $admin_api_key" \
     --output "$ops_file" "$admin_ops_url"; then
     if ! ops_summary="$(python3 - "$ops_file" <<'PY' 2>&1
