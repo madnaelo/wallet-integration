@@ -26,7 +26,9 @@ export type QuoteResponse = {
   quoteId?: string;
   providerId?: string;
   providerName?: string;
-  executionKind?: "evm-same-chain" | "evm-to-bitcoin" | "bitcoin-to-evm";
+  executionKind?: "evm-same-chain" | "evm-cross-chain" | "evm-to-bitcoin" | "bitcoin-to-evm";
+  fromChainId?: number;
+  toChainId?: number;
   providerRank?: number;
   isBest?: boolean;
   platformFeeBps?: number;

@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { QuoteParams } from "@/lib/server/aggregator";
-import { LifiBitcoinClient } from "@/lib/server/lifiBitcoinClient";
+import { LifiClient } from "@/lib/server/lifiClient";
 import { OneInchClient } from "@/lib/server/oneInchClient";
 import { ParaswapClient } from "@/lib/server/paraswapClient";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 import { ZeroXClient } from "@/lib/server/zeroxClient";
+import { NATIVE_BITCOIN_CHAIN_ID } from "@/lib/tokens";
 
 const FEE_RECIPIENT = "0x18a5bAABfD3a5a7f6ca30B74b6A60fFe5454454D";
 const BUY_TOKEN = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
@@ -130,13 +131,14 @@ describe("provider monetization requests", () => {
     }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const quote = await new LifiBitcoinClient({
+    const quote = await new LifiClient({
       baseUrl: "https://li.quest",
       apiKey: "test-key",
       integrator: "swapassistant",
       platformFee: feeConfig
     }).getQuote({
       ...params,
+      buyChainId: NATIVE_BITCOIN_CHAIN_ID,
       buyToken: "bitcoin",
       buyTokenSymbol: "BTC",
       buyTokenDecimals: 8,
@@ -146,6 +148,8 @@ describe("provider monetization requests", () => {
     const url = requestUrl(fetchMock);
     expect(url.searchParams.get("integrator")).toBe("swapassistant");
     expect(url.searchParams.get("fee")).toBe("0.002");
+    expect(url.searchParams.get("fromChain")).toBe("1");
+    expect(url.searchParams.get("toChain")).toBe(String(NATIVE_BITCOIN_CHAIN_ID));
     expect(quote.netBuyAmount).toBe("1000");
     expect(quote.grossBuyAmount).toBe("1002");
   });

@@ -58,6 +58,7 @@ class SwapHistoryServiceTest {
   private SaveSwapHistoryRequest requestWithQuote(com.fasterxml.jackson.databind.JsonNode quote) {
     return new SaveSwapHistoryRequest(
         1L,
+        1L,
         null,
         "dry_run",
         "0x0000000000000000000000000000000000000002",

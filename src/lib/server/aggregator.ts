@@ -2,6 +2,7 @@ import type { QuoteResponse } from "@/lib/types";
 
 export type QuoteParams = {
   chainId: number;
+  buyChainId?: number;
   sellToken: string;
   sellTokenSymbol: string;
   sellTokenDecimals: number;

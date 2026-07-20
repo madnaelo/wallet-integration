@@ -33,7 +33,7 @@ class NotificationMessageFormatterTest {
 
     assertThat(body).contains("Review this swap:");
     assertThat(body).contains(
-        "https://wallet.example/swap?chainId=1&sellToken=0xdAC17F958D2ee523a2206206994597C13D831ec7"
+        "https://wallet.example/swap?chainId=8453&toChainId=1&sellToken=0xdAC17F958D2ee523a2206206994597C13D831ec7"
             + "&buyToken=ETH&sellAmountRaw=2286868739&autoQuote=1");
   }
 
@@ -71,7 +71,7 @@ class NotificationMessageFormatterTest {
 
     assertThat(body).contains("Review this swap:");
     assertThat(body).contains(
-        "https://wallet.example/swap?chainId=1&sellToken=ETH"
+        "https://wallet.example/swap?chainId=1&toChainId=1&sellToken=ETH"
             + "&buyToken=0xdAC17F958D2ee523a2206206994597C13D831ec7");
     assertThat(body).doesNotContain("sellAmountRaw=");
   }
@@ -90,7 +90,7 @@ class NotificationMessageFormatterTest {
     assertThat(payload.title()).contains("Favorite pair alert");
     assertThat(payload.body()).contains("reached your target");
     assertThat(payload.url()).isEqualTo(
-        "https://wallet.example/swap?chainId=1&sellToken=ETH"
+        "https://wallet.example/swap?chainId=1&toChainId=1&sellToken=ETH"
             + "&buyToken=0xdAC17F958D2ee523a2206206994597C13D831ec7");
   }
 
@@ -107,7 +107,7 @@ class NotificationMessageFormatterTest {
 
     assertThat(body).contains("Swap Assistant cannot move funds on its own");
     assertThat(body).contains(
-        "https://wallet.example/swap?chainId=1&sellToken=ETH"
+        "https://wallet.example/swap?chainId=1&toChainId=1&sellToken=ETH"
             + "&buyToken=0xdAC17F958D2ee523a2206206994597C13D831ec7&sellAmountRaw=1000000000000000000&autoQuote=1");
   }
 
@@ -122,6 +122,7 @@ class NotificationMessageFormatterTest {
         UUID.randomUUID(),
         "0x1234567890123456789012345678901234567890",
         1L,
+        8453L,
         "ETH",
         "ETH",
         18,

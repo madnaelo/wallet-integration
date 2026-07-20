@@ -56,6 +56,8 @@ export function normalizeQuote(
     quoteId: buildQuoteId(meta.providerId, params, fields.to, grossBuyAmount),
     providerId: meta.providerId,
     providerName: meta.providerName,
+    fromChainId: params.chainId,
+    toChainId: params.buyChainId ?? params.chainId,
     platformFeeBps: fields.platformFeeBps,
     sellAmount: params.sellAmount,
     buyAmount: netBuyAmount,
@@ -69,7 +71,9 @@ export function normalizeQuote(
     gasPrice: fields.gasPrice,
     totalNetworkFee: fields.totalNetworkFee,
     networkFeeToken: fields.networkFeeToken,
-    executionKind: fields.executionKind,
+    executionKind: fields.executionKind ?? (
+      (params.buyChainId ?? params.chainId) === params.chainId ? "evm-same-chain" : "evm-cross-chain"
+    ),
     allowanceTarget: fields.allowanceTarget,
     routeLines: fields.routeLines ?? [],
     serviceFees: fields.serviceFees ?? []
@@ -267,6 +271,21 @@ export function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+export function uintStringValue(value: unknown): string {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? String(value) : "";
+  }
+  if (typeof value !== "string") return "";
+  const normalized = value.trim();
+  if (/^\d{1,78}$/.test(normalized)) return normalized;
+  if (!/^0x[0-9a-fA-F]{1,64}$/.test(normalized)) return "";
+  try {
+    return BigInt(normalized).toString();
+  } catch {
+    return "";
+  }
+}
+
 export function scalarStringValue(value: unknown): string {
   if (typeof value === "string") return value;
   return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
@@ -287,7 +306,7 @@ export function numberValue(value: unknown): number {
 }
 
 function buildQuoteId(providerId: string, params: QuoteParams, to: string, buyAmount: string): string {
-  return `${providerId}:${params.chainId}:${params.sellToken}:${params.buyToken}:${params.sellAmount}:${buyAmount}:${to}`;
+  return `${providerId}:${params.chainId}:${params.buyChainId ?? params.chainId}:${params.sellToken}:${params.buyToken}:${params.sellAmount}:${buyAmount}:${to}`;
 }
 
 function compareIntegerStrings(a: string, b: string): number {

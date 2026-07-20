@@ -1,6 +1,6 @@
 import type { QuoteResponse, QuoteFee, QuoteToken } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
-import { SAME_CHAIN_QUOTE_CHAIN_IDS } from "@/lib/chains";
+import { NATIVE_BITCOIN_CHAIN_ID, NATIVE_BITCOIN_TOKEN_ADDRESS } from "@/lib/tokens";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 import {
   assertExecutableQuote,
@@ -8,39 +8,34 @@ import {
   readProviderResponse,
   recordValue,
   stringValue,
+  uintStringValue,
   ZERO_ADDRESS
 } from "@/lib/server/quoteNormalization";
 
-const BITCOIN_CHAIN_ID = "20000000000001";
-const BITCOIN_TOKEN_ID = "bitcoin";
 const LIFI_QUOTE_TIMEOUT_MS = 15_000;
 
-export type LifiBitcoinClientConfig = {
+export type LifiClientConfig = {
   baseUrl: string;
   apiKey?: string;
   integrator?: string;
   platformFee: PlatformFeeConfig;
 };
 
-export class LifiBitcoinClient implements DexAggregatorClient {
+export class LifiClient implements DexAggregatorClient {
   providerId = "lifi";
   providerName = "LI.FI";
-  supportedChainIds: number[] = [...SAME_CHAIN_QUOTE_CHAIN_IDS];
 
-  constructor(private readonly cfg: LifiBitcoinClientConfig) {}
+  constructor(private readonly cfg: LifiClientConfig) {}
 
   async getQuote(params: QuoteParams): Promise<QuoteResponse> {
-    if (!this.supportedChainIds.includes(params.chainId)) {
-      throw new Error("Native Bitcoin quotes are not available from this network yet.");
-    }
-    if (!isBitcoinToken(params.sellToken) && !isBitcoinToken(params.buyToken)) {
-      throw new Error("LI.FI Bitcoin quotes require native Bitcoin on one side.");
-    }
+    const buyChainId = params.buyChainId ?? params.chainId;
     if (!params.toAddress) throw new Error("Choose where this swap should be received.");
+    assertAssetMatchesChain(params.sellToken, params.chainId, "source");
+    assertAssetMatchesChain(params.buyToken, buyChainId, "destination");
 
     const url = new URL("/v1/quote", this.cfg.baseUrl);
-    url.searchParams.set("fromChain", isBitcoinToken(params.sellToken) ? BITCOIN_CHAIN_ID : String(params.chainId));
-    url.searchParams.set("toChain", isBitcoinToken(params.buyToken) ? BITCOIN_CHAIN_ID : String(params.chainId));
+    url.searchParams.set("fromChain", String(params.chainId));
+    url.searchParams.set("toChain", String(buyChainId));
     url.searchParams.set("fromToken", toLifiToken(params.sellToken));
     url.searchParams.set("toToken", toLifiToken(params.buyToken));
     url.searchParams.set("fromAddress", params.takerAddress);
@@ -80,9 +75,9 @@ export class LifiBitcoinClient implements DexAggregatorClient {
       minBuyAmount: stringValue(estimate.toAmountMin),
       to: stringValue(tx.to),
       data: stringValue(tx.data),
-      value: stringValue(tx.value) || "0",
-      gas: stringValue(tx.gasLimit) || stringValue(tx.gas),
-      gasPrice: stringValue(tx.gasPrice) || gasCostPrice(gasCosts),
+      value: uintStringValue(tx.value) || "0",
+      gas: uintStringValue(tx.gasLimit) || uintStringValue(tx.gas),
+      gasPrice: uintStringValue(tx.gasPrice) || gasCostPrice(gasCosts),
       allowanceTarget: stringValue(estimate.approvalAddress) || stringValue(tx.to),
       routeLines: [
         {
@@ -94,15 +89,28 @@ export class LifiBitcoinClient implements DexAggregatorClient {
       platformFeeBps: hasPlatformFee ? this.cfg.platformFee.feeBps : undefined
     };
 
-    assertExecutableQuote(params, fields, { quoteOnly: isBitcoinToken(params.sellToken) });
-    if (!fields.buyAmount) throw new Error("LI.FI did not return a Bitcoin output amount.");
+    const sourceIsBitcoin = isBitcoinChain(params.chainId);
+    assertExecutableQuote(params, fields, { quoteOnly: sourceIsBitcoin });
+    if (!fields.buyAmount) throw new Error("LI.FI did not return an output amount.");
 
     return normalizeQuote(params, this, {
       ...fields,
-      executionKind: isBitcoinToken(params.sellToken) ? "bitcoin-to-evm" : "evm-to-bitcoin",
+      executionKind: getExecutionKind(params.chainId, params.buyChainId ?? params.chainId),
       totalNetworkFee: sumCostAmounts(gasCosts),
       networkFeeToken: firstCostToken(gasCosts)
     });
+  }
+}
+
+function getExecutionKind(fromChainId: number, toChainId: number): NonNullable<QuoteResponse["executionKind"]> {
+  if (isBitcoinChain(fromChainId)) return "bitcoin-to-evm";
+  if (isBitcoinChain(toChainId)) return "evm-to-bitcoin";
+  return fromChainId === toChainId ? "evm-same-chain" : "evm-cross-chain";
+}
+
+function assertAssetMatchesChain(token: string, chainId: number, side: string) {
+  if (isBitcoinToken(token) !== isBitcoinChain(chainId)) {
+    throw new Error(`The ${side} token does not match its selected network.`);
   }
 }
 
@@ -111,16 +119,10 @@ function collectLifiFees(value: unknown): QuoteFee[] {
   return value.flatMap((feeValue) => {
     const fee = recordValue(feeValue);
     const tokenDetails = recordValue(fee.token);
-    const amount = stringValue(fee.amount);
+    const amount = uintStringValue(fee.amount);
     const token = stringValue(tokenDetails.address);
     if (!amount || !token) return [];
-    return [
-      {
-        label: feeLabel(stringValue(fee.name)),
-        amount,
-        token
-      }
-    ];
+    return [{ label: feeLabel(stringValue(fee.name)), amount, token }];
   });
 }
 
@@ -130,7 +132,7 @@ function feeLabel(name: string): string {
 
 function gasCostPrice(costs: unknown[]): string {
   for (const cost of costs) {
-    const price = stringValue(recordValue(cost).price);
+    const price = uintStringValue(recordValue(cost).price);
     if (price) return price;
   }
   return "";
@@ -138,19 +140,23 @@ function gasCostPrice(costs: unknown[]): string {
 
 function sumCostAmounts(costs: unknown[]): string {
   const total = costs.reduce<bigint>((sum, cost) => {
-    const amount = stringValue(recordValue(cost).amount);
-    return /^\d+$/.test(amount) ? sum + BigInt(amount) : sum;
+    const amount = uintStringValue(recordValue(cost).amount);
+    return amount ? sum + BigInt(amount) : sum;
   }, 0n);
   return total > 0n ? total.toString() : "";
 }
 
 function toLifiToken(token: string): string {
-  if (isBitcoinToken(token)) return BITCOIN_TOKEN_ID;
+  if (isBitcoinToken(token)) return NATIVE_BITCOIN_TOKEN_ADDRESS;
   return token === "ETH" ? ZERO_ADDRESS : token;
 }
 
 function isBitcoinToken(token: string): boolean {
-  return token.trim().toLowerCase() === BITCOIN_TOKEN_ID;
+  return token.trim().toLowerCase() === NATIVE_BITCOIN_TOKEN_ADDRESS;
+}
+
+function isBitcoinChain(chainId: number): boolean {
+  return chainId === NATIVE_BITCOIN_CHAIN_ID;
 }
 
 function firstCostToken(costs: unknown[]): QuoteToken | undefined {

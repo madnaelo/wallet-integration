@@ -6,7 +6,8 @@ import {
   normalizeQuote,
   normalizeProviderError,
   providerError,
-  readProviderResponse
+  readProviderResponse,
+  uintStringValue
 } from "@/lib/server/quoteNormalization";
 import type { QuoteParams } from "@/lib/server/aggregator";
 
@@ -118,6 +119,24 @@ describe("quote amount normalization", () => {
     expect(quote).not.toHaveProperty("route");
     expect(quote).not.toHaveProperty("fees");
   });
+
+  it("binds quote identity to both source and destination networks", () => {
+    const first = normalizeQuote(
+      { ...baseParams, buyChainId: 8453 },
+      { providerId: "provider", providerName: "Provider" },
+      { buyAmount: "200", to: ROUTER, data: "0x1234" }
+    );
+    const second = normalizeQuote(
+      { ...baseParams, buyChainId: 42161 },
+      { providerId: "provider", providerName: "Provider" },
+      { buyAmount: "200", to: ROUTER, data: "0x1234" }
+    );
+
+    expect(first.fromChainId).toBe(1);
+    expect(first.toChainId).toBe(8453);
+    expect(first.executionKind).toBe("evm-cross-chain");
+    expect(first.quoteId).not.toBe(second.quoteId);
+  });
 });
 
 describe("provider response limits", () => {
@@ -154,6 +173,13 @@ describe("provider response limits", () => {
 });
 
 describe("executable quote validation", () => {
+  it("normalizes bounded provider hexadecimal quantities before validation", () => {
+    expect(uintStringValue("0x38d7ea4c68000")).toBe("1000000000000000");
+    expect(uintStringValue("0x83658")).toBe("538200");
+    expect(uintStringValue("-1")).toBe("");
+    expect(uintStringValue(`0x${"f".repeat(65)}`)).toBe("");
+  });
+
   it("accepts a bounded token transaction", () => {
     expect(() => assertExecutableQuote(baseParams, {
       buyAmount: "200",

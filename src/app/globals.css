@@ -1064,13 +1064,16 @@ body {
 }
 
 .tokenSearch {
+  flex: 0 0 auto;
   margin-bottom: 8px;
 }
 
 .tokenNetworkTabs {
   display: flex;
+  flex: 0 0 auto;
   gap: 6px;
   margin-bottom: 8px;
+  min-height: 32px;
   overflow-x: auto;
   padding-bottom: 2px;
 }

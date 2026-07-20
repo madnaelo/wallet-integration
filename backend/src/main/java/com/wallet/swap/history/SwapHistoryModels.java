@@ -16,6 +16,7 @@ public final class SwapHistoryModels {
 
   public record SaveSwapHistoryRequest(
       @NotNull @Min(1) Long chainId,
+      @NotNull @Min(1) Long buyChainId,
       @Size(max = 128) @Pattern(regexp = SafeText.IDENTIFIER_PATTERN) String txHash,
       @NotBlank @Size(max = 32) String status,
       @NotBlank @Size(max = 128) @Pattern(regexp = SafeText.IDENTIFIER_PATTERN) String sellTokenAddress,
@@ -34,6 +35,7 @@ public final class SwapHistoryModels {
       UUID id,
       String walletAddress,
       Long chainId,
+      Long buyChainId,
       String txHash,
       String status,
       String sellTokenAddress,

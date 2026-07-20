@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/server/ip";
 import { rateLimitMany } from "@/lib/server/rateLimit";
 import { quoteCache } from "@/lib/server/cache";
-import { getChainById, isChainAllowed } from "@/lib/chains";
+import { isChainAllowed } from "@/lib/chains";
 import { isAddress, isBitcoinMainnetAddress, isPositiveIntegerString } from "@/lib/validation";
 import type { QuoteResponse } from "@/lib/types";
-import { createNativeBitcoinQuoteClient, createQuoteClient } from "@/lib/server/quoteProvider";
+import { createQuoteClient } from "@/lib/server/quoteProvider";
 import { getProviderErrorStatus } from "@/lib/server/quoteNormalization";
-import { isNativeBitcoinToken, type TokenInfo } from "@/lib/tokens";
+import {
+  isNativeBitcoinToken,
+  NATIVE_BITCOIN_CHAIN_ID,
+  NATIVE_BITCOIN_TOKEN,
+  type TokenInfo
+} from "@/lib/tokens";
 import { getTokensForChain } from "@/lib/server/tokenRegistry";
 import { parseQuoteSlippageBps } from "@/lib/server/quoteRequestValidation";
 import { applyCorsHeaders, evaluateRequestOrigin } from "@/lib/server/requestOrigin";
@@ -47,24 +52,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const chainIdStr = searchParams.get("chainId") ?? "";
   const sellToken = searchParams.get("sellToken") ?? "";
   const buyToken = searchParams.get("buyToken") ?? "";
   const sellAmount = searchParams.get("sellAmount") ?? "";
   const toAddress = (searchParams.get("toAddress") ?? "").trim();
   const slippageBpsStr = searchParams.get("slippageBps") ?? "";
-
-  if (!chainIdStr || !/^\d+$/.test(chainIdStr)) {
-    return withCors(NextResponse.json({ error: "Choose a valid network." }, { status: 400 }), corsOrigin);
-  }
-  const chainId = Number(chainIdStr);
-
-  if (!isChainAllowed(chainId)) {
-    return withCors(
-      NextResponse.json({ error: "This network is not supported yet." }, { status: 400 }),
-      corsOrigin
-    );
-  }
 
   if (!sellToken || !buyToken) {
     return withCors(
@@ -89,6 +81,22 @@ export async function GET(req: NextRequest) {
       corsOrigin
     );
   }
+
+  const legacyChainId = searchParams.get("chainId") ?? "";
+  const requestedFromChainId = parseChainId(searchParams.get("fromChainId") ?? legacyChainId);
+  const requestedToChainId = parseChainId(searchParams.get("toChainId") ?? legacyChainId);
+  const fromChainId = isNativeBitcoinToken(sellToken) ? NATIVE_BITCOIN_CHAIN_ID : requestedFromChainId;
+  const toChainId = isNativeBitcoinToken(buyToken) ? NATIVE_BITCOIN_CHAIN_ID : requestedToChainId;
+
+  if (!isSupportedAssetChain(fromChainId, sellToken) || !isSupportedAssetChain(toChainId, buyToken)) {
+    return withCors(
+      NextResponse.json({ error: "Choose a supported network for each token." }, { status: 400 }),
+      corsOrigin
+    );
+  }
+  if (fromChainId === toChainId && normalizeTokenKey(sellToken) === normalizeTokenKey(buyToken)) {
+    return withCors(NextResponse.json({ error: "Choose two different assets." }, { status: 400 }), corsOrigin);
+  }
   if (sellAmount.length > 78) {
     return withCors(NextResponse.json({ error: "Enter a smaller amount." }, { status: 400 }), corsOrigin);
   }
@@ -111,10 +119,8 @@ export async function GET(req: NextRequest) {
     if (!isBitcoinMainnetAddress(toAddress)) {
       return withCors(NextResponse.json({ error: "Choose a Bitcoin receive address." }, { status: 400 }), corsOrigin);
     }
-  } else if (toAddress && !isAddress(toAddress)) {
+  } else if (!isAddress(toAddress)) {
     return withCors(NextResponse.json({ error: "Invalid receive address." }, { status: 400 }), corsOrigin);
-  } else if (isNativeBitcoinToken(sellToken) && !toAddress) {
-    return withCors(NextResponse.json({ error: "Choose a receive address." }, { status: 400 }), corsOrigin);
   }
 
   const slippage = parseQuoteSlippageBps(slippageBpsStr);
@@ -123,19 +129,15 @@ export async function GET(req: NextRequest) {
   }
   const slippageBps = slippage.value;
 
-  const chain = getChainById(chainId);
-  if (!chain) {
-    return withCors(NextResponse.json({ error: "This network is temporarily unavailable." }, { status: 500 }), corsOrigin);
-  }
-
-  const sellTokenInfo = await resolveTokenInfo(chainId, sellToken);
-  const buyTokenInfo = await resolveTokenInfo(chainId, buyToken);
+  const sellTokenInfo = await resolveTokenInfo(fromChainId, sellToken);
+  const buyTokenInfo = await resolveTokenInfo(toChainId, buyToken);
   if (!sellTokenInfo || !buyTokenInfo) {
     return withCors(NextResponse.json({ error: "Token is not available on this network." }, { status: 400 }), corsOrigin);
   }
   const cacheKey = [
     "quote",
-    chainId,
+    fromChainId,
+    toChainId,
     normalizeTokenKey(sellToken),
     normalizeTokenKey(buyToken),
     sellAmount,
@@ -149,8 +151,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const isBitcoinSwap = isNativeBitcoinToken(sellTokenInfo) || isNativeBitcoinToken(buyTokenInfo);
-    const client = isBitcoinSwap ? createNativeBitcoinQuoteClient() : createQuoteClient(chain);
+    const client = createQuoteClient(fromChainId, toChainId);
 
     const quote = await client.getQuote({
       sellToken,
@@ -162,7 +163,8 @@ export async function GET(req: NextRequest) {
       sellAmount,
       takerAddress,
       toAddress: toAddress || undefined,
-      chainId,
+      chainId: fromChainId,
+      buyChainId: toChainId,
       slippageBps
     });
 
@@ -173,7 +175,8 @@ export async function GET(req: NextRequest) {
     const providerStatus = getProviderErrorStatus(error);
     console.warn({
       event: "quote_request_failed",
-      chainId,
+      fromChainId,
+      toChainId,
       providerStatus,
       errorType: error instanceof Error ? error.name : "UnknownError"
     });
@@ -188,9 +191,24 @@ export async function GET(req: NextRequest) {
 }
 
 async function resolveTokenInfo(chainId: number, address: string): Promise<TokenInfo | null> {
+  if (chainId === NATIVE_BITCOIN_CHAIN_ID) {
+    return isNativeBitcoinToken(address) ? NATIVE_BITCOIN_TOKEN : null;
+  }
   const tokens = await getTokensForChain(chainId);
   const normalized = normalizeTokenKey(address);
   return tokens.find((token) => normalizeTokenKey(token.address) === normalized) ?? null;
+}
+
+function parseChainId(value: string): number {
+  if (!/^\d{1,16}$/.test(value)) return Number.NaN;
+  const chainId = Number(value);
+  return Number.isSafeInteger(chainId) && chainId > 0 ? chainId : Number.NaN;
+}
+
+function isSupportedAssetChain(chainId: number, token: string): boolean {
+  return isNativeBitcoinToken(token)
+    ? chainId === NATIVE_BITCOIN_CHAIN_ID
+    : Number.isSafeInteger(chainId) && isChainAllowed(chainId);
 }
 
 function normalizeTokenKey(address: string): string {

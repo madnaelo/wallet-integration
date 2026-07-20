@@ -14,6 +14,7 @@ export type TokenInfo = {
 
 export const NATIVE_BITCOIN_TOKEN_ADDRESS = "bitcoin";
 export const NATIVE_BITCOIN_NETWORK_ID = "bip122:bitcoin";
+export const NATIVE_BITCOIN_CHAIN_ID = 20_000_000_000_001;
 
 export const NATIVE_BITCOIN_TOKEN: TokenInfo = {
   symbol: "BTC",

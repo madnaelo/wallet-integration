@@ -1,7 +1,7 @@
 "use client";
 
 import "@/context/appkit";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   useAppKit,
   useAppKitAccount,
@@ -51,17 +51,24 @@ export default function WalletBridge({ onState, onActions }: WalletBridgeProps) 
   const { walletInfo: evmWalletInfo } = useWalletInfo("eip155");
   const { walletInfo: bitcoinWalletInfo } = useWalletInfo("bip122");
   const { disconnect } = useDisconnect();
+  const openRef = useRef(open);
+  const disconnectRef = useRef(disconnect);
+
+  useEffect(() => {
+    openRef.current = open;
+    disconnectRef.current = disconnect;
+  }, [disconnect, open]);
 
   const actions = useMemo<WalletBridgeActions>(
     () => ({
       open: async (options) => {
-        await open(options);
+        await openRef.current(options);
       },
       disconnect: async (options) => {
-        await disconnect(options);
+        await disconnectRef.current(options);
       }
     }),
-    [disconnect, open]
+    []
   );
 
   useEffect(() => {

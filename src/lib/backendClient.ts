@@ -16,6 +16,7 @@ export type AuthNonceResponse = {
 
 export type SaveSwapHistoryRequest = {
   chainId: number;
+  buyChainId: number;
   txHash?: string;
   status: "dry_run" | "submitted" | "confirmed" | "failed";
   sellTokenAddress: string;

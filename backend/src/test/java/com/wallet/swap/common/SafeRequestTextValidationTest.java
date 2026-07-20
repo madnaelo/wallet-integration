@@ -16,6 +16,7 @@ class SafeRequestTextValidationTest {
   void rejectsControlAndBidirectionalCharactersInPersistedTokenMetadata() {
     SaveSwapHistoryRequest history = new SaveSwapHistoryRequest(
         1L,
+        1L,
         null,
         "dry_run",
         "ETH",

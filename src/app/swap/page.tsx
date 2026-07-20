@@ -14,7 +14,12 @@ import {
 } from "react";
 import type { QuoteResponse } from "@/lib/types";
 import { CHAINS, getAllowedChains, getChainById } from "@/lib/chains";
-import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
+import {
+  DEFAULT_TOKENS_BY_CHAIN,
+  NATIVE_BITCOIN_CHAIN_ID,
+  isNativeBitcoinToken,
+  type TokenInfo
+} from "@/lib/tokens";
 import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress, isBitcoinMainnetAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
@@ -141,6 +146,7 @@ type AddressFamilyConfig = {
 };
 type PendingSwapLink = {
   chainId: number;
+  toChainId: number;
   sellToken: string;
   buyToken: string;
   sellAmountRaw: string;
@@ -244,6 +250,7 @@ export default function Page() {
   });
   const [featureFlagsLoaded, setFeatureFlagsLoaded] = useState<boolean>(false);
   const [selectedChainId, setSelectedChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
+  const [buyChainId, setBuyChainId] = useState<number>(allowedChains[0]?.chainId ?? 11155111);
 
   const [provider, setProvider] = useState<Eip1193Provider | null>(null);
   const [walletAddress, setWalletAddress] = useState<string>("");
@@ -361,6 +368,7 @@ export default function Page() {
   );
 
   const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
+  const buyChain = useMemo(() => getChainById(buyChainId), [buyChainId]);
   const connectedWalletName = useMemo(
     () => getWalletDisplayName(walletBridgeState.evmWalletName, walletProviderType),
     [walletBridgeState.evmWalletName, walletProviderType]
@@ -391,6 +399,10 @@ export default function Page() {
   const tokens = useMemo(
     () => tokensByChain[selectedChainId] ?? DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [],
     [selectedChainId, tokensByChain]
+  );
+  const buyTokens = useMemo(
+    () => tokensByChain[buyChainId] ?? DEFAULT_TOKENS_BY_CHAIN[buyChainId] ?? [],
+    [buyChainId, tokensByChain]
   );
   const tokensLoading = useMemo(
     () => allowedChains.some((allowedChain) => tokensLoadingByChain[allowedChain.chainId]),
@@ -447,8 +459,9 @@ export default function Page() {
   }, [allowedChains]);
 
   useEffect(() => {
-    const swapLink = parseSwapLinkParams(window.location.search);
-    if (!swapLink || !allowedChains.some((allowedChain) => allowedChain.chainId === swapLink.chainId)) return;
+    const parsedSwapLink = parseSwapLinkParams(window.location.search);
+    const swapLink = parsedSwapLink ? resolveSwapLinkForUi(parsedSwapLink, allowedChains) : null;
+    if (!swapLink) return;
 
     setPendingSwapLink(swapLink);
     setPendingAutoQuoteLink(swapLink.autoQuote ? swapLink : null);
@@ -458,6 +471,7 @@ export default function Page() {
       window.history.replaceState(null, "", `/swap${window.location.search}`);
     }
     setSelectedChainId(swapLink.chainId);
+    setBuyChainId(swapLink.toChainId);
     setSellToken(swapLink.sellToken);
     setBuyToken(swapLink.buyToken);
     setQuoteValidationVisible(false);
@@ -469,20 +483,27 @@ export default function Page() {
     if (pendingSwapLink) return;
 
     const sellTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(sellToken));
-    const buyTokenAvailable = tokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken));
-
     if (!sellTokenAvailable && tokens.length > 0) setSellToken(tokens[0]!.address);
-    if (!buyTokenAvailable && tokens.length > 1) {
-      const fallbackBuyToken = tokens.find((token) => normalizeTokenKey(token.address) !== normalizeTokenKey(tokens[0]!.address));
+  }, [tokens, sellToken, pendingSwapLink]);
+
+  useEffect(() => {
+    if (pendingSwapLink) return;
+
+    const buyTokenAvailable = buyTokens.some((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken));
+    const duplicatesSource =
+      buyChainId === selectedChainId && normalizeTokenKey(buyToken) === normalizeTokenKey(sellToken);
+    if ((!buyTokenAvailable || duplicatesSource) && buyTokens.length > 0) {
+      const fallbackBuyToken = buyTokens.find(
+        (token) => buyChainId !== selectedChainId || normalizeTokenKey(token.address) !== normalizeTokenKey(sellToken)
+      );
       if (fallbackBuyToken) setBuyToken(fallbackBuyToken.address);
     }
-  }, [tokens, sellToken, buyToken, pendingSwapLink]);
+  }, [buyChainId, buyToken, buyTokens, pendingSwapLink, selectedChainId, sellToken]);
 
   useEffect(() => {
     if (!allowedChains.some((allowedChain) => allowedChain.chainId === selectedChainId)) {
       setSelectedChainId(allowedChains[0]?.chainId ?? 11155111);
       setSellToken("");
-      setBuyToken("");
       clearQuoteState();
       setActionError("");
       return;
@@ -490,11 +511,19 @@ export default function Page() {
   }, [allowedChains, selectedChainId]);
 
   useEffect(() => {
+    if (!allowedChains.some((allowedChain) => allowedChain.chainId === buyChainId)) {
+      setBuyChainId(allowedChains[0]?.chainId ?? 11155111);
+      setBuyToken("");
+      clearQuoteState();
+      setActionError("");
+    }
+  }, [allowedChains, buyChainId]);
+
+  useEffect(() => {
     if (!walletChainId || !allowedChains.some((allowedChain) => allowedChain.chainId === walletChainId)) return;
 
     setSelectedChainId(walletChainId);
     setSellToken("");
-    setBuyToken("");
     setQuote(null);
     setSelectedQuoteId("");
     setQuoteFetchedAtMs(null);
@@ -783,12 +812,16 @@ export default function Page() {
     [tokens, sellToken]
   );
   const buyTokenInfo = useMemo(
-    () => tokens.find((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken)),
-    [tokens, buyToken]
+    () => buyTokens.find((token) => normalizeTokenKey(token.address) === normalizeTokenKey(buyToken)),
+    [buyTokens, buyToken]
   );
 
   useEffect(() => {
-    if (!pendingSwapLink || selectedChainId !== pendingSwapLink.chainId) return;
+    if (
+      !pendingSwapLink ||
+      selectedChainId !== pendingSwapLink.chainId ||
+      buyChainId !== pendingSwapLink.toChainId
+    ) return;
 
     if (sellTokenInfo && buyTokenInfo) {
       if (pendingSwapLink.sellAmountRaw) {
@@ -798,14 +831,21 @@ export default function Page() {
       return;
     }
 
-    const loadingKnown = Object.prototype.hasOwnProperty.call(tokensLoadingByChain, selectedChainId);
-    if (loadingKnown && !tokensLoadingByChain[selectedChainId]) {
+    const sourceLoadingKnown = Object.prototype.hasOwnProperty.call(tokensLoadingByChain, selectedChainId);
+    const destinationLoadingKnown = Object.prototype.hasOwnProperty.call(tokensLoadingByChain, buyChainId);
+    if (
+      sourceLoadingKnown &&
+      destinationLoadingKnown &&
+      !tokensLoadingByChain[selectedChainId] &&
+      !tokensLoadingByChain[buyChainId]
+    ) {
       setPendingSwapLink(null);
     }
-  }, [buyTokenInfo, pendingSwapLink, selectedChainId, sellTokenInfo, tokensLoadingByChain]);
+  }, [buyChainId, buyTokenInfo, pendingSwapLink, selectedChainId, sellTokenInfo, tokensLoadingByChain]);
 
   const sellTokenNetworkId = getTokenNetworkId(sellTokenInfo, selectedChainId);
-  const buyTokenNetworkId = getTokenNetworkId(buyTokenInfo, selectedChainId);
+  const buyTokenNetworkId = getTokenNetworkId(buyTokenInfo, buyChainId);
+  const sameSwapNetwork = sellTokenNetworkId === buyTokenNetworkId;
   const connectedWallets = useMemo<Partial<Record<WalletNamespace, string>>>(
     () => ({
       eip155: walletAddress,
@@ -834,13 +874,13 @@ export default function Page() {
     () =>
       buildRecipientAddressDisplay({
         address: recipientAddress,
-        networkName: getTokenNetworkName(buyTokenInfo, chain?.name),
+        networkName: getTokenNetworkName(buyTokenInfo, buyChain?.name),
         source: recipientAddressMode === "connected" ? "connected" : recipientAddressSource,
         walletName: recipientAddressSource === "wallet_import" ? recipientImportedWalletName : recipientConnectedWalletName
       }),
     [
       buyTokenInfo,
-      chain?.name,
+      buyChain?.name,
       recipientAddress,
       recipientAddressMode,
       recipientAddressSource,
@@ -866,11 +906,22 @@ export default function Page() {
         amountHuman,
         sellTokenInfo,
         buyTokenInfo,
+        sellTokenNetworkId,
+        buyTokenNetworkId,
         sourceWalletAddress,
         recipientAddress,
         slippageBps
       }),
-    [amountHuman, sellTokenInfo, buyTokenInfo, sourceWalletAddress, recipientAddress, slippageBps]
+    [
+      amountHuman,
+      sellTokenInfo,
+      buyTokenInfo,
+      sellTokenNetworkId,
+      buyTokenNetworkId,
+      sourceWalletAddress,
+      recipientAddress,
+      slippageBps
+    ]
   );
   const hasQuoteValidationErrors = useMemo(
     () => Object.values(quoteValidationErrors).some(Boolean),
@@ -1023,27 +1074,21 @@ export default function Page() {
   }
 
   function selectTokenForSide(side: "sell" | "buy", token: TokenPickerOption) {
-    const oppositeToken = side === "sell" ? buyTokenInfo : sellTokenInfo;
-    const nextChainId = getQuoteChainIdForTokenSelection(token, selectedChainId);
-    const chainChanged = typeof nextChainId === "number" && nextChainId !== selectedChainId;
-    const clearOppositeToken = chainChanged && getTokenWalletNamespace(oppositeToken) === "eip155";
-
-    if (typeof nextChainId === "number" && chainChanged) {
-      setSelectedChainId(nextChainId);
-    }
-
     if (side === "sell") {
+      const nextChainId = getQuoteChainIdForTokenSelection(token, selectedChainId);
+      if (typeof nextChainId === "number" && nextChainId !== selectedChainId) {
+        setSelectedChainId(nextChainId);
+      }
       setSellToken(token.address);
-      if (clearOppositeToken) setBuyToken("");
       if (getTokenWalletNamespace(token) !== "eip155" || getTokenWalletAddress(token, connectedWallets)) {
         setConnectPromptVisible(false);
       }
     } else {
+      const nextChainId = getQuoteChainIdForTokenSelection(token, buyChainId);
+      if (typeof nextChainId === "number" && nextChainId !== buyChainId) {
+        setBuyChainId(nextChainId);
+      }
       setBuyToken(token.address);
-      if (clearOppositeToken) setSellToken("");
-    }
-
-    if (side === "buy" || chainChanged) {
       setRecipientAddressMode("connected");
       setRecipientAddressSource("connected");
       setRecipientImportedWalletName("");
@@ -1057,23 +1102,13 @@ export default function Page() {
 
     const nextSellToken = buyTokenInfo;
     const nextBuyToken = sellTokenInfo;
-    const nextChainId = getQuoteChainIdForTokenSelection(
-      tokenInfoToPickerLikeOption(nextSellToken, selectedChainId),
-      selectedChainId
-    );
+    const nextSourceChainId = getTokenWalletNamespace(nextSellToken) === "eip155" ? buyChainId : selectedChainId;
+    const nextDestinationChainId = getTokenWalletNamespace(nextBuyToken) === "eip155" ? selectedChainId : buyChainId;
 
-    if (typeof nextChainId === "number" && nextChainId !== selectedChainId) {
-      setSelectedChainId(nextChainId);
-      setSellToken(nextSellToken?.address ?? "");
-      if (getTokenWalletNamespace(nextBuyToken) === "eip155") {
-        setBuyToken("");
-      } else {
-        setBuyToken(nextBuyToken?.address ?? "");
-      }
-    } else {
-      setSellToken(nextSellToken?.address ?? "");
-      setBuyToken(nextBuyToken?.address ?? "");
-    }
+    setSelectedChainId(nextSourceChainId);
+    setBuyChainId(nextDestinationChainId);
+    setSellToken(nextSellToken?.address ?? "");
+    setBuyToken(nextBuyToken?.address ?? "");
 
     setRecipientAddressMode("connected");
     setRecipientAddressSource("connected");
@@ -1198,7 +1233,7 @@ export default function Page() {
     try {
       const recipientImport = await createRecipientWalletImport({
         projectId: envPublic.WALLETCONNECT_PROJECT_ID,
-        chainId: selectedChainId,
+        chainId: buyChainId,
         origin: window.location.origin
       });
 
@@ -1813,6 +1848,7 @@ export default function Page() {
   function buildPriceAlertRuleRequest(): SavePriceAlertRuleRequest {
     if (!featureFlags.priceAlertsEnabled) throw new Error("Set Alerts is not available.");
     if (!sellTokenInfo || !buyTokenInfo) throw new Error("Select a pair before saving an alert.");
+    if (!sameSwapNetwork) throw new Error("Alerts currently support token pairs on the same network.");
     if (normalizeTokenKey(sellTokenInfo.address) === normalizeTokenKey(buyTokenInfo.address)) {
       throw new Error("Choose two different tokens before saving an alert.");
     }
@@ -1941,6 +1977,7 @@ export default function Page() {
   function openFavoritePair(pair: FavoritePair, direction: "saved" | "reverse" = "saved") {
     const swapLink: PendingSwapLink = {
       chainId: pair.chainId,
+      toChainId: pair.chainId,
       sellToken: direction === "reverse" ? pair.buyTokenAddress : pair.sellTokenAddress,
       buyToken: direction === "reverse" ? pair.sellTokenAddress : pair.buyTokenAddress,
       sellAmountRaw: "",
@@ -1952,6 +1989,7 @@ export default function Page() {
     autoQuoteNoticeShownRef.current = false;
     setActiveView("swap");
     setSelectedChainId(swapLink.chainId);
+    setBuyChainId(swapLink.toChainId);
     setSellToken(swapLink.sellToken);
     setBuyToken(swapLink.buyToken);
     setAmountHuman("");
@@ -1964,6 +2002,7 @@ export default function Page() {
 
   function buildFavoritePairRequest(): SaveFavoritePairRequest {
     if (!sellTokenInfo || !buyTokenInfo) throw new Error("Select a pair before saving it.");
+    if (!sameSwapNetwork) throw new Error("Favorites currently support token pairs on the same network.");
     if (normalizeTokenKey(sellTokenInfo.address) === normalizeTokenKey(buyTokenInfo.address)) {
       throw new Error("Choose two different tokens before saving a favorite pair.");
     }
@@ -2023,7 +2062,8 @@ export default function Page() {
 
     let session = await ensureBackendSession();
     const request: SaveSwapHistoryRequest = {
-      chainId: selectedChainId,
+      chainId: getTokenExecutionChainId(sellTokenInfo, selectedChainId),
+      buyChainId: getTokenExecutionChainId(buyTokenInfo, buyChainId),
       txHash,
       status,
       sellTokenAddress: sellTokenInfo.address,
@@ -2115,7 +2155,8 @@ export default function Page() {
     setQuoteLoading(true);
     try {
       const url = buildQuoteUrl({
-        chainId: selectedChainId,
+        fromChainId: getTokenExecutionChainId(sellTokenInfo, selectedChainId),
+        toChainId: getTokenExecutionChainId(buyTokenInfo, buyChainId),
         sellToken: sellTokenInfo.address,
         buyToken: buyTokenInfo.address,
         sellAmount,
@@ -2154,6 +2195,10 @@ export default function Page() {
     }
     if (selectedChainId !== pendingAutoQuoteLink.chainId) {
       setSelectedChainId(pendingAutoQuoteLink.chainId);
+      return;
+    }
+    if (buyChainId !== pendingAutoQuoteLink.toChainId) {
+      setBuyChainId(pendingAutoQuoteLink.toChainId);
       return;
     }
     if (normalizeTokenKey(sellToken) !== normalizeTokenKey(pendingAutoQuoteLink.sellToken)) {
@@ -2206,6 +2251,7 @@ export default function Page() {
   }, [
     activeView,
     amountHuman,
+    buyChainId,
     buyToken,
     buyTokenInfo,
     canQuote,
@@ -2281,6 +2327,14 @@ export default function Page() {
     }
 
     try {
+      const expectedFromChainId = getTokenExecutionChainId(sellTokenInfo, selectedChainId);
+      const expectedToChainId = getTokenExecutionChainId(buyTokenInfo, buyChainId);
+      if (
+        quote.fromChainId !== expectedFromChainId ||
+        quote.toChainId !== expectedToChainId
+      ) {
+        throw new Error("The selected networks changed. Refresh the quote before continuing.");
+      }
       await ensureCorrectNetwork();
 
       if (isDryRun) {
@@ -2345,7 +2399,9 @@ export default function Page() {
 
       const receipt = await tx.wait();
       if (receipt?.status === 1) {
-        const historyStatus = quote.executionKind === "evm-to-bitcoin" ? "submitted" : "confirmed";
+        const historyStatus = ["evm-cross-chain", "evm-to-bitcoin"].includes(quote.executionKind ?? "")
+          ? "submitted"
+          : "confirmed";
         setSwapStatus(historyStatus);
         try {
           await persistCurrentSwap(historyStatus, tx.hash);
@@ -2371,7 +2427,8 @@ export default function Page() {
     const networkFeeToken = quote.networkFeeToken ? tokenMetadataToDisplay(quote.networkFeeToken) : nativeToken;
     const sellDisplayToken = tokenInfoToDisplay(sellTokenInfo);
     const buyDisplayToken = tokenInfoToDisplay(buyTokenInfo);
-    const tokenForAddress = (address: string): DisplayToken => resolveDisplayToken(address, tokens, nativeToken);
+    const tokenForAddress = (address: string): DisplayToken =>
+      resolveDisplayToken(address, [...tokens, ...buyTokens], nativeToken);
 
     const sellHuman = formatTokenAmount(quote.sellAmount, sellDisplayToken);
     const grossBuyAmount = stringValue(quote.grossBuyAmount) || quote.buyAmount;
@@ -2420,7 +2477,7 @@ export default function Page() {
       platformFeeLabel,
       warnings
     };
-  }, [quote, sellTokenInfo, buyTokenInfo, chain, tokens, rateInverted, slippageBps]);
+  }, [quote, sellTokenInfo, buyTokenInfo, chain, tokens, buyTokens, rateInverted, slippageBps]);
 
   const connectHint = useMemo(() => {
     if (walletAddress) return "";
@@ -2442,18 +2499,20 @@ export default function Page() {
     () =>
       favoritePairs.filter(
         (pair) =>
+          sameSwapNetwork &&
           pair.chainId === selectedChainId &&
           normalizeTokenKey(pair.sellTokenAddress) === normalizeTokenKey(sellToken) &&
           normalizeTokenKey(pair.buyTokenAddress) === normalizeTokenKey(buyToken)
       ).length,
-    [buyToken, favoritePairs, selectedChainId, sellToken]
+    [buyToken, favoritePairs, sameSwapNetwork, selectedChainId, sellToken]
   );
   const favoritePairSelected = useMemo(
     () =>
       !!sellTokenInfo &&
       !!buyTokenInfo &&
+      sameSwapNetwork &&
       normalizeTokenKey(sellTokenInfo.address) !== normalizeTokenKey(buyTokenInfo.address),
-    [buyTokenInfo, sellTokenInfo]
+    [buyTokenInfo, sameSwapNetwork, sellTokenInfo]
   );
   const favoriteTargetHelper = useMemo(() => {
     if (!sellTokenInfo || !buyTokenInfo) return "";
@@ -2474,7 +2533,7 @@ export default function Page() {
     setPriceAlertDirectionDraft("above");
     setPriceAlertRuleError("");
     setPriceAlertRuleNotice("");
-  }, [selectedChainId, sellToken, buyToken]);
+  }, [buyChainId, selectedChainId, sellToken, buyToken]);
 
   useEffect(() => {
     if (currentFavoriteRate && !favoriteTargetRateDraft.trim()) {
@@ -3220,6 +3279,11 @@ export default function Page() {
               {quote.executionKind === "evm-to-bitcoin" ? (
                 <div className="small" style={{ marginTop: 8 }}>
                   Bitcoin delivery can continue after your wallet confirms the source transaction.
+                </div>
+              ) : null}
+              {quote.executionKind === "evm-cross-chain" ? (
+                <div className="small" style={{ marginTop: 8 }}>
+                  Delivery continues on the destination network after your wallet confirms the source transaction.
                 </div>
               ) : null}
             </>
@@ -3984,15 +4048,24 @@ function formatBuildTimestamp(value: string): string {
 function parseSwapLinkParams(search: string): PendingSwapLink | null {
   const params = new URLSearchParams(search);
   const chainId = Number(params.get("chainId"));
+  const requestedToChainId = Number(params.get("toChainId") ?? params.get("chainId"));
   const sellToken = sanitizeTokenQueryParam(params.get("sellToken"));
   const buyToken = sanitizeTokenQueryParam(params.get("buyToken"));
   const sellAmountRaw = sanitizeRawAmountQueryParam(params.get("sellAmountRaw") ?? params.get("sellAmount"));
   const autoQuote = sellAmountRaw ? isTruthyQueryParam(params.get("autoQuote") ?? params.get("quote")) : false;
 
-  if (!Number.isSafeInteger(chainId) || chainId <= 0 || !sellToken || !buyToken) return null;
+  if (
+    !Number.isSafeInteger(chainId) ||
+    chainId <= 0 ||
+    !Number.isSafeInteger(requestedToChainId) ||
+    requestedToChainId <= 0 ||
+    !sellToken ||
+    !buyToken
+  ) return null;
 
   return {
     chainId,
+    toChainId: requestedToChainId,
     sellToken,
     buyToken,
     sellAmountRaw,
@@ -4000,9 +4073,48 @@ function parseSwapLinkParams(search: string): PendingSwapLink | null {
   };
 }
 
+function resolveSwapLinkForUi(
+  swapLink: PendingSwapLink,
+  allowedChains: Array<{ chainId: number }>
+): PendingSwapLink | null {
+  const allowedChainIds = new Set(allowedChains.map((chain) => chain.chainId));
+  const firstAllowedChainId = allowedChains[0]?.chainId;
+  const sourceChainId = resolveUiChainId(
+    swapLink.chainId,
+    swapLink.sellToken,
+    swapLink.toChainId,
+    allowedChainIds,
+    firstAllowedChainId
+  );
+  if (!sourceChainId) return null;
+
+  const toChainId = resolveUiChainId(
+    swapLink.toChainId,
+    swapLink.buyToken,
+    sourceChainId,
+    allowedChainIds,
+    firstAllowedChainId
+  );
+  return toChainId ? { ...swapLink, chainId: sourceChainId, toChainId } : null;
+}
+
+function resolveUiChainId(
+  requestedChainId: number,
+  token: string,
+  pairedChainId: number,
+  allowedChainIds: ReadonlySet<number>,
+  firstAllowedChainId: number | undefined
+): number | null {
+  if (requestedChainId === NATIVE_BITCOIN_CHAIN_ID && isNativeBitcoinToken(token)) {
+    return allowedChainIds.has(pairedChainId) ? pairedChainId : firstAllowedChainId ?? null;
+  }
+  return allowedChainIds.has(requestedChainId) ? requestedChainId : null;
+}
+
 function buildSwapLinkHref(params: PendingSwapLink): string {
   const searchParams = new URLSearchParams({
     chainId: String(params.chainId),
+    toChainId: String(params.toChainId),
     sellToken: params.sellToken,
     buyToken: params.buyToken
   });
@@ -4160,6 +4272,10 @@ function getTokenNetworkName(token: TokenInfo | undefined, fallbackNetworkName: 
   return token?.networkName ?? fallbackNetworkName ?? "this network";
 }
 
+function getTokenExecutionChainId(token: TokenInfo | undefined, fallbackChainId: number): number {
+  return token && isNativeBitcoinToken(token) ? NATIVE_BITCOIN_CHAIN_ID : fallbackChainId;
+}
+
 function getTokenAddressFamily(token: TokenInfo | undefined): AddressFamily {
   return token?.addressFamily ?? "evm";
 }
@@ -4194,18 +4310,6 @@ function getQuoteChainIdForTokenSelection(
   if (typeof token?.quoteChainId === "number") return token.quoteChainId;
   if (token?.supportedQuoteChainIds?.includes(currentChainId)) return currentChainId;
   return token?.supportedQuoteChainIds?.[0];
-}
-
-function tokenInfoToPickerLikeOption(
-  token: TokenInfo | undefined,
-  currentChainId: number
-): Pick<TokenPickerOption, "quoteChainId" | "supportedQuoteChainIds"> | undefined {
-  if (!token) return undefined;
-  const walletNamespace = getTokenWalletNamespace(token);
-  return {
-    quoteChainId: walletNamespace === "eip155" ? currentChainId : undefined,
-    supportedQuoteChainIds: [currentChainId]
-  };
 }
 
 function WalletSupportNotice({
@@ -4495,6 +4599,8 @@ function getQuoteValidationErrors(params: {
   amountHuman: string;
   sellTokenInfo: TokenInfo | undefined;
   buyTokenInfo: TokenInfo | undefined;
+  sellTokenNetworkId: string;
+  buyTokenNetworkId: string;
   sourceWalletAddress: string;
   recipientAddress: string;
   slippageBps: number | null;
@@ -4509,7 +4615,12 @@ function getQuoteValidationErrors(params: {
     errors.buyToken = "Select a token to buy.";
   }
 
-  if (params.sellTokenInfo && params.buyTokenInfo && params.sellTokenInfo.address === params.buyTokenInfo.address) {
+  if (
+    params.sellTokenInfo &&
+    params.buyTokenInfo &&
+    params.sellTokenNetworkId === params.buyTokenNetworkId &&
+    normalizeTokenKey(params.sellTokenInfo.address) === normalizeTokenKey(params.buyTokenInfo.address)
+  ) {
     errors.buyToken = "Choose a different token to buy.";
   }
 

@@ -604,7 +604,8 @@ export default function LimitOrdersPage() {
       setRateSampleError("");
       try {
         const url = buildQuoteUrl({
-          chainId,
+          fromChainId: chainId,
+          toChainId: chainId,
           sellToken: executionSellToken!.address,
           buyToken: executionBuyToken!.address,
           sellAmount: sampleAmountRaw!,

@@ -32,6 +32,7 @@ public final class ReverseProfitModels {
       UUID swapHistoryId,
       String walletAddress,
       long chainId,
+      long buyChainId,
       String sellTokenAddress,
       String sellTokenSymbol,
       int sellTokenDecimals,
@@ -61,7 +62,7 @@ public final class ReverseProfitModels {
     }
 
     public TokenRef buyToken() {
-      return new TokenRef(chainId, buyTokenAddress, buyTokenSymbol, buyTokenDecimals);
+      return new TokenRef(buyChainId, buyTokenAddress, buyTokenSymbol, buyTokenDecimals);
     }
   }
 

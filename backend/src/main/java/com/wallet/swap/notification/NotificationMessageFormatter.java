@@ -173,6 +173,7 @@ public class NotificationMessageFormatter {
 
   private String reverseSwapUrl(ReverseProfitOpportunity opportunity) {
     return swapUrl(
+        opportunity.candidate().buyChainId(),
         opportunity.candidate().chainId(),
         opportunity.candidate().buyTokenAddress(),
         opportunity.candidate().sellTokenAddress(),
@@ -182,6 +183,7 @@ public class NotificationMessageFormatter {
   private String favoritePairSwapUrl(FavoritePairOpportunity opportunity) {
     return swapUrl(
         opportunity.candidate().chainId(),
+        opportunity.candidate().chainId(),
         opportunity.candidate().sellTokenAddress(),
         opportunity.candidate().buyTokenAddress(),
         "");
@@ -190,17 +192,19 @@ public class NotificationMessageFormatter {
   private String priceAlertUrl(PriceAlertOpportunity opportunity) {
     return swapUrl(
         opportunity.candidate().chainId(),
+        opportunity.candidate().chainId(),
         opportunity.candidate().sellTokenAddress(),
         opportunity.candidate().buyTokenAddress(),
         rawAmount(new BigDecimal(opportunity.candidate().sellAmountRaw())));
   }
 
-  private String swapUrl(long chainId, String sellToken, String buyToken, String sellAmountRaw) {
+  private String swapUrl(long chainId, long toChainId, String sellToken, String buyToken, String sellAmountRaw) {
     UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(appBaseUrl())
         .replacePath("/swap")
         .replaceQuery(null)
         .fragment(null)
         .queryParam("chainId", chainId)
+        .queryParam("toChainId", toChainId)
         .queryParam("sellToken", sellToken)
         .queryParam("buyToken", buyToken);
 

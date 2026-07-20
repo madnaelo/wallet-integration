@@ -40,17 +40,18 @@ public class SwapHistoryRepository {
     jdbcTemplate.update(
         """
         INSERT INTO swap_history (
-          id, wallet_address, chain_id, tx_hash, status,
+          id, wallet_address, chain_id, buy_chain_id, tx_hash, status,
           sell_token_address, sell_token_symbol, sell_token_decimals,
           buy_token_address, buy_token_symbol, buy_token_decimals,
           sell_amount_raw, buy_amount_raw, min_buy_amount_raw,
           aggregator, quote_json, submitted_at, confirmed_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?)
         """,
         id,
         walletAddress,
         request.chainId(),
+        request.buyChainId(),
         blankToNull(request.txHash()),
         status,
         request.sellTokenAddress(),
@@ -115,6 +116,7 @@ public class SwapHistoryRepository {
         rs.getObject("id", UUID.class),
         rs.getString("wallet_address"),
         rs.getLong("chain_id"),
+        rs.getLong("buy_chain_id"),
         rs.getString("tx_hash"),
         rs.getString("status"),
         rs.getString("sell_token_address"),

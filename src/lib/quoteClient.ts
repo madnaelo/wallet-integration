@@ -1,5 +1,6 @@
 export function buildQuoteUrl(params: {
-  chainId: number;
+  fromChainId: number;
+  toChainId: number;
   sellToken: string;
   buyToken: string;
   sellAmount: string;
@@ -8,7 +9,8 @@ export function buildQuoteUrl(params: {
   slippageBps?: number;
 }) {
   const sp = new URLSearchParams();
-  sp.set("chainId", String(params.chainId));
+  sp.set("fromChainId", String(params.fromChainId));
+  sp.set("toChainId", String(params.toChainId));
   sp.set("sellToken", params.sellToken);
   sp.set("buyToken", params.buyToken);
   sp.set("sellAmount", params.sellAmount);
