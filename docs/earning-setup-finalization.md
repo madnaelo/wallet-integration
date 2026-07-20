@@ -17,8 +17,10 @@ platform fees in production.
   addresses, CORS, and cache/rate-limit settings.
 - LI.FI Partner Portal fee collection is enabled for integration `the-wallet`
   with default EVM, Solana/SVM, Sui, and Bitcoin receiving wallets.
-- Current EVM launch networks are Ethereum, Arbitrum, Optimism, Base, Polygon,
-  BNB Smart Chain, and Avalanche.
+- EVM route availability is catalog-driven across provider-supported mainnets.
+  Native Bitcoin and Solana routes use LI.FI. Every returned route must still
+  pass the production provider policy and fee-response validation before it is
+  shown as executable.
 - `PARASWAP_API_KEY` is still missing. A Velora Pro API/rate-limit request was
   submitted on May 27, 2026, using the public production URL and the project
   owner's contact address. No response was found in the project mailbox as of
@@ -238,7 +240,9 @@ Reference:
 Before public launch:
 
 - Replace or confirm `FEE_RECIPIENT_ADDRESS` and `AFFILIATE_ADDRESS`.
-- Verify fee receipt on every enabled EVM chain, not only Ethereum.
+- Verify fee receipt for each enabled provider and payout mechanism, including
+  representative EVM, Solana, and native Bitcoin routes. Repeat the check
+  before treating a newly material chain or asset type as revenue-verified.
 - Rotate the Telegram bot token because the old token was pasted in chat.
 - Keep 1inch, ParaSwap/Velora, and Odos disabled unless their commercial and
   fee terms are explicitly confirmed and recorded in the policy file.
