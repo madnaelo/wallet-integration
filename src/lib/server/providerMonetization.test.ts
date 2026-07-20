@@ -120,11 +120,23 @@ describe("provider monetization requests", () => {
   it("sends LI.FI integrator fees and does not deduct disclosed fees twice", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
       tool: "bridge",
+      integrator: "swapassistant",
+      fee: 0.002,
       estimate: {
         toAmount: "1000",
         toAmountMin: "950",
         approvalAddress: ALLOWANCE_TARGET,
-        feeCosts: [{ name: "Integrator fee", amount: "2", token: { address: "bitcoin" } }],
+        feeCosts: [{
+          name: "LIFI Fixed Fee",
+          amount: "20000000000000",
+          token: { address: SELL_TOKEN },
+          feeSplit: {
+            recipients: [
+              { name: "LI.FI", type: "FIXED", fee: "1" },
+              { name: "swapassistant", type: "FIXED", fee: "20000000000000" }
+            ]
+          }
+        }],
         gasCosts: []
       },
       transactionRequest: { to: ROUTER, data: "0x1234", value: "0", gasLimit: "100000" }
@@ -151,7 +163,23 @@ describe("provider monetization requests", () => {
     expect(url.searchParams.get("fromChain")).toBe("1");
     expect(url.searchParams.get("toChain")).toBe(String(NATIVE_BITCOIN_CHAIN_ID));
     expect(quote.netBuyAmount).toBe("1000");
-    expect(quote.grossBuyAmount).toBe("1002");
+    expect(quote.grossBuyAmount).toBe("1000");
+  });
+
+  it("rejects a 0x quote when the configured affiliate fee is absent", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      buyAmount: "1000",
+      minBuyAmount: "950",
+      fees: {},
+      issues: { allowance: { spender: ALLOWANCE_TARGET } },
+      transaction: { to: ROUTER, data: "0x1234", value: "0", gas: "100000" }
+    })));
+
+    await expect(new ZeroXClient({
+      apiKey: "test-key",
+      baseUrl: "https://api.0x.org",
+      platformFee: feeConfig
+    }).getQuote(params)).rejects.toThrow(/configured service fee/i);
   });
 });
 

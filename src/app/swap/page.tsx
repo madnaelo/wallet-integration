@@ -13,15 +13,19 @@ import {
   type MouseEvent as ReactMouseEvent
 } from "react";
 import type { QuoteResponse } from "@/lib/types";
-import { CHAINS, getAllowedChains, getChainById } from "@/lib/chains";
+import { CHAINS, getSwapChainById, getSwapChains } from "@/lib/chains";
 import {
   DEFAULT_TOKENS_BY_CHAIN,
   NATIVE_BITCOIN_CHAIN_ID,
+  NATIVE_BITCOIN_NETWORK_ID,
+  SOLANA_CHAIN_ID,
+  SOLANA_NETWORK_ID,
   isNativeBitcoinToken,
   type TokenInfo
 } from "@/lib/tokens";
+import type { AddressFamily, WalletNamespace } from "@/lib/ecosystems";
 import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
-import { isAddress, isBitcoinMainnetAddress } from "@/lib/validation";
+import { isAddress, isBitcoinMainnetAddress, isSolanaAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
 import { ensureExactTokenAllowance } from "@/lib/tokenAllowance";
 import { validateSwapTransaction } from "@/lib/swapTransaction";
@@ -119,8 +123,6 @@ type RouteLine = {
   source: string;
   share: string;
 };
-type WalletNamespace = "eip155" | "bip122";
-type AddressFamily = NonNullable<TokenInfo["addressFamily"]> | "evm";
 type RecipientAddressMode = "connected" | "custom";
 type RecipientAddressSource = "connected" | "pasted" | "scanned" | "wallet_import";
 type RecipientDialogMode = "paste" | "scan" | "wallet";
@@ -215,11 +217,19 @@ const ADDRESS_FAMILY_CONFIG: Record<AddressFamily, AddressFamilyConfig> = {
     placeholder: "bc1...",
     parse: parseBitcoinAddressInput,
     isValid: isBitcoinMainnetAddress
+  },
+  solana: {
+    walletNamespace: "solana",
+    walletLabel: "Solana wallet",
+    recipientLabel: "Solana recipient address",
+    placeholder: "Solana address",
+    parse: parseSolanaAddressInput,
+    isValid: isSolanaAddress
   }
 };
 
 export default function Page() {
-  const allowedChains = useMemo(() => getAllowedChains(), []);
+  const allowedChains = useMemo(() => getSwapChains(), []);
   const allowedChainIds = useMemo(
     () => new Set(allowedChains.map((allowedChain) => allowedChain.chainId)),
     [allowedChains]
@@ -229,6 +239,7 @@ export default function Page() {
   const appKitAddress = walletBridgeState.evmAddress;
   const appKitConnected = walletBridgeState.evmConnected;
   const bitcoinAccountAddress = walletBridgeState.bitcoinAddress;
+  const solanaAccountAddress = walletBridgeState.solanaAddress;
   const appKitProvider = walletBridgeState.evmProvider;
   const walletProviderType = walletBridgeState.providerType;
   const walletBridgeReady = Boolean(walletBridgeActions);
@@ -371,8 +382,8 @@ export default function Page() {
     () => undefined
   );
 
-  const chain = useMemo(() => getChainById(selectedChainId), [selectedChainId]);
-  const buyChain = useMemo(() => getChainById(buyChainId), [buyChainId]);
+  const chain = useMemo(() => getSwapChainById(selectedChainId), [selectedChainId]);
+  const buyChain = useMemo(() => getSwapChainById(buyChainId), [buyChainId]);
   const connectedWalletName = useMemo(
     () => getWalletDisplayName(walletBridgeState.evmWalletName, walletProviderType),
     [walletBridgeState.evmWalletName, walletProviderType]
@@ -452,7 +463,7 @@ export default function Page() {
   }, [allowedChainIds]);
 
   const handleTokenPickerNetworkChange = useCallback((networkId: string | "all") => {
-    const chainId = parseEvmNetworkId(networkId);
+    const chainId = parseTokenNetworkId(networkId);
     if (chainId) loadTokensForChain(chainId);
   }, [loadTokensForChain]);
 
@@ -867,18 +878,40 @@ export default function Page() {
   const connectedWallets = useMemo<Partial<Record<WalletNamespace, string>>>(
     () => ({
       eip155: walletAddress,
-      bip122: bitcoinAccountAddress ?? ""
+      bip122: bitcoinAccountAddress ?? "",
+      solana: solanaAccountAddress ?? ""
     }),
-    [bitcoinAccountAddress, walletAddress]
+    [bitcoinAccountAddress, solanaAccountAddress, walletAddress]
   );
   const sourceWalletAddress = getTokenWalletAddress(sellTokenInfo, connectedWallets);
   const destinationWalletAddress = getTokenWalletAddress(buyTokenInfo, connectedWallets);
+  const sourceWalletName = useMemo(() => {
+    const namespace = getTokenWalletNamespace(sellTokenInfo);
+    if (namespace === "bip122") {
+      return getWalletDisplayName(walletBridgeState.bitcoinWalletName, walletBridgeState.bitcoinWalletType);
+    }
+    if (namespace === "solana") {
+      return getWalletDisplayName(walletBridgeState.solanaWalletName, walletBridgeState.solanaWalletType);
+    }
+    return connectedWalletName;
+  }, [
+    connectedWalletName,
+    sellTokenInfo,
+    walletBridgeState.bitcoinWalletName,
+    walletBridgeState.bitcoinWalletType,
+    walletBridgeState.solanaWalletName,
+    walletBridgeState.solanaWalletType
+  ]);
   const recipientConnectedWalletName = useMemo(() => {
     if (recipientAddressMode !== "connected" || !recipientAddress.trim()) return "";
     const walletNamespace = getTokenWalletNamespace(buyTokenInfo);
-    return walletNamespace === "bip122"
-      ? getWalletDisplayName(walletBridgeState.bitcoinWalletName, walletBridgeState.bitcoinWalletType)
-      : getWalletDisplayName(walletBridgeState.evmWalletName, walletProviderType);
+    if (walletNamespace === "bip122") {
+      return getWalletDisplayName(walletBridgeState.bitcoinWalletName, walletBridgeState.bitcoinWalletType);
+    }
+    if (walletNamespace === "solana") {
+      return getWalletDisplayName(walletBridgeState.solanaWalletName, walletBridgeState.solanaWalletType);
+    }
+    return getWalletDisplayName(walletBridgeState.evmWalletName, walletProviderType);
   }, [
     buyTokenInfo,
     recipientAddress,
@@ -886,6 +919,8 @@ export default function Page() {
     walletBridgeState.bitcoinWalletName,
     walletBridgeState.bitcoinWalletType,
     walletBridgeState.evmWalletName,
+    walletBridgeState.solanaWalletName,
+    walletBridgeState.solanaWalletType,
     walletProviderType
   ]);
   const recipientAddressDisplay = useMemo(
@@ -1120,8 +1155,8 @@ export default function Page() {
 
     const nextSellToken = buyTokenInfo;
     const nextBuyToken = sellTokenInfo;
-    const nextSourceChainId = getTokenWalletNamespace(nextSellToken) === "eip155" ? buyChainId : selectedChainId;
-    const nextDestinationChainId = getTokenWalletNamespace(nextBuyToken) === "eip155" ? selectedChainId : buyChainId;
+    const nextSourceChainId = buyChainId;
+    const nextDestinationChainId = selectedChainId;
 
     setSelectedChainId(nextSourceChainId);
     setBuyChainId(nextDestinationChainId);
@@ -1148,7 +1183,8 @@ export default function Page() {
 
     const connectedNamespaces: WalletNamespace[] = [
       ...(walletAddress ? (["eip155"] as const) : []),
-      ...(bitcoinAccountAddress ? (["bip122"] as const) : [])
+      ...(bitcoinAccountAddress ? (["bip122"] as const) : []),
+      ...(solanaAccountAddress ? (["solana"] as const) : [])
     ];
 
     if (connectedNamespaces.length > 0) {
@@ -1187,6 +1223,16 @@ export default function Page() {
 
   async function openBitcoinWalletChooser() {
     await openWalletForNamespace("bip122");
+  }
+
+  async function openSolanaWalletChooser() {
+    await openWalletForNamespace("solana");
+  }
+
+  async function openWalletChooserForNamespace(namespace: WalletNamespace) {
+    if (namespace === "bip122") return openBitcoinWalletChooser();
+    if (namespace === "solana") return openSolanaWalletChooser();
+    return openWalletChooser();
   }
 
   function openRecipientAddressDialog() {
@@ -1232,11 +1278,6 @@ export default function Page() {
   async function startRecipientWalletImport() {
     chooseRecipientDialogMode("wallet");
 
-    if (getTokenAddressFamily(buyTokenInfo) !== "evm") {
-      setRecipientDialogError("Wallet import is available for Ethereum-compatible wallets. Paste or scan this address instead.");
-      return;
-    }
-
     if (!envPublic.WALLETCONNECT_PROJECT_ID) {
       setRecipientDialogError("Wallet import is unavailable right now. Paste or scan the address instead.");
       return;
@@ -1252,6 +1293,7 @@ export default function Page() {
       const recipientImport = await createRecipientWalletImport({
         projectId: envPublic.WALLETCONNECT_PROJECT_ID,
         chainId: buyChainId,
+        addressFamily: getTokenAddressFamily(buyTokenInfo),
         origin: window.location.origin
       });
 
@@ -2339,11 +2381,6 @@ export default function Page() {
       setActionError("Quote expired. Refresh the quote before continuing.");
       return;
     }
-    if (quote.executionKind === "bitcoin-to-evm") {
-      setActionError("BTC sell quotes are available now. Sending from Bitcoin is not available yet.");
-      return;
-    }
-
     try {
       const expectedFromChainId = getTokenExecutionChainId(sellTokenInfo, selectedChainId);
       const expectedToChainId = getTokenExecutionChainId(buyTokenInfo, buyChainId);
@@ -2353,24 +2390,86 @@ export default function Page() {
       ) {
         throw new Error("The selected networks changed. Refresh the quote before continuing.");
       }
-      await ensureCorrectNetwork();
-
       if (isDryRun) {
         setSwapStatus("confirmed");
         setSwapTxHash("Preview saved. No transaction submitted.");
-        try {
-          await persistCurrentSwap("dry_run", "dry-run");
-        } catch (historySaveError: any) {
-          setHistoryError(normalizeWalletError(historySaveError));
+        if (walletAddress) {
+          try {
+            await persistCurrentSwap("dry_run", "dry-run");
+          } catch (historySaveError: any) {
+            setHistoryError(normalizeWalletError(historySaveError));
+          }
         }
         return;
       }
 
-      if (!walletAddress || !sellTokenInfo) {
+      if (!sourceWalletAddress || !sellTokenInfo) {
         throw new Error("Reconnect your wallet and refresh the quote before continuing.");
       }
       const expectedSellAmountRaw = parseUnitsSafe(amountHuman, sellTokenInfo.decimals);
       if (!expectedSellAmountRaw) throw new Error("Enter a valid swap amount and refresh the quote.");
+      if (quote.sellAmount !== expectedSellAmountRaw) {
+        throw new Error("The amount changed. Refresh the quote before continuing.");
+      }
+
+      if (quote.executionKind === "bitcoin-to-evm") {
+        const bitcoinProvider = walletBridgeState.bitcoinProvider;
+        if (!bitcoinProvider) throw new Error("Reconnect a Bitcoin wallet that supports transaction signing.");
+        setSwapStatus("pending");
+        setWalletRequestNotice(buildWalletApprovalNotice(sourceWalletName, "swap"));
+        const { broadcastBitcoinTransaction, signBitcoinQuote } = await import("@/lib/bitcoinSwapExecution");
+        const signed = await signBitcoinQuote({
+          quote,
+          provider: bitcoinProvider,
+          sourceAddress: sourceWalletAddress
+        });
+        setWalletRequestNotice("Your wallet approved the swap. Broadcasting it to the Bitcoin network.");
+        const transactionId = await broadcastBitcoinTransaction(signed);
+        setWalletRequestNotice("");
+        setSwapStatus("submitted");
+        setSwapTxHash(transactionId);
+        swapLog.add({ txHash: transactionId, walletAddress: sourceWalletAddress, timestampMs: Date.now() });
+        if (walletAddress) {
+          try {
+            await persistCurrentSwap("submitted", transactionId);
+          } catch (historySaveError: any) {
+            setHistoryError(normalizeWalletError(historySaveError));
+          }
+        }
+        return;
+      }
+
+      if (quote.executionKind === "solana-source") {
+        const solanaProvider = walletBridgeState.solanaProvider;
+        const solanaConnection = walletBridgeState.solanaConnection;
+        if (!solanaProvider || !solanaConnection) {
+          throw new Error("Reconnect a Solana wallet that supports transaction signing.");
+        }
+        setSwapStatus("pending");
+        setWalletRequestNotice(buildWalletApprovalNotice(sourceWalletName, "swap"));
+        const { executeSolanaQuote } = await import("@/lib/solanaSwapExecution");
+        const signature = await executeSolanaQuote({
+          quote,
+          provider: solanaProvider,
+          connection: solanaConnection,
+          sourceAddress: sourceWalletAddress
+        });
+        setWalletRequestNotice("");
+        setSwapStatus("submitted");
+        setSwapTxHash(signature);
+        swapLog.add({ txHash: signature, walletAddress: sourceWalletAddress, timestampMs: Date.now() });
+        if (walletAddress) {
+          try {
+            await persistCurrentSwap("submitted", signature);
+          } catch (historySaveError: any) {
+            setHistoryError(normalizeWalletError(historySaveError));
+          }
+        }
+        return;
+      }
+
+      await ensureCorrectNetwork();
+      if (!walletAddress) throw new Error("Reconnect your EVM wallet and refresh the quote before continuing.");
       const p = getProviderOrThrow();
       const { BrowserProvider } = await import("ethers");
       const provider = new BrowserProvider(p);
@@ -2791,7 +2890,7 @@ export default function Page() {
                 <WalletSupportNotice
                   message={sourceWalletNotice.message}
                   actionLabel={sourceWalletNotice.actionLabel}
-                  onAction={sourceWalletNotice.walletNamespace === "bip122" ? openBitcoinWalletChooser : openWalletChooser}
+                  onAction={() => void openWalletChooserForNamespace(sourceWalletNotice.walletNamespace)}
                 />
               ) : null}
             </div>
@@ -3016,7 +3115,7 @@ export default function Page() {
                         onClick={() => {
                           void startRecipientWalletImport();
                         }}
-                        disabled={recipientWalletImportLoading || getTokenAddressFamily(buyTokenInfo) !== "evm"}
+                        disabled={recipientWalletImportLoading}
                       >
                         {recipientWalletImportQrDataUrl ? "Restart" : "Start"}
                       </button>
@@ -3073,7 +3172,7 @@ export default function Page() {
 
           <div className="quoteActionRow" ref={quoteActionRef} data-tour="quote">
             <span className="quoteButtonWrap" onMouseEnter={revealQuoteValidation} onClick={revealQuoteValidation}>
-              <button className="btn" onClick={fetchQuote} disabled={(!!walletAddress && !canQuote) || quoteLoading}>
+              <button className="btn" onClick={fetchQuote} disabled={(!!sourceWalletAddress && !canQuote) || quoteLoading}>
                 <span className="quoteButtonContent">
                   {quoteLoading ? <span className="buttonSpinner" aria-hidden="true" /> : null}
                   <span>{quoteLoading ? "Fetching quote..." : quote ? "Refresh Quote" : "Get Quote"}</span>
@@ -3083,15 +3182,10 @@ export default function Page() {
             <button
               className="btn btnPrimary"
               onClick={executeSwap}
-              disabled={!quote || !walletAddress || isQuoteExpired || quote.executionKind === "bitcoin-to-evm" || swapBusy}
+              disabled={!quote || !sourceWalletAddress || isQuoteExpired || swapBusy}
             >
-              {quote?.executionKind === "bitcoin-to-evm" ? "BTC Sell Quote Only" : isDryRun ? "Preview Swap" : "Swap"}
+              {isDryRun ? "Preview Swap" : "Swap"}
             </button>
-            {quote?.executionKind === "bitcoin-to-evm" ? (
-              <div className="small" style={{ marginTop: 8 }}>
-                BTC sell quotes are available now. Sending from Bitcoin is not available yet.
-              </div>
-            ) : null}
           </div>
 
           {favoritePopoverOpen && sellTokenInfo && buyTokenInfo ? (
@@ -3525,7 +3619,7 @@ export default function Page() {
                       <tr key={rule.id}>
                         <td>
                           <div>{rule.sellTokenSymbol} to {rule.buyTokenSymbol}</div>
-                          <div className="small">{getChainById(rule.chainId)?.name ?? `Chain ${rule.chainId}`}</div>
+                          <div className="small">{getSwapChainById(rule.chainId)?.name ?? `Chain ${rule.chainId}`}</div>
                         </td>
                         <td>{formatPriceAlertAmount(rule)}</td>
                         <td>{formatPriceAlertTarget(rule)}</td>
@@ -4234,7 +4328,7 @@ function getWalletDisplayName(walletName: string | undefined, providerType: stri
 }
 
 function getWalletNetworkLabel(chainId: number | null, fallback: string | undefined): string {
-  if (chainId) return getChainById(chainId)?.name ?? `Chain ${chainId}`;
+  if (chainId) return getSwapChainById(chainId)?.name ?? `Chain ${chainId}`;
   return fallback ?? "Network";
 }
 
@@ -4284,7 +4378,9 @@ function getEvmNetworkId(chainId: number): string {
   return `eip155:${chainId}`;
 }
 
-function parseEvmNetworkId(networkId: string): number | null {
+function parseTokenNetworkId(networkId: string): number | null {
+  if (networkId === NATIVE_BITCOIN_NETWORK_ID) return NATIVE_BITCOIN_CHAIN_ID;
+  if (networkId === SOLANA_NETWORK_ID) return SOLANA_CHAIN_ID;
   const match = /^eip155:(\d{1,10})$/.exec(networkId);
   if (!match) return null;
   const chainId = Number(match[1]);
@@ -4292,7 +4388,7 @@ function parseEvmNetworkId(networkId: string): number | null {
 }
 
 function getTokenNetworkId(token: TokenInfo | undefined, fallbackChainId: number): string {
-  return token?.networkId ?? getEvmNetworkId(fallbackChainId);
+  return token?.networkId ?? getSwapChainById(fallbackChainId)?.networkId ?? getEvmNetworkId(fallbackChainId);
 }
 
 function getTokenNetworkName(token: TokenInfo | undefined, fallbackNetworkName: string | undefined): string {
@@ -4694,6 +4790,16 @@ function parseBitcoinAddressInput(value: string): string {
     return decodeURIComponent(bitcoinUri[1] ?? "").trim();
   } catch {
     return (bitcoinUri[1] ?? "").trim();
+  }
+}
+
+function parseSolanaAddressInput(value: string): string {
+  const solanaUri = value.match(/^solana:([^?]+)/i);
+  const candidate = solanaUri?.[1] ?? value;
+  try {
+    return decodeURIComponent(candidate).trim();
+  } catch {
+    return candidate.trim();
   }
 }
 

@@ -24,9 +24,11 @@ export type QuoteProviderError = {
 
 export type QuoteResponse = {
   quoteId?: string;
+  providerQuoteId?: string;
+  bridgeTool?: string;
   providerId?: string;
   providerName?: string;
-  executionKind?: "evm-same-chain" | "evm-cross-chain" | "evm-to-bitcoin" | "bitcoin-to-evm";
+  executionKind?: "evm-same-chain" | "evm-cross-chain" | "evm-to-bitcoin" | "bitcoin-to-evm" | "solana-source";
   fromChainId?: number;
   toChainId?: number;
   providerRank?: number;

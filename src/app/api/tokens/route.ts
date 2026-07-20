@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isChainAllowed } from "@/lib/chains";
+import { isSwapChainAllowed } from "@/lib/chains";
 import { getClientIp } from "@/lib/server/ip";
 import { rateLimit } from "@/lib/server/rateLimit";
 import { getTokensForChain } from "@/lib/server/tokenRegistry";
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   }
 
   const chainId = Number(chainIdValue);
-  if (!isChainAllowed(chainId)) {
+  if (!Number.isSafeInteger(chainId) || !isSwapChainAllowed(chainId)) {
     return NextResponse.json(
       { error: "This network is not supported yet." },
       { status: 400 }

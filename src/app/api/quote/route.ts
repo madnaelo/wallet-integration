@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/server/ip";
 import { rateLimitMany } from "@/lib/server/rateLimit";
 import { quoteCache } from "@/lib/server/cache";
-import { isChainAllowed } from "@/lib/chains";
-import { isAddress, isBitcoinMainnetAddress, isPositiveIntegerString } from "@/lib/validation";
+import { isSwapChainAllowed } from "@/lib/chains";
+import { getAddressFamilyForChain } from "@/lib/ecosystems";
+import { isAddress, isBitcoinMainnetAddress, isPositiveIntegerString, isSolanaAddress } from "@/lib/validation";
 import type { QuoteResponse } from "@/lib/types";
 import { createQuoteClient } from "@/lib/server/quoteProvider";
 import { getProviderErrorStatus } from "@/lib/server/quoteNormalization";
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
   const takerAddress = searchParams.get("takerAddress") ?? "";
   const rl = await rateLimitMany([
     `quote-ip:${ip}`,
-    `quote-wallet:${normalizeTokenKey(takerAddress) || "missing"}`
+    `quote-wallet:${normalizeWalletKey(takerAddress) || "missing"}`
   ]);
   if (rl.unavailable) {
     return withCors(
@@ -65,16 +66,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const isSellTokenOk = sellToken === "ETH" || isAddress(sellToken) || isNativeBitcoinToken(sellToken);
-  const isBuyTokenOk = buyToken === "ETH" || isAddress(buyToken) || isNativeBitcoinToken(buyToken);
-
-  if (!isSellTokenOk || !isBuyTokenOk) {
-    return withCors(
-      NextResponse.json({ error: "Choose a valid token." }, { status: 400 }),
-      corsOrigin
-    );
-  }
-
   if (!/^\d+$/.test(sellAmount)) {
     return withCors(
       NextResponse.json({ error: "Enter a valid amount." }, { status: 400 }),
@@ -94,7 +85,10 @@ export async function GET(req: NextRequest) {
       corsOrigin
     );
   }
-  if (fromChainId === toChainId && normalizeTokenKey(sellToken) === normalizeTokenKey(buyToken)) {
+  if (
+    fromChainId === toChainId &&
+    normalizeAssetKey(sellToken, fromChainId) === normalizeAssetKey(buyToken, toChainId)
+  ) {
     return withCors(NextResponse.json({ error: "Choose two different assets." }, { status: 400 }), corsOrigin);
   }
   if (sellAmount.length > 78) {
@@ -107,19 +101,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (isNativeBitcoinToken(sellToken)) {
-    if (!isBitcoinMainnetAddress(takerAddress)) {
-      return withCors(NextResponse.json({ error: "Invalid Bitcoin source address." }, { status: 400 }), corsOrigin);
-    }
-  } else if (!isAddress(takerAddress)) {
+  if (!isWalletAddressForChain(takerAddress, fromChainId)) {
     return withCors(NextResponse.json({ error: "Invalid source wallet address." }, { status: 400 }), corsOrigin);
   }
 
-  if (isNativeBitcoinToken(buyToken)) {
-    if (!isBitcoinMainnetAddress(toAddress)) {
-      return withCors(NextResponse.json({ error: "Choose a Bitcoin receive address." }, { status: 400 }), corsOrigin);
-    }
-  } else if (!isAddress(toAddress)) {
+  if (!isWalletAddressForChain(toAddress, toChainId)) {
     return withCors(NextResponse.json({ error: "Invalid receive address." }, { status: 400 }), corsOrigin);
   }
 
@@ -138,11 +124,11 @@ export async function GET(req: NextRequest) {
     "quote",
     fromChainId,
     toChainId,
-    normalizeTokenKey(sellToken),
-    normalizeTokenKey(buyToken),
+    normalizeAssetKey(sellToken, fromChainId),
+    normalizeAssetKey(buyToken, toChainId),
     sellAmount,
-    normalizeTokenKey(takerAddress),
-    normalizeTokenKey(toAddress),
+    normalizeWalletKey(takerAddress),
+    normalizeWalletKey(toAddress),
     slippageBps ?? "default"
   ].join(":");
   const cached = quoteCache.get(cacheKey);
@@ -186,7 +172,14 @@ export async function GET(req: NextRequest) {
         : providerStatus === 400 || providerStatus === 404 || providerStatus === 422
           ? "No swap route is available for these details."
           : "Quotes are temporarily unavailable. Please try again shortly.";
-    return withCors(NextResponse.json({ error: message }, { status: 502 }), corsOrigin);
+    const responseStatus = providerStatus === 429
+      ? 429
+      : providerStatus === 400 || providerStatus === 404 || providerStatus === 422
+        ? 422
+        : 503;
+    const response = NextResponse.json({ error: message }, { status: responseStatus });
+    if (providerStatus === 429) response.headers.set("Retry-After", "10");
+    return withCors(response, corsOrigin);
   }
 }
 
@@ -195,8 +188,8 @@ async function resolveTokenInfo(chainId: number, address: string): Promise<Token
     return isNativeBitcoinToken(address) ? NATIVE_BITCOIN_TOKEN : null;
   }
   const tokens = await getTokensForChain(chainId);
-  const normalized = normalizeTokenKey(address);
-  return tokens.find((token) => normalizeTokenKey(token.address) === normalized) ?? null;
+  const normalized = normalizeAssetKey(address, chainId);
+  return tokens.find((token) => normalizeAssetKey(token.address, chainId) === normalized) ?? null;
 }
 
 function parseChainId(value: string): number {
@@ -206,13 +199,28 @@ function parseChainId(value: string): number {
 }
 
 function isSupportedAssetChain(chainId: number, token: string): boolean {
-  return isNativeBitcoinToken(token)
-    ? chainId === NATIVE_BITCOIN_CHAIN_ID
-    : Number.isSafeInteger(chainId) && isChainAllowed(chainId);
+  if (!Number.isSafeInteger(chainId) || !isSwapChainAllowed(chainId)) return false;
+  const family = getAddressFamilyForChain(chainId);
+  if (family === "bitcoin") return isNativeBitcoinToken(token);
+  if (family === "solana") return isSolanaAddress(token);
+  return token === "ETH" || isAddress(token);
 }
 
-function normalizeTokenKey(address: string): string {
-  return address.trim().toLowerCase();
+function isWalletAddressForChain(address: string, chainId: number): boolean {
+  const family = getAddressFamilyForChain(chainId);
+  if (family === "bitcoin") return isBitcoinMainnetAddress(address);
+  if (family === "solana") return isSolanaAddress(address);
+  return isAddress(address);
+}
+
+function normalizeAssetKey(address: string, chainId: number): string {
+  const value = address.trim();
+  return getAddressFamilyForChain(chainId) === "evm" ? value.toLowerCase() : value;
+}
+
+function normalizeWalletKey(address: string): string {
+  const value = address.trim();
+  return /^0x[0-9a-f]{40}$/i.test(value) ? value.toLowerCase() : value;
 }
 
 function withCors(res: NextResponse, origin: string | null) {

@@ -1,6 +1,12 @@
 import type { QuoteResponse, QuoteFee, QuoteToken } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
-import { NATIVE_BITCOIN_CHAIN_ID, NATIVE_BITCOIN_TOKEN_ADDRESS } from "@/lib/tokens";
+import {
+  NATIVE_BITCOIN_CHAIN_ID,
+  NATIVE_BITCOIN_TOKEN_ADDRESS,
+  SOLANA_CHAIN_ID
+} from "@/lib/tokens";
+import { getAddressFamilyForChain } from "@/lib/ecosystems";
+import { isAddress, isSolanaAddress } from "@/lib/validation";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
 import {
   assertExecutableQuote,
@@ -62,6 +68,10 @@ export class LifiClient implements DexAggregatorClient {
     });
     const body = await readProviderResponse(res, this.providerName);
 
+    if (integrator && this.cfg.platformFee.enabled) {
+      assertLifiIntegratorFee(body, params, integrator, this.cfg.platformFee);
+    }
+
     return this.normalizeLifiQuote(body, params, Boolean(integrator && this.cfg.platformFee.enabled));
   }
 
@@ -90,27 +100,61 @@ export class LifiClient implements DexAggregatorClient {
     };
 
     const sourceIsBitcoin = isBitcoinChain(params.chainId);
-    assertExecutableQuote(params, fields, { quoteOnly: sourceIsBitcoin });
+    const sourceIsSolana = params.chainId === SOLANA_CHAIN_ID;
+    assertExecutableQuote(params, fields, { quoteOnly: sourceIsBitcoin || sourceIsSolana });
+    if (sourceIsBitcoin) assertBitcoinTransactionRequest(fields);
+    if (sourceIsSolana) assertSolanaTransactionRequest(fields);
     if (!fields.buyAmount) throw new Error("LI.FI did not return an output amount.");
 
-    return normalizeQuote(params, this, {
+    return {
+      ...normalizeQuote(params, this, {
       ...fields,
       executionKind: getExecutionKind(params.chainId, params.buyChainId ?? params.chainId),
       totalNetworkFee: sumCostAmounts(gasCosts),
       networkFeeToken: firstCostToken(gasCosts)
-    });
+      }),
+      providerQuoteId: stringValue(body.id),
+      bridgeTool: stringValue(body.tool)
+    };
   }
 }
 
 function getExecutionKind(fromChainId: number, toChainId: number): NonNullable<QuoteResponse["executionKind"]> {
   if (isBitcoinChain(fromChainId)) return "bitcoin-to-evm";
+  if (fromChainId === SOLANA_CHAIN_ID) return "solana-source";
   if (isBitcoinChain(toChainId)) return "evm-to-bitcoin";
   return fromChainId === toChainId ? "evm-same-chain" : "evm-cross-chain";
 }
 
 function assertAssetMatchesChain(token: string, chainId: number, side: string) {
-  if (isBitcoinToken(token) !== isBitcoinChain(chainId)) {
-    throw new Error(`The ${side} token does not match its selected network.`);
+  const family = getAddressFamilyForChain(chainId);
+  const valid = family === "bitcoin"
+    ? isBitcoinToken(token)
+    : family === "solana"
+      ? isSolanaAddress(token)
+      : token === "ETH" || isAddress(token);
+  if (!valid) throw new Error(`The ${side} token does not match its selected network.`);
+}
+
+function assertBitcoinTransactionRequest(fields: { data: string; value?: string }) {
+  const psbtHex = fields.data.trim();
+  if (!/^70736274ff[0-9a-fA-F]*$/.test(psbtHex) || psbtHex.length > 1_048_576) {
+    throw new Error("LI.FI did not return a valid Bitcoin transaction.");
+  }
+  if (!fields.value || !/^\d{1,16}$/.test(fields.value) || BigInt(fields.value) <= 0n) {
+    throw new Error("LI.FI did not return a valid Bitcoin amount.");
+  }
+}
+
+function assertSolanaTransactionRequest(fields: { data: string }) {
+  const transaction = fields.data.trim();
+  if (
+    transaction.length < 16 ||
+    transaction.length > 524_288 ||
+    transaction.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(transaction)
+  ) {
+    throw new Error("LI.FI did not return a valid Solana transaction.");
   }
 }
 
@@ -170,4 +214,40 @@ function firstCostToken(costs: unknown[]): QuoteToken | undefined {
     }
   }
   return undefined;
+}
+
+function assertLifiIntegratorFee(
+  body: Record<string, unknown>,
+  params: QuoteParams,
+  integrator: string,
+  platformFee: PlatformFeeConfig
+) {
+  if (stringValue(body.integrator) !== integrator) {
+    throw new Error("LI.FI did not preserve the configured integration on this route.");
+  }
+
+  const returnedFee = Number(body.fee);
+  if (!Number.isFinite(returnedFee) || Math.abs(returnedFee - platformFee.feeFraction) > 1e-12) {
+    throw new Error("LI.FI did not preserve the configured service fee on this route.");
+  }
+
+  const expectedFee = (BigInt(params.sellAmount) * BigInt(platformFee.feeBps)) / 10_000n;
+  if (expectedFee <= 0n) {
+    throw new Error("The swap amount is too small to apply the service fee.");
+  }
+
+  const feeCosts = Array.isArray(recordValue(body.estimate).feeCosts)
+    ? recordValue(body.estimate).feeCosts as unknown[]
+    : [];
+  const recipientFees = feeCosts.flatMap((feeCost) => {
+    const recipients = recordValue(recordValue(feeCost).feeSplit).recipients;
+    return Array.isArray(recipients) ? recipients : [];
+  });
+  const integratorFee = recipientFees
+    .map(recordValue)
+    .find((recipient) => stringValue(recipient.name) === integrator);
+  const returnedAmount = integratorFee ? uintStringValue(integratorFee.fee) : "";
+  if (!returnedAmount || BigInt(returnedAmount) < expectedFee) {
+    throw new Error("LI.FI did not include the configured service fee in this route.");
+  }
 }

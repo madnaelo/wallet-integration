@@ -110,7 +110,7 @@ jobs:
         run: npm test
 
       - name: Audit frontend dependencies
-        run: npm audit --audit-level=moderate
+        run: node scripts/check-npm-audit.mjs
 
       - name: Typecheck
         run: npm run typecheck

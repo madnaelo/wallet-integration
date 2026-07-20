@@ -50,7 +50,13 @@ export class MultiQuoteProvider implements DexAggregatorClient {
 
     if (!quotes.length) {
       const detail = quoteErrors.map((error) => `${error.providerName}: ${error.message}`).join("; ");
-      throw new Error(detail || "No swap provider returned a quote.");
+      const statuses = quoteErrors.map((error) => error.status).filter((status): status is number => !!status);
+      const status = statuses.includes(429)
+        ? 429
+        : statuses.every((candidate) => [400, 404, 422].includes(candidate))
+          ? 422
+          : 503;
+      throw Object.assign(new Error(detail || "No swap provider returned a quote."), { status });
     }
 
     const ranked = rankQuotes(quotes).map((quote, index) => ({

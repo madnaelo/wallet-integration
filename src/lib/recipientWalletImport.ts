@@ -1,4 +1,10 @@
-import { isAddress } from "@/lib/validation";
+import {
+  NATIVE_BITCOIN_NETWORK_ID,
+  SOLANA_NETWORK_ID,
+  type AddressFamily,
+  type WalletNamespace
+} from "@/lib/ecosystems";
+import { isAddress, isBitcoinMainnetAddress, isSolanaAddress } from "@/lib/validation";
 
 type RecipientImportClient = {
   connect: (params: {
@@ -13,11 +19,7 @@ type RecipientImportClient = {
 
 type RecipientImportSession = {
   topic: string;
-  namespaces?: {
-    eip155?: {
-      accounts?: unknown;
-    };
-  };
+  namespaces?: Record<string, { accounts?: unknown }>;
   peer?: {
     metadata?: {
       name?: unknown;
@@ -28,6 +30,7 @@ type RecipientImportSession = {
 type RecipientWalletImportParams = {
   projectId: string;
   chainId: number;
+  addressFamily: AddressFamily;
   origin: string;
 };
 
@@ -48,13 +51,14 @@ let clientPromise: Promise<RecipientImportClient> | null = null;
 export async function createRecipientWalletImport({
   projectId,
   chainId,
+  addressFamily,
   origin
 }: RecipientWalletImportParams): Promise<RecipientWalletImport> {
   const normalizedProjectId = projectId.trim();
   if (!normalizedProjectId) throw new Error("Wallet import is unavailable right now.");
 
   const client = await getRecipientImportClient(normalizedProjectId, origin);
-  const { uri, approval } = await client.connect({ requiredNamespaces: recipientAddressNamespaces(chainId) });
+  const { uri, approval } = await client.connect({ requiredNamespaces: recipientAddressNamespaces(chainId, addressFamily) });
 
   if (!uri) throw new Error("Could not start wallet import.");
 
@@ -71,9 +75,10 @@ export async function createRecipientWalletImport({
     qrDataUrl,
     waitForAddress: async () => {
       const session = await approval();
-      const account = getEvmAccountFromSession(session, chainId);
+      const namespace = walletNamespaceForFamily(addressFamily);
+      const account = getAccountFromSession(session, namespace, networkIdForFamily(chainId, addressFamily));
       const address = account?.split(":").pop() ?? "";
-      if (!isAddress(address)) throw new Error("Wallet did not return a valid address.");
+      if (!isAddressForFamily(address, addressFamily)) throw new Error("Wallet did not return a valid address.");
 
       return {
         address,
@@ -124,26 +129,46 @@ async function createQrDataUrl(
   return qrCode.toDataURL(uri, options);
 }
 
-export function recipientAddressNamespaces(chainId: number) {
+export function recipientAddressNamespaces(chainId: number, addressFamily: AddressFamily = "evm") {
   if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("Choose a valid network.");
+  const namespace = walletNamespaceForFamily(addressFamily);
+  const networkId = networkIdForFamily(chainId, addressFamily);
   return {
-    eip155: {
-      chains: [`eip155:${chainId}`],
+    [namespace]: {
+      chains: [networkId],
       methods: [],
       events: []
     }
   };
 }
 
-function getEvmAccountFromSession(session: RecipientImportSession, chainId: number): string {
-  const accounts = session?.namespaces?.eip155?.accounts;
+function getAccountFromSession(session: RecipientImportSession, namespace: WalletNamespace, networkId: string): string {
+  const accounts = session?.namespaces?.[namespace]?.accounts;
   if (!Array.isArray(accounts)) return "";
 
   return (
-    accounts.find((account: unknown) => typeof account === "string" && account.startsWith(`eip155:${chainId}:`)) ??
+    accounts.find((account: unknown) => typeof account === "string" && account.startsWith(`${networkId}:`)) ??
     accounts.find((account: unknown) => typeof account === "string") ??
     ""
   );
+}
+
+function walletNamespaceForFamily(addressFamily: AddressFamily): WalletNamespace {
+  if (addressFamily === "bitcoin") return "bip122";
+  if (addressFamily === "solana") return "solana";
+  return "eip155";
+}
+
+function networkIdForFamily(chainId: number, addressFamily: AddressFamily): string {
+  if (addressFamily === "bitcoin") return NATIVE_BITCOIN_NETWORK_ID;
+  if (addressFamily === "solana") return SOLANA_NETWORK_ID;
+  return `eip155:${chainId}`;
+}
+
+function isAddressForFamily(address: string, addressFamily: AddressFamily): boolean {
+  if (addressFamily === "bitcoin") return isBitcoinMainnetAddress(address);
+  if (addressFamily === "solana") return isSolanaAddress(address);
+  return isAddress(address);
 }
 
 function getWalletNameFromSession(session: RecipientImportSession): string | undefined {

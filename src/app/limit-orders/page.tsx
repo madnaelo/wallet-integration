@@ -1035,6 +1035,7 @@ export default function LimitOrdersPage() {
       const recipientImport = await createRecipientWalletImport({
         projectId: envPublic.WALLETCONNECT_PROJECT_ID,
         chainId,
+        addressFamily: "evm",
         origin: window.location.origin
       });
 

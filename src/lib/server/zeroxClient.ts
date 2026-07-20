@@ -65,6 +65,10 @@ export class ZeroXClient implements DexAggregatorClient {
 
     const body = await readZeroXResponse(res);
 
+    if (this.cfg.platformFee.enabled) {
+      assertZeroXIntegratorFee(body, params.buyToken);
+    }
+
     return this.normalizeZeroXQuote(body, params);
   }
 
@@ -112,4 +116,17 @@ function collectZeroXFees(body: Record<string, unknown>): QuoteFee[] {
     }
   }
   return lines;
+}
+
+function assertZeroXIntegratorFee(body: Record<string, unknown>, buyToken: string) {
+  const integratorFee = recordValue(recordValue(body.fees).integratorFee);
+  const amount = stringValue(integratorFee.amount);
+  const token = stringValue(integratorFee.token);
+  if (!/^\d+$/.test(amount) || BigInt(amount) <= 0n || !sameAsset(token, normalizeNativeToken(buyToken))) {
+    throw new Error("0x did not include the configured service fee in this route.");
+  }
+}
+
+function sameAsset(first: string, second: string): boolean {
+  return first.trim().toLowerCase() === second.trim().toLowerCase();
 }

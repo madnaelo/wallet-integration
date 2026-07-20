@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { QuoteParams } from "@/lib/server/aggregator";
 import { LifiClient } from "@/lib/server/lifiClient";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
-import { NATIVE_BITCOIN_CHAIN_ID } from "@/lib/tokens";
+import { NATIVE_BITCOIN_CHAIN_ID, NATIVE_SOLANA_TOKEN_ADDRESS, SOLANA_CHAIN_ID } from "@/lib/tokens";
 
 const SELL_TOKEN = "0x1111111111111111111111111111111111111111";
 const BUY_TOKEN = "0x2222222222222222222222222222222222222222";
@@ -75,8 +75,10 @@ describe("LI.FI routing", () => {
     expect(quote.toChainId).toBe(1);
   });
 
-  it("keeps Bitcoin-source routes quote-only and identifies their networks", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(lifiResponse({ transactionRequest: {} })));
+  it("preserves an executable Bitcoin PSBT and identifies its networks", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(lifiResponse({
+      transactionRequest: { data: "70736274ff00", value: "100000" }
+    }, "200")));
 
     const quote = await createClient().getQuote({
       ...baseParams,
@@ -92,11 +94,45 @@ describe("LI.FI routing", () => {
     expect(quote.executionKind).toBe("bitcoin-to-evm");
     expect(quote.fromChainId).toBe(NATIVE_BITCOIN_CHAIN_ID);
     expect(quote.toChainId).toBe(1);
+    expect(quote.data).toBe("70736274ff00");
+  });
+
+  it("preserves an executable Solana transaction", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(lifiResponse({
+      transactionRequest: { data: "AQIDBAUGBwgJCgsMDQ4PEA==" }
+    }, "200000")));
+
+    const quote = await createClient().getQuote({
+      ...baseParams,
+      chainId: SOLANA_CHAIN_ID,
+      buyChainId: 1,
+      sellToken: NATIVE_SOLANA_TOKEN_ADDRESS,
+      sellTokenSymbol: "SOL",
+      sellTokenDecimals: 9,
+      takerAddress: NATIVE_SOLANA_TOKEN_ADDRESS,
+      sellAmount: "100000000"
+    });
+
+    expect(quote.executionKind).toBe("solana-source");
+    expect(quote.fromChainId).toBe(SOLANA_CHAIN_ID);
+    expect(quote.data).toBe("AQIDBAUGBwgJCgsMDQ4PEA==");
   });
 
   it("rejects a Bitcoin token paired with an EVM chain id", async () => {
     await expect(createClient().getQuote({ ...baseParams, sellToken: "bitcoin" }))
       .rejects.toThrow(/does not match/i);
+  });
+
+  it("rejects a route that omits the configured integrator fee", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      tool: "relay",
+      integrator: "swapassistant",
+      fee: 0.002,
+      estimate: { toAmount: "1000", toAmountMin: "950", feeCosts: [], gasCosts: [] },
+      transactionRequest: { to: ROUTER, data: "0x1234", value: "0", gasLimit: "100000" }
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+
+    await expect(createClient().getQuote(baseParams)).rejects.toThrow(/configured service fee/i);
   });
 });
 
@@ -109,14 +145,29 @@ function createClient() {
   });
 }
 
-function lifiResponse(overrides: Record<string, unknown> = {}): Response {
+function lifiResponse(
+  overrides: Record<string, unknown> = {},
+  integratorFeeAmount = "2000000000000000"
+): Response {
   const body = {
     tool: "relay",
+    integrator: "swapassistant",
+    fee: 0.002,
     estimate: {
       toAmount: "1000",
       toAmountMin: "950",
       approvalAddress: ROUTER,
-      feeCosts: [],
+      feeCosts: [{
+        name: "LIFI Fixed Fee",
+        amount: integratorFeeAmount,
+        token: { address: SELL_TOKEN },
+        feeSplit: {
+          recipients: [
+            { name: "LI.FI", type: "FIXED", fee: "1" },
+            { name: "swapassistant", type: "FIXED", fee: integratorFeeAmount }
+          ]
+        }
+      }],
       gasCosts: []
     },
     transactionRequest: {

@@ -1,9 +1,15 @@
 import "server-only";
 
 import { env } from "@/lib/server/env";
-import { getChainById } from "@/lib/chains";
+import { getSwapChainById } from "@/lib/chains";
+import {
+  getAddressFamilyForChain,
+  getWalletNamespaceForFamily,
+  NATIVE_BITCOIN_TOKEN_ADDRESS,
+  NATIVE_SOLANA_TOKEN_ADDRESS
+} from "@/lib/ecosystems";
 import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
-import { isAddress } from "@/lib/validation";
+import { isAddress, isSolanaAddress } from "@/lib/validation";
 
 const UNISWAP_TOKEN_LIST_URL = "https://tokens.uniswap.org";
 const TOKEN_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -48,10 +54,12 @@ export async function getTokensForChain(chainId: number): Promise<TokenInfo[]> {
 
 async function refreshTokensForChain(chainId: number): Promise<TokenInfo[]> {
   const curated = DEFAULT_TOKENS_BY_CHAIN[chainId] ?? nativeTokenForChain(chainId);
-  const remoteResults = await Promise.allSettled([
-    loadUniswapTokens(chainId),
-    loadLifiTokens(chainId)
-  ]);
+  const family = getAddressFamilyForChain(chainId);
+  const remoteResults = await Promise.allSettled(
+    family === "evm"
+      ? [loadUniswapTokens(chainId), loadLifiTokens(chainId)]
+      : [loadLifiTokens(chainId)]
+  );
 
   const remote = remoteResults.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
   const tokens = mergeTokens(curated, remote);
@@ -117,6 +125,9 @@ async function loadUniswapTokenList(): Promise<unknown> {
 async function loadLifiTokens(chainId: number): Promise<TokenInfo[]> {
   const url = new URL("/v1/tokens", env.LIFI_BASE_URL);
   url.searchParams.set("chains", String(chainId));
+  const family = getAddressFamilyForChain(chainId);
+  if (family === "solana") url.searchParams.set("chainTypes", "SVM");
+  if (family === "bitcoin") url.searchParams.set("chainTypes", "UTXO");
   const apiKey = env.LIFI_API_KEY.trim();
   const body = await fetchJson(url.toString(), apiKey ? { "x-lifi-api-key": apiKey } : undefined);
   const tokens = readLifiTokensForChain(body, chainId);
@@ -187,9 +198,25 @@ function toTokenInfo(value: unknown, chainId: number): TokenInfo[] {
   const symbol = normalizeDisplayText(value.symbol, MAX_TOKEN_SYMBOL_LENGTH);
   const decimals = typeof value.decimals === "number" ? value.decimals : Number.NaN;
   if (!address || !symbol || !Number.isInteger(decimals) || decimals < 0 || decimals > 30) return [];
-  if (!isAddress(address) || NATIVE_TOKEN_SENTINELS.has(normalizeTokenKey(address))) return [];
 
-  const token: TokenInfo = { address, symbol, decimals };
+  const family = getAddressFamilyForChain(chainId);
+  if (family === "evm" && (!isAddress(address) || NATIVE_TOKEN_SENTINELS.has(normalizeTokenKey(address)))) return [];
+  if (family === "solana" && !isSolanaAddress(address)) return [];
+  if (family === "bitcoin" && normalizeTokenKey(address) !== NATIVE_BITCOIN_TOKEN_ADDRESS) return [];
+
+  const chain = getSwapChainById(chainId);
+  const token: TokenInfo = {
+    address,
+    symbol,
+    decimals,
+    ...(family === "evm" ? {} : {
+      addressFamily: family,
+      assetKind: family,
+      walletNamespace: getWalletNamespaceForFamily(family),
+      networkId: chain?.networkId,
+      networkName: chain?.name
+    })
+  };
   const name = normalizeDisplayText(value.name, MAX_TOKEN_NAME_LENGTH);
   if (name) token.name = name;
   return [token];
@@ -215,12 +242,25 @@ function normalizeIdentity(value: string): string {
 }
 
 function nativeTokenForChain(chainId: number): TokenInfo[] {
-  const nativeCurrency = getChainById(chainId)?.nativeCurrency;
+  const chain = getSwapChainById(chainId);
+  const nativeCurrency = chain?.nativeCurrency;
+  const family = getAddressFamilyForChain(chainId);
   return nativeCurrency ? [{
-    address: "ETH",
+    address: family === "bitcoin"
+      ? NATIVE_BITCOIN_TOKEN_ADDRESS
+      : family === "solana"
+        ? NATIVE_SOLANA_TOKEN_ADDRESS
+        : "ETH",
     symbol: nativeCurrency.symbol,
     decimals: nativeCurrency.decimals,
     name: nativeCurrency.name,
-    isNative: true
+    isNative: true,
+    ...(family === "evm" ? {} : {
+      addressFamily: family,
+      assetKind: family,
+      walletNamespace: getWalletNamespaceForFamily(family),
+      networkId: chain?.networkId,
+      networkName: chain?.name
+    })
   }] : [];
 }

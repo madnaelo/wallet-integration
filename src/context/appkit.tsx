@@ -3,7 +3,8 @@
 import { createAppKit } from "@reown/appkit/react";
 import { BitcoinAdapter } from "@reown/appkit-adapter-bitcoin";
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
-import { bitcoin, type AppKitNetwork } from "@reown/appkit/networks";
+import { SolanaAdapter } from "@reown/appkit-adapter-solana";
+import { bitcoin, solana, type AppKitNetwork } from "@reown/appkit/networks";
 import { getAllowedChains } from "@/lib/chains";
 import { WALLETCONNECT_PROJECT_ID } from "@/lib/walletConfig";
 
@@ -16,6 +17,7 @@ const evmNetworks = configuredNetworks.length ? configuredNetworks : [fallbackSe
 const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
   evmNetworks[0]!,
   ...evmNetworks.slice(1),
+  solana,
   bitcoin
 ];
 const appUrl = typeof window === "undefined"
@@ -41,7 +43,7 @@ const metadata: AppKitMetadataWithRedirect = {
 };
 
 createAppKit({
-  adapters: [new EthersAdapter(), new BitcoinAdapter({ projectId })],
+  adapters: [new EthersAdapter(), new SolanaAdapter(), new BitcoinAdapter({ projectId })],
   projectId,
   networks,
   defaultNetwork: evmNetworks[0],

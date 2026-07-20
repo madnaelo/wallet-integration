@@ -17,6 +17,13 @@ The workflows are in `.github/workflows`.
 - `Security`: runs dependency review, CodeQL when GitHub Advanced Security is
   available, mandatory Semgrep OSS analysis for Java and TypeScript, Gitleaks,
   and Trivy filesystem vulnerability scans.
+
+The frontend audit is fail-closed through `scripts/check-npm-audit.mjs`. A
+specific upstream advisory may be accepted only in
+`config/npm-audit-allowlist.json`, with a technical rationale and an expiry
+date. Expired exceptions, new advisory roots, and unclassified findings fail
+CI. This keeps temporary upstream risk acceptance visible and time-bounded
+instead of disabling dependency auditing.
 - `Release Production`: starts only after CI succeeds for `master`,
   then waits for Security to pass for that exact commit. It publishes one
   immutable GHCR image and builds a production Vercel deployment without
