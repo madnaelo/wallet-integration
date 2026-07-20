@@ -49,7 +49,12 @@ public final class SwapHistoryModels {
       String minBuyAmountRaw,
       String aggregator,
       JsonNode quote,
+      String providerStatus,
+      String providerSubstatus,
+      String destinationTransactionHash,
+      Instant lastStatusCheckedAt,
       Instant submittedAt,
       Instant confirmedAt,
-      Instant createdAt) {}
+      Instant createdAt,
+      Instant updatedAt) {}
 }

@@ -18,7 +18,7 @@ export type SaveSwapHistoryRequest = {
   chainId: number;
   buyChainId: number;
   txHash?: string;
-  status: "dry_run" | "submitted" | "confirmed" | "failed";
+  status: "dry_run" | "submitted" | "confirmed" | "failed" | "refunded";
   sellTokenAddress: string;
   sellTokenSymbol: string;
   sellTokenDecimals: number;
@@ -35,6 +35,10 @@ export type SaveSwapHistoryRequest = {
 export type SwapHistoryRecord = SaveSwapHistoryRequest & {
   id: string;
   walletAddress: string;
+  providerStatus?: string | null;
+  providerSubstatus?: string | null;
+  destinationTransactionHash?: string | null;
+  lastStatusCheckedAt?: string | null;
   submittedAt?: string;
   confirmedAt?: string;
   createdAt: string;

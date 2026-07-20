@@ -7,6 +7,7 @@ type Bucket = {
 };
 
 type RateLimitDecision = { allowed: boolean; retryAfterMs: number; unavailable?: boolean };
+type RateLimitPolicy = { maxRequests?: number; windowMs?: number };
 
 type RedisResponse = {
   result?: unknown;
@@ -38,26 +39,31 @@ const buckets = new Map<string, Bucket>();
 const MAX_MEMORY_BUCKETS = 50_000;
 let lastSweepAt = 0;
 
-export async function rateLimit(key: string): Promise<RateLimitDecision> {
-  return rateLimitMany([key]);
+export async function rateLimit(key: string, policy?: RateLimitPolicy): Promise<RateLimitDecision> {
+  return rateLimitMany([key], policy);
 }
 
-export async function rateLimitMany(keys: string[]): Promise<RateLimitDecision> {
+export async function rateLimitMany(
+  keys: string[],
+  policy: RateLimitPolicy = {}
+): Promise<RateLimitDecision> {
   const uniqueKeys = [...new Set(keys.map((key) => key.trim()).filter(Boolean))];
+  const windowMs = normalizedWindowMs(policy.windowMs);
+  const maxRequests = normalizedMaxRequests(policy.maxRequests);
   if (uniqueKeys.length === 0) {
-    return { allowed: false, retryAfterMs: normalizedWindowMs(), unavailable: true };
+    return { allowed: false, retryAfterMs: windowMs, unavailable: true };
   }
 
   const redisConfigured = hasRedisConfiguration();
   if (env.RATE_LIMIT_REDIS_REQUIRED && !redisConfigured) {
-    return { allowed: false, retryAfterMs: normalizedWindowMs(), unavailable: true };
+    return { allowed: false, retryAfterMs: windowMs, unavailable: true };
   }
   if (redisConfigured) {
     try {
-      return await redisRateLimitMany(uniqueKeys);
+      return await redisRateLimitMany(uniqueKeys, maxRequests, windowMs);
     } catch (error) {
       if (!env.RATE_LIMIT_REDIS_FAIL_OPEN) {
-        return { allowed: false, retryAfterMs: normalizedWindowMs(), unavailable: true };
+        return { allowed: false, retryAfterMs: windowMs, unavailable: true };
       }
       console.error({
         event: "rate_limit_redis_failed",
@@ -66,13 +72,11 @@ export async function rateLimitMany(keys: string[]): Promise<RateLimitDecision> 
       });
     }
   }
-  return memoryRateLimitMany(uniqueKeys);
+  return memoryRateLimitMany(uniqueKeys, maxRequests, windowMs);
 }
 
-function memoryRateLimitMany(keys: string[]): RateLimitDecision {
+function memoryRateLimitMany(keys: string[], max: number, windowMs: number): RateLimitDecision {
   const now = Date.now();
-  const windowMs = normalizedWindowMs();
-  const max = normalizedMaxRequests();
   sweepExpiredBuckets(now);
 
   for (const key of keys) {
@@ -93,9 +97,11 @@ function memoryRateLimitMany(keys: string[]): RateLimitDecision {
   return { allowed: true, retryAfterMs: 0 };
 }
 
-async function redisRateLimitMany(keys: string[]): Promise<RateLimitDecision> {
-  const windowMs = normalizedWindowMs();
-  const max = normalizedMaxRequests();
+async function redisRateLimitMany(
+  keys: string[],
+  max: number,
+  windowMs: number
+): Promise<RateLimitDecision> {
   const redisKeys = keys.map(
     (key) => `${env.RATE_LIMIT_REDIS_PREFIX}:rl:${hashKey(key)}`
   );
@@ -155,12 +161,12 @@ function hasRedisConfiguration(): boolean {
   return Boolean(env.UPSTASH_REDIS_REST_URL.trim() && env.UPSTASH_REDIS_REST_TOKEN.trim());
 }
 
-function normalizedWindowMs(): number {
-  return Math.max(1_000, Math.min(3_600_000, Math.round(env.RATE_LIMIT_WINDOW_MS)));
+function normalizedWindowMs(value = env.RATE_LIMIT_WINDOW_MS): number {
+  return Math.max(1_000, Math.min(3_600_000, Math.round(value)));
 }
 
-function normalizedMaxRequests(): number {
-  return Math.max(1, Math.min(10_000, Math.round(env.RATE_LIMIT_MAX)));
+function normalizedMaxRequests(value = env.RATE_LIMIT_MAX): number {
+  return Math.max(1, Math.min(10_000, Math.round(value)));
 }
 
 function sweepExpiredBuckets(now: number) {

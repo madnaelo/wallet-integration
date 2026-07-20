@@ -1,7 +1,7 @@
 import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 import { describe, expect, it, vi } from "vitest";
 import type { Connection, Provider } from "@reown/appkit-adapter-solana/react";
-import { executeSolanaQuote } from "@/lib/solanaSwapExecution";
+import { executeSolanaQuote, waitForSolanaConfirmation } from "@/lib/solanaSwapExecution";
 import { SOLANA_CHAIN_ID } from "@/lib/ecosystems";
 import type { QuoteResponse } from "@/lib/types";
 
@@ -33,6 +33,31 @@ describe("Solana swap execution", () => {
       connection: {} as Connection,
       sourceAddress: Keypair.generate().publicKey.toBase58()
     })).rejects.toThrow(/does not match/i);
+  });
+
+  it("recognizes a confirmed Solana transaction", async () => {
+    const getSignatureStatus = vi.fn().mockResolvedValue({
+      value: { confirmationStatus: "confirmed", err: null }
+    });
+
+    await expect(waitForSolanaConfirmation(
+      { getSignatureStatus } as unknown as Connection,
+      "2".repeat(88)
+    )).resolves.toBe(true);
+    expect(getSignatureStatus).toHaveBeenCalledWith("2".repeat(88), {
+      searchTransactionHistory: true
+    });
+  });
+
+  it("surfaces an explicit Solana transaction failure", async () => {
+    const getSignatureStatus = vi.fn().mockResolvedValue({
+      value: { confirmationStatus: "confirmed", err: { InstructionError: [0, "Custom"] } }
+    });
+
+    await expect(waitForSolanaConfirmation(
+      { getSignatureStatus } as unknown as Connection,
+      "2".repeat(88)
+    )).rejects.toThrow(/rejected/i);
   });
 });
 

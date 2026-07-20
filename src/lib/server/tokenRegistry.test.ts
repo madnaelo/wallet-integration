@@ -121,6 +121,61 @@ describe("token registry refresh", () => {
     const lifiRequest = fetchMock.mock.calls.find(([input]) => String(input).includes("/v1/tokens"));
     expect(lifiRequest?.[1]).toMatchObject({ headers: { "x-lifi-api-key": "test-lifi-key" } });
   });
+
+  it("resolves an exact contract address missing from the cached catalog", async () => {
+    vi.stubEnv("LIFI_API_KEY", "test-lifi-key");
+    const address = "0x5555555555555555555555555555555555555555";
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.startsWith("https://tokens.uniswap.org")) {
+        return Promise.resolve(new Response(JSON.stringify({ tokens: [] })));
+      }
+      if (url.includes("/v1/tokens")) {
+        return Promise.resolve(new Response(JSON.stringify({ tokens: { "1": [] } })));
+      }
+      return Promise.resolve(new Response(JSON.stringify(token(address, "EXACT", "Exact Token"))));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { resolveTokenForChain } = await import("@/lib/server/tokenRegistry");
+
+    const resolved = await resolveTokenForChain(1, address.toUpperCase().replace("0X", "0x"));
+
+    expect(resolved).toMatchObject({ address, symbol: "EXACT", decimals: 18 });
+    const request = fetchMock.mock.calls.find(([input]) => String(input).includes("/v1/token?"));
+    expect(request?.[1]).toMatchObject({ headers: { "x-lifi-api-key": "test-lifi-key" } });
+  });
+
+  it("rejects token metadata returned for a different contract", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.startsWith("https://tokens.uniswap.org")) {
+        return Promise.resolve(new Response(JSON.stringify({ tokens: [] })));
+      }
+      if (url.includes("/v1/tokens")) {
+        return Promise.resolve(new Response(JSON.stringify({ tokens: { "1": [] } })));
+      }
+      return Promise.resolve(new Response(JSON.stringify(token(
+        "0x6666666666666666666666666666666666666666",
+        "WRONG",
+        "Wrong Token"
+      ))));
+    }));
+    const { resolveTokenForChain } = await import("@/lib/server/tokenRegistry");
+
+    await expect(resolveTokenForChain(1, "0x5555555555555555555555555555555555555555"))
+      .resolves.toBeNull();
+  });
+
+  it("rejects exact token metadata returned for a different network", async () => {
+    const address = "0x7777777777777777777777777777777777777777";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ...token(address, "WRONG_CHAIN", "Wrong Chain Token"),
+      chainId: "8453"
+    }))));
+    const { resolveTokenForChain } = await import("@/lib/server/tokenRegistry");
+
+    await expect(resolveTokenForChain(1, address)).resolves.toBeNull();
+  });
 });
 
 function token(address: string, symbol: string, name: string) {

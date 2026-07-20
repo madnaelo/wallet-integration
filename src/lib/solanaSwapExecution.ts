@@ -5,6 +5,10 @@ import { SOLANA_CHAIN_ID } from "@/lib/ecosystems";
 import { isSolanaAddress } from "@/lib/validation";
 
 const MAX_SOLANA_TRANSACTION_BYTES = 393_216;
+const SOLANA_CONFIRMATION_ATTEMPTS = 20;
+const SOLANA_CONFIRMATION_DELAY_MS = 1_500;
+
+class SolanaTransactionRejectedError extends Error {}
 
 export async function executeSolanaQuote(params: {
   quote: QuoteResponse;
@@ -32,6 +36,31 @@ export async function executeSolanaQuote(params: {
   });
   if (!isSolanaSignature(signature)) throw new Error("The Solana wallet did not return a transaction signature.");
   return signature;
+}
+
+export async function waitForSolanaConfirmation(
+  connection: Connection,
+  signature: TransactionSignature
+): Promise<boolean> {
+  for (let attempt = 0; attempt < SOLANA_CONFIRMATION_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await connection.getSignatureStatus(signature, {
+        searchTransactionHistory: true
+      });
+      const status = response.value;
+      if (status?.err) throw new SolanaTransactionRejectedError("The Solana network rejected this swap.");
+      if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
+        return true;
+      }
+    } catch (error) {
+      if (error instanceof SolanaTransactionRejectedError) throw error;
+    }
+
+    if (attempt < SOLANA_CONFIRMATION_ATTEMPTS - 1) {
+      await delay(SOLANA_CONFIRMATION_DELAY_MS);
+    }
+  }
+  return false;
 }
 
 function decodeBase64Transaction(value: string): Uint8Array {
@@ -69,4 +98,8 @@ function getFeePayer(transaction: Transaction | VersionedTransaction): PublicKey
 
 function isSolanaSignature(value: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(value);
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

@@ -30,6 +30,11 @@ type TokenPickerProps = {
   describedBy?: string;
   onChange: (token: TokenPickerOption) => void;
   onNetworkChange?: (networkId: string | "all") => void;
+  onResolveAddress?: (
+    networkId: string,
+    address: string,
+    signal: AbortSignal
+  ) => Promise<TokenPickerOption | null>;
 };
 
 export function TokenPicker({
@@ -42,7 +47,8 @@ export function TokenPicker({
   invalid,
   describedBy,
   onChange,
-  onNetworkChange
+  onNetworkChange,
+  onResolveAddress
 }: TokenPickerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -51,6 +57,8 @@ export function TokenPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [networkFilter, setNetworkFilter] = useState<string | "all">(selectedNetworkId);
+  const [resolvedAddressToken, setResolvedAddressToken] = useState<TokenPickerOption | null>(null);
+  const [addressLookupState, setAddressLookupState] = useState<"idle" | "loading" | "not-found" | "error">("idle");
   const [panelPosition, setPanelPosition] = useState<{ left: number; top: number; width: number; maxHeight: number } | null>(null);
   const selectedToken = useMemo(() => findToken(tokens, value, selectedNetworkId), [tokens, value, selectedNetworkId]);
   const filteredTokens = useMemo(
@@ -59,6 +67,9 @@ export function TokenPicker({
   );
   const matchingTokens = useMemo(() => searchTokens(filteredTokens, query), [filteredTokens, query]);
   const visibleTokens = matchingTokens.slice(0, MAX_VISIBLE_TOKENS);
+  const exactAddressQuery = query.trim();
+  const looksLikeAddress = isTokenAddressQuery(exactAddressQuery);
+  const hasExactAddressMatch = filteredTokens.some((token) => sameToken(token.address, exactAddressQuery));
   const useNetworkMenu = networks.length > 12;
 
   const selectNetwork = (networkId: string | "all") => {
@@ -108,6 +119,40 @@ export function TokenPicker({
   useEffect(() => {
     if (!open) setNetworkFilter(selectedNetworkId);
   }, [open, selectedNetworkId]);
+
+  useEffect(() => {
+    setResolvedAddressToken(null);
+    if (
+      !open
+      || !onResolveAddress
+      || networkFilter === "all"
+      || !looksLikeAddress
+      || hasExactAddressMatch
+    ) {
+      setAddressLookupState("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      setAddressLookupState("loading");
+      void onResolveAddress(networkFilter, exactAddressQuery, controller.signal)
+        .then((token) => {
+          if (controller.signal.aborted) return;
+          setResolvedAddressToken(token);
+          setAddressLookupState(token ? "idle" : "not-found");
+        })
+        .catch((error: any) => {
+          if (controller.signal.aborted || error?.name === "AbortError") return;
+          setAddressLookupState("error");
+        });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [exactAddressQuery, hasExactAddressMatch, looksLikeAddress, networkFilter, onResolveAddress, open]);
 
   return (
     <div className={`tokenPicker${open ? " tokenPickerOpen" : ""}`} ref={rootRef}>
@@ -192,9 +237,28 @@ export function TokenPicker({
             aria-label={`${label} search`}
           />
           <div className="tokenPickerList">
+            {resolvedAddressToken ? (
+              <button
+                className="tokenPickerOption tokenPickerResolvedOption"
+                type="button"
+                onClick={() => {
+                  onChange(resolvedAddressToken);
+                  setOpen(false);
+                  window.requestAnimationFrame(() => triggerRef.current?.focus());
+                }}
+              >
+                <span className="tokenPickerOptionSymbol">{resolvedAddressToken.symbol}</span>
+                <span className="tokenPickerOptionMeta">
+                  <span>{tokenCaption(resolvedAddressToken)}</span>
+                  <span>{resolvedAddressToken.networkName}</span>
+                  <span className="mono">{shortAddress(resolvedAddressToken.address)}</span>
+                  <span className="tokenPickerResolvedWarning">Added by address. Check it carefully.</span>
+                </span>
+              </button>
+            ) : null}
             {visibleTokens.map((token) => (
               <button
-                className={`tokenPickerOption${sameToken(token.address, value) && token.networkId === selectedNetworkId ? " tokenPickerOptionSelected" : ""}`}
+                className={`tokenPickerOption${token.isCustom ? " tokenPickerResolvedOption" : ""}${sameToken(token.address, value) && token.networkId === selectedNetworkId ? " tokenPickerOptionSelected" : ""}`}
                 type="button"
                 key={`${token.networkId}:${token.address}`}
                 onClick={() => {
@@ -208,10 +272,28 @@ export function TokenPicker({
                   <span>{tokenCaption(token)}</span>
                   <span>{token.networkName}</span>
                   <span className="mono">{token.isNative ? "" : shortAddress(token.address)}</span>
+                  {token.isCustom ? (
+                    <span className="tokenPickerResolvedWarning">Added by address. Check it carefully.</span>
+                  ) : null}
                 </span>
               </button>
             ))}
-            {!loading && !visibleTokens.length ? <div className="tokenPickerEmpty">No matching tokens.</div> : null}
+            {looksLikeAddress && networkFilter === "all" ? (
+              <div className="tokenPickerEmpty">Choose a network to search this address.</div>
+            ) : null}
+            {addressLookupState === "loading" ? <div className="tokenPickerEmpty">Checking this address...</div> : null}
+            {addressLookupState === "not-found" ? (
+              <div className="tokenPickerEmpty">No token was found at this address on the selected network.</div>
+            ) : null}
+            {addressLookupState === "error" ? (
+              <div className="tokenPickerEmpty">Token search is unavailable right now.</div>
+            ) : null}
+            {!loading
+              && !visibleTokens.length
+              && !resolvedAddressToken
+              && !looksLikeAddress
+              ? <div className="tokenPickerEmpty">No matching tokens.</div>
+              : null}
           </div>
           {matchingTokens.length > visibleTokens.length ? (
             <div className="small tokenPickerHint">Keep typing to narrow the list.</div>
@@ -300,10 +382,19 @@ function findToken(tokens: TokenPickerOption[], address: string, networkId: stri
 }
 
 function sameToken(first: string, second: string): boolean {
-  return first.trim().toLowerCase() === second.trim().toLowerCase();
+  const left = first.trim();
+  const right = second.trim();
+  return /^0x[0-9a-f]{40}$/i.test(left) && /^0x[0-9a-f]{40}$/i.test(right)
+    ? left.toLowerCase() === right.toLowerCase()
+    : left === right;
+}
+
+function isTokenAddressQuery(value: string): boolean {
+  return /^0x[0-9a-f]{40}$/i.test(value) || /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
 function selectedTokenCaption(token: TokenPickerOption): string {
+  if (token.isCustom) return `${token.networkName} - Added by address`;
   const name = token.isNative ? token.name ?? "Native" : token.name ?? token.symbol;
   return `${token.networkName}${name ? ` - ${name}` : ""}`;
 }

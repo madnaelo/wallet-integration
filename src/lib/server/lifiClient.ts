@@ -8,6 +8,7 @@ import {
 import { getAddressFamilyForChain } from "@/lib/ecosystems";
 import { isAddress, isSolanaAddress } from "@/lib/validation";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
+import { acquireLifiRequestBudget } from "@/lib/server/providerRequestBudget";
 import {
   assertExecutableQuote,
   normalizeQuote,
@@ -57,6 +58,7 @@ export class LifiClient implements DexAggregatorClient {
       if (this.cfg.platformFee.enabled) url.searchParams.set("fee", String(this.cfg.platformFee.feeFraction));
     }
 
+    await acquireLifiRequestBudget();
     const res = await fetch(url.toString(), {
       method: "GET",
       headers: {
@@ -239,15 +241,32 @@ function assertLifiIntegratorFee(
   const feeCosts = Array.isArray(recordValue(body.estimate).feeCosts)
     ? recordValue(body.estimate).feeCosts as unknown[]
     : [];
-  const recipientFees = feeCosts.flatMap((feeCost) => {
-    const recipients = recordValue(recordValue(feeCost).feeSplit).recipients;
-    return Array.isArray(recipients) ? recipients : [];
-  });
-  const integratorFee = recipientFees
-    .map(recordValue)
-    .find((recipient) => stringValue(recipient.name) === integrator);
-  const returnedAmount = integratorFee ? uintStringValue(integratorFee.fee) : "";
-  if (!returnedAmount || BigInt(returnedAmount) < expectedFee) {
+  const returnedAmount = feeCosts.reduce<bigint>((total, feeCost) => {
+    const fee = recordValue(feeCost);
+    const feeToken = stringValue(recordValue(fee.token).address);
+    if (!sameLifiAsset(feeToken, params.sellToken)) return total;
+
+    const recipients = recordValue(fee.feeSplit).recipients;
+    if (!Array.isArray(recipients)) return total;
+    return recipients.reduce<bigint>((recipientTotal, recipientValue) => {
+      const recipient = recordValue(recipientValue);
+      if (stringValue(recipient.name) !== integrator) return recipientTotal;
+      const amount = uintStringValue(recipient.fee);
+      return amount ? recipientTotal + BigInt(amount) : recipientTotal;
+    }, total);
+  }, 0n);
+  if (returnedAmount < expectedFee) {
     throw new Error("LI.FI did not include the configured service fee in this route.");
   }
+}
+
+function sameLifiAsset(first: string, second: string): boolean {
+  return normalizeLifiAsset(first) === normalizeLifiAsset(second);
+}
+
+function normalizeLifiAsset(value: string): string {
+  const token = value.trim();
+  if (/^eth$/i.test(token) || /^0x(?:0{40}|e{40})$/i.test(token)) return "evm-native";
+  if (isBitcoinToken(token)) return NATIVE_BITCOIN_TOKEN_ADDRESS;
+  return /^0x[0-9a-f]{40}$/i.test(token) ? token.toLowerCase() : token;
 }

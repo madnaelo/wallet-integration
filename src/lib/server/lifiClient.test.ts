@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { QuoteParams } from "@/lib/server/aggregator";
 import { LifiClient } from "@/lib/server/lifiClient";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
-import { NATIVE_BITCOIN_CHAIN_ID, NATIVE_SOLANA_TOKEN_ADDRESS, SOLANA_CHAIN_ID } from "@/lib/tokens";
+import {
+  NATIVE_BITCOIN_CHAIN_ID,
+  NATIVE_BITCOIN_TOKEN_ADDRESS,
+  NATIVE_SOLANA_TOKEN_ADDRESS,
+  SOLANA_CHAIN_ID
+} from "@/lib/tokens";
 
 const SELL_TOKEN = "0x1111111111111111111111111111111111111111";
 const BUY_TOKEN = "0x2222222222222222222222222222222222222222";
@@ -78,7 +83,7 @@ describe("LI.FI routing", () => {
   it("preserves an executable Bitcoin PSBT and identifies its networks", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(lifiResponse({
       transactionRequest: { data: "70736274ff00", value: "100000" }
-    }, "200")));
+    }, "200", NATIVE_BITCOIN_TOKEN_ADDRESS)));
 
     const quote = await createClient().getQuote({
       ...baseParams,
@@ -100,7 +105,7 @@ describe("LI.FI routing", () => {
   it("preserves an executable Solana transaction", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(lifiResponse({
       transactionRequest: { data: "AQIDBAUGBwgJCgsMDQ4PEA==" }
-    }, "200000")));
+    }, "200000", NATIVE_SOLANA_TOKEN_ADDRESS)));
 
     const quote = await createClient().getQuote({
       ...baseParams,
@@ -134,6 +139,26 @@ describe("LI.FI routing", () => {
 
     await expect(createClient().getQuote(baseParams)).rejects.toThrow(/configured service fee/i);
   });
+
+  it("rejects an integrator allocation charged in an unrelated token", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(lifiResponse({
+      estimate: {
+        toAmount: "1000",
+        toAmountMin: "950",
+        feeCosts: [{
+          name: "Integrator fee",
+          amount: "2000000000000000",
+          token: { address: BUY_TOKEN },
+          feeSplit: {
+            recipients: [{ name: "swapassistant", fee: "2000000000000000" }]
+          }
+        }],
+        gasCosts: []
+      }
+    })));
+
+    await expect(createClient().getQuote(baseParams)).rejects.toThrow(/configured service fee/i);
+  });
 });
 
 function createClient() {
@@ -147,7 +172,8 @@ function createClient() {
 
 function lifiResponse(
   overrides: Record<string, unknown> = {},
-  integratorFeeAmount = "2000000000000000"
+  integratorFeeAmount = "2000000000000000",
+  integratorFeeToken = SELL_TOKEN
 ): Response {
   const body = {
     tool: "relay",
@@ -160,7 +186,7 @@ function lifiResponse(
       feeCosts: [{
         name: "LIFI Fixed Fee",
         amount: integratorFeeAmount,
-        token: { address: SELL_TOKEN },
+        token: { address: integratorFeeToken },
         feeSplit: {
           recipients: [
             { name: "LI.FI", type: "FIXED", fee: "1" },

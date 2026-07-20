@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SwapHistoryService {
-  private static final Set<String> ALLOWED_STATUSES = Set.of("dry_run", "submitted", "confirmed", "failed");
+  private static final Set<String> ALLOWED_STATUSES = Set.of("dry_run", "submitted", "confirmed", "failed", "refunded");
   private static final int MAX_QUOTE_JSON_BYTES = 65_536;
   private static final int MAX_HISTORY_ENTRIES_PER_WALLET = 10_000;
 
@@ -31,7 +31,12 @@ public class SwapHistoryService {
   public SwapHistoryResponse save(String walletAddress, SaveSwapHistoryRequest request) {
     validate(request);
     walletMutationLock.lock(walletAddress);
-    if (swapHistoryRepository.countForWallet(walletAddress) >= MAX_HISTORY_ENTRIES_PER_WALLET) {
+    boolean existingTransaction = swapHistoryRepository.existsTransaction(
+        walletAddress,
+        request.chainId(),
+        request.txHash());
+    if (!existingTransaction
+        && swapHistoryRepository.countForWallet(walletAddress) >= MAX_HISTORY_ENTRIES_PER_WALLET) {
       throw new ApiException(HttpStatus.CONFLICT, "History storage for this wallet is full.");
     }
     return swapHistoryRepository.save(walletAddress, request);
@@ -45,6 +50,12 @@ public class SwapHistoryService {
   private void validate(SaveSwapHistoryRequest request) {
     if (!ALLOWED_STATUSES.contains(request.status())) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid swap status.");
+    }
+    if (!"dry_run".equals(request.status()) && (request.txHash() == null || request.txHash().isBlank())) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "A transaction identifier is required for this swap status.");
+    }
+    if (request.txHash() != null && !request.txHash().isBlank() && !isValidTransactionIdentifier(request.txHash())) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid transaction identifier.");
     }
     validateIntegerString(request.sellAmountRaw(), "sellAmountRaw");
     validateIntegerString(request.buyAmountRaw(), "buyAmountRaw");
@@ -61,5 +72,12 @@ public class SwapHistoryService {
     if (value == null || !value.matches("^\\d+$")) {
       throw new ApiException(HttpStatus.BAD_REQUEST, field + " must be an integer base-unit amount.");
     }
+  }
+
+  private boolean isValidTransactionIdentifier(String value) {
+    String normalized = value.trim();
+    return normalized.equals("dry-run")
+        || normalized.matches("(?i)^(0x)?[0-9a-f]{64}$")
+        || normalized.matches("^[1-9A-HJ-NP-Za-km-z]{80,90}$");
   }
 }

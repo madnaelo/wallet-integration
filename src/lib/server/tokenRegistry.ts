@@ -10,14 +10,18 @@ import {
 } from "@/lib/ecosystems";
 import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
 import { isAddress, isSolanaAddress } from "@/lib/validation";
+import { acquireLifiRequestBudget } from "@/lib/server/providerRequestBudget";
 
 const UNISWAP_TOKEN_LIST_URL = "https://tokens.uniswap.org";
 const TOKEN_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const FALLBACK_CACHE_TTL_MS = 5 * 60 * 1000;
+const TOKEN_RESOLUTION_CACHE_TTL_MS = 60 * 60 * 1000;
+const TOKEN_RESOLUTION_NEGATIVE_TTL_MS = 5 * 60 * 1000;
 const TOKEN_REQUEST_TIMEOUT_MS = 8_000;
 const MAX_TOKEN_LIST_RESPONSE_BYTES = 8 * 1024 * 1024;
 const MAX_REMOTE_TOKENS_PER_SOURCE = 10_000;
 const MAX_MERGED_TOKENS = 10_000;
+const MAX_TOKEN_RESOLUTION_CACHE_ENTRIES = 10_000;
 const MAX_TOKEN_SYMBOL_LENGTH = 32;
 const MAX_TOKEN_NAME_LENGTH = 128;
 const UNSAFE_DISPLAY_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069]/u;
@@ -33,6 +37,8 @@ type CachedTokens = {
 
 const tokenCache = new Map<number, CachedTokens>();
 const tokenLoads = new Map<number, Promise<TokenInfo[]>>();
+const tokenResolutionCache = new Map<string, { expiresAt: number; token: TokenInfo | null }>();
+const tokenResolutionLoads = new Map<string, Promise<TokenInfo | null>>();
 let uniswapTokenListCache: { expiresAt: number; value: unknown } | undefined;
 let uniswapTokenListLoad: Promise<unknown> | undefined;
 
@@ -49,6 +55,45 @@ export async function getTokensForChain(chainId: number): Promise<TokenInfo[]> {
     return await load;
   } finally {
     if (tokenLoads.get(chainId) === load) tokenLoads.delete(chainId);
+  }
+}
+
+export async function resolveTokenForChain(chainId: number, address: string): Promise<TokenInfo | null> {
+  const family = getAddressFamilyForChain(chainId);
+  const normalizedAddress = normalizeTokenKey(address);
+  const validAddress = family === "evm"
+    ? isAddress(address)
+    : family === "solana"
+      ? isSolanaAddress(address)
+      : normalizedAddress === NATIVE_BITCOIN_TOKEN_ADDRESS;
+  if (!validAddress) return null;
+
+  const knownTokens = tokenCache.get(chainId)?.tokens
+    ?? DEFAULT_TOKENS_BY_CHAIN[chainId]
+    ?? nativeTokenForChain(chainId);
+  const known = knownTokens.find((token) => normalizeTokenKey(token.address) === normalizedAddress);
+  if (known) return known;
+  if (family === "bitcoin") return null;
+
+  const cacheKey = `${chainId}:${normalizedAddress}`;
+  const cached = tokenResolutionCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.token;
+  const pending = tokenResolutionLoads.get(cacheKey);
+  if (pending) return pending;
+
+  const load = loadLifiToken(chainId, address).then((token) => {
+    makeTokenResolutionCacheRoom(cacheKey);
+    tokenResolutionCache.set(cacheKey, {
+      token,
+      expiresAt: Date.now() + (token ? TOKEN_RESOLUTION_CACHE_TTL_MS : TOKEN_RESOLUTION_NEGATIVE_TTL_MS)
+    });
+    return token;
+  });
+  tokenResolutionLoads.set(cacheKey, load);
+  try {
+    return await load;
+  } finally {
+    if (tokenResolutionLoads.get(cacheKey) === load) tokenResolutionLoads.delete(cacheKey);
   }
 }
 
@@ -129,12 +174,44 @@ async function loadLifiTokens(chainId: number): Promise<TokenInfo[]> {
   if (family === "solana") url.searchParams.set("chainTypes", "SVM");
   if (family === "bitcoin") url.searchParams.set("chainTypes", "UTXO");
   const apiKey = env.LIFI_API_KEY.trim();
+  await acquireLifiRequestBudget();
   const body = await fetchJson(url.toString(), apiKey ? { "x-lifi-api-key": apiKey } : undefined);
   const tokens = readLifiTokensForChain(body, chainId);
 
   return tokens
     .slice(0, MAX_REMOTE_TOKENS_PER_SOURCE)
     .flatMap((token) => toTokenInfo(token, chainId));
+}
+
+async function loadLifiToken(chainId: number, requestedAddress: string): Promise<TokenInfo | null> {
+  const url = new URL("/v1/token", env.LIFI_BASE_URL);
+  url.searchParams.set("chain", String(chainId));
+  url.searchParams.set("token", requestedAddress.trim());
+  const apiKey = env.LIFI_API_KEY.trim();
+  await acquireLifiRequestBudget();
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      ...(apiKey ? { "x-lifi-api-key": apiKey } : {})
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS)
+  });
+  const text = await readBoundedResponseText(response);
+  if ([400, 404, 422].includes(response.status)) return null;
+  if (!response.ok) throw new Error(`Token lookup failed with status ${response.status}.`);
+
+  let body: unknown;
+  try {
+    body = text ? JSON.parse(text) as unknown : {};
+  } catch {
+    throw new Error("Token lookup response was not valid JSON.");
+  }
+  const token = toTokenInfo(body, chainId)[0];
+  return token && normalizeTokenKey(token.address) === normalizeTokenKey(requestedAddress)
+    ? { ...token, isCustom: true }
+    : null;
 }
 
 function readLifiTokensForChain(value: unknown, chainId: number): unknown[] {
@@ -175,7 +252,7 @@ async function readBoundedResponseText(res: Response): Promise<string> {
   if (!reader) return "";
 
   const decoder = new TextDecoder();
-  let text = "";
+  const textChunks: string[] = [];
   let bytesRead = 0;
   while (true) {
     const { done, value } = await reader.read();
@@ -185,14 +262,15 @@ async function readBoundedResponseText(res: Response): Promise<string> {
       await reader.cancel();
       throw new Error("Token list response exceeded the safe size limit.");
     }
-    text += decoder.decode(value, { stream: true });
+    textChunks.push(decoder.decode(value, { stream: true }));
   }
-  return text + decoder.decode();
+  textChunks.push(decoder.decode());
+  return textChunks.join("");
 }
 
 function toTokenInfo(value: unknown, chainId: number): TokenInfo[] {
   if (!isRecord(value)) return [];
-  if (typeof value.chainId === "number" && value.chainId !== chainId) return [];
+  if ("chainId" in value && parseProviderChainId(value.chainId) !== chainId) return [];
 
   const address = typeof value.address === "string" ? value.address.trim() : "";
   const symbol = normalizeDisplayText(value.symbol, MAX_TOKEN_SYMBOL_LENGTH);
@@ -234,11 +312,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeTokenKey(value: string): string {
-  return value.trim().toLowerCase();
+  const normalized = value.trim();
+  return /^0x/i.test(normalized) || /^(eth|bitcoin)$/i.test(normalized)
+    ? normalized.toLowerCase()
+    : normalized;
 }
 
 function normalizeIdentity(value: string): string {
   return value.normalize("NFKC").trim().toLowerCase();
+}
+
+function parseProviderChainId(value: unknown): number {
+  if (typeof value === "number" && Number.isSafeInteger(value)) return value;
+  if (typeof value === "string" && /^\d{1,16}$/.test(value)) {
+    const parsed = Number(value);
+    if (Number.isSafeInteger(parsed)) return parsed;
+  }
+  return Number.NaN;
+}
+
+function makeTokenResolutionCacheRoom(nextKey: string) {
+  if (tokenResolutionCache.has(nextKey) || tokenResolutionCache.size < MAX_TOKEN_RESOLUTION_CACHE_ENTRIES) return;
+  const now = Date.now();
+  for (const [key, entry] of tokenResolutionCache) {
+    if (entry.expiresAt <= now) tokenResolutionCache.delete(key);
+  }
+  while (tokenResolutionCache.size >= MAX_TOKEN_RESOLUTION_CACHE_ENTRIES) {
+    const oldestKey = tokenResolutionCache.keys().next().value as string | undefined;
+    if (!oldestKey) return;
+    tokenResolutionCache.delete(oldestKey);
+  }
 }
 
 function nativeTokenForChain(chainId: number): TokenInfo[] {

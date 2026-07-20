@@ -9,6 +9,8 @@ type CachedTokenList = {
 
 const tokenCache = new Map<number, CachedTokenList>();
 const tokenRequests = new Map<number, Promise<TokenInfo[]>>();
+const tokenAddressCache = new Map<string, { token: TokenInfo | null; expiresAt: number }>();
+const tokenAddressRequests = new Map<string, Promise<TokenInfo | null>>();
 
 export async function listTokens(chainId: number, signal?: AbortSignal): Promise<TokenInfo[]> {
   const cached = tokenCache.get(chainId);
@@ -25,6 +27,23 @@ export async function listTokens(chainId: number, signal?: AbortSignal): Promise
   return withAbort(request, signal);
 }
 
+export async function resolveTokenAddress(
+  chainId: number,
+  address: string,
+  signal?: AbortSignal
+): Promise<TokenInfo | null> {
+  const cacheKey = `${chainId}:${normalizeTokenAddress(address)}`;
+  const cached = tokenAddressCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.token;
+
+  let request = tokenAddressRequests.get(cacheKey);
+  if (!request) {
+    request = fetchTokenAddress(chainId, address).finally(() => tokenAddressRequests.delete(cacheKey));
+    tokenAddressRequests.set(cacheKey, request);
+  }
+  return withAbort(request, signal);
+}
+
 async function fetchTokens(chainId: number): Promise<TokenInfo[]> {
   const query = new URLSearchParams({ chainId: String(chainId) });
   const res = await fetch(`/api/tokens?${query.toString()}`, { method: "GET", cache: "default" });
@@ -33,6 +52,27 @@ async function fetchTokens(chainId: number): Promise<TokenInfo[]> {
   const tokens = Array.isArray(body?.tokens) ? (body.tokens as TokenInfo[]) : [];
   tokenCache.set(chainId, { tokens, expiresAt: Date.now() + TOKEN_CLIENT_CACHE_TTL_MS });
   return tokens;
+}
+
+async function fetchTokenAddress(chainId: number, address: string): Promise<TokenInfo | null> {
+  const query = new URLSearchParams({ chainId: String(chainId), address: address.trim() });
+  const response = await fetch(`/api/token?${query.toString()}`, { method: "GET", cache: "default" });
+  const body = await response.json().catch(() => ({}));
+  if (response.status === 400 || response.status === 404) {
+    tokenAddressCache.set(`${chainId}:${normalizeTokenAddress(address)}`, {
+      token: null,
+      expiresAt: Date.now() + 60_000
+    });
+    return null;
+  }
+  if (!response.ok) throw new Error(body?.error ?? "Token search is unavailable right now.");
+  const token = body?.token as TokenInfo | undefined;
+  if (!token || typeof token.address !== "string" || typeof token.symbol !== "string") return null;
+  tokenAddressCache.set(`${chainId}:${normalizeTokenAddress(address)}`, {
+    token,
+    expiresAt: Date.now() + TOKEN_CLIENT_CACHE_TTL_MS
+  });
+  return token;
 }
 
 function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
@@ -50,4 +90,9 @@ function createAbortError(): Error {
   const error = new Error("The operation was aborted.");
   error.name = "AbortError";
   return error;
+}
+
+function normalizeTokenAddress(value: string): string {
+  const address = value.trim();
+  return /^0x[0-9a-f]{40}$/i.test(address) ? address.toLowerCase() : address;
 }

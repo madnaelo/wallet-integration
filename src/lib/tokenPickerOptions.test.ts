@@ -42,4 +42,16 @@ describe("token picker network catalog", () => {
       expect.objectContaining({ symbol: "BTC", quoteChainId: NATIVE_BITCOIN_CHAIN_ID, walletNamespace: "bip122" })
     ]));
   });
+
+  it("keeps case-sensitive non-EVM token identifiers distinct", () => {
+    const chain = getSwapChainById(SOLANA_CHAIN_ID)!;
+    const options = buildTokenPickerOptions([chain], {
+      [SOLANA_CHAIN_ID]: [
+        { symbol: "ONE", address: "Abcdefghijk123456789ABCDEFGHJKLMNPQ", decimals: 6 },
+        { symbol: "TWO", address: "abcdefghijk123456789ABCDEFGHJKLMNPQ", decimals: 6 }
+      ]
+    });
+
+    expect(options).toHaveLength(2);
+  });
 });

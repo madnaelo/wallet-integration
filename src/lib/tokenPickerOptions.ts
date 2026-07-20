@@ -107,5 +107,8 @@ function getTokenNetworkName(token: TokenInfo | undefined, fallbackNetworkName: 
 }
 
 function normalizeTokenKey(address: string): string {
-  return address.trim().toLowerCase();
+  const normalized = address.trim();
+  return /^0x/i.test(normalized) || /^(eth|bitcoin)$/i.test(normalized)
+    ? normalized.toLowerCase()
+    : normalized;
 }

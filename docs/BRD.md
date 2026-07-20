@@ -32,10 +32,18 @@ Fee collection must be transparent in product/legal copy before public launch.
 ## Current Production Scope
 
 - Wallet connection through installed wallets and WalletConnect/Reown flows.
-- Quote aggregation through configured providers.
+- Quote aggregation through 0x and LI.FI, the providers currently approved for
+  fee-generating production routing.
+- Independent source/destination network selection across reviewed EVM
+  mainnets, Solana, and native Bitcoin.
+- Provider-catalog token discovery plus exact contract/mint lookup. Executable
+  coverage remains dependent on wallet support, liquidity, route safety, and
+  provider availability.
 - User-signed swap execution.
 - Dry-run safeguards for testing.
 - Wallet-authenticated swap history.
+- Durable cross-chain delivery reconciliation, including failed and refunded
+  terminal states.
 - Favorite pairs with target-rate alerts.
 - Reverse-swap profit and loss-protection monitoring.
 - Telegram, email, and browser push notification channels.

@@ -33,6 +33,8 @@ if (process.env.VERCEL_ENV === "production") {
   const rateLimitMax = Number(process.env.RATE_LIMIT_MAX ?? "30");
   const quoteCacheTtlMs = Number(process.env.QUOTE_CACHE_TTL_MS ?? "8000");
   const quoteCacheMaxEntries = Number(process.env.QUOTE_CACHE_MAX_ENTRIES ?? "2000");
+  const lifiRequestBudgetWindowMs = Number(process.env.LIFI_REQUEST_BUDGET_WINDOW_MS ?? "60000");
+  const lifiRequestBudgetMax = Number(process.env.LIFI_REQUEST_BUDGET_MAX ?? "100");
   const rateLimitPrefix = (process.env.RATE_LIMIT_REDIS_PREFIX ?? "").trim();
   const enabledProviders = parseProviderList(
     (process.env.SWAP_PROVIDERS ?? "").trim() || defaultMonetizedProviders.join(",")
@@ -84,6 +86,10 @@ if (process.env.VERCEL_ENV === "production") {
   assertIntegerRange(rateLimitMax, 1, 10_000, "RATE_LIMIT_MAX");
   assertIntegerRange(quoteCacheTtlMs, 250, 60_000, "QUOTE_CACHE_TTL_MS");
   assertIntegerRange(quoteCacheMaxEntries, 100, 20_000, "QUOTE_CACHE_MAX_ENTRIES");
+  if (lifiRequestBudgetWindowMs !== 60_000) {
+    throw new Error("LIFI_REQUEST_BUDGET_WINDOW_MS must be 60000 in production.");
+  }
+  assertIntegerRange(lifiRequestBudgetMax, 1, 120, "LIFI_REQUEST_BUDGET_MAX");
   if (!/^[a-zA-Z0-9:_-]{1,64}$/.test(rateLimitPrefix)) {
     throw new Error("RATE_LIMIT_REDIS_PREFIX must contain 1-64 safe key-prefix characters.");
   }

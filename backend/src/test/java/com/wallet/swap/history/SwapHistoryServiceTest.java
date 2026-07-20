@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet.swap.common.ApiException;
@@ -55,6 +56,46 @@ class SwapHistoryServiceTest {
     verify(repository, never()).save(WALLET, request);
   }
 
+  @Test
+  void permitsStatusUpdatesWhenWalletHistoryIsFull() {
+    SaveSwapHistoryRequest request = requestWithTransaction("confirmed");
+    when(repository.existsTransaction(WALLET, 1L, request.txHash())).thenReturn(true);
+    when(repository.countForWallet(WALLET)).thenReturn(10_000);
+
+    service.save(WALLET, request);
+
+    verify(repository).save(WALLET, request);
+    verify(repository, never()).countForWallet(WALLET);
+  }
+
+  @Test
+  void requiresAValidTransactionIdentifierForSubmittedSwaps() {
+    SaveSwapHistoryRequest request = requestWithTransaction("submitted");
+    request = new SaveSwapHistoryRequest(
+        request.chainId(),
+        request.buyChainId(),
+        "not-a-transaction",
+        request.status(),
+        request.sellTokenAddress(),
+        request.sellTokenSymbol(),
+        request.sellTokenDecimals(),
+        request.buyTokenAddress(),
+        request.buyTokenSymbol(),
+        request.buyTokenDecimals(),
+        request.sellAmountRaw(),
+        request.buyAmountRaw(),
+        request.minBuyAmountRaw(),
+        request.aggregator(),
+        request.quote());
+
+    SaveSwapHistoryRequest invalidRequest = request;
+    assertThatThrownBy(() -> service.save(WALLET, invalidRequest))
+        .isInstanceOf(ApiException.class)
+        .hasMessage("Invalid transaction identifier.");
+
+    verify(repository, never()).save(WALLET, invalidRequest);
+  }
+
   private SaveSwapHistoryRequest requestWithQuote(com.fasterxml.jackson.databind.JsonNode quote) {
     return new SaveSwapHistoryRequest(
         1L,
@@ -72,5 +113,25 @@ class SwapHistoryServiceTest {
         "1900",
         "0x",
         quote);
+  }
+
+  private SaveSwapHistoryRequest requestWithTransaction(String status) {
+    SaveSwapHistoryRequest request = requestWithQuote(null);
+    return new SaveSwapHistoryRequest(
+        request.chainId(),
+        request.buyChainId(),
+        "0x" + "a".repeat(64),
+        status,
+        request.sellTokenAddress(),
+        request.sellTokenSymbol(),
+        request.sellTokenDecimals(),
+        request.buyTokenAddress(),
+        request.buyTokenSymbol(),
+        request.buyTokenDecimals(),
+        request.sellAmountRaw(),
+        request.buyAmountRaw(),
+        request.minBuyAmountRaw(),
+        request.aggregator(),
+        request.quote());
   }
 }

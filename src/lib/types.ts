@@ -55,3 +55,11 @@ export type QuoteResponse = {
   availableQuotes?: QuoteResponse[];
   quoteErrors?: QuoteProviderError[];
 };
+
+export type RouteStatusResponse = {
+  state: "pending" | "completed" | "failed" | "refunded";
+  message: string;
+  providerStatus: string;
+  providerSubstatus?: string;
+  destinationTransactionHash?: string;
+};

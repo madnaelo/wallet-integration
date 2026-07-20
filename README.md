@@ -15,16 +15,18 @@ Implemented:
 - Next.js App Router frontend with ethers-based wallet transaction execution.
 - Reown AppKit wallet connection for installed wallets and WalletConnect-style
   QR/mobile flows.
-- Same-chain swap selection for configured Ethereum, Arbitrum, Optimism, Base,
-  Polygon, BNB Smart Chain, and Avalanche networks. The connected wallet chain
-  is selected when it is allowed.
-- Searchable token pickers backed by cached token-list/provider metadata,
-  native/popular-token fallbacks, native BTC selection, and a sell/buy reversal
-  control.
+- Independent source and destination network selection across the reviewed EVM
+  mainnets exposed by the provider registry, plus Solana and native Bitcoin.
+  The connected source-wallet network is selected when it is supported.
+- Searchable token pickers backed by cached provider catalogs with thousands of
+  assets per major network, popular-token ordering, native assets, and exact
+  EVM contract or Solana mint lookup for provider-supported tokens that are not
+  in the default list. Address-added tokens are visibly marked for verification.
 - `GET /api/quote` with validation, per-IP rate limiting, and short quote cache.
-- Confirmed-fee production routing through 0x for same-chain EVM swaps and
-  LI.FI for native-Bitcoin paths. Dormant 1inch, ParaSwap, and Odos adapters
-  cannot be enabled until their fee terms are recorded as confirmed.
+- Confirmed-fee production routing through 0x for supported same-chain EVM
+  swaps and LI.FI for provider-supported same-chain, cross-chain, Solana, and
+  native-Bitcoin paths. 1inch, ParaSwap/Velora, and Odos are excluded from live
+  quote routing while their commercial fee terms remain unresolved.
 - Provider failure isolation: one timed-out or rejected provider does not hide
   successful quotes from other configured providers.
 - User-facing trade summary with slippage, quote expiry, provider selection,
@@ -35,7 +37,8 @@ Implemented:
 - Spring Boot and PostgreSQL backend for signed wallet sessions and swap
   history.
 - Collapsed swap history panel that loads authenticated history on demand and
-  stores dry-run, submitted cross-chain, or confirmed swaps.
+  stores dry-run, submitted, confirmed, failed, or refunded swaps. A leased
+  backend worker durably reconciles LI.FI delivery after the source transaction.
 - Backend notification preferences, scheduled reverse-swap profit/loss scanning,
   and email, Telegram, and browser push delivery adapters. Alert checks batch
   market price reads before evaluating historical swaps.
@@ -67,8 +70,6 @@ Not implemented yet:
 - General price alert workflows beyond favorite-pair target rates and
   reverse-swap profit/loss alerts.
 - In-app notification inbox.
-- Guarded import-by-address flow and token risk signals.
-- Native BTC sell execution and cross-chain destination status tracking.
 - Native asset, native BTC, cross-chain, and non-EVM automatic limit-order
   execution. These stay blocked until each path has a provider-verifiable
   signed-intent adapter.
@@ -92,8 +93,10 @@ High-level flow:
 1. User connects a source wallet through AppKit.
 2. Frontend requests quotes from the Next.js quote route with the selected
    pair, source-wallet address, and the selected receive wallet/address.
-3. The quote route asks the confirmed-fee 0x adapter for same-chain routes or
-   LI.FI for native-BTC paths, then returns normalized quote data.
+3. The quote route asks the confirmed-fee 0x and LI.FI adapters that support the
+   selected networks, isolates provider failures, and returns normalized ranked
+   quotes. A route is returned only when its configured platform fee is present
+   in the provider response.
 4. The frontend checks approvals when needed and asks the user's wallet to sign
    and submit the selected transaction.
 5. Swap history uses a signed wallet message to create a backend session before
@@ -112,11 +115,13 @@ High-level flow:
    ownership-scoped and remains pending in the UI until the provider confirms
    whether cancellation or an in-flight fill won the race.
 
-Native BTC swaps use the same form model: the source wallet pays, the receive
-wallet/address receives, and the connected destination wallet pre-fills the
-receive field when it matches the destination network. BTC-source quotes are
-kept visible while Bitcoin-side PSBT signing and submission remain a dedicated
-follow-up.
+Native BTC and Solana swaps use the same form model: the source wallet pays,
+the receive wallet/address receives, and the destination wallet pre-fills the
+receive field when it matches the destination network. Bitcoin execution
+preserves and validates the provider PSBT before wallet signing and broadcast;
+Solana execution validates the transaction fee payer before wallet submission.
+Executable coverage is always route- and liquidity-dependent: selecting or
+resolving a token does not promise that a safe route exists for every amount.
 
 ## Local Setup
 
@@ -175,14 +180,16 @@ Important quote and wallet variables:
 - `MONETIZED_SWAP_PROVIDERS`
 - `ZEROX_API_KEY`
 - `LIFI_BASE_URL`, `LIFI_API_KEY`, `LIFI_INTEGRATOR`
+- `LIFI_REQUEST_BUDGET_WINDOW_MS`, `LIFI_REQUEST_BUDGET_MAX`
 
 Production builds validate `SWAP_PROVIDERS` before deployment. Only providers
 whose fee terms are confirmed in `config/provider-commercial-policy.json` can
 be routed, each must have its required credentials, LI.FI must have its
 registered integrator identifier, and at least one same-chain provider must
 remain enabled. `MONETIZED_SWAP_PROVIDERS` must include every routed provider,
-and production requires a non-zero platform fee. Dormant 1inch, ParaSwap, and
-Odos settings remain available for adapter testing but are not production
+and production requires a non-zero platform fee. The frontend enforces a
+distributed LI.FI request budget, while OCI reserves a separate bounded budget
+for durable transfer-status reconciliation. Dormant adapters are not production
 quote sources.
 
 Important fee variables:
@@ -190,7 +197,6 @@ Important fee variables:
 - `FEE_RECIPIENT_ADDRESS`
 - `AFFILIATE_ADDRESS`
 - `PLATFORM_FEE_BPS`
-- `PARASWAP_PARTNER`
 
 Important backend variables:
 

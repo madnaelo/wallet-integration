@@ -16,6 +16,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
   private static final Set<String> ONEINCH_HOSTS = Set.of("api.1inch.com", "api.1inch.dev");
   private static final Set<String> COW_PUBLIC_HOSTS = Set.of("api.cow.fi");
   private static final Set<String> COW_PARTNER_HOSTS = Set.of("partners.cow.fi");
+  private static final Set<String> LIFI_HOSTS = Set.of("li.quest");
   private static final Set<String> TELEGRAM_HOSTS = Set.of("api.telegram.org");
   private static final Set<String> ALLOWED_PUSH_HOST_PATTERNS = Set.of(
       "fcm.googleapis.com",
@@ -29,6 +30,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
   private final ApiProperties apiProperties;
   private final AuthProperties authProperties;
   private final FeatureProperties featureProperties;
+  private final LifiProperties lifiProperties;
   private final LimitOrderProperties limitOrderProperties;
   private final MaintenanceProperties maintenanceProperties;
   private final NotificationProperties notificationProperties;
@@ -41,6 +43,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
       ApiProperties apiProperties,
       AuthProperties authProperties,
       FeatureProperties featureProperties,
+      LifiProperties lifiProperties,
       LimitOrderProperties limitOrderProperties,
       MaintenanceProperties maintenanceProperties,
       NotificationProperties notificationProperties) {
@@ -51,6 +54,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     this.apiProperties = apiProperties;
     this.authProperties = authProperties;
     this.featureProperties = featureProperties;
+    this.lifiProperties = lifiProperties;
     this.limitOrderProperties = limitOrderProperties;
     this.maintenanceProperties = maintenanceProperties;
     this.notificationProperties = notificationProperties;
@@ -70,6 +74,7 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     validateDatabase(problems);
     validateMaintenance(problems);
     validateNotifications(problems);
+    validateLifi(problems);
     validateLimitOrders(problems);
 
     if (!problems.isEmpty()) {
@@ -317,6 +322,38 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     }
     if (outside(limitOrderProperties.getStatusCheckMaxBackoffSeconds(), 60, 86_400)) {
       problems.add("LIMIT_ORDER_STATUS_CHECK_MAX_BACKOFF_SECONDS must be between 60 and 86400");
+    }
+  }
+
+  private void validateLifi(List<String> problems) {
+    validateProviderUrl(problems, "LIFI_BASE_URL", lifiProperties.getBaseUrl(), LIFI_HOSTS);
+    if (!lifiProperties.isTrackingEnabled()) return;
+    if (isWeakSecret(lifiProperties.getApiKey(), 16)) {
+      problems.add("LIFI_API_KEY is required when transfer tracking is enabled");
+    }
+    if (outside(lifiProperties.getRequestTimeoutSeconds(), 1, 30)) {
+      problems.add("LIFI_STATUS_REQUEST_TIMEOUT_SECONDS must be between 1 and 30");
+    }
+    if (outside(lifiProperties.getStatusCheckFixedDelayMs(), 5_000, 600_000)) {
+      problems.add("LIFI_STATUS_CHECK_FIXED_DELAY_MS must be between 5000 and 600000");
+    }
+    if (outside(lifiProperties.getStatusCheckBatchSize(), 1, 200)) {
+      problems.add("LIFI_STATUS_CHECK_BATCH_SIZE must be between 1 and 200");
+    }
+    long statusRequestsPerMinute = lifiProperties.getStatusCheckFixedDelayMs() <= 0
+        ? Long.MAX_VALUE
+        : lifiProperties.getStatusCheckBatchSize() * 60_000L / lifiProperties.getStatusCheckFixedDelayMs();
+    if (statusRequestsPerMinute > 60) {
+      problems.add("LI.FI status tracking must reserve API capacity for live quotes");
+    }
+    if (outside(lifiProperties.getStatusCheckLockTtlSeconds(), 15, 3_600)) {
+      problems.add("LIFI_STATUS_CHECK_LOCK_TTL_SECONDS must be between 15 and 3600");
+    }
+    if (outside(lifiProperties.getStatusCheckMaxBackoffSeconds(), 60, 86_400)) {
+      problems.add("LIFI_STATUS_CHECK_MAX_BACKOFF_SECONDS must be between 60 and 86400");
+    }
+    if (outside(lifiProperties.getMaximumTrackingHours(), 1, 2_160)) {
+      problems.add("LIFI_STATUS_MAXIMUM_TRACKING_HOURS must be between 1 and 2160");
     }
   }
 

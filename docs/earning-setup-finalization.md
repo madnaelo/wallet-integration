@@ -210,6 +210,11 @@ The LI.FI client sends:
 - `fee`
 - `x-lifi-api-key`
 
+The quote adapter rejects a route unless the response preserves the registered
+integrator, the requested fee fraction, and an integrator allocation in the
+source asset of at least the configured amount. This is a per-route technical
+guard; settled fee receipt still requires a small real-transaction check.
+
 LI.FI fee wallet/payout routing is configured in the LI.FI Partner Portal.
 On May 27, 2026, fee collection was enabled for integration `the-wallet` with
 default EVM, Solana/SVM, Sui, and Bitcoin receiving wallets. The portal also
@@ -282,7 +287,6 @@ Steps:
 Run small real swaps after funding a test wallet:
 
 - one EVM route through each enabled fee-supporting provider,
-- one LI.FI route after confirming portal fee routing,
-- one ParaSwap/Velora route after API-key or partner-access status is resolved.
+- one LI.FI route after confirming portal fee routing.
 
 Record whether the expected fee reached the configured treasury destination.

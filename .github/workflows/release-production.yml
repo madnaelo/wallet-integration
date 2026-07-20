@@ -294,6 +294,7 @@ jobs:
           OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
           OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
           COW_API_KEY: ${{ secrets.COW_API_KEY }}
+          LIFI_API_KEY: ${{ secrets.LIFI_API_KEY }}
           WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
           OCI_PROXY_NETWORK: ${{ vars.OCI_PROXY_NETWORK || secrets.OCI_PROXY_NETWORK || secrets.OCI_CONTAINER_NETWORK }}
           OCI_CADDYFILE_PATH: ${{ vars.OCI_CADDYFILE_PATH || secrets.OCI_CADDYFILE_PATH }}
@@ -303,7 +304,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=()
-          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER OCI_BACKUP_BUCKET OCI_BACKUP_NAMESPACE; do
+          for name in OCI_SSH_HOST OCI_SSH_USER OCI_SSH_PRIVATE_KEY OCI_SSH_KNOWN_HOSTS OCI_BACKEND_ENV LIFI_API_KEY WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER OCI_BACKUP_BUCKET OCI_BACKUP_NAMESPACE; do
             if [ -z "${!name:-}" ]; then
               missing+=("$name")
             fi
@@ -361,7 +362,7 @@ jobs:
           )"
           unset admin_api_key
           echo "::add-mask::$rate_limit_key_pepper"
-          for name in COW_API_KEY; do
+          for name in COW_API_KEY LIFI_API_KEY; do
             value="${!name:-}"
             if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
               echo "$name must be a single-line value." >&2
@@ -418,6 +419,15 @@ jobs:
             printf 'OCI_BACKUP_OBJECT_PREFIX=%s\n' "$OCI_BACKUP_OBJECT_PREFIX"
             printf 'OCI_BACKUP_AUTH_MODE=instance_principal\n'
             printf 'LIMIT_ORDERS_DEFAULT_ENABLED=true\n'
+            printf 'LIFI_BASE_URL=https://li.quest\n'
+            printf 'LIFI_API_KEY=%s\n' "$LIFI_API_KEY"
+            printf 'LIFI_STATUS_TRACKING_ENABLED=true\n'
+            printf 'LIFI_STATUS_REQUEST_TIMEOUT_SECONDS=10\n'
+            printf 'LIFI_STATUS_CHECK_FIXED_DELAY_MS=10000\n'
+            printf 'LIFI_STATUS_CHECK_BATCH_SIZE=10\n'
+            printf 'LIFI_STATUS_CHECK_LOCK_TTL_SECONDS=45\n'
+            printf 'LIFI_STATUS_CHECK_MAX_BACKOFF_SECONDS=1800\n'
+            printf 'LIFI_STATUS_MAXIMUM_TRACKING_HOURS=168\n'
             printf 'ONEINCH_ORDERBOOK_ENABLED=false\n'
             printf 'ONEINCH_API_KEY=\n'
             printf 'ONEINCH_ORDERBOOK_BASE_URL=https://api.1inch.com/orderbook/v4.1\n'
@@ -446,6 +456,7 @@ jobs:
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
           OCI_BACKEND_ENV: ${{ secrets.OCI_BACKEND_ENV }}
           COW_API_KEY: ${{ secrets.COW_API_KEY }}
+          LIFI_API_KEY: ${{ secrets.LIFI_API_KEY }}
           OCI_BACKUP_BUCKET: ${{ vars.OCI_BACKUP_BUCKET }}
           OCI_BACKUP_NAMESPACE: ${{ vars.OCI_BACKUP_NAMESPACE }}
           OCI_BACKUP_OBJECT_PREFIX: ${{ vars.OCI_BACKUP_OBJECT_PREFIX || 'swap-assistant/postgres' }}

@@ -48,6 +48,11 @@ preference/rule storage, not autonomous private-key signing.
 - Quote route: confirmed-fee production routing through 0x and LI.FI. Dormant
   1inch, ParaSwap/Velora, and Odos adapters fail closed until commercial terms
   are explicitly confirmed.
+- Asset coverage: independent source/destination selection across reviewed EVM
+  mainnets, Solana, and native Bitcoin; cached provider catalogs plus exact
+  contract/mint lookup; route availability still depends on live liquidity.
+- LI.FI source transactions are tracked in the browser for immediate feedback
+  and by a leased backend worker for durable confirmed/failed/refunded history.
 - Wallet connection: Reown AppKit plus provider-specific signing handling.
 - Backend: Spring Boot, Flyway, PostgreSQL.
 - Notifications: scheduled monitor with email, Telegram, and browser push

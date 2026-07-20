@@ -41,6 +41,25 @@ describe("distributed rate limiting", () => {
     expect(String(request.body)).not.toContain("0x1111111111111111111111111111111111111111");
   });
 
+  it("supports an independent shared provider budget", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis-token");
+    vi.stubEnv("RATE_LIMIT_REDIS_REQUIRED", "true");
+    vi.stubEnv("RATE_LIMIT_KEY_PEPPER", "test-pepper-that-is-long-enough");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ result: [1, 0] }), { status: 200 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { rateLimitMany } = await import("@/lib/server/rateLimit");
+    await rateLimitMany(["provider-budget:lifi"], { maxRequests: 100, windowMs: 60_000 });
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const command = JSON.parse(String(request.body)) as unknown[];
+    expect(command.at(-2)).toBe(100);
+    expect(command.at(-1)).toBe(60_000);
+  });
+
   it("accepts credentials injected by the Vercel Upstash integration", async () => {
     vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");

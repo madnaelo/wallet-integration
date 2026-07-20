@@ -45,9 +45,10 @@ import type {
 import { isAppKitConfigured } from "@/lib/walletConfig";
 import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
+import { fetchRouteStatus, routeStatusDelayMs, shouldTrackRoute } from "@/lib/routeStatus";
 import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import { swapLog } from "@/lib/swapLog";
-import { listTokens } from "@/lib/tokenClient";
+import { listTokens, resolveTokenAddress } from "@/lib/tokenClient";
 import {
   type PreparedPushSubscription,
   preparePushSubscription,
@@ -95,7 +96,7 @@ import {
 
 const WalletBridge = dynamic(() => import("@/components/WalletBridge"), { ssr: false });
 
-type TxStatus = "idle" | "pending" | "submitted" | "confirmed" | "failed";
+type TxStatus = "idle" | "pending" | "submitted" | "confirmed" | "failed" | "refunded";
 type ActiveView = "swap" | "alerts" | "favorites" | "preferences";
 const QUOTE_TTL_SECONDS = 20;
 const SWAP_TOUR_STORAGE_KEY = "wallet.swapAssistant.swapTour.v1";
@@ -153,6 +154,13 @@ type PendingSwapLink = {
   buyToken: string;
   sellAmountRaw: string;
   autoQuote: boolean;
+};
+type SwapExecutionSnapshot = {
+  quote: QuoteResponse;
+  fromChainId: number;
+  toChainId: number;
+  sellToken: Pick<TokenInfo, "address" | "symbol" | "decimals">;
+  buyToken: Pick<TokenInfo, "address" | "symbol" | "decimals">;
 };
 type TourAnchor = { left: number; top: number; width: number; height: number };
 type TourStep = {
@@ -301,6 +309,7 @@ export default function Page() {
   const [approvalTxHash, setApprovalTxHash] = useState<string>("");
   const [swapTxHash, setSwapTxHash] = useState<string>("");
   const [swapStatus, setSwapStatus] = useState<TxStatus>("idle");
+  const [routeProgressMessage, setRouteProgressMessage] = useState<string>("");
   const [walletRequestNotice, setWalletRequestNotice] = useState<string>("");
   const [actionError, setActionError] = useState<string>("");
   const [connectPromptVisible, setConnectPromptVisible] = useState<boolean>(false);
@@ -317,6 +326,8 @@ export default function Page() {
   const historyRequestInFlightRef = useRef<boolean>(false);
   const backendSessionRequestRef = useRef<Promise<BackendSession> | null>(null);
   const walletSignPromptResolverRef = useRef<((approved: boolean) => void) | null>(null);
+  const routeTrackingRunRef = useRef<number>(0);
+  const routeTrackingControllerRef = useRef<AbortController | null>(null);
   const [notificationPreference, setNotificationPreference] = useState<NotificationPreference | null>(null);
   const [notificationPreferenceLoaded, setNotificationPreferenceLoaded] = useState<boolean>(false);
   const [notificationPreferenceLoading, setNotificationPreferenceLoading] = useState<boolean>(false);
@@ -467,6 +478,27 @@ export default function Page() {
     if (chainId) loadTokensForChain(chainId);
   }, [loadTokensForChain]);
 
+  const resolveTokenPickerAddress = useCallback(async (
+    networkId: string,
+    address: string,
+    signal: AbortSignal
+  ): Promise<TokenPickerOption | null> => {
+    const chainId = parseTokenNetworkId(networkId);
+    const tokenChain = chainId ? allowedChains.find((candidate) => candidate.chainId === chainId) : undefined;
+    if (!chainId || !tokenChain || !allowedChainIds.has(chainId)) return null;
+
+    const token = await resolveTokenAddress(chainId, address, signal);
+    if (!token) return null;
+    setTokensByChain((current) => {
+      const existing = current[chainId] ?? [];
+      if (existing.some((candidate) => normalizeTokenKey(candidate.address) === normalizeTokenKey(token.address))) {
+        return current;
+      }
+      return { ...current, [chainId]: [...existing, token] };
+    });
+    return buildTokenPickerOptions([tokenChain], { [chainId]: [token] })[0] ?? null;
+  }, [allowedChainIds, allowedChains]);
+
   useEffect(() => {
     setTokensByChain((current) => {
       const next = { ...current };
@@ -485,6 +517,8 @@ export default function Page() {
   useEffect(() => () => {
     tokenLoadControllersRef.current.forEach((controller) => controller.abort());
     tokenLoadControllersRef.current.clear();
+    routeTrackingControllerRef.current?.abort();
+    routeTrackingControllerRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -1116,6 +1150,9 @@ export default function Page() {
   }
 
   function clearQuoteState() {
+    routeTrackingControllerRef.current?.abort();
+    routeTrackingControllerRef.current = null;
+    routeTrackingRunRef.current += 1;
     setQuote(null);
     setSelectedQuoteId("");
     setQuoteFetchedAtMs(null);
@@ -1123,6 +1160,7 @@ export default function Page() {
     setApprovalTxHash("");
     setSwapTxHash("");
     setSwapStatus("idle");
+    setRouteProgressMessage("");
     setWalletRequestNotice("");
   }
 
@@ -2117,26 +2155,53 @@ export default function Page() {
     if (saved) closeFavoritePopover();
   }
 
-  async function persistCurrentSwap(status: SaveSwapHistoryRequest["status"], txHash?: string) {
-    if (!quote || !sellTokenInfo || !buyTokenInfo) return;
+  function captureCurrentSwapSnapshot(): SwapExecutionSnapshot | null {
+    if (!quote || !sellTokenInfo || !buyTokenInfo) return null;
+    return {
+      quote: quoteForHistory(quote),
+      fromChainId: getTokenExecutionChainId(sellTokenInfo, selectedChainId),
+      toChainId: getTokenExecutionChainId(buyTokenInfo, buyChainId),
+      sellToken: {
+        address: sellTokenInfo.address,
+        symbol: sellTokenInfo.symbol,
+        decimals: sellTokenInfo.decimals
+      },
+      buyToken: {
+        address: buyTokenInfo.address,
+        symbol: buyTokenInfo.symbol,
+        decimals: buyTokenInfo.decimals
+      }
+    };
+  }
 
+  async function persistCurrentSwap(status: SaveSwapHistoryRequest["status"], txHash?: string) {
+    const snapshot = captureCurrentSwapSnapshot();
+    if (!snapshot) return;
+    await persistSwapSnapshot(snapshot, status, txHash);
+  }
+
+  async function persistSwapSnapshot(
+    snapshot: SwapExecutionSnapshot,
+    status: SaveSwapHistoryRequest["status"],
+    txHash?: string
+  ) {
     let session = await ensureBackendSession();
     const request: SaveSwapHistoryRequest = {
-      chainId: getTokenExecutionChainId(sellTokenInfo, selectedChainId),
-      buyChainId: getTokenExecutionChainId(buyTokenInfo, buyChainId),
+      chainId: snapshot.fromChainId,
+      buyChainId: snapshot.toChainId,
       txHash,
       status,
-      sellTokenAddress: sellTokenInfo.address,
-      sellTokenSymbol: sellTokenInfo.symbol,
-      sellTokenDecimals: sellTokenInfo.decimals,
-      buyTokenAddress: buyTokenInfo.address,
-      buyTokenSymbol: buyTokenInfo.symbol,
-      buyTokenDecimals: buyTokenInfo.decimals,
-      sellAmountRaw: quote.sellAmount,
-      buyAmountRaw: quote.buyAmount,
-      minBuyAmountRaw: stringValue(quote.minBuyAmount),
-      aggregator: stringValue(quote.providerId) || "swap-provider",
-      quote: quoteForHistory(quote)
+      sellTokenAddress: snapshot.sellToken.address,
+      sellTokenSymbol: snapshot.sellToken.symbol,
+      sellTokenDecimals: snapshot.sellToken.decimals,
+      buyTokenAddress: snapshot.buyToken.address,
+      buyTokenSymbol: snapshot.buyToken.symbol,
+      buyTokenDecimals: snapshot.buyToken.decimals,
+      sellAmountRaw: snapshot.quote.sellAmount,
+      buyAmountRaw: snapshot.quote.buyAmount,
+      minBuyAmountRaw: stringValue(snapshot.quote.minBuyAmount),
+      aggregator: stringValue(snapshot.quote.providerId) || "swap-provider",
+      quote: snapshot.quote
     };
 
     let saved: SwapHistoryRecord;
@@ -2150,6 +2215,53 @@ export default function Page() {
       saved = await saveSwapHistory(envPublic.BACKEND_BASE_URL, session, request);
     }
     setDbSwapHistory((history) => [saved, ...history.filter((item) => item.id !== saved.id)].slice(0, 25));
+  }
+
+  function monitorSubmittedRoute(snapshot: SwapExecutionSnapshot, transactionHash: string) {
+    if (!shouldTrackRoute(snapshot.quote)) return;
+
+    routeTrackingControllerRef.current?.abort();
+    const controller = new AbortController();
+    const runId = routeTrackingRunRef.current + 1;
+    routeTrackingRunRef.current = runId;
+    routeTrackingControllerRef.current = controller;
+    setRouteProgressMessage("Source transaction accepted. Tracking delivery to the recipient.");
+
+    void (async () => {
+      const maxAttempts = 30;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        if (attempt > 0) {
+          try {
+            await waitForDelay(routeStatusDelayMs(attempt - 1), controller.signal);
+          } catch {
+            return;
+          }
+        }
+
+        if (controller.signal.aborted || routeTrackingRunRef.current !== runId) return;
+        try {
+          const status = await fetchRouteStatus(snapshot.quote, transactionHash, controller.signal);
+          if (controller.signal.aborted || routeTrackingRunRef.current !== runId) return;
+          setRouteProgressMessage(status.message);
+          if (status.state === "pending") continue;
+
+          const historyStatus = status.state === "completed" ? "confirmed" : status.state;
+          setSwapStatus(historyStatus);
+          // The backend reconciler is the durable source of truth. A browser
+          // response must not race it and discard provider/destination details.
+          routeTrackingControllerRef.current = null;
+          return;
+        } catch (error: any) {
+          if (controller.signal.aborted || error?.name === "AbortError") return;
+          if (attempt === maxAttempts - 1) {
+            setRouteProgressMessage(
+              "The swap is still being tracked. You can close this page and check your history later."
+            );
+          }
+        }
+      }
+      routeTrackingControllerRef.current = null;
+    })();
   }
 
   async function ensureCorrectNetwork() {
@@ -2190,13 +2302,8 @@ export default function Page() {
   }
 
   async function fetchQuote() {
-    setQuote(null);
-    setQuoteError("");
+    clearQuoteState();
     setActionError("");
-    setApprovalTxHash("");
-    setSwapTxHash("");
-    setSwapStatus("idle");
-    setWalletRequestNotice("");
 
     revealQuoteValidation();
     if (!requireWalletForForm()) return;
@@ -2411,6 +2518,8 @@ export default function Page() {
       if (quote.sellAmount !== expectedSellAmountRaw) {
         throw new Error("The amount changed. Refresh the quote before continuing.");
       }
+      const executionSnapshot = captureCurrentSwapSnapshot();
+      if (!executionSnapshot) throw new Error("Refresh the quote before continuing.");
 
       if (quote.executionKind === "bitcoin-to-evm") {
         const bitcoinProvider = walletBridgeState.bitcoinProvider;
@@ -2431,11 +2540,12 @@ export default function Page() {
         swapLog.add({ txHash: transactionId, walletAddress: sourceWalletAddress, timestampMs: Date.now() });
         if (walletAddress) {
           try {
-            await persistCurrentSwap("submitted", transactionId);
+            await persistSwapSnapshot(executionSnapshot, "submitted", transactionId);
           } catch (historySaveError: any) {
             setHistoryError(normalizeWalletError(historySaveError));
           }
         }
+        monitorSubmittedRoute(executionSnapshot, transactionId);
         return;
       }
 
@@ -2447,7 +2557,7 @@ export default function Page() {
         }
         setSwapStatus("pending");
         setWalletRequestNotice(buildWalletApprovalNotice(sourceWalletName, "swap"));
-        const { executeSolanaQuote } = await import("@/lib/solanaSwapExecution");
+        const { executeSolanaQuote, waitForSolanaConfirmation } = await import("@/lib/solanaSwapExecution");
         const signature = await executeSolanaQuote({
           quote,
           provider: solanaProvider,
@@ -2456,15 +2566,23 @@ export default function Page() {
         });
         setWalletRequestNotice("");
         setSwapStatus("submitted");
+        const trackDelivery = shouldTrackRoute(executionSnapshot.quote);
+        const historyStatus = trackDelivery
+          ? "submitted"
+          : await waitForSolanaConfirmation(solanaConnection, signature)
+            ? "confirmed"
+            : "submitted";
+        setSwapStatus(historyStatus);
         setSwapTxHash(signature);
         swapLog.add({ txHash: signature, walletAddress: sourceWalletAddress, timestampMs: Date.now() });
         if (walletAddress) {
           try {
-            await persistCurrentSwap("submitted", signature);
+            await persistSwapSnapshot(executionSnapshot, historyStatus, signature);
           } catch (historySaveError: any) {
             setHistoryError(normalizeWalletError(historySaveError));
           }
         }
+        if (trackDelivery) monitorSubmittedRoute(executionSnapshot, signature);
         return;
       }
 
@@ -2521,10 +2639,11 @@ export default function Page() {
           : "confirmed";
         setSwapStatus(historyStatus);
         try {
-          await persistCurrentSwap(historyStatus, tx.hash);
+          await persistSwapSnapshot(executionSnapshot, historyStatus, tx.hash);
         } catch (historySaveError: any) {
           setHistoryError(normalizeWalletError(historySaveError));
         }
+        if (historyStatus === "submitted") monitorSubmittedRoute(executionSnapshot, tx.hash);
       } else setSwapStatus("failed");
     } catch (e: any) {
       setWalletRequestNotice("");
@@ -2578,6 +2697,9 @@ export default function Page() {
       buyTokenFeesDeducted,
       grossBuyAmount
     });
+    if (sellTokenInfo.isCustom || buyTokenInfo.isCustom) {
+      warnings.unshift("This pair includes a token added by address. Verify the address before approving the swap.");
+    }
 
     return {
       providerName: stringValue(quote.providerName) || "Best route",
@@ -2875,6 +2997,7 @@ export default function Page() {
                 tokens={tokenPickerTokens}
                 loading={tokensLoading}
                 onNetworkChange={handleTokenPickerNetworkChange}
+                onResolveAddress={resolveTokenPickerAddress}
                 onChange={(token) => {
                   selectTokenForSide("sell", token);
                 }}
@@ -2916,6 +3039,7 @@ export default function Page() {
                 tokens={tokenPickerTokens}
                 loading={tokensLoading}
                 onNetworkChange={handleTokenPickerNetworkChange}
+                onResolveAddress={resolveTokenPickerAddress}
                 onChange={(token) => {
                   selectTokenForSide("buy", token);
                 }}
@@ -3291,6 +3415,11 @@ export default function Page() {
               style={{ marginTop: 8 }}
             >
               Status: {formatSwapStatus(swapStatus)}
+            </div>
+          ) : null}
+          {routeProgressMessage ? (
+            <div className={swapStatus === "confirmed" ? "ok" : swapStatus === "failed" || swapStatus === "refunded" ? "error" : "warn"} style={{ marginTop: 8 }} role="status" aria-live="polite">
+              {routeProgressMessage}
             </div>
           ) : null}
         </div>
@@ -4612,6 +4741,8 @@ function formatHistoryStatus(status: SwapHistoryRecord["status"]): string {
       return "Confirmed";
     case "failed":
       return "Failed";
+    case "refunded":
+      return "Refunded";
     default:
       return status;
   }
@@ -4673,6 +4804,21 @@ function formatSlippageBpsAsPercent(slippageBps: number): string {
 function formatSwapStatus(status: TxStatus): string {
   if (status === "idle") return "";
   return `${status[0]!.toUpperCase()}${status.slice(1)}`;
+}
+
+function waitForDelay(delayMs: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, delayMs);
+    const onAbort = () => {
+      window.clearTimeout(timeoutId);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function quoteForHistory(quote: QuoteResponse): QuoteResponse {
@@ -4856,7 +5002,10 @@ function tokenMetadataToDisplay(token: DisplayToken): DisplayToken {
 }
 
 function normalizeTokenKey(address: string): string {
-  return address.trim().toLowerCase();
+  const normalized = address.trim();
+  return /^0x/i.test(normalized) || /^(eth|bitcoin)$/i.test(normalized)
+    ? normalized.toLowerCase()
+    : normalized;
 }
 
 function waitMs(ms: number): Promise<void> {

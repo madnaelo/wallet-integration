@@ -14,7 +14,7 @@ import {
   NATIVE_BITCOIN_TOKEN,
   type TokenInfo
 } from "@/lib/tokens";
-import { getTokensForChain } from "@/lib/server/tokenRegistry";
+import { getTokensForChain, resolveTokenForChain } from "@/lib/server/tokenRegistry";
 import { parseQuoteSlippageBps } from "@/lib/server/quoteRequestValidation";
 import { applyCorsHeaders, evaluateRequestOrigin } from "@/lib/server/requestOrigin";
 
@@ -115,8 +115,26 @@ export async function GET(req: NextRequest) {
   }
   const slippageBps = slippage.value;
 
-  const sellTokenInfo = await resolveTokenInfo(fromChainId, sellToken);
-  const buyTokenInfo = await resolveTokenInfo(toChainId, buyToken);
+  let sellTokenInfo: TokenInfo | null;
+  let buyTokenInfo: TokenInfo | null;
+  try {
+    [sellTokenInfo, buyTokenInfo] = await Promise.all([
+      resolveTokenInfo(fromChainId, sellToken),
+      resolveTokenInfo(toChainId, buyToken)
+    ]);
+  } catch (error) {
+    const providerStatus = getProviderErrorStatus(error);
+    const response = NextResponse.json(
+      {
+        error: providerStatus === 429
+          ? "Token details are busy right now. Please try again shortly."
+          : "Token details are temporarily unavailable. Please try again shortly."
+      },
+      { status: providerStatus === 429 ? 429 : 503 }
+    );
+    if (providerStatus === 429) response.headers.set("Retry-After", "10");
+    return withCors(response, corsOrigin);
+  }
   if (!sellTokenInfo || !buyTokenInfo) {
     return withCors(NextResponse.json({ error: "Token is not available on this network." }, { status: 400 }), corsOrigin);
   }
@@ -189,7 +207,8 @@ async function resolveTokenInfo(chainId: number, address: string): Promise<Token
   }
   const tokens = await getTokensForChain(chainId);
   const normalized = normalizeAssetKey(address, chainId);
-  return tokens.find((token) => normalizeAssetKey(token.address, chainId) === normalized) ?? null;
+  const listed = tokens.find((token) => normalizeAssetKey(token.address, chainId) === normalized);
+  return listed ?? resolveTokenForChain(chainId, address);
 }
 
 function parseChainId(value: string): number {

@@ -31,6 +31,7 @@ class ProductionConfigurationValidatorTest {
         api,
         auth,
         validFeatureProperties(),
+        validLifiProperties(),
         validLimitOrderProperties(),
         validMaintenanceProperties(),
         validNotificationProperties());
@@ -64,6 +65,7 @@ class ProductionConfigurationValidatorTest {
         api,
         validAuthProperties(),
         features,
+        validLifiProperties(),
         limitOrders,
         validMaintenanceProperties(),
         notifications);
@@ -90,6 +92,7 @@ class ProductionConfigurationValidatorTest {
         validApiProperties(),
         validAuthProperties(),
         validFeatureProperties(),
+        validLifiProperties(),
         limitOrders,
         validMaintenanceProperties(),
         validNotificationProperties());
@@ -118,6 +121,53 @@ class ProductionConfigurationValidatorTest {
   }
 
   @Test
+  void rejectsUnsafeOrUncredentialedLifiTracking() {
+    var lifi = new LifiProperties();
+    lifi.setBaseUrl("https://li.quest.attacker.example");
+    lifi.setApiKey("");
+    var configuration = new ProductionConfigurationValidator(
+        "production",
+        "jdbc:postgresql://wallet-postgres:5432/wallet",
+        "a-long-random-database-password",
+        "",
+        validApiProperties(),
+        validAuthProperties(),
+        validFeatureProperties(),
+        lifi,
+        validLimitOrderProperties(),
+        validMaintenanceProperties(),
+        validNotificationProperties());
+
+    assertThatThrownBy(configuration::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("LIFI_BASE_URL")
+        .hasMessageContaining("LIFI_API_KEY");
+  }
+
+  @Test
+  void rejectsLifiPollingThatConsumesTheSharedQuoteBudget() {
+    var lifi = validLifiProperties();
+    lifi.setStatusCheckFixedDelayMs(5_000);
+    lifi.setStatusCheckBatchSize(100);
+    var configuration = new ProductionConfigurationValidator(
+        "production",
+        "jdbc:postgresql://wallet-postgres:5432/wallet",
+        "a-long-random-database-password",
+        "",
+        validApiProperties(),
+        validAuthProperties(),
+        validFeatureProperties(),
+        lifi,
+        validLimitOrderProperties(),
+        validMaintenanceProperties(),
+        validNotificationProperties());
+
+    assertThatThrownBy(configuration::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("reserve API capacity");
+  }
+
+  @Test
   void rejectsCorsValuesThatAreNotExactOrigins() {
     var api = validApiProperties();
     api.setCorsAllowedOrigins(
@@ -131,6 +181,7 @@ class ProductionConfigurationValidatorTest {
         api,
         validAuthProperties(),
         validFeatureProperties(),
+        validLifiProperties(),
         validLimitOrderProperties(),
         validMaintenanceProperties(),
         validNotificationProperties());
@@ -186,6 +237,7 @@ class ProductionConfigurationValidatorTest {
         api,
         validAuthProperties(),
         validFeatureProperties(),
+        validLifiProperties(),
         limitOrders,
         maintenance,
         notifications);
@@ -219,6 +271,7 @@ class ProductionConfigurationValidatorTest {
         validApiProperties(),
         validAuthProperties(),
         validFeatureProperties(),
+        validLifiProperties(),
         limitOrders,
         validMaintenanceProperties(),
         notifications);
@@ -253,6 +306,12 @@ class ProductionConfigurationValidatorTest {
     var properties = new LimitOrderProperties();
     properties.setOneinchOrderbookEnabled(true);
     properties.setOneinchApiKey("1234567890123456");
+    return properties;
+  }
+
+  private LifiProperties validLifiProperties() {
+    var properties = new LifiProperties();
+    properties.setApiKey("1234567890123456");
     return properties;
   }
 

@@ -1156,6 +1156,16 @@ body {
   white-space: nowrap;
 }
 
+.tokenPickerResolvedOption {
+  border: 1px solid rgba(110, 168, 254, 0.42);
+  margin-bottom: 6px;
+}
+
+.tokenPickerOptionMeta > .tokenPickerResolvedWarning {
+  color: #f5c76b;
+  white-space: normal;
+}
+
 .tokenPickerEmpty {
   color: var(--muted);
   font-size: 13px;

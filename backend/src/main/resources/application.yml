@@ -85,6 +85,16 @@ wallet:
     price-alerts-default-enabled: ${PRICE_ALERTS_DEFAULT_ENABLED:false}
     limit-orders-default-enabled: ${LIMIT_ORDERS_DEFAULT_ENABLED:true}
     admin-api-key: ${ADMIN_API_KEY:}
+  lifi:
+    tracking-enabled: ${LIFI_STATUS_TRACKING_ENABLED:true}
+    base-url: ${LIFI_BASE_URL:https://li.quest}
+    api-key: ${LIFI_API_KEY:}
+    request-timeout-seconds: ${LIFI_STATUS_REQUEST_TIMEOUT_SECONDS:10}
+    status-check-fixed-delay-ms: ${LIFI_STATUS_CHECK_FIXED_DELAY_MS:10000}
+    status-check-batch-size: ${LIFI_STATUS_CHECK_BATCH_SIZE:10}
+    status-check-lock-ttl-seconds: ${LIFI_STATUS_CHECK_LOCK_TTL_SECONDS:45}
+    status-check-max-backoff-seconds: ${LIFI_STATUS_CHECK_MAX_BACKOFF_SECONDS:1800}
+    maximum-tracking-hours: ${LIFI_STATUS_MAXIMUM_TRACKING_HOURS:168}
   limit-orders:
     orderbook-submission-enabled: ${LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED:true}
     oneinch-orderbook-enabled: ${ONEINCH_ORDERBOOK_ENABLED:false}

@@ -334,7 +334,10 @@ function addIntegerStrings(value: string, addition: string): string {
 }
 
 function normalizeTokenKey(token: string): string {
-  const key = token.trim().toLowerCase();
+  const normalized = token.trim();
+  const key = /^0x[0-9a-f]{40}$/i.test(normalized) || /^eth$/i.test(normalized)
+    ? normalized.toLowerCase()
+    : normalized;
   return key === "eth" ? NATIVE_TOKEN_ADDRESS.toLowerCase() : key;
 }
 

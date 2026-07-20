@@ -21,6 +21,7 @@ export type TokenInfo = {
   walletNamespace?: WalletNamespace;
   networkId?: string;
   networkName?: string;
+  isCustom?: boolean;
 };
 
 export { NATIVE_BITCOIN_CHAIN_ID, NATIVE_BITCOIN_NETWORK_ID, NATIVE_BITCOIN_TOKEN_ADDRESS };
