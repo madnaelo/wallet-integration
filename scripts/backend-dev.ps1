@@ -48,6 +48,9 @@ if (-not $env:DATABASE_USERNAME) {
 if (-not $env:DATABASE_PASSWORD) {
   $env:DATABASE_PASSWORD = "wallet"
 }
+if (-not $env:PORT) {
+  $env:PORT = "18080"
+}
 if (-not $env:CORS_ALLOWED_ORIGINS) {
   $env:CORS_ALLOWED_ORIGINS = "http://localhost:3000"
 }

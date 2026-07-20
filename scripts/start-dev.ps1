@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $logDir = Join-Path (Join-Path $repoRoot "logs") "dev"
 $stateDir = Join-Path $repoRoot ".dev"
-$backendHealthUrl = "http://localhost:8080/api/health"
+$backendHealthUrl = "http://localhost:18080/api/health"
 $frontendUrl = "http://localhost:3000"
 $script:composeKind = $null
 

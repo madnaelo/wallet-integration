@@ -89,7 +89,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\stop-dev.ps1'
 Default local endpoints:
 
 - Frontend: `http://localhost:3000`
-- Backend health: `http://localhost:8080/api/health`
+- Backend health: `http://localhost:18080/api/health`
 - PostgreSQL: `localhost:56434`
 
 ## Verification Habit

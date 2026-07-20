@@ -10,7 +10,7 @@ $npmExe = Get-ProjectNpmExecutable
 Push-Location $repoRoot
 try {
   if (-not $env:NEXT_PUBLIC_BACKEND_BASE_URL) {
-    $env:NEXT_PUBLIC_BACKEND_BASE_URL = "http://localhost:8080"
+    $env:NEXT_PUBLIC_BACKEND_BASE_URL = "http://localhost:18080"
   }
   & $npmExe run dev
 } finally {

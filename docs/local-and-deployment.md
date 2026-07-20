@@ -115,7 +115,7 @@ Local Compose resources use the `swap-assistant-dev` project namespace.
 Default local URLs:
 
 - Frontend: `http://localhost:3000`
-- Backend health: `http://localhost:8080/api/health`
+- Backend health: `http://localhost:18080/api/health`
 - Postgres: `localhost:56434`, database/user/password all `wallet`
 
 ## Local Full Docker Workflow
