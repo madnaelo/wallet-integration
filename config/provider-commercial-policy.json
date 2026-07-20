@@ -1,9 +1,9 @@
 {
-  "lastReviewed": "2026-07-19",
+  "lastReviewed": "2026-07-20",
   "providers": {
     "0x": {
       "monetization": "confirmed",
-      "basis": "Official 0x documentation states affiliate fees are available on all pricing plans."
+      "basis": "Official 0x documentation states affiliate fees are available on every pricing plan and are sent to the configured external EVM wallet."
     },
     "1inch": {
       "monetization": "pending",
@@ -19,7 +19,7 @@
     },
     "lifi": {
       "monetization": "confirmed",
-      "basis": "The LI.FI Partner Portal integration and chain-specific fee wallets are configured."
+      "basis": "Official LI.FI documentation supports integrator fees sent directly to configured EVM, Solana, Sui, and Bitcoin fee wallets, and the Partner Portal integration is configured."
     }
   }
 }

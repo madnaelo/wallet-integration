@@ -5,7 +5,6 @@ import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
 import { isAddress } from "@/lib/validation";
 
 const UNISWAP_TOKEN_LIST_URL = "https://tokens.uniswap.org";
-const ONEINCH_BASE_URL = "https://api.1inch.dev";
 const TOKEN_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const FALLBACK_CACHE_TTL_MS = 5 * 60 * 1000;
 const TOKEN_REQUEST_TIMEOUT_MS = 8_000;
@@ -48,7 +47,7 @@ async function refreshTokensForChain(chainId: number): Promise<TokenInfo[]> {
   const curated = DEFAULT_TOKENS_BY_CHAIN[chainId] ?? [];
   const remoteResults = await Promise.allSettled([
     loadUniswapTokens(chainId),
-    loadOneInchTokens(chainId)
+    loadLifiTokens(chainId)
   ]);
 
   const remote = remoteResults.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
@@ -94,24 +93,25 @@ async function loadUniswapTokens(chainId: number): Promise<TokenInfo[]> {
     .flatMap((token) => toTokenInfo(token, chainId));
 }
 
-async function loadOneInchTokens(chainId: number): Promise<TokenInfo[]> {
-  if (!hasApiKey(env.ONEINCH_API_KEY, "your_1inch_api_key_here")) return [];
+async function loadLifiTokens(chainId: number): Promise<TokenInfo[]> {
+  const url = new URL("/v1/tokens", env.LIFI_BASE_URL);
+  url.searchParams.set("chains", String(chainId));
+  const apiKey = env.LIFI_API_KEY.trim();
+  const body = await fetchJson(url.toString(), apiKey ? { "x-lifi-api-key": apiKey } : undefined);
+  const tokens = readLifiTokensForChain(body, chainId);
 
-  const url = new URL(`/swap/v6.1/${chainId}/tokens`, ONEINCH_BASE_URL);
-  const body = await fetchJson(url.toString(), {
-    Authorization: `Bearer ${env.ONEINCH_API_KEY}`
-  });
-  if (!isRecord(body) || !isRecord(body.tokens)) return [];
-  const tokens = body.tokens;
-
-  return Object.entries(tokens)
+  return tokens
     .slice(0, MAX_REMOTE_TOKENS_PER_SOURCE)
-    .flatMap(([address, token]) => {
-      if (!isRecord(token)) return [];
-      const declaredAddress = typeof token.address === "string" ? token.address.trim() : "";
-      if (declaredAddress && normalizeTokenKey(declaredAddress) !== normalizeTokenKey(address)) return [];
-      return toTokenInfo({ ...token, address }, chainId);
-    });
+    .flatMap((token) => toTokenInfo(token, chainId));
+}
+
+function readLifiTokensForChain(value: unknown, chainId: number): unknown[] {
+  if (!isRecord(value)) return [];
+  if (Array.isArray(value.tokens)) return value.tokens;
+
+  const tokenGroups = isRecord(value.tokens) ? value.tokens : value;
+  const tokens = tokenGroups[String(chainId)];
+  return Array.isArray(tokens) ? tokens : [];
 }
 
 async function fetchJson(url: string, headers?: Record<string, string>): Promise<unknown> {
@@ -179,11 +179,6 @@ function normalizeDisplayText(value: unknown, maximumLength: number): string {
   const normalized = value.normalize("NFC").trim();
   if (!normalized || normalized.length > maximumLength || UNSAFE_DISPLAY_CHARACTERS.test(normalized)) return "";
   return normalized;
-}
-
-function hasApiKey(value: string, placeholder: string): boolean {
-  const normalized = value.trim();
-  return normalized.length > 0 && normalized !== placeholder;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -97,7 +97,7 @@ services:
     environment:
       ZEROX_API_KEY: ${ZEROX_API_KEY:-}
       ONEINCH_API_KEY: ${ONEINCH_API_KEY:-}
-      SWAP_PROVIDERS: ${SWAP_PROVIDERS:-0x,1inch,paraswap,odos,lifi}
+      SWAP_PROVIDERS: ${SWAP_PROVIDERS:-0x,lifi}
       MONETIZED_SWAP_PROVIDERS: ${MONETIZED_SWAP_PROVIDERS:-0x,lifi}
       PARASWAP_BASE_URL: ${PARASWAP_BASE_URL:-https://api.paraswap.io}
       PARASWAP_API_KEY: ${PARASWAP_API_KEY:-}

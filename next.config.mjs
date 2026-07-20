@@ -9,6 +9,7 @@ const supportedProviders = new Set(Object.keys(providerCommercialPolicy.provider
 const defaultMonetizedProviders = Object.entries(providerCommercialPolicy.providers)
   .filter(([, provider]) => provider.monetization === "confirmed")
   .map(([provider]) => provider);
+const confirmedProviders = new Set(defaultMonetizedProviders);
 
 if (process.env.VERCEL_ENV === "production") {
   const publicBackendBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "").trim();
@@ -33,7 +34,9 @@ if (process.env.VERCEL_ENV === "production") {
   const quoteCacheTtlMs = Number(process.env.QUOTE_CACHE_TTL_MS ?? "8000");
   const quoteCacheMaxEntries = Number(process.env.QUOTE_CACHE_MAX_ENTRIES ?? "2000");
   const rateLimitPrefix = (process.env.RATE_LIMIT_REDIS_PREFIX ?? "").trim();
-  const enabledProviders = parseProviderList(process.env.SWAP_PROVIDERS ?? "");
+  const enabledProviders = parseProviderList(
+    (process.env.SWAP_PROVIDERS ?? "").trim() || defaultMonetizedProviders.join(",")
+  );
   const monetizedProviders = parseProviderList(
     process.env.MONETIZED_SWAP_PROVIDERS ?? defaultMonetizedProviders.join(",")
   );
@@ -108,11 +111,11 @@ if (process.env.VERCEL_ENV === "production") {
     throw new Error("PARASWAP_API_KEY_HEADER must be X-API-Key in production.");
   }
   assertHttpsOrigin(siteUrl, "NEXT_PUBLIC_SITE_URL");
-  if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 300) {
-    throw new Error("PLATFORM_FEE_BPS must be an integer between 0 and 300.");
+  if (!Number.isInteger(feeBps) || feeBps < 1 || feeBps > 300) {
+    throw new Error("PLATFORM_FEE_BPS must be an integer between 1 and 300 in production.");
   }
-  if (feeBps > 0 && (!isEvmAddress(feeRecipient) || /^0x0{40}$/i.test(feeRecipient))) {
-    throw new Error("A non-zero FEE_RECIPIENT_ADDRESS is required when production platform fees are enabled.");
+  if (!isEvmAddress(feeRecipient) || /^0x0{40}$/i.test(feeRecipient)) {
+    throw new Error("A non-zero FEE_RECIPIENT_ADDRESS is required for production platform fees.");
   }
 }
 
@@ -247,6 +250,12 @@ function assertProductionProviders(enabledProviders) {
   if (unknownProviders.length) {
     throw new Error(`SWAP_PROVIDERS contains unsupported providers: ${unknownProviders.join(", ")}.`);
   }
+  const unconfirmedProviders = enabledProviders.filter((provider) => !confirmedProviders.has(provider));
+  if (unconfirmedProviders.length) {
+    throw new Error(
+      `SWAP_PROVIDERS contains providers without confirmed fee terms: ${unconfirmedProviders.join(", ")}.`
+    );
+  }
   if (!enabledProviders.some((provider) => provider !== "lifi")) {
     throw new Error("SWAP_PROVIDERS must enable at least one same-chain swap provider in production.");
   }
@@ -284,6 +293,13 @@ function assertProductionMonetization(enabledProviders, monetizedProviders, feeB
   if (disabledProviders.length) {
     throw new Error(
       `MONETIZED_SWAP_PROVIDERS must be a subset of SWAP_PROVIDERS; disable monetization for: ${disabledProviders.join(", ")}.`
+    );
+  }
+
+  const unmonetizedProviders = enabledProviders.filter((provider) => !monetizedProviders.includes(provider));
+  if (unmonetizedProviders.length) {
+    throw new Error(
+      `Every enabled swap provider must collect the configured platform fee; missing: ${unmonetizedProviders.join(", ")}.`
     );
   }
 

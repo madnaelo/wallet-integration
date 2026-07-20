@@ -10,41 +10,38 @@ afterEach(() => {
 
 describe("token registry refresh", () => {
   it("coalesces concurrent remote refreshes for the same chain", async () => {
-    vi.stubEnv("ONEINCH_API_KEY", "");
-    const fetchMock = vi.fn().mockResolvedValue(tokenListResponse());
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(tokenListResponse()));
     vi.stubGlobal("fetch", fetchMock);
     const { getTokensForChain } = await import("@/lib/server/tokenRegistry");
 
     const [first, second] = await Promise.all([getTokensForChain(1), getTokensForChain(1)]);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(first).toBe(second);
     expect(first.some((token) => token.symbol === "TEST")).toBe(true);
   });
 
   it("falls back to curated tokens without reading an oversized list", async () => {
-    vi.stubEnv("ONEINCH_API_KEY", "");
-    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}", {
       headers: { "Content-Length": String(9 * 1024 * 1024) }
-    }));
+    })));
     vi.stubGlobal("fetch", fetchMock);
     const { getTokensForChain } = await import("@/lib/server/tokenRegistry");
 
     const tokens = await getTokensForChain(1);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(tokens.some((token) => token.symbol === "ETH")).toBe(true);
   });
 
   it("rejects unsafe token labels and omits unsafe optional names", async () => {
-    vi.stubEnv("ONEINCH_API_KEY", "");
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
       tokens: [
         token("0x1111111111111111111111111111111111111111", "SAFE", "Safe\u202eName"),
         token("0x2222222222222222222222222222222222222222", "BAD\u202e", "Unsafe symbol"),
         token("0x3333333333333333333333333333333333333333", "A".repeat(33), "Long symbol")
       ]
-    }))));
+    })))));
     const { getTokensForChain } = await import("@/lib/server/tokenRegistry");
 
     const tokens = await getTokensForChain(1);
@@ -57,14 +54,13 @@ describe("token registry refresh", () => {
   });
 
   it("prevents remote tokens from impersonating curated identities", async () => {
-    vi.stubEnv("ONEINCH_API_KEY", "");
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
       tokens: [
         token("0x1111111111111111111111111111111111111111", "USDT", "Fake dollar"),
         token("0x2222222222222222222222222222222222222222", "FAKE", "Tether USD"),
         token("0x3333333333333333333333333333333333333333", "TEST", "Test Token")
       ]
-    }))));
+    })))));
     const { getTokensForChain } = await import("@/lib/server/tokenRegistry");
 
     const tokens = await getTokensForChain(1);
@@ -74,6 +70,29 @@ describe("token registry refresh", () => {
     expect(tokens.some((entry) => entry.address === "0x3333333333333333333333333333333333333333")).toBe(true);
     expect(tokens.find((entry) => entry.symbol === "USDT")?.address.toLowerCase())
       .toBe("0xdac17f958d2ee523a2206206994597c13d831ec7");
+  });
+
+  it("reads the confirmed LI.FI token catalog shape and authenticates when configured", async () => {
+    vi.stubEnv("LIFI_API_KEY", "test-lifi-key");
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.startsWith("https://tokens.uniswap.org")) {
+        return Promise.resolve(new Response(JSON.stringify({ tokens: [] })));
+      }
+      return Promise.resolve(new Response(JSON.stringify({
+        tokens: {
+          "1": [token("0x4444444444444444444444444444444444444444", "LIFI", "LI.FI Token")]
+        }
+      })));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { getTokensForChain } = await import("@/lib/server/tokenRegistry");
+
+    const tokens = await getTokensForChain(1);
+
+    expect(tokens.some((entry) => entry.symbol === "LIFI")).toBe(true);
+    const lifiRequest = fetchMock.mock.calls.find(([input]) => String(input).includes("/v1/tokens"));
+    expect(lifiRequest?.[1]).toMatchObject({ headers: { "x-lifi-api-key": "test-lifi-key" } });
   });
 });
 

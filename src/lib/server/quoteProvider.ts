@@ -11,8 +11,7 @@ import { LifiBitcoinClient } from "@/lib/server/lifiBitcoinClient";
 import { MultiQuoteProvider } from "@/lib/server/multiQuoteProvider";
 import { createPlatformFeeConfig } from "@/lib/server/platformFees";
 import {
-  parseSwapProviderList,
-  resolveMonetizedSwapProviders,
+  resolveSwapProviderPolicy,
   type SwapProviderId
 } from "@/lib/server/providerCommercialPolicy";
 
@@ -28,18 +27,18 @@ export function createQuoteClient(chain: ChainConfig): DexAggregatorClient {
 }
 
 export function createNativeBitcoinQuoteClient(): DexAggregatorClient {
-  if (!enabledProviders().includes("lifi")) {
+  const policy = resolveSwapProviderPolicy(env.SWAP_PROVIDERS, env.MONETIZED_SWAP_PROVIDERS);
+  if (!policy.enabled.includes("lifi")) {
     throw new Error("Native Bitcoin quotes are unavailable right now.");
   }
 
   const platformFee = createPlatformFeeConfig();
-  const monetizedProviders = resolveMonetizedSwapProviders(env.MONETIZED_SWAP_PROVIDERS);
 
   return new LifiBitcoinClient({
     baseUrl: env.LIFI_BASE_URL,
     apiKey: env.LIFI_API_KEY,
     integrator: env.LIFI_INTEGRATOR,
-    platformFee: feeConfigForProvider(platformFee, "lifi", monetizedProviders)
+    platformFee: feeConfigForProvider(platformFee, "lifi", policy.monetized)
   });
 }
 
@@ -54,17 +53,17 @@ function hasApiKey(value: string, placeholder: string): boolean {
 }
 
 function createEnabledClients(chain: ChainConfig): DexAggregatorClient[] {
-  const providers = enabledProviders();
+  const policy = resolveSwapProviderPolicy(env.SWAP_PROVIDERS, env.MONETIZED_SWAP_PROVIDERS);
+  const providers = policy.enabled;
   const clients: DexAggregatorClient[] = [];
   const platformFee = createPlatformFeeConfig();
-  const monetizedProviders = resolveMonetizedSwapProviders(env.MONETIZED_SWAP_PROVIDERS);
 
   if (providers.includes("0x") && hasZeroXApiKey(env.ZEROX_API_KEY)) {
     clients.push(
       new ZeroXClient({
         apiKey: env.ZEROX_API_KEY,
         baseUrl: chain.zeroXBaseUrl,
-        platformFee: feeConfigForProvider(platformFee, "0x", monetizedProviders)
+        platformFee: feeConfigForProvider(platformFee, "0x", policy.monetized)
       })
     );
   }
@@ -73,7 +72,7 @@ function createEnabledClients(chain: ChainConfig): DexAggregatorClient[] {
     clients.push(
       new OneInchClient({
         apiKey: env.ONEINCH_API_KEY,
-        platformFee: feeConfigForProvider(platformFee, "1inch", monetizedProviders)
+        platformFee: feeConfigForProvider(platformFee, "1inch", policy.monetized)
       })
     );
   }
@@ -84,7 +83,7 @@ function createEnabledClients(chain: ChainConfig): DexAggregatorClient[] {
         baseUrl: env.PARASWAP_BASE_URL,
         apiKey: env.PARASWAP_API_KEY,
         apiKeyHeader: env.PARASWAP_API_KEY_HEADER,
-        platformFee: feeConfigForProvider(platformFee, "paraswap", monetizedProviders)
+        platformFee: feeConfigForProvider(platformFee, "paraswap", policy.monetized)
       })
     );
   }
@@ -94,16 +93,12 @@ function createEnabledClients(chain: ChainConfig): DexAggregatorClient[] {
       new OdosClient({
         baseUrl: env.ODOS_BASE_URL,
         apiKey: env.ODOS_API_KEY,
-        platformFee: feeConfigForProvider(platformFee, "odos", monetizedProviders)
+        platformFee: feeConfigForProvider(platformFee, "odos", policy.monetized)
       })
     );
   }
 
   return clients;
-}
-
-function enabledProviders(): SwapProviderId[] {
-  return parseSwapProviderList(env.SWAP_PROVIDERS);
 }
 
 function feeConfigForProvider(

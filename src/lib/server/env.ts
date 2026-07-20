@@ -1,4 +1,7 @@
-import { DEFAULT_MONETIZED_SWAP_PROVIDERS } from "@/lib/server/providerCommercialPolicy";
+import {
+  DEFAULT_MONETIZED_SWAP_PROVIDERS,
+  DEFAULT_SWAP_PROVIDERS
+} from "@/lib/server/providerCommercialPolicy";
 
 function optional(name: string, fallback: string): string {
   const v = process.env[name];
@@ -40,7 +43,7 @@ const redisRest = redisRestCredentials();
 export const env = {
   ZEROX_API_KEY: optional("ZEROX_API_KEY", ""),
   ONEINCH_API_KEY: optional("ONEINCH_API_KEY", ""),
-  SWAP_PROVIDERS: optional("SWAP_PROVIDERS", "0x,1inch,paraswap,odos,lifi"),
+  SWAP_PROVIDERS: optional("SWAP_PROVIDERS", DEFAULT_SWAP_PROVIDERS.join(",")),
   MONETIZED_SWAP_PROVIDERS: optional(
     "MONETIZED_SWAP_PROVIDERS",
     DEFAULT_MONETIZED_SWAP_PROVIDERS.join(",")

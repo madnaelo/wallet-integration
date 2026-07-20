@@ -22,9 +22,9 @@ Implemented:
   native/popular-token fallbacks, native BTC selection, and a sell/buy reversal
   control.
 - `GET /api/quote` with validation, per-IP rate limiting, and short quote cache.
-- Multi-provider same-chain quote clients for 0x, 1inch, ParaSwap, and Odos.
-  LI.FI builds native-BTC quote paths while successful quotes are normalized
-  and shown through one provider/route UI.
+- Confirmed-fee production routing through 0x for same-chain EVM swaps and
+  LI.FI for native-Bitcoin paths. Dormant 1inch, ParaSwap, and Odos adapters
+  cannot be enabled until their fee terms are recorded as confirmed.
 - Provider failure isolation: one timed-out or rejected provider does not hide
   successful quotes from other configured providers.
 - User-facing trade summary with slippage, quote expiry, provider selection,
@@ -92,8 +92,8 @@ High-level flow:
 1. User connects a source wallet through AppKit.
 2. Frontend requests quotes from the Next.js quote route with the selected
    pair, source-wallet address, and the selected receive wallet/address.
-3. The quote route asks enabled same-chain providers in parallel or LI.FI for
-   native-BTC quote paths, then returns normalized quote data.
+3. The quote route asks the confirmed-fee 0x adapter for same-chain routes or
+   LI.FI for native-BTC paths, then returns normalized quote data.
 4. The frontend checks approvals when needed and asks the user's wallet to sign
    and submit the selected transaction.
 5. Swap history uses a signed wallet message to create a backend session before
@@ -174,19 +174,16 @@ Important quote and wallet variables:
 - `SWAP_PROVIDERS`
 - `MONETIZED_SWAP_PROVIDERS`
 - `ZEROX_API_KEY`
-- `ONEINCH_API_KEY`
-- `PARASWAP_BASE_URL`, `PARASWAP_API_KEY`, `PARASWAP_API_KEY_HEADER`
-- `ODOS_BASE_URL`, `ODOS_API_KEY`
 - `LIFI_BASE_URL`, `LIFI_API_KEY`, `LIFI_INTEGRATOR`
 
-Production builds validate `SWAP_PROVIDERS` before deployment. Every enabled
-provider except ParaSwap must have its API key configured, LI.FI must also have
-its registered integrator identifier, and at least one same-chain provider must
-remain enabled. ParaSwap can use its public API while partner-key approval is
-pending, with the corresponding lower rate limit. `MONETIZED_SWAP_PROVIDERS`
-is a separate fail-closed allowlist: fee parameters are sent only for providers
-whose approval is recorded as confirmed in
-`config/provider-commercial-policy.json`.
+Production builds validate `SWAP_PROVIDERS` before deployment. Only providers
+whose fee terms are confirmed in `config/provider-commercial-policy.json` can
+be routed, each must have its required credentials, LI.FI must have its
+registered integrator identifier, and at least one same-chain provider must
+remain enabled. `MONETIZED_SWAP_PROVIDERS` must include every routed provider,
+and production requires a non-zero platform fee. Dormant 1inch, ParaSwap, and
+Odos settings remain available for adapter testing but are not production
+quote sources.
 
 Important fee variables:
 

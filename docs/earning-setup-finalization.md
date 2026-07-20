@@ -1,6 +1,6 @@
 # Earning Setup Finalization
 
-Last reviewed: July 19, 2026
+Last reviewed: July 20, 2026
 
 This checklist tracks what is required before Swap Assistant can reliably collect
 platform fees in production.
@@ -9,10 +9,10 @@ platform fees in production.
 
 - Production frontend is live on Vercel.
 - Production backend health is live on OCI.
-- The quote route supports provider-side fee parameters for 0x, 1inch,
-  Velora/ParaSwap, Odos, and LI.FI. Runtime policy now separates quote access
-  from fee collection: only 0x and LI.FI receive fee parameters until the
-  remaining providers give written commercial approval.
+- Production quote routing and fee collection are restricted to 0x and LI.FI,
+  whose current official documentation explicitly supports integrator fees.
+  Dormant 1inch, Velora/ParaSwap, and Odos adapters fail closed until written
+  terms are recorded as confirmed.
 - Vercel production environment variable names exist for provider keys, fee
   addresses, CORS, and cache/rate-limit settings.
 - LI.FI Partner Portal fee collection is enabled for integration `the-wallet`
@@ -235,10 +235,8 @@ Before public launch:
 - Replace or confirm `FEE_RECIPIENT_ADDRESS` and `AFFILIATE_ADDRESS`.
 - Verify fee receipt on every enabled EVM chain, not only Ethereum.
 - Rotate the Telegram bot token because the old token was pasted in chat.
-- Confirm `PARASWAP_API_KEY`, or keep ParaSwap documented as a public/best
-  effort provider that can hit lower rate limits.
-- Confirm 1inch commercial/API terms fit a revenue-generating app.
-- Verify Odos delegated-fee payout with a settled real swap.
+- Keep 1inch, ParaSwap/Velora, and Odos disabled unless their commercial and
+  fee terms are explicitly confirmed and recorded in the policy file.
 - Run a small LI.FI route and confirm the fee appears under Collectable Fees.
 - Keep public fee disclosure, terms, and privacy pages current as provider
   terms and fee settings change.
@@ -250,7 +248,7 @@ Before public launch:
 - Configure production monitor secrets so GitHub Actions can send uptime/error
   alerts to Telegram after the bot token is rotated.
 - Monitor `/api/health` and `/api/admin/ops/summary` after each deployment.
-- Run small real swaps through each provider and record the fee receipt result.
+- Run small real swaps through each enabled provider and record the fee receipt result.
 - Keep `MONETIZED_SWAP_PROVIDERS` limited to providers with written or
   unambiguous official commercial approval. Do not treat a successful quote as
   payout approval.

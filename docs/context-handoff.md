@@ -45,8 +45,9 @@ preference/rule storage, not autonomous private-key signing.
 ## Current Implementation
 
 - Frontend: Next.js App Router.
-- Quote route: server-side provider clients for 0x, 1inch, ParaSwap/Velora,
-  Odos, and LI.FI.
+- Quote route: confirmed-fee production routing through 0x and LI.FI. Dormant
+  1inch, ParaSwap/Velora, and Odos adapters fail closed until commercial terms
+  are explicitly confirmed.
 - Wallet connection: Reown AppKit plus provider-specific signing handling.
 - Backend: Spring Boot, Flyway, PostgreSQL.
 - Notifications: scheduled monitor with email, Telegram, and browser push

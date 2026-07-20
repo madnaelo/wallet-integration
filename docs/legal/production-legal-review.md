@@ -59,8 +59,8 @@ status is `confirmed`.
 | --- | --- | --- | --- |
 | 0x | Enabled with API key | Official affiliate-fee documentation permits fees on current plans | Fee parameters allowed; live receipt test pending |
 | LI.FI | Enabled with API key/integrator | Partner Portal fee wallets configured | Fee parameter allowed; live receipt test pending |
-| Odos | Enabled with API key | Written account/plan confirmation pending | Quote-only; fee fields suppressed |
-| Velora/ParaSwap | Public quote access enabled | Partnership API and fee-sharing approval pending | Quote-only; fee fields suppressed |
+| Odos | Adapter retained | Written account/plan confirmation pending | Disabled from production quote routing |
+| Velora/ParaSwap | Adapter retained | Partnership API and fee-sharing approval pending | Disabled from production quote routing |
 | 1inch | Disabled in production | Dev Plan active; commercial-use response pending | No production quotes or fee fields |
 
 Provider correspondence and detailed evidence are tracked in
