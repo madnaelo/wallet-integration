@@ -29,6 +29,7 @@ type TokenPickerProps = {
   invalid?: boolean;
   describedBy?: string;
   onChange: (token: TokenPickerOption) => void;
+  onNetworkChange?: (networkId: string | "all") => void;
 };
 
 export function TokenPicker({
@@ -40,7 +41,8 @@ export function TokenPicker({
   loading,
   invalid,
   describedBy,
-  onChange
+  onChange,
+  onNetworkChange
 }: TokenPickerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -57,6 +59,12 @@ export function TokenPicker({
   );
   const matchingTokens = useMemo(() => searchTokens(filteredTokens, query), [filteredTokens, query]);
   const visibleTokens = matchingTokens.slice(0, MAX_VISIBLE_TOKENS);
+  const useNetworkMenu = networks.length > 12;
+
+  const selectNetwork = (networkId: string | "all") => {
+    setNetworkFilter(networkId);
+    onNetworkChange?.(networkId);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -140,27 +148,41 @@ export function TokenPicker({
             maxHeight: panelPosition.maxHeight
           } : undefined}
         >
-          <div className="tokenNetworkTabs" role="group" aria-label={`${label} networks`}>
-            <button
-              className={`tokenNetworkTab${networkFilter === "all" ? " tokenNetworkTabActive" : ""}`}
-              type="button"
-              aria-pressed={networkFilter === "all"}
-              onClick={() => setNetworkFilter("all")}
+          {useNetworkMenu ? (
+            <select
+              className="input tokenNetworkSelect"
+              aria-label={`${label} network`}
+              value={networkFilter}
+              onChange={(event) => selectNetwork(event.target.value)}
             >
-              All
-            </button>
-            {networks.map((network) => (
+              <option value="all">All networks</option>
+              {networks.map((network) => (
+                <option key={network.id} value={network.id}>{shortNetworkName(network.name)}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="tokenNetworkTabs" role="group" aria-label={`${label} networks`}>
               <button
-                className={`tokenNetworkTab${networkFilter === network.id ? " tokenNetworkTabActive" : ""}`}
+                className={`tokenNetworkTab${networkFilter === "all" ? " tokenNetworkTabActive" : ""}`}
                 type="button"
-                aria-pressed={networkFilter === network.id}
-                key={network.id}
-                onClick={() => setNetworkFilter(network.id)}
+                aria-pressed={networkFilter === "all"}
+                onClick={() => selectNetwork("all")}
               >
-                {shortNetworkName(network.name)}
+                All
               </button>
-            ))}
-          </div>
+              {networks.map((network) => (
+                <button
+                  className={`tokenNetworkTab${networkFilter === network.id ? " tokenNetworkTabActive" : ""}`}
+                  type="button"
+                  aria-pressed={networkFilter === network.id}
+                  key={network.id}
+                  onClick={() => selectNetwork(network.id)}
+                >
+                  {shortNetworkName(network.name)}
+                </button>
+              ))}
+            </div>
+          )}
           <input
             className="input tokenSearch"
             autoFocus

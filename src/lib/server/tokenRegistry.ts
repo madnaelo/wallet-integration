@@ -1,6 +1,7 @@
 import "server-only";
 
 import { env } from "@/lib/server/env";
+import { getChainById } from "@/lib/chains";
 import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
 import { isAddress } from "@/lib/validation";
 
@@ -26,6 +27,8 @@ type CachedTokens = {
 
 const tokenCache = new Map<number, CachedTokens>();
 const tokenLoads = new Map<number, Promise<TokenInfo[]>>();
+let uniswapTokenListCache: { expiresAt: number; value: unknown } | undefined;
+let uniswapTokenListLoad: Promise<unknown> | undefined;
 
 export async function getTokensForChain(chainId: number): Promise<TokenInfo[]> {
   const cached = tokenCache.get(chainId);
@@ -44,7 +47,7 @@ export async function getTokensForChain(chainId: number): Promise<TokenInfo[]> {
 }
 
 async function refreshTokensForChain(chainId: number): Promise<TokenInfo[]> {
-  const curated = DEFAULT_TOKENS_BY_CHAIN[chainId] ?? [];
+  const curated = DEFAULT_TOKENS_BY_CHAIN[chainId] ?? nativeTokenForChain(chainId);
   const remoteResults = await Promise.allSettled([
     loadUniswapTokens(chainId),
     loadLifiTokens(chainId)
@@ -86,11 +89,29 @@ function mergeTokens(curated: TokenInfo[], remote: TokenInfo[]): TokenInfo[] {
 }
 
 async function loadUniswapTokens(chainId: number): Promise<TokenInfo[]> {
-  const body = await fetchJson(UNISWAP_TOKEN_LIST_URL);
+  const body = await loadUniswapTokenList();
   if (!isRecord(body) || !Array.isArray(body.tokens)) return [];
   return body.tokens
     .slice(0, MAX_REMOTE_TOKENS_PER_SOURCE)
     .flatMap((token) => toTokenInfo(token, chainId));
+}
+
+async function loadUniswapTokenList(): Promise<unknown> {
+  if (uniswapTokenListCache && uniswapTokenListCache.expiresAt > Date.now()) {
+    return uniswapTokenListCache.value;
+  }
+  if (uniswapTokenListLoad) return uniswapTokenListLoad;
+
+  const load = fetchJson(UNISWAP_TOKEN_LIST_URL).then((value) => {
+    uniswapTokenListCache = { expiresAt: Date.now() + TOKEN_CACHE_TTL_MS, value };
+    return value;
+  });
+  uniswapTokenListLoad = load;
+  try {
+    return await load;
+  } finally {
+    if (uniswapTokenListLoad === load) uniswapTokenListLoad = undefined;
+  }
 }
 
 async function loadLifiTokens(chainId: number): Promise<TokenInfo[]> {
@@ -191,4 +212,15 @@ function normalizeTokenKey(value: string): string {
 
 function normalizeIdentity(value: string): string {
   return value.normalize("NFKC").trim().toLowerCase();
+}
+
+function nativeTokenForChain(chainId: number): TokenInfo[] {
+  const nativeCurrency = getChainById(chainId)?.nativeCurrency;
+  return nativeCurrency ? [{
+    address: "ETH",
+    symbol: nativeCurrency.symbol,
+    decimals: nativeCurrency.decimals,
+    name: nativeCurrency.name,
+    isNative: true
+  }] : [];
 }

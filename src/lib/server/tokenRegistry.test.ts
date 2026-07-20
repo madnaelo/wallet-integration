@@ -21,6 +21,33 @@ describe("token registry refresh", () => {
     expect(first.some((token) => token.symbol === "TEST")).toBe(true);
   });
 
+  it("shares the large Uniswap catalog fetch across different chains", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = String(input);
+      return Promise.resolve(url.startsWith("https://tokens.uniswap.org")
+        ? new Response(JSON.stringify({ tokens: [] }))
+        : new Response(JSON.stringify({ tokens: {} })));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { getTokensForChain } = await import("@/lib/server/tokenRegistry");
+
+    await Promise.all([getTokensForChain(1), getTokensForChain(8453)]);
+
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith("https://tokens.uniswap.org")))
+      .toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/v1/tokens")))
+      .toHaveLength(2);
+  });
+
+  it("keeps a configured network usable when remote token catalogs are empty", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ tokens: {} }))));
+    const { getTokensForChain } = await import("@/lib/server/tokenRegistry");
+
+    const tokens = await getTokensForChain(59144);
+
+    expect(tokens).toContainEqual(expect.objectContaining({ symbol: "ETH", address: "ETH", isNative: true }));
+  });
+
   it("falls back to curated tokens without reading an oversized list", async () => {
     const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}", {
       headers: { "Content-Length": String(9 * 1024 * 1024) }

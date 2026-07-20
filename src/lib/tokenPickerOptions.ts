@@ -1,4 +1,5 @@
 import type { TokenPickerNetwork, TokenPickerOption } from "@/components/TokenPicker";
+import { getChainById } from "@/lib/chains";
 import { DEFAULT_TOKENS_BY_CHAIN, type TokenInfo } from "@/lib/tokens";
 
 type ChainLike = {
@@ -7,7 +8,7 @@ type ChainLike = {
 };
 
 export function buildFallbackTokensByChain(chainIds: number[]): Record<number, TokenInfo[]> {
-  return Object.fromEntries(chainIds.map((chainId) => [chainId, DEFAULT_TOKENS_BY_CHAIN[chainId] ?? []]));
+  return Object.fromEntries(chainIds.map((chainId) => [chainId, fallbackTokensForChain(chainId)]));
 }
 
 export function buildTokenPickerOptions(
@@ -17,7 +18,7 @@ export function buildTokenPickerOptions(
   const optionsByKey = new Map<string, TokenPickerOption>();
 
   for (const chain of chains) {
-    const chainTokens = tokensByChain[chain.chainId] ?? DEFAULT_TOKENS_BY_CHAIN[chain.chainId] ?? [];
+    const chainTokens = tokensByChain[chain.chainId] ?? fallbackTokensForChain(chain.chainId);
     for (const token of chainTokens) {
       const networkId = getTokenNetworkId(token, chain.chainId);
       const key = `${networkId}:${normalizeTokenKey(token.address)}`;
@@ -42,6 +43,19 @@ export function buildTokenPickerOptions(
   }
 
   return [...optionsByKey.values()];
+}
+
+function fallbackTokensForChain(chainId: number): TokenInfo[] {
+  const curated = DEFAULT_TOKENS_BY_CHAIN[chainId];
+  if (curated?.length) return curated;
+  const nativeCurrency = getChainById(chainId)?.nativeCurrency;
+  return nativeCurrency ? [{
+    address: "ETH",
+    symbol: nativeCurrency.symbol,
+    decimals: nativeCurrency.decimals,
+    name: nativeCurrency.name,
+    isNative: true
+  }] : [];
 }
 
 export function buildTokenPickerNetworks(

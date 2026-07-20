@@ -1,4 +1,5 @@
 import { envPublic } from "@/lib/envPublic";
+import chainCatalog from "../../config/supported-evm-chains.json";
 
 export type ChainConfig = {
   chainId: number;
@@ -10,16 +11,23 @@ export type ChainConfig = {
 };
 
 export const SAME_CHAIN_QUOTE_CHAIN_IDS = [1, 137, 8453, 42161, 10, 56, 43114] as const;
+export const ZERO_X_SWAP_CHAIN_IDS = chainCatalog.chains
+  .filter((chain) => chain.zeroXSupported)
+  .map((chain) => chain.chainId);
+export const MAINNET_CHAIN_IDS = chainCatalog.chains.map((chain) => chain.chainId);
 
 export const CHAINS: Record<number, ChainConfig> = {
-  1: {
-    chainId: 1,
-    name: "Ethereum Mainnet",
-    zeroXBaseUrl: "https://api.0x.org",
-    rpcUrls: ["https://rpc.ankr.com/eth"],
-    blockExplorerUrls: ["https://etherscan.io"],
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }
-  },
+  ...Object.fromEntries(chainCatalog.chains.map((chain) => [
+    chain.chainId,
+    {
+      chainId: chain.chainId,
+      name: chain.name,
+      zeroXBaseUrl: "https://api.0x.org",
+      rpcUrls: chain.rpcUrls,
+      blockExplorerUrls: chain.blockExplorerUrls,
+      nativeCurrency: chain.nativeCurrency
+    }
+  ])),
   11155111: {
     chainId: 11155111,
     name: "Sepolia",
@@ -27,59 +35,12 @@ export const CHAINS: Record<number, ChainConfig> = {
     rpcUrls: ["https://rpc.sepolia.org"],
     blockExplorerUrls: ["https://sepolia.etherscan.io"],
     nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 }
-  },
-  137: {
-    chainId: 137,
-    name: "Polygon",
-    zeroXBaseUrl: "https://api.0x.org",
-    rpcUrls: ["https://polygon-rpc.com"],
-    blockExplorerUrls: ["https://polygonscan.com"],
-    nativeCurrency: { name: "Polygon Ecosystem Token", symbol: "POL", decimals: 18 }
-  },
-  8453: {
-    chainId: 8453,
-    name: "Base",
-    zeroXBaseUrl: "https://api.0x.org",
-    rpcUrls: ["https://mainnet.base.org"],
-    blockExplorerUrls: ["https://basescan.org"],
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }
-  },
-  42161: {
-    chainId: 42161,
-    name: "Arbitrum One",
-    zeroXBaseUrl: "https://api.0x.org",
-    rpcUrls: ["https://arb1.arbitrum.io/rpc"],
-    blockExplorerUrls: ["https://arbiscan.io"],
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }
-  },
-  10: {
-    chainId: 10,
-    name: "Optimism",
-    zeroXBaseUrl: "https://api.0x.org",
-    rpcUrls: ["https://mainnet.optimism.io"],
-    blockExplorerUrls: ["https://optimistic.etherscan.io"],
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }
-  },
-  56: {
-    chainId: 56,
-    name: "BNB Smart Chain",
-    zeroXBaseUrl: "https://api.0x.org",
-    rpcUrls: ["https://bsc-dataseed.binance.org"],
-    blockExplorerUrls: ["https://bscscan.com"],
-    nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 }
-  },
-  43114: {
-    chainId: 43114,
-    name: "Avalanche C-Chain",
-    zeroXBaseUrl: "https://api.0x.org",
-    rpcUrls: ["https://api.avax.network/ext/bc/C/rpc"],
-    blockExplorerUrls: ["https://snowtrace.io"],
-    nativeCurrency: { name: "Avalanche", symbol: "AVAX", decimals: 18 }
   }
 };
 
 export function getAllowedChainIds(): number[] {
   const raw = envPublic.ALLOWED_CHAIN_IDS;
+  if (raw.trim().toLowerCase() === "all") return [...MAINNET_CHAIN_IDS];
   const ids = raw
     .split(",")
     .map((s) => s.trim())

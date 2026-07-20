@@ -220,6 +220,10 @@ const ADDRESS_FAMILY_CONFIG: Record<AddressFamily, AddressFamilyConfig> = {
 
 export default function Page() {
   const allowedChains = useMemo(() => getAllowedChains(), []);
+  const allowedChainIds = useMemo(
+    () => new Set(allowedChains.map((allowedChain) => allowedChain.chainId)),
+    [allowedChains]
+  );
   const [walletBridgeState, setWalletBridgeState] = useState<WalletBridgeState>({ evmConnected: false });
   const [walletBridgeActions, setWalletBridgeActions] = useState<WalletBridgeActions | null>(null);
   const appKitAddress = walletBridgeState.evmAddress;
@@ -396,6 +400,8 @@ export default function Page() {
   );
   const [tokensLoadingByChain, setTokensLoadingByChain] = useState<Record<number, boolean>>({});
   const [tokenListNotice, setTokenListNotice] = useState<string>("");
+  const loadedTokenChainsRef = useRef<Set<number>>(new Set());
+  const tokenLoadControllersRef = useRef<Map<number, AbortController>>(new Map());
   const tokens = useMemo(
     () => tokensByChain[selectedChainId] ?? DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [],
     [selectedChainId, tokensByChain]
@@ -417,8 +423,40 @@ export default function Page() {
     [allowedChains, tokenPickerTokens]
   );
 
+  const loadTokensForChain = useCallback((chainId: number) => {
+    if (
+      !allowedChainIds.has(chainId) ||
+      loadedTokenChainsRef.current.has(chainId) ||
+      tokenLoadControllersRef.current.has(chainId)
+    ) return;
+
+    const controller = new AbortController();
+    tokenLoadControllersRef.current.set(chainId, controller);
+    setTokensLoadingByChain((current) => ({ ...current, [chainId]: true }));
+    void listTokens(chainId, controller.signal)
+      .then((availableTokens) => {
+        loadedTokenChainsRef.current.add(chainId);
+        if (!availableTokens.length) return;
+        setTokensByChain((current) => ({ ...current, [chainId]: availableTokens }));
+      })
+      .catch((error: any) => {
+        if (error?.name === "AbortError") return;
+        setTokenListNotice("Showing popular tokens while the full list is unavailable.");
+      })
+      .finally(() => {
+        if (tokenLoadControllersRef.current.get(chainId) !== controller) return;
+        tokenLoadControllersRef.current.delete(chainId);
+        if (controller.signal.aborted) return;
+        setTokensLoadingByChain((current) => ({ ...current, [chainId]: false }));
+      });
+  }, [allowedChainIds]);
+
+  const handleTokenPickerNetworkChange = useCallback((networkId: string | "all") => {
+    const chainId = parseEvmNetworkId(networkId);
+    if (chainId) loadTokensForChain(chainId);
+  }, [loadTokensForChain]);
+
   useEffect(() => {
-    const controllers: AbortController[] = [];
     setTokensByChain((current) => {
       const next = { ...current };
       for (const allowedChain of allowedChains) {
@@ -426,37 +464,17 @@ export default function Page() {
       }
       return next;
     });
-    setTokensLoadingByChain(
-      Object.fromEntries(allowedChains.map((allowedChain) => [allowedChain.chainId, true]))
-    );
-    setTokenListNotice("");
-
-    for (const allowedChain of allowedChains) {
-      const controller = new AbortController();
-      controllers.push(controller);
-      listTokens(allowedChain.chainId, controller.signal)
-        .then((availableTokens) => {
-          if (!availableTokens.length) return;
-          setTokensByChain((current) => ({
-            ...current,
-            [allowedChain.chainId]: availableTokens
-          }));
-        })
-        .catch((error: any) => {
-          if (error?.name === "AbortError") return;
-          setTokenListNotice("Showing popular tokens while the full list is unavailable.");
-        })
-        .finally(() => {
-          if (controller.signal.aborted) return;
-          setTokensLoadingByChain((current) => ({
-            ...current,
-            [allowedChain.chainId]: false
-          }));
-        });
-    }
-
-    return () => controllers.forEach((controller) => controller.abort());
   }, [allowedChains]);
+
+  useEffect(() => {
+    loadTokensForChain(selectedChainId);
+    loadTokensForChain(buyChainId);
+  }, [buyChainId, loadTokensForChain, selectedChainId]);
+
+  useEffect(() => () => {
+    tokenLoadControllersRef.current.forEach((controller) => controller.abort());
+    tokenLoadControllersRef.current.clear();
+  }, []);
 
   useEffect(() => {
     const parsedSwapLink = parseSwapLinkParams(window.location.search);
@@ -2757,6 +2775,7 @@ export default function Page() {
                 networks={tokenPickerNetworks}
                 tokens={tokenPickerTokens}
                 loading={tokensLoading}
+                onNetworkChange={handleTokenPickerNetworkChange}
                 onChange={(token) => {
                   selectTokenForSide("sell", token);
                 }}
@@ -2797,6 +2816,7 @@ export default function Page() {
                 networks={tokenPickerNetworks}
                 tokens={tokenPickerTokens}
                 loading={tokensLoading}
+                onNetworkChange={handleTokenPickerNetworkChange}
                 onChange={(token) => {
                   selectTokenForSide("buy", token);
                 }}
@@ -4262,6 +4282,13 @@ function getRecipientAddressSourceLabel(source: RecipientAddressSource): string 
 
 function getEvmNetworkId(chainId: number): string {
   return `eip155:${chainId}`;
+}
+
+function parseEvmNetworkId(networkId: string): number | null {
+  const match = /^eip155:(\d{1,10})$/.exec(networkId);
+  if (!match) return null;
+  const chainId = Number(match[1]);
+  return Number.isSafeInteger(chainId) && chainId > 0 ? chainId : null;
 }
 
 function getTokenNetworkId(token: TokenInfo | undefined, fallbackChainId: number): string {

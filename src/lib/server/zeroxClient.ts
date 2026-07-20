@@ -1,6 +1,6 @@
 import type { QuoteFee, QuoteResponse } from "@/lib/types";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
-import { SAME_CHAIN_QUOTE_CHAIN_IDS } from "@/lib/chains";
+import { ZERO_X_SWAP_CHAIN_IDS } from "@/lib/chains";
 import {
   assertExecutableQuote,
   collectNestedProtocolLines,
@@ -21,7 +21,7 @@ export type ZeroXClientConfig = {
 export class ZeroXClient implements DexAggregatorClient {
   providerId = "0x";
   providerName = "0x";
-  supportedChainIds: number[] = [...SAME_CHAIN_QUOTE_CHAIN_IDS];
+  supportedChainIds: number[] = [...ZERO_X_SWAP_CHAIN_IDS];
 
   private cfg: ZeroXClientConfig;
 

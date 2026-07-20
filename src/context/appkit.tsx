@@ -3,40 +3,16 @@
 import { createAppKit } from "@reown/appkit/react";
 import { BitcoinAdapter } from "@reown/appkit-adapter-bitcoin";
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
-import {
-  arbitrum,
-  avalanche,
-  base,
-  bitcoin,
-  bsc,
-  mainnet,
-  optimism,
-  polygon,
-  sepolia,
-  type AppKitNetwork
-} from "@reown/appkit/networks";
-import { getAllowedChainIds } from "@/lib/chains";
+import { bitcoin, type AppKitNetwork } from "@reown/appkit/networks";
+import { getAllowedChains } from "@/lib/chains";
 import { WALLETCONNECT_PROJECT_ID } from "@/lib/walletConfig";
 
 const placeholderProjectId = "your_walletconnect_project_id_here";
 const projectId = WALLETCONNECT_PROJECT_ID || placeholderProjectId;
 
-const networkByChainId: Record<number, AppKitNetwork> = {
-  1: mainnet,
-  11155111: sepolia,
-  137: polygon,
-  8453: base,
-  42161: arbitrum,
-  10: optimism,
-  56: bsc,
-  43114: avalanche
-};
+const configuredNetworks = getAllowedChains().flatMap(toAppKitNetwork);
 
-const configuredNetworks = getAllowedChainIds()
-  .map((chainId) => networkByChainId[chainId])
-  .filter((network): network is AppKitNetwork => Boolean(network));
-
-const evmNetworks = configuredNetworks.length ? configuredNetworks : [sepolia];
+const evmNetworks = configuredNetworks.length ? configuredNetworks : [fallbackSepoliaNetwork()];
 const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
   evmNetworks[0]!,
   ...evmNetworks.slice(1),
@@ -81,3 +57,27 @@ createAppKit({
     "--w3m-border-radius-master": "2px"
   }
 });
+
+function toAppKitNetwork(chain: ReturnType<typeof getAllowedChains>[number]): AppKitNetwork[] {
+  if (!chain.rpcUrls?.length || !chain.nativeCurrency) return [];
+  const explorerUrl = chain.blockExplorerUrls?.[0];
+  return [{
+    id: chain.chainId,
+    name: chain.name,
+    nativeCurrency: chain.nativeCurrency,
+    rpcUrls: { default: { http: chain.rpcUrls } },
+    ...(explorerUrl ? {
+      blockExplorers: { default: { name: `${chain.name} explorer`, url: explorerUrl } }
+    } : {})
+  }];
+}
+
+function fallbackSepoliaNetwork(): AppKitNetwork {
+  return {
+    id: 11155111,
+    name: "Sepolia",
+    nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: ["https://rpc.sepolia.org"] } },
+    blockExplorers: { default: { name: "Sepolia explorer", url: "https://sepolia.etherscan.io" } }
+  };
+}
