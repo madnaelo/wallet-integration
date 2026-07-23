@@ -1,6 +1,6 @@
 # Earning Setup Finalization
 
-Last reviewed: July 20, 2026
+Last reviewed: July 23, 2026
 
 This checklist tracks what is required before Swap Assistant can reliably collect
 platform fees in production.
@@ -28,6 +28,11 @@ platform fees in production.
 - Treasury receive addresses have been provided. Keep the actual values in
   deployment/provider configuration, not in committed docs, and verify them with
   small real swaps before relying on revenue collection.
+- Automated production gates cover frontend/backend builds, tests, dependency
+  and secret scanning, provider-policy validation, OCI backup creation and
+  restore verification, deployment health, and post-deployment monitoring.
+  These controls support a controlled release; they do not replace real
+  settlement and fee-receipt checks.
 
 ## Fee Address Model
 
@@ -148,7 +153,7 @@ Action remaining:
   `https://wallet-integration-theta.vercel.app`, GitHub profile
   `https://github.com/madnaelo`, initial target `5 requests per second`, and
   the project owner's contact address. No response was found in the project
-  mailbox as of July 17, 2026.
+  mailbox as of July 23, 2026.
 - A follow-up was sent to Velora support on July 19, 2026, asking explicitly
   for Partnership API approval, an API key/rate-limit decision, and the
   commercial terms for fee sharing.
@@ -181,7 +186,7 @@ configured API key accepted a Base quote request with those fee parameters and
 returned a route id. That confirms our request shape is accepted, but it does
 not prove payout until a real swap settles and the treasury receives its share.
 The project owner also emailed Odos sales on May 27, 2026, to request explicit
-monetization confirmation; no reply was found by July 19. A corrected follow-up
+monetization confirmation; no reply was found by July 23. A corrected follow-up
 was sent on July 19 with the exact V3 fields and fee value, asking Odos to
 resolve the apparent difference between its delegated-fee and pricing pages
 and confirm whether the current key/account is enabled.
@@ -269,6 +274,20 @@ Before public launch:
 - Attach the final branded domain before public marketing.
 - Treat Limit Orders as a separate monetization track: current CoW/1inch signed
   order adapters do not add the normal swap platform fee.
+
+For a controlled production release without a branded domain or real-fund
+tests, keep these boundaries explicit:
+
+- Route production quotes only through providers marked confirmed in
+  `config/provider-commercial-policy.json`.
+- Keep Set Alerts disabled unless deliberately enabled by an administrator.
+- Treat Limit Orders as limited availability until a signed create,
+  reconciliation, cancellation, and fill cycle has been exercised with a
+  deliberately small real order.
+- Keep Telegram available as the mobile fallback while the recorded Android
+  browser push-service failure awaits physical-device verification.
+- Do not describe fee payout as verified until an enabled provider settles a
+  real swap and the configured treasury receives or accrues the expected fee.
 
 ## Remaining Owner Actions
 

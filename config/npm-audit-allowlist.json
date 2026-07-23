@@ -1,10 +1,3 @@
 {
-  "advisories": {
-    "1103747": {
-      "package": "bigint-buffer",
-      "ghsa": "GHSA-3gc7-fjrx-p6mg",
-      "expiresOn": "2026-09-20",
-      "rationale": "The latest Reown Solana adapter depends on @solana/spl-token, which transitively includes bigint-buffer without a patched release. Swap Assistant uses the adapter only in client code, where bigint-buffer resolves to its pure-JavaScript browser implementation, and our Solana execution path does not call the affected native conversion function. Reassess before expiry or immediately when Reown removes the dependency."
-    }
-  }
+  "advisories": {}
 }
