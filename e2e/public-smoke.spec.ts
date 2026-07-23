@@ -91,6 +91,14 @@ test("wallet-scoped pages explain their sign-in gates", async ({ page }) => {
 });
 
 test("limit orders disclose safeguards before accepting an order", async ({ page }) => {
+  const requestedTokenChains: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/api/tokens") {
+      requestedTokenChains.push(url.searchParams.get("chainId") ?? "");
+    }
+  });
+
   await page.goto("/limit-orders");
 
   await expect(page.getByRole("heading", { level: 2, name: "Swap later at the price you choose." })).toBeVisible();
@@ -98,6 +106,8 @@ test("limit orders disclose safeguards before accepting an order", async ({ page
   await expect(page.getByText("Exact signed terms")).toBeVisible();
   await expect(page.getByText("No custody of funds")).toBeVisible();
   await expect(page.getByRole("region", { name: "Limit order form" })).toBeVisible();
+  await expect(page.getByText("Showing popular tokens while the full list is unavailable.")).toHaveCount(0);
+  expect(requestedTokenChains).toEqual(["1"]);
 });
 
 test("mobile token picker remains inside the viewport", async ({ page }) => {

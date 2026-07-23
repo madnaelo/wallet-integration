@@ -28,7 +28,6 @@ import {
 } from "@/lib/backendClient";
 import { submitOneInchLimitOrderCancellation } from "@/lib/limitOrderCancellation";
 import type { TokenInfo } from "@/lib/tokens";
-import { listTokens } from "@/lib/tokenClient";
 import { formatUnitsSafe, parseUnitsSafe } from "@/lib/units";
 import { isAddress } from "@/lib/validation";
 import type { Eip1193Provider } from "@/lib/wallet";
@@ -48,11 +47,9 @@ import {
 } from "@/lib/limitOrderSpender";
 import { TokenPicker, type TokenPickerOption } from "@/components/TokenPicker";
 import {
-  buildFallbackTokensByChain,
-  buildTokenPickerNetworks,
-  buildTokenPickerOptions,
   getEvmNetworkId
 } from "@/lib/tokenPickerOptions";
+import { useTokenCatalog } from "@/hooks/useTokenCatalog";
 
 const WalletBridge = dynamic(() => import("@/components/WalletBridge"), { ssr: false });
 
@@ -220,11 +217,6 @@ export default function LimitOrdersPage() {
   const providerKind: ProviderKind = walletProviderType === "WALLET_CONNECT" ? "walletconnect" : walletProvider ? "injected" : null;
   const walletName = getWalletDisplayName(walletBridgeState.evmWalletName, walletProviderType);
   const [chainId, setChainId] = useState<number>(chains[0]?.chainId ?? 1);
-  const [tokensByChain, setTokensByChain] = useState<Record<number, TokenInfo[]>>(() =>
-    buildFallbackTokensByChain(chains.map((chain) => chain.chainId))
-  );
-  const [tokensLoadingByChain, setTokensLoadingByChain] = useState<Record<number, boolean>>({});
-  const [tokenListNotice, setTokenListNotice] = useState("");
   const [sellTokenAddress, setSellTokenAddress] = useState("");
   const [sellTokenNetworkId, setSellTokenNetworkId] = useState(getEvmNetworkId(chains[0]?.chainId ?? 1));
   const [buyTokenAddress, setBuyTokenAddress] = useState("");
@@ -273,18 +265,18 @@ export default function LimitOrdersPage() {
     () => undefined
   );
 
-  const tokenPickerTokens = useMemo(
-    () => buildTokenPickerOptions(chains, tokensByChain),
-    [chains, tokensByChain]
+  const activeTokenChainIds = useMemo(
+    () => [chainId],
+    [chainId]
   );
-  const tokenPickerNetworks = useMemo(
-    () => buildTokenPickerNetworks(chains, tokenPickerTokens),
-    [chains, tokenPickerTokens]
-  );
-  const tokensLoading = useMemo(
-    () => chains.some((chain) => tokensLoadingByChain[chain.chainId]),
-    [chains, tokensLoadingByChain]
-  );
+  const {
+    handleTokenPickerNetworkChange,
+    resolveTokenPickerAddress,
+    tokenListNotice,
+    tokenPickerNetworks,
+    tokenPickerTokens,
+    tokensLoading
+  } = useTokenCatalog(chains, activeTokenChainIds);
   const sellToken = useMemo(
     () => findTokenPickerSelection(tokenPickerTokens, sellTokenAddress, sellTokenNetworkId),
     [sellTokenAddress, sellTokenNetworkId, tokenPickerTokens]
@@ -323,45 +315,6 @@ export default function LimitOrdersPage() {
     ].includes(order.executionStatus)),
     [orders]
   );
-
-  useEffect(() => {
-    const controllers: AbortController[] = [];
-    setTokensByChain((current) => {
-      const next = { ...current };
-      for (const chain of chains) {
-        next[chain.chainId] = next[chain.chainId] ?? [];
-      }
-      return next;
-    });
-    setTokensLoadingByChain(Object.fromEntries(chains.map((chain) => [chain.chainId, true])));
-    setTokenListNotice("");
-
-    for (const chain of chains) {
-      const controller = new AbortController();
-      controllers.push(controller);
-      listTokens(chain.chainId, controller.signal)
-        .then((items) => {
-          if (!items.length) return;
-          setTokensByChain((current) => ({
-            ...current,
-            [chain.chainId]: items
-          }));
-        })
-        .catch((error: any) => {
-          if (error?.name === "AbortError") return;
-          setTokenListNotice("Showing popular tokens while the full list is unavailable.");
-        })
-        .finally(() => {
-          if (controller.signal.aborted) return;
-          setTokensLoadingByChain((current) => ({
-            ...current,
-            [chain.chainId]: false
-          }));
-        });
-    }
-
-    return () => controllers.forEach((controller) => controller.abort());
-  }, [chains]);
 
   useEffect(() => {
     if (!tokenPickerTokens.length) return;
@@ -1166,6 +1119,8 @@ export default function LimitOrdersPage() {
               tokens={tokenPickerTokens}
               loading={tokensLoading}
               onChange={(token) => selectTokenForSide("sell", token)}
+              onNetworkChange={handleTokenPickerNetworkChange}
+              onResolveAddress={resolveTokenPickerAddress}
             />
 
             <button
@@ -1188,6 +1143,8 @@ export default function LimitOrdersPage() {
               tokens={tokenPickerTokens}
               loading={tokensLoading}
               onChange={(token) => selectTokenForSide("buy", token)}
+              onNetworkChange={handleTokenPickerNetworkChange}
+              onResolveAddress={resolveTokenPickerAddress}
             />
           </div>
 

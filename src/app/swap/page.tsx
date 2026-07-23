@@ -17,9 +17,7 @@ import { CHAINS, getSwapChainById, getSwapChains } from "@/lib/chains";
 import {
   DEFAULT_TOKENS_BY_CHAIN,
   NATIVE_BITCOIN_CHAIN_ID,
-  NATIVE_BITCOIN_NETWORK_ID,
   SOLANA_CHAIN_ID,
-  SOLANA_NETWORK_ID,
   isNativeBitcoinToken,
   type TokenInfo
 } from "@/lib/tokens";
@@ -48,7 +46,6 @@ import { buildQuoteUrl } from "@/lib/quoteClient";
 import { fetchRouteStatus, routeStatusDelayMs, shouldTrackRoute } from "@/lib/routeStatus";
 import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import { swapLog } from "@/lib/swapLog";
-import { listTokens, resolveTokenAddress } from "@/lib/tokenClient";
 import {
   type PreparedPushSubscription,
   preparePushSubscription,
@@ -57,11 +54,7 @@ import {
   withPushSubscription
 } from "@/lib/pushNotifications";
 import { TokenPicker, type TokenPickerOption } from "@/components/TokenPicker";
-import {
-  buildFallbackTokensByChain,
-  buildTokenPickerNetworks,
-  buildTokenPickerOptions
-} from "@/lib/tokenPickerOptions";
+import { useTokenCatalog } from "@/hooks/useTokenCatalog";
 import {
   type PriceAlertRule,
   type FavoritePair,
@@ -238,10 +231,6 @@ const ADDRESS_FAMILY_CONFIG: Record<AddressFamily, AddressFamilyConfig> = {
 
 export default function Page() {
   const allowedChains = useMemo(() => getSwapChains(), []);
-  const allowedChainIds = useMemo(
-    () => new Set(allowedChains.map((allowedChain) => allowedChain.chainId)),
-    [allowedChains]
-  );
   const [walletBridgeState, setWalletBridgeState] = useState<WalletBridgeState>({ evmConnected: false });
   const [walletBridgeActions, setWalletBridgeActions] = useState<WalletBridgeActions | null>(null);
   const appKitAddress = walletBridgeState.evmAddress;
@@ -417,13 +406,20 @@ export default function Page() {
       walletProviderType
     ]
   );
-  const [tokensByChain, setTokensByChain] = useState<Record<number, TokenInfo[]>>(() =>
-    buildFallbackTokensByChain(allowedChains.map((allowedChain) => allowedChain.chainId))
+  const activeTokenChainIds = useMemo(
+    () => [selectedChainId, buyChainId],
+    [buyChainId, selectedChainId]
   );
-  const [tokensLoadingByChain, setTokensLoadingByChain] = useState<Record<number, boolean>>({});
-  const [tokenListNotice, setTokenListNotice] = useState<string>("");
-  const loadedTokenChainsRef = useRef<Set<number>>(new Set());
-  const tokenLoadControllersRef = useRef<Map<number, AbortController>>(new Map());
+  const {
+    handleTokenPickerNetworkChange,
+    resolveTokenPickerAddress,
+    tokenListNotice,
+    tokenPickerNetworks,
+    tokenPickerTokens,
+    tokensByChain,
+    tokensLoadingByChain,
+    tokensLoading
+  } = useTokenCatalog(allowedChains, activeTokenChainIds);
   const tokens = useMemo(
     () => tokensByChain[selectedChainId] ?? DEFAULT_TOKENS_BY_CHAIN[selectedChainId] ?? [],
     [selectedChainId, tokensByChain]
@@ -432,91 +428,7 @@ export default function Page() {
     () => tokensByChain[buyChainId] ?? DEFAULT_TOKENS_BY_CHAIN[buyChainId] ?? [],
     [buyChainId, tokensByChain]
   );
-  const tokensLoading = useMemo(
-    () => allowedChains.some((allowedChain) => tokensLoadingByChain[allowedChain.chainId]),
-    [allowedChains, tokensLoadingByChain]
-  );
-  const tokenPickerTokens = useMemo(
-    () => buildTokenPickerOptions(allowedChains, tokensByChain),
-    [allowedChains, tokensByChain]
-  );
-  const tokenPickerNetworks = useMemo(
-    () => buildTokenPickerNetworks(allowedChains, tokenPickerTokens),
-    [allowedChains, tokenPickerTokens]
-  );
-
-  const loadTokensForChain = useCallback((chainId: number) => {
-    if (
-      !allowedChainIds.has(chainId) ||
-      loadedTokenChainsRef.current.has(chainId) ||
-      tokenLoadControllersRef.current.has(chainId)
-    ) return;
-
-    const controller = new AbortController();
-    tokenLoadControllersRef.current.set(chainId, controller);
-    setTokensLoadingByChain((current) => ({ ...current, [chainId]: true }));
-    void listTokens(chainId, controller.signal)
-      .then((availableTokens) => {
-        loadedTokenChainsRef.current.add(chainId);
-        if (!availableTokens.length) return;
-        setTokensByChain((current) => ({ ...current, [chainId]: availableTokens }));
-      })
-      .catch((error: any) => {
-        if (error?.name === "AbortError") return;
-        setTokenListNotice("Showing popular tokens while the full list is unavailable.");
-      })
-      .finally(() => {
-        if (tokenLoadControllersRef.current.get(chainId) !== controller) return;
-        tokenLoadControllersRef.current.delete(chainId);
-        if (controller.signal.aborted) return;
-        setTokensLoadingByChain((current) => ({ ...current, [chainId]: false }));
-      });
-  }, [allowedChainIds]);
-
-  const handleTokenPickerNetworkChange = useCallback((networkId: string | "all") => {
-    const chainId = parseTokenNetworkId(networkId);
-    if (chainId) loadTokensForChain(chainId);
-  }, [loadTokensForChain]);
-
-  const resolveTokenPickerAddress = useCallback(async (
-    networkId: string,
-    address: string,
-    signal: AbortSignal
-  ): Promise<TokenPickerOption | null> => {
-    const chainId = parseTokenNetworkId(networkId);
-    const tokenChain = chainId ? allowedChains.find((candidate) => candidate.chainId === chainId) : undefined;
-    if (!chainId || !tokenChain || !allowedChainIds.has(chainId)) return null;
-
-    const token = await resolveTokenAddress(chainId, address, signal);
-    if (!token) return null;
-    setTokensByChain((current) => {
-      const existing = current[chainId] ?? [];
-      if (existing.some((candidate) => normalizeTokenKey(candidate.address) === normalizeTokenKey(token.address))) {
-        return current;
-      }
-      return { ...current, [chainId]: [...existing, token] };
-    });
-    return buildTokenPickerOptions([tokenChain], { [chainId]: [token] })[0] ?? null;
-  }, [allowedChainIds, allowedChains]);
-
-  useEffect(() => {
-    setTokensByChain((current) => {
-      const next = { ...current };
-      for (const allowedChain of allowedChains) {
-        next[allowedChain.chainId] = next[allowedChain.chainId] ?? DEFAULT_TOKENS_BY_CHAIN[allowedChain.chainId] ?? [];
-      }
-      return next;
-    });
-  }, [allowedChains]);
-
-  useEffect(() => {
-    loadTokensForChain(selectedChainId);
-    loadTokensForChain(buyChainId);
-  }, [buyChainId, loadTokensForChain, selectedChainId]);
-
   useEffect(() => () => {
-    tokenLoadControllersRef.current.forEach((controller) => controller.abort());
-    tokenLoadControllersRef.current.clear();
     routeTrackingControllerRef.current?.abort();
     routeTrackingControllerRef.current = null;
   }, []);
@@ -4505,15 +4417,6 @@ function getRecipientAddressSourceLabel(source: RecipientAddressSource): string 
 
 function getEvmNetworkId(chainId: number): string {
   return `eip155:${chainId}`;
-}
-
-function parseTokenNetworkId(networkId: string): number | null {
-  if (networkId === NATIVE_BITCOIN_NETWORK_ID) return NATIVE_BITCOIN_CHAIN_ID;
-  if (networkId === SOLANA_NETWORK_ID) return SOLANA_CHAIN_ID;
-  const match = /^eip155:(\d{1,10})$/.exec(networkId);
-  if (!match) return null;
-  const chainId = Number(match[1]);
-  return Number.isSafeInteger(chainId) && chainId > 0 ? chainId : null;
 }
 
 function getTokenNetworkId(token: TokenInfo | undefined, fallbackChainId: number): string {
