@@ -24,7 +24,7 @@ export default function FeesPage() {
           Back to swap
         </Link>
         <h1>Fees & Risks</h1>
-        <p>Effective July 19, 2026.</p>
+        <p>Effective July 23, 2026.</p>
         <p>
           Swap Assistant is a non-custodial swap assistant. Your wallet signs and
           submits transactions. Swap Assistant does not hold private keys, seed
@@ -67,6 +67,12 @@ export default function FeesPage() {
             the user after disclosed service fees, not by the compensation Swap
             Assistant expects to receive. You can review and choose another
             available route before approving a transaction.
+          </p>
+          <p>
+            Platform or integrator fees are received by the individual
+            operator, Syed Aqeel Ashiq, or shared according to the selected
+            provider&apos;s commercial terms. This compensation supports the
+            service and creates a commercial interest in completed swaps.
           </p>
           <p>
             Signed limit orders use third-party order protocols and do not

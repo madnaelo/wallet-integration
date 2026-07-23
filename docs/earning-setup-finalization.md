@@ -266,8 +266,11 @@ Before public launch:
 - Keep `MONETIZED_SWAP_PROVIDERS` limited to providers with written or
   unambiguous official commercial approval. Do not treat a successful quote as
   payout approval.
-- Confirm the operating legal entity, jurisdiction, privacy contact, and
-  counsel-reviewed Terms/Privacy language before broad commercial launch.
+- The confirmed operator is Syed Aqeel Ashiq acting personally from Dubai,
+  United Arab Emirates, with public contact aqeel613@yahoo.com. There is no
+  incorporated Swap Assistant entity. Obtain VARA or qualified UAE counsel's
+  written regulatory classification and counsel-reviewed Terms/Privacy
+  language before broad commercial launch.
 - Keep the automated daily backup-freshness check and weekly isolated restore
   drill passing. The production release also creates and verifies an Object
   Storage backup before promoting the backend.

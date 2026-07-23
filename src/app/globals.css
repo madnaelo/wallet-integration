@@ -685,6 +685,22 @@ body {
   margin: 0 0 12px;
 }
 
+.legalShell a:not(.legalBackLink) {
+  color: #8bb9ff;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.legalShell a:not(.legalBackLink):hover,
+.legalShell a:not(.legalBackLink):focus-visible {
+  color: #b8d4ff;
+}
+
+.legalShell a:not(.legalBackLink):focus-visible {
+  outline: 2px solid #8bb9ff;
+  outline-offset: 3px;
+}
+
 .introPage {
   margin: 0 auto;
   max-width: 1220px;

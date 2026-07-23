@@ -1,6 +1,7 @@
 # Production Legal Review Pack
 
 Prepared: July 19, 2026
+Last updated: July 23, 2026
 
 Status: engineering and legal-readiness review complete; qualified-counsel
 review pending.
@@ -13,23 +14,38 @@ documents have been approved by a lawyer or regulator.
 
 Broad commercial launch remains gated on these decisions:
 
-1. Record the operator's exact legal name, public legal/privacy contact, and
-   governing jurisdiction in the public Terms and Privacy Notice.
-2. Obtain UAE virtual-assets counsel's written classification of the product,
+1. Obtain VARA or UAE virtual-assets counsel's written classification of the product,
    including whether operating or marketing it in or from Dubai requires a
    VARA licence or another authorization.
-3. Have counsel approve the Terms, Privacy Notice, fee disclosure, sanctions
+2. Have counsel approve the Terms, Privacy Notice, fee disclosure, sanctions
    language, limit-order risk acceptance, liability allocation, and dispute
    provisions as one consistent document set.
-4. Record the reviewer's name, firm, jurisdiction, review date, approved
+3. Record the reviewer's name, firm, jurisdiction, review date, approved
    document versions, and required follow-up date in the review log below.
 
 Software controls do not satisfy these legal gates by themselves.
+
+## Confirmed Operator Record
+
+- Operator: Syed Aqeel Ashiq, acting personally as an individual.
+- Place of operation: Dubai, United Arab Emirates.
+- Public legal, privacy, and support contact: aqeel613@yahoo.com.
+- Public service name: Swap Assistant.
+- There is no Luxembourg company or other incorporated Swap Assistant entity.
+  Do not describe the service as incorporated, licensed, or regulator-approved
+  unless verified evidence is added to this repository.
+- The current operating decision is not to target advertising at UAE or
+  Pakistan residents and not to impose a location block solely on that basis.
+  This decision is not a regulatory exemption or legal-clearance conclusion.
+- The public Terms provisionally use applicable UAE federal and Dubai law and
+  Dubai courts, subject to mandatory rights and qualified review.
 
 ## Product Facts For Counsel
 
 - Swap Assistant compares third-party swap quotes and can add a disclosed
   platform/integrator fee on approved provider routes.
+- The service is operated personally from Dubai under the service name Swap
+  Assistant; it is not currently operated through a company.
 - The normal swap flow is non-custodial. The app does not hold private keys or
   sign transactions. The user reviews and approves execution in a wallet.
 - Wallet sign-in proves control of a public wallet address and protects saved
@@ -115,20 +131,23 @@ Official starting points:
 
 ## Public Document Audit
 
-The existing public pages correctly disclose the non-custodial model, wallet
-approval, third-party dependencies, platform/provider/network costs, execution
-risk, alerts as estimates, and special limit-order risks. Before counsel can
+The public pages disclose the individual operator, contact email, non-custodial
+model, wallet approval, third-party dependencies, platform/provider/network
+costs, execution risk, alerts as estimates, and special limit-order risks.
+They also contain provisional eligibility, liability, governing-law, dispute,
+privacy-purpose, transfer, minors, and rights language. Before counsel can
 approve them, the following gaps must be closed:
 
-- operator identity and service/contact address;
-- governing law, venue, dispute process, and mandatory consumer rights;
+- whether Dubai and an email contact are sufficient or a full service address
+  and trade licence disclosure are required;
+- enforceability of the provisional governing law, venue, dispute process,
+  warranty disclaimer, and liability cap;
 - age, territory, sanctions, restricted-person, and restricted-jurisdiction
   rules appropriate to the licensed operating model;
-- warranty, liability-cap, indemnity, suspension, termination, severability,
-  assignment, and notice language approved for the chosen jurisdiction;
-- privacy-controller identity, purposes and lawful bases, recipients and
-  subprocessors, cross-border safeguards, retention schedule, data-subject
-  rights, complaint route, minors, cookies/storage, and breach contact;
+- whether additional indemnity, severability, assignment, and formal notice
+  language is necessary;
+- final privacy lawful bases, named subprocessors, cross-border safeguards,
+  data-subject response process, deletion workflow, and breach procedure;
 - precise fee conflicts and whether route ranking is based on net user output
   regardless of provider remuneration;
 - final limit-order terms version and evidence that every accepted version is
@@ -160,9 +179,10 @@ Do not mark this complete until a qualified reviewer fills every field.
 
 | Field | Value |
 | --- | --- |
-| Operator legal name | Pending |
-| Public legal/privacy contact | Pending |
-| Governing jurisdiction | Pending |
+| Operator legal name | Syed Aqeel Ashiq, individual operator |
+| Public legal/privacy contact | aqeel613@yahoo.com |
+| Place of operation | Dubai, United Arab Emirates |
+| Governing jurisdiction | UAE/Dubai provision added; qualified review pending |
 | Reviewer and firm | Pending |
 | Reviewer qualification/jurisdiction | Pending |
 | Documents and versions approved | Pending |

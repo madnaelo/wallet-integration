@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Terms",
+  title: "Terms of Use",
   description: "Terms of use for Swap Assistant.",
   alternates: {
     canonical: "/terms"
@@ -21,32 +21,65 @@ export default function TermsPage() {
         <Link className="legalBackLink" href="/swap">
           Back to swap
         </Link>
-        <h1>Terms</h1>
+        <h1>Terms of Use</h1>
         <p>
-          Effective July 19, 2026. Limit Order Terms version 2026-07-17.1.
+          Effective July 23, 2026. Limit Order Terms version 2026-07-17.1.
         </p>
         <p>
-          These terms describe the expected use of Swap Assistant. By using the
-          app, you agree to use it only where lawful and to review every wallet
-          request before signing.
+          These terms govern your use of Swap Assistant. By using the service,
+          you agree to these terms, to use it only where lawful, and to review
+          every wallet request before signing.
         </p>
 
         <section>
-          <h2>Non-Custodial Service</h2>
+          <h2>Operator And Contact</h2>
           <p>
-            Swap Assistant provides quote comparison, saved history, favorites,
-            alerts, and wallet-assisted swap execution. It does not custody
-            funds, store private keys, or sign transactions for you.
+            Swap Assistant is operated by Syed Aqeel Ashiq as an individual
+            operator based in Dubai, United Arab Emirates. Swap Assistant is a
+            service name, not a separately incorporated company. Legal,
+            privacy, and support questions can be sent to{" "}
+            <a href="mailto:aqeel613@yahoo.com">aqeel613@yahoo.com</a>.
+          </p>
+          <p>
+            Nothing in these terms represents that Swap Assistant or its
+            operator is licensed, endorsed, or approved by a financial or
+            virtual-asset regulator.
           </p>
         </section>
 
         <section>
           <h2>Eligibility And Lawful Use</h2>
           <p>
-            You must have legal capacity to use the service and must comply
-            with the laws and restrictions that apply to you. Do not use Swap
-            Assistant for unlawful activity or to transact with sanctioned,
-            blocked, fraudulent, or illicit parties.
+            You must be at least 18 years old, have legal capacity to accept
+            these terms, and be permitted to use the service where you are
+            located. Availability of the website does not mean that its use is
+            lawful in every country.
+          </p>
+          <p>
+            Do not use Swap Assistant for unlawful activity, sanctions
+            evasion, market abuse, fraud, or transactions involving blocked,
+            sanctioned, stolen, or illicit assets or parties. You must not
+            interfere with the service, bypass security or request limits, or
+            use automated access without permission.
+          </p>
+        </section>
+
+        <section>
+          <h2>Non-Custodial Service</h2>
+          <p>
+            Swap Assistant provides quote comparison, saved history, favorites,
+            alerts, and wallet-assisted swap execution. It does not custody
+            funds, control wallet assets, store private keys or seed phrases,
+            or sign ordinary swap transactions for you. You retain control of
+            your wallet and decide whether to approve each wallet request.
+          </p>
+          <p>
+            Swap Assistant can prepare transaction data or transmit an exact
+            wallet-signed protocol order to a selected third-party service.
+            Blockchain networks, wallet providers, protocols, solvers, and
+            liquidity venues perform the resulting transaction or order fill.
+            Swap Assistant is not the buyer, seller, custodian, or counterparty
+            to your swap.
           </p>
         </section>
 
@@ -57,6 +90,12 @@ export default function TermsPage() {
             blockchain data can depend on third-party providers. Their
             availability, terms, security controls, rate limits, and output can
             change independently of Swap Assistant.
+          </p>
+          <p>
+            Your use of a wallet, protocol, network, or route can also be
+            governed by that provider&apos;s terms and privacy notice. Swap
+            Assistant does not control third-party smart contracts, token
+            contracts, liquidity, or transaction settlement.
           </p>
         </section>
 
@@ -92,6 +131,14 @@ export default function TermsPage() {
             providers. Available routes are ranked by the receiving amount
             returned for the user after disclosed service fees, and you remain
             free to choose another route before signing.
+          </p>
+          <p>
+            A platform or integrator fee can be paid to the operator or shared
+            with a provider. This creates a commercial interest in completed
+            swaps. Routes are ranked by the estimated amount you receive after
+            disclosed service fees, not by the compensation expected by the
+            operator. Provider estimates can differ in completeness and are not
+            guaranteed.
           </p>
         </section>
 
@@ -151,13 +198,60 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2>No Guarantee</h2>
+          <h2>Disclaimer</h2>
           <p>
             To the fullest extent permitted by law, Swap Assistant is provided
-            without a guarantee of availability, accuracy, security, execution,
-            price, profit, or fitness for a particular purpose. You control
-            whether to sign and bear the risks of the wallet, token, protocol,
-            network, and transaction you choose.
+            on an &quot;as is&quot; and &quot;as available&quot; basis, without
+            a guarantee of availability, accuracy, security, execution, price,
+            profit, merchantability, non-infringement, or fitness for a
+            particular purpose. You control whether to sign and bear the risks
+            of the wallet, token, protocol, network, and transaction you choose.
+          </p>
+        </section>
+
+        <section>
+          <h2>Liability</h2>
+          <p>
+            To the fullest extent permitted by law, the operator will not be
+            liable for indirect, incidental, special, consequential, punitive,
+            or exemplary loss, or for lost profits, opportunities, data, or
+            digital assets arising from use of the service or a third-party
+            provider.
+          </p>
+          <p>
+            To the fullest extent permitted by law, the operator&apos;s total
+            aggregate liability arising from the service will not exceed the
+            greater of USD 100 or the platform fees directly retained from your
+            swaps during the 12 months before the event giving rise to the
+            claim. Nothing in these terms excludes liability that applicable
+            law does not permit to be excluded or limited.
+          </p>
+        </section>
+
+        <section>
+          <h2>Suspension And Termination</h2>
+          <p>
+            Access can be restricted or terminated when reasonably necessary
+            for security, legal compliance, abuse prevention, provider
+            requirements, or service protection. Terms that by their nature
+            should continue, including risk, liability, dispute, and payment
+            provisions, survive termination.
+          </p>
+        </section>
+
+        <section>
+          <h2>Governing Law And Disputes</h2>
+          <p>
+            These terms are governed by the applicable federal laws of the
+            United Arab Emirates and the laws applicable in the Emirate of
+            Dubai, without overriding mandatory rights that apply to you.
+          </p>
+          <p>
+            Before starting formal proceedings, please send the details of the
+            dispute to{" "}
+            <a href="mailto:aqeel613@yahoo.com">aqeel613@yahoo.com</a> and allow
+            30 days for an informal resolution. Subject to mandatory applicable
+            law, the courts of Dubai have exclusive jurisdiction.
           </p>
         </section>
 
