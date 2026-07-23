@@ -1,6 +1,6 @@
 # VARA Regulatory-Perimeter Inquiry Draft
 
-Status: sent July 23, 2026.
+Status: formal follow-up submitted; VARA Ecosystem review pending.
 
 Delivery record:
 
@@ -9,6 +9,22 @@ Delivery record:
 - CC: operator contact inbox
 - Gmail message ID: 19f8e401ed2818fd
 - Official contact page: https://www.vara.ae/en/contact/
+
+VARA response and follow-up:
+
+- VARA replied on July 23, 2026 from `ConnectVARA@vara.ae`.
+- VARA requested a formal activity description, business plan, and details of
+  the intended Dubai setup, to be sent to `ecosystem@vara.ae`.
+- VARA stated that review of a legal opinion or memorandum for written
+  regulatory-perimeter confirmation may incur a fee of up to AED 4,000.
+- The factual submission in
+  [vara-formal-submission-2026-07-23.md](vara-formal-submission-2026-07-23.md)
+  was sent to `ecosystem@vara.ae` on July 23, 2026, with ConnectVARA and the
+  operator contact inbox copied.
+- The follow-up explicitly states that it is not a legal opinion or memorandum
+  and that no paid review is authorized without a written scope, fee, and the
+  operator's separate express acceptance.
+- Gmail follow-up message ID: 19f8fad2d14ec0e3
 
 ## Subject
 

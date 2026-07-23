@@ -3,8 +3,9 @@
 Prepared: July 19, 2026
 Last updated: July 23, 2026
 
-Status: engineering and legal-readiness review complete; qualified-counsel
-review pending.
+Status: engineering and legal-readiness review complete; a formal factual
+submission is pending review by VARA Ecosystem; qualified-counsel review
+remains pending.
 
 This document is a factual handoff for legal counsel. It is not legal advice
 and must not be used to claim that Swap Assistant, its operator, or its public
@@ -191,6 +192,6 @@ Do not mark this complete until a qualified reviewer fills every field.
 | Reviewer qualification/jurisdiction | Pending |
 | Documents and versions approved | Pending |
 | Approval date | Pending |
-| Regulatory classification | Pending |
+| Regulatory classification | Formal VARA Ecosystem submission sent July 23, 2026; response pending |
 | Required launch restrictions | Pending |
 | Next review date | Pending |
