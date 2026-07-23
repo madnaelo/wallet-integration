@@ -2,21 +2,30 @@ package com.wallet.swap.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.common.WalletMutationLock;
-import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
+import com.wallet.swap.config.ApiRateLimitDecision;
+import com.wallet.swap.config.ApiRateLimiter;
+import com.wallet.swap.config.NotificationProperties;
+import com.wallet.swap.notification.NotificationMessageFormatter.PushNotificationPayload;
+import com.wallet.swap.notification.NotificationModels.PushNotificationTestRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionDisableRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionKeys;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
+import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
+import java.time.Duration;
 import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,6 +46,12 @@ class PushSubscriptionServiceTest {
   @Mock
   private WalletMutationLock walletMutationLock;
 
+  @Mock
+  private PushNotificationSender pushNotificationSender;
+
+  @Mock
+  private ApiRateLimiter apiRateLimiter;
+
   @BeforeEach
   void setUp() {
     properties = new NotificationProperties();
@@ -44,7 +59,9 @@ class PushSubscriptionServiceTest {
         properties,
         pushSubscriptionRepository,
         preferenceService,
-        walletMutationLock);
+        walletMutationLock,
+        pushNotificationSender,
+        apiRateLimiter);
   }
 
   @Test
@@ -154,6 +171,71 @@ class PushSubscriptionServiceTest {
         .hasMessageContaining("incomplete");
 
     verify(pushSubscriptionRepository, never()).upsert(WALLET, request, "Chrome");
+  }
+
+  @Test
+  void sendsADeviceScopedTestNotification() {
+    enablePush();
+    when(pushSubscriptionRepository.isActiveForWalletEndpoint(WALLET, ENDPOINT)).thenReturn(true);
+    when(apiRateLimiter.check("push-test:" + WALLET, 1, 60_000))
+        .thenReturn(ApiRateLimitDecision.permit());
+
+    var response = service.sendTest(WALLET, new PushNotificationTestRequest(ENDPOINT));
+
+    assertThat(response.delivered()).isTrue();
+    ArgumentCaptor<PushNotificationPayload> payload = ArgumentCaptor.forClass(PushNotificationPayload.class);
+    verify(pushNotificationSender).sendToDevice(eq(WALLET), eq(ENDPOINT), payload.capture());
+    assertThat(payload.getValue().title()).isEqualTo("Swap Assistant test");
+    assertThat(payload.getValue().url()).isEqualTo("/swap#preferences");
+  }
+
+  @Test
+  void rejectsATestForAnUnlinkedDevice() {
+    enablePush();
+    when(pushSubscriptionRepository.isActiveForWalletEndpoint(WALLET, ENDPOINT)).thenReturn(false);
+
+    assertThatThrownBy(() -> service.sendTest(WALLET, new PushNotificationTestRequest(ENDPOINT)))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Enable push notifications");
+
+    verify(apiRateLimiter, never()).check(any(), eq(1), eq(60_000L));
+    verify(pushNotificationSender, never()).sendToDevice(any(), any(), any());
+  }
+
+  @Test
+  void rateLimitsPushNotificationTestsPerWallet() {
+    enablePush();
+    when(pushSubscriptionRepository.isActiveForWalletEndpoint(WALLET, ENDPOINT)).thenReturn(true);
+    when(apiRateLimiter.check("push-test:" + WALLET, 1, 60_000))
+        .thenReturn(ApiRateLimitDecision.reject(Duration.ofSeconds(45)));
+
+    assertThatThrownBy(() -> service.sendTest(WALLET, new PushNotificationTestRequest(ENDPOINT)))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Wait a minute");
+
+    verify(pushNotificationSender, never()).sendToDevice(any(), any(), any());
+  }
+
+  @Test
+  void returnsASafeMessageWhenTestDeliveryFails() {
+    enablePush();
+    when(pushSubscriptionRepository.isActiveForWalletEndpoint(WALLET, ENDPOINT)).thenReturn(true);
+    when(apiRateLimiter.check("push-test:" + WALLET, 1, 60_000))
+        .thenReturn(ApiRateLimitDecision.permit());
+    doThrow(new IllegalStateException("push provider returned secret diagnostics"))
+        .when(pushNotificationSender)
+        .sendToDevice(eq(WALLET), eq(ENDPOINT), any(PushNotificationPayload.class));
+
+    assertThatThrownBy(() -> service.sendTest(WALLET, new PushNotificationTestRequest(ENDPOINT)))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("could not be delivered")
+        .hasMessageNotContaining("secret diagnostics");
+  }
+
+  private void enablePush() {
+    properties.getPush().setEnabled(true);
+    properties.getPush().setVapidPublicKey("A".repeat(87));
+    properties.getPush().setVapidPrivateKey("B".repeat(43));
   }
 
   private PushSubscriptionKeys validKeys() {

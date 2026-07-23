@@ -54,6 +54,12 @@ public final class NotificationModels {
       boolean linked,
       int walletSubscriptionCount) {}
 
+  public record PushNotificationTestRequest(
+      @NotBlank @Size(max = 2048) String endpoint) {}
+
+  public record PushNotificationTestResponse(
+      boolean delivered) {}
+
   public record PushSubscriptionKeys(
       @NotBlank @Size(max = 512) String p256dh,
       @NotBlank @Size(max = 256) String auth) {}

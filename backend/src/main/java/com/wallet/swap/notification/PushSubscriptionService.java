@@ -2,7 +2,11 @@ package com.wallet.swap.notification;
 
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.common.WalletMutationLock;
+import com.wallet.swap.config.ApiRateLimiter;
 import com.wallet.swap.config.NotificationProperties;
+import com.wallet.swap.notification.NotificationMessageFormatter.PushNotificationPayload;
+import com.wallet.swap.notification.NotificationModels.PushNotificationTestRequest;
+import com.wallet.swap.notification.NotificationModels.PushNotificationTestResponse;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionDisableRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
@@ -17,20 +21,28 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PushSubscriptionService {
+  private static final long TEST_WINDOW_MS = 60_000;
+
   private final NotificationProperties properties;
   private final PushSubscriptionRepository pushSubscriptionRepository;
   private final NotificationPreferenceService preferenceService;
   private final WalletMutationLock walletMutationLock;
+  private final PushNotificationSender pushNotificationSender;
+  private final ApiRateLimiter apiRateLimiter;
 
   public PushSubscriptionService(
       NotificationProperties properties,
       PushSubscriptionRepository pushSubscriptionRepository,
       NotificationPreferenceService preferenceService,
-      WalletMutationLock walletMutationLock) {
+      WalletMutationLock walletMutationLock,
+      PushNotificationSender pushNotificationSender,
+      ApiRateLimiter apiRateLimiter) {
     this.properties = properties;
     this.pushSubscriptionRepository = pushSubscriptionRepository;
     this.preferenceService = preferenceService;
     this.walletMutationLock = walletMutationLock;
+    this.pushNotificationSender = pushNotificationSender;
+    this.apiRateLimiter = apiRateLimiter;
   }
 
   public boolean isAvailable() {
@@ -80,6 +92,47 @@ public class PushSubscriptionService {
     return new PushSubscriptionStatusResponse(
         pushSubscriptionRepository.isActiveForWalletEndpoint(walletAddress, endpoint),
         walletSubscriptionCount);
+  }
+
+  public PushNotificationTestResponse sendTest(
+      String walletAddress,
+      PushNotificationTestRequest request) {
+    if (!isAvailable()) {
+      throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "Push notifications are not available right now.");
+    }
+    String endpoint = request.endpoint().trim();
+    validateEndpoint(endpoint);
+    if (!pushSubscriptionRepository.isActiveForWalletEndpoint(walletAddress, endpoint)) {
+      throw new ApiException(
+          HttpStatus.BAD_REQUEST,
+          "Enable push notifications on this device before sending a test.");
+    }
+
+    var rateLimit = apiRateLimiter.check(
+        "push-test:" + walletAddress.toLowerCase(Locale.ROOT),
+        1,
+        TEST_WINDOW_MS);
+    if (!rateLimit.allowed()) {
+      throw new ApiException(
+          HttpStatus.TOO_MANY_REQUESTS,
+          "A test notification was sent recently. Wait a minute and try again.");
+    }
+
+    try {
+      pushNotificationSender.sendToDevice(
+          walletAddress,
+          endpoint,
+          new PushNotificationPayload(
+              "Swap Assistant test",
+              "Push notifications are working on this device.",
+              "/swap#preferences",
+              "swap-assistant-push-test"));
+    } catch (IllegalStateException exception) {
+      throw new ApiException(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          "The test notification could not be delivered. Check this device's notification settings and try again.");
+    }
+    return new PushNotificationTestResponse(true);
   }
 
   private void validate(PushSubscriptionRequest request) {

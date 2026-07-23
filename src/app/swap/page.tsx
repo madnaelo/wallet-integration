@@ -83,6 +83,7 @@ import {
   saveNotificationPreferences,
   savePushSubscription,
   saveSwapHistory,
+  sendPushNotificationTest,
   startTelegramLink,
   verifyAuthSignature
 } from "@/lib/backendClient";
@@ -326,6 +327,7 @@ export default function Page() {
   const [telegramEnabledDraft, setTelegramEnabledDraft] = useState<boolean>(false);
   const [pushEnabledDraft, setPushEnabledDraft] = useState<boolean>(false);
   const [pushPreferenceLoading, setPushPreferenceLoading] = useState<boolean>(false);
+  const [pushTestLoading, setPushTestLoading] = useState<boolean>(false);
   const [pushPublicKey, setPushPublicKey] = useState<string>(() => envPublic.VAPID_PUBLIC_KEY);
   const [pushSupportMessage, setPushSupportMessage] = useState<string>("");
   const [pushDeviceState, setPushDeviceState] = useState<PushDeviceState>("unknown");
@@ -2262,6 +2264,35 @@ export default function Page() {
     }
   }
 
+  async function sendPushTest() {
+    setPushTestLoading(true);
+    setNotificationPreferenceError("");
+    setNotificationPreferenceNotice("");
+    try {
+      const session = getSignedInBackendSessionOrThrow();
+      const endpoint = await getCurrentPushSubscriptionEndpoint();
+      if (!endpoint || pushDeviceState !== "linked") {
+        throw new Error("Enable push notifications on this device before sending a test.");
+      }
+      const result = await sendPushNotificationTest(
+        envPublic.BACKEND_BASE_URL,
+        session,
+        endpoint
+      );
+      if (!result.delivered) throw new Error("The test notification could not be delivered.");
+      setNotificationPreferenceNotice("Test notification sent to this device.");
+    } catch (e: any) {
+      if (isExpiredBackendSessionError(e)) {
+        clearStoredBackendSession();
+        setBackendSession(null);
+      }
+      setNotificationPreferenceError(normalizeWalletError(e));
+    } finally {
+      setPushTestLoading(false);
+      setPreferencesAuthNotice("");
+    }
+  }
+
   useEffect(() => {
     if (!pendingAutoQuoteLink) return;
     if (activeView !== "swap") {
@@ -3819,16 +3850,26 @@ export default function Page() {
                     <div className="subtle">{pushStatusText}</div>
                     <div className="pushActions">
                       {pushDeviceLinked ? (
-                        <button
-                          className="btn"
-                          type="button"
-                          onClick={() => {
-                            void disablePushNotifications("device");
-                          }}
-                          disabled={pushPreferenceLoading}
-                        >
-                          {pushPreferenceLoading ? "Updating..." : "Disable This Device"}
-                        </button>
+                        <>
+                          <button
+                            className="btn btnPrimary"
+                            type="button"
+                            onClick={sendPushTest}
+                            disabled={pushPreferenceLoading || pushTestLoading}
+                          >
+                            {pushTestLoading ? "Sending..." : "Send Test Notification"}
+                          </button>
+                          <button
+                            className="btn"
+                            type="button"
+                            onClick={() => {
+                              void disablePushNotifications("device");
+                            }}
+                            disabled={pushPreferenceLoading || pushTestLoading}
+                          >
+                            {pushPreferenceLoading ? "Updating..." : "Disable This Device"}
+                          </button>
+                        </>
                       ) : (
                         <button
                           className="btn btnPrimary"

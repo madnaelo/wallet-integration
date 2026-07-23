@@ -62,7 +62,24 @@ public class PushNotificationSender {
         walletAddress,
         Math.max(1, properties.getPush().getMaxDevicesPerWallet()));
     if (subscriptions.isEmpty()) throw new IllegalStateException("No push notification subscription is active.");
+    sendToSubscriptions(walletAddress, subscriptions, payload);
+  }
 
+  public void sendToDevice(String walletAddress, String endpoint, PushNotificationPayload payload) {
+    if (!isEnabled()) throw new IllegalStateException("Push notifications are disabled.");
+
+    List<PushSubscriptionRecord> subscriptions =
+        pushSubscriptionRepository.findActiveForWalletEndpoint(walletAddress, endpoint);
+    if (subscriptions.isEmpty()) {
+      throw new IllegalStateException("No push notification subscription is active on this device.");
+    }
+    sendToSubscriptions(walletAddress, subscriptions, payload);
+  }
+
+  private void sendToSubscriptions(
+      String walletAddress,
+      List<PushSubscriptionRecord> subscriptions,
+      PushNotificationPayload payload) {
     PushService pushService = buildPushService();
     String payloadJson = toJson(payload);
     List<String> failures = new ArrayList<>();

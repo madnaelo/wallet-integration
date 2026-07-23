@@ -1,7 +1,7 @@
 # Mobile Push Subscription Failure
 
-Status: application-side fix implemented on 2026-07-19; production mobile
-verification pending.
+Status: application-side fix implemented on 2026-07-19; production
+configuration reverified on 2026-07-23; physical mobile verification pending.
 
 ## Summary
 
@@ -135,6 +135,12 @@ The production VAPID configuration was verified without exposing key material:
 - the decoded public key is a valid 65-byte uncompressed P-256 point,
 - desktop subscription and delivery already work.
 
+The configuration was checked again on July 23, 2026. The public key returned
+by the production backend is valid, the service worker and manifest are
+reachable, and recent production operations reported no failed notification
+deliveries. These checks prove server readiness but cannot create or verify a
+subscription on a physical mobile browser.
+
 The client flow did not follow the strongest mobile browser lifecycle. It
 requested notification permission separately, then fetched/prepared resources,
 then called `PushManager.subscribe()`. That can detach subscription from the
@@ -158,6 +164,14 @@ The replacement flow now:
 Focused tests enforce malformed-key rejection, existing-subscription reuse,
 key-rotation cleanup, one-call subscription behavior, and no retry/reset loop.
 
+The Preferences page also provides an authenticated **Send Test Notification**
+action for a linked device. The backend:
+
+1. accepts only an endpoint already linked to the signed-in wallet,
+2. sends only to that exact device,
+3. limits tests to one per wallet per minute, and
+4. returns a user-safe error without exposing push-service diagnostics.
+
 This matches the platform guidance that `subscribe()` should run in response
 to a user gesture and use an active service-worker registration:
 
@@ -178,8 +192,8 @@ path is evaluated.
    Notifications once.
 3. Confirm that the browser permission prompt and subscription complete as one
    action and that the UI reports this device as connected.
-4. Trigger a testable alert and confirm delivery after the application is
-   backgrounded.
+4. Tap **Send Test Notification**, background the application, and confirm
+   delivery on that exact device.
 5. If Chromium still reports `Registration failed - push service error`, test
    one different physical device or network before changing application code.
 

@@ -5,6 +5,8 @@ import com.wallet.swap.config.NotificationProperties;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceRequest;
 import com.wallet.swap.notification.NotificationModels.NotificationPreferenceResponse;
 import com.wallet.swap.notification.NotificationModels.PushNotificationConfigResponse;
+import com.wallet.swap.notification.NotificationModels.PushNotificationTestRequest;
+import com.wallet.swap.notification.NotificationModels.PushNotificationTestResponse;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionDisableRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionRequest;
 import com.wallet.swap.notification.NotificationModels.PushSubscriptionStatusRequest;
@@ -110,6 +112,15 @@ public class NotificationPreferenceController {
       @RequestBody(required = false) PushSubscriptionStatusRequest request) {
     String walletAddress = authService.authenticateRequest(authorization, httpRequest);
     return pushSubscriptionService.status(walletAddress, request);
+  }
+
+  @PostMapping("/push-subscriptions/test")
+  public PushNotificationTestResponse testPushSubscription(
+      @RequestHeader(name = "Authorization", required = false) String authorization,
+      HttpServletRequest httpRequest,
+      @Valid @RequestBody PushNotificationTestRequest request) {
+    String walletAddress = authService.authenticateRequest(authorization, httpRequest);
+    return pushSubscriptionService.sendTest(walletAddress, request);
   }
 
 }

@@ -79,6 +79,10 @@ export type PushSubscriptionStatus = {
   walletSubscriptionCount: number;
 };
 
+export type PushNotificationTestResult = {
+  delivered: boolean;
+};
+
 export type TelegramLinkStart = {
   code: string;
   botUsername: string;
@@ -405,6 +409,22 @@ export async function disablePushSubscriptions(
     headers: authHeaders(session),
     body: endpoint ? JSON.stringify({ endpoint }) : undefined
   });
+}
+
+export async function sendPushNotificationTest(
+  backendBaseUrl: string,
+  session: BackendSession,
+  endpoint: string
+): Promise<PushNotificationTestResult> {
+  return backendFetch<PushNotificationTestResult>(
+    backendBaseUrl,
+    "/api/notifications/preferences/push-subscriptions/test",
+    {
+      method: "POST",
+      headers: authHeaders(session),
+      body: JSON.stringify({ endpoint })
+    }
+  );
 }
 
 export async function listFavoritePairs(

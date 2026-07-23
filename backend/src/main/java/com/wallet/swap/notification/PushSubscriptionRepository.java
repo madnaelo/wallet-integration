@@ -145,6 +145,31 @@ public class PushSubscriptionRepository {
         Math.max(1, limit));
   }
 
+  public List<PushSubscriptionRecord> findActiveForWalletEndpoint(String walletAddress, String endpoint) {
+    return jdbcTemplate.query(
+        """
+        SELECT
+          ps.id,
+          psw.wallet_address,
+          ps.endpoint,
+          ps.p256dh,
+          ps.auth_secret,
+          ps.created_at,
+          GREATEST(ps.updated_at, psw.updated_at) AS updated_at,
+          GREATEST(ps.last_seen_at, psw.last_seen_at) AS last_seen_at
+        FROM push_subscription_wallets psw
+        JOIN push_subscriptions ps ON ps.id = psw.push_subscription_id
+        WHERE psw.wallet_address = ?
+          AND ps.endpoint = ?
+          AND psw.disabled_at IS NULL
+          AND ps.disabled_at IS NULL
+        LIMIT 1
+        """,
+        (rs, rowNum) -> mapRow(rs),
+        walletAddress,
+        endpoint.trim());
+  }
+
   public int disableForWallet(String walletAddress) {
     return jdbcTemplate.update(
         """
