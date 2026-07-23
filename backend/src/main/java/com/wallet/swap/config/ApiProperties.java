@@ -10,6 +10,8 @@ public class ApiProperties {
   private long rateLimitWindowMs = 60_000;
   private int rateLimitMaxRequests = 120;
   private int authRateLimitMaxRequests = 20;
+  private long contactRateLimitWindowMs = 3_600_000;
+  private int contactRateLimitMaxRequests = 5;
   private String rateLimitKeyPepper = "";
   private boolean trustForwardedHeaders = true;
   private boolean trustPrivateProxyHeaders = true;
@@ -61,6 +63,22 @@ public class ApiProperties {
 
   public void setAuthRateLimitMaxRequests(int authRateLimitMaxRequests) {
     this.authRateLimitMaxRequests = authRateLimitMaxRequests;
+  }
+
+  public long getContactRateLimitWindowMs() {
+    return contactRateLimitWindowMs;
+  }
+
+  public void setContactRateLimitWindowMs(long contactRateLimitWindowMs) {
+    this.contactRateLimitWindowMs = contactRateLimitWindowMs;
+  }
+
+  public int getContactRateLimitMaxRequests() {
+    return contactRateLimitMaxRequests;
+  }
+
+  public void setContactRateLimitMaxRequests(int contactRateLimitMaxRequests) {
+    this.contactRateLimitMaxRequests = contactRateLimitMaxRequests;
   }
 
   public String getRateLimitKeyPepper() {

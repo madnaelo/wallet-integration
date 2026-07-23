@@ -237,6 +237,7 @@ public class NotificationProperties {
   public static class Email {
     private boolean enabled = false;
     private String from = "";
+    private String contactRecipient = "";
 
     public boolean isEnabled() {
       return enabled;
@@ -252,6 +253,14 @@ public class NotificationProperties {
 
     public void setFrom(String from) {
       this.from = from;
+    }
+
+    public String getContactRecipient() {
+      return contactRecipient;
+    }
+
+    public void setContactRecipient(String contactRecipient) {
+      this.contactRecipient = contactRecipient;
     }
   }
 

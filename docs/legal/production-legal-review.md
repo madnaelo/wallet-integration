@@ -29,7 +29,8 @@ Software controls do not satisfy these legal gates by themselves.
 
 - Operator: Syed Aqeel Ashiq, acting personally as an individual.
 - Place of operation: Dubai, United Arab Emirates.
-- Public legal, privacy, and support contact: aqeel613@yahoo.com.
+- Public legal, privacy, and support contact: `/contact`.
+- The private delivery inbox is configured only through `CONTACT_RECIPIENT_EMAIL`.
 - Public service name: Swap Assistant.
 - There is no Luxembourg company or other incorporated Swap Assistant entity.
   Do not describe the service as incorporated, licensed, or regulator-approved
@@ -94,17 +95,19 @@ Data categories currently include:
   endpoints and encryption keys;
 - signed limit-order payloads, signatures, hashes, accepted terms version, and
   provider lifecycle state;
+- names, reply email addresses, topics, and messages supplied through the
+  contact form;
 - request metadata used for abuse prevention, reliability, backup, and incident
   response.
 
 Current default retention controls expire sign-in nonces after 10 minutes,
 sessions after 7 days, dry-run swap history after 180 days, alert-delivery
 records after 365 days, and notification-outbox records after 30 days. Saved
-preferences, favorites, non-dry-run history, device links, and limit-order
-records remain until the user removes them where supported or an operational
-deletion policy applies. Counsel must review whether fixed retention periods,
-an account-data deletion workflow, and a formal data-subject request process
-are required before launch.
+contact messages are retained for up to 365 days. Preferences, favorites,
+non-dry-run history, device links, and limit-order records remain until the
+user removes them where supported or an operational deletion policy applies.
+Counsel must review whether fixed retention periods, an account-data deletion
+workflow, and a formal data-subject request process are required before launch.
 
 ## UAE And Dubai Review Questions
 
@@ -131,15 +134,16 @@ Official starting points:
 
 ## Public Document Audit
 
-The public pages disclose the individual operator, contact email, non-custodial
-model, wallet approval, third-party dependencies, platform/provider/network
-costs, execution risk, alerts as estimates, and special limit-order risks.
+The public pages disclose the individual operator, a contact form,
+non-custodial model, wallet approval, third-party dependencies,
+platform/provider/network costs, execution risk, alerts as estimates, and
+special limit-order risks.
 They also contain provisional eligibility, liability, governing-law, dispute,
 privacy-purpose, transfer, minors, and rights language. Before counsel can
 approve them, the following gaps must be closed:
 
-- whether Dubai and an email contact are sufficient or a full service address
-  and trade licence disclosure are required;
+- whether Dubai and the online contact channel are sufficient or a full
+  service address and trade licence disclosure are required;
 - enforceability of the provisional governing law, venue, dispute process,
   warranty disclaimer, and liability cap;
 - age, territory, sanctions, restricted-person, and restricted-jurisdiction
@@ -180,7 +184,7 @@ Do not mark this complete until a qualified reviewer fills every field.
 | Field | Value |
 | --- | --- |
 | Operator legal name | Syed Aqeel Ashiq, individual operator |
-| Public legal/privacy contact | aqeel613@yahoo.com |
+| Public legal/privacy contact | `/contact` (recipient address remains private) |
 | Place of operation | Dubai, United Arab Emirates |
 | Governing jurisdiction | UAE/Dubai provision added; qualified review pending |
 | Reviewer and firm | Pending |

@@ -90,4 +90,19 @@ public class ExpiredDataRepository {
         limit);
   }
 
+  public int deleteOldContactSubmissions(Instant cutoff, int limit) {
+    return jdbcTemplate.update(
+        """
+        DELETE FROM contact_submissions
+        WHERE ctid IN (
+          SELECT ctid FROM contact_submissions
+          WHERE created_at < ?
+          ORDER BY created_at
+          LIMIT ?
+        )
+        """,
+        Timestamp.from(cutoff),
+        limit);
+  }
+
 }

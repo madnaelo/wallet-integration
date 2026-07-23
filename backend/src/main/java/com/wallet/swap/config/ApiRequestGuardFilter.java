@@ -160,12 +160,17 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
   }
 
   private ApiRateLimitDecision checkRateLimit(String path, String ip) {
-    long windowMs = Math.max(1_000, apiProperties.getRateLimitWindowMs());
+    long windowMs = path.equals("/api/contact")
+        ? Math.max(1_000, apiProperties.getContactRateLimitWindowMs())
+        : Math.max(1_000, apiProperties.getRateLimitWindowMs());
     int maxRequests = maxRequestsFor(path);
     return rateLimiter.check(rateLimitKey(rateLimitGroup(path), ip), maxRequests, windowMs);
   }
 
   private int maxRequestsFor(String path) {
+    if (path.equals("/api/contact")) {
+      return Math.max(1, apiProperties.getContactRateLimitMaxRequests());
+    }
     if (path.startsWith("/api/auth/") || path.startsWith("/api/admin/")) {
       return Math.max(1, apiProperties.getAuthRateLimitMaxRequests());
     }
@@ -173,6 +178,7 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
   }
 
   private String rateLimitGroup(String path) {
+    if (path.equals("/api/contact")) return "contact";
     if (path.startsWith("/api/auth/")) return "auth";
     if (path.startsWith("/api/admin/")) return "admin";
     return "api";

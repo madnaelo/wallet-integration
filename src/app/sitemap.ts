@@ -40,6 +40,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       ...(lastModified ? { lastModified } : {}),
       changeFrequency: "monthly",
       priority: 0.5
+    },
+    {
+      url: new URL("/contact", baseUrl).toString(),
+      ...(lastModified ? { lastModified } : {}),
+      changeFrequency: "monthly",
+      priority: 0.4
     }
   ];
 }

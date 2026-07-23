@@ -232,10 +232,10 @@ export default function TermsPage() {
             Dubai, without overriding mandatory rights that apply to you.
           </p>
           <p>
-            Before starting formal proceedings, please use the contact address
-            in the legal disclosure below and allow 30 days for an informal
-            resolution. Subject to mandatory applicable law, the courts of
-            Dubai have exclusive jurisdiction.
+            Before starting formal proceedings, please use the{" "}
+            <Link href="/contact">contact form</Link> and allow 30 days for an
+            informal resolution. Subject to mandatory applicable law, the
+            courts of Dubai have exclusive jurisdiction.
           </p>
         </section>
 

@@ -104,6 +104,18 @@ export type FeatureFlags = {
   limitOrdersEnabled: boolean;
 };
 
+export type ContactSubmissionRequest = {
+  name?: string;
+  email: string;
+  topic: "general" | "technical" | "privacy" | "partnership" | "legal";
+  message: string;
+  website?: string;
+};
+
+export type ContactSubmissionResponse = {
+  accepted: boolean;
+};
+
 export type FavoritePair = {
   id: string;
   walletAddress: string;
@@ -276,6 +288,16 @@ export async function getFeatureFlags(backendBaseUrl: string): Promise<FeatureFl
     priceAlertsEnabled: Boolean(flags.priceAlertsEnabled),
     limitOrdersEnabled: Boolean(flags.limitOrdersEnabled)
   };
+}
+
+export async function submitContact(
+  backendBaseUrl: string,
+  request: ContactSubmissionRequest
+): Promise<ContactSubmissionResponse> {
+  return backendFetch<ContactSubmissionResponse>(backendBaseUrl, "/api/contact", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
 }
 
 export async function requestAuthNonce(backendBaseUrl: string, walletAddress: string): Promise<AuthNonceResponse> {

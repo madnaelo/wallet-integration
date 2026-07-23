@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -23,6 +24,8 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
       "updates.push.services.mozilla.com",
       "web.push.apple.com",
       ".notify.windows.com");
+  private static final Pattern BASIC_EMAIL_PATTERN =
+      Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
   private final String appEnvironment;
   private final String databaseUrl;
   private final String databasePassword;
@@ -106,6 +109,12 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     if (outside(apiProperties.getAuthRateLimitMaxRequests(), 1, 1_000)) {
       problems.add("API_AUTH_RATE_LIMIT_MAX_REQUESTS must be between 1 and 1000");
     }
+    if (outside(apiProperties.getContactRateLimitWindowMs(), 60_000, 86_400_000)) {
+      problems.add("CONTACT_RATE_LIMIT_WINDOW_MS must be between 60000 and 86400000");
+    }
+    if (outside(apiProperties.getContactRateLimitMaxRequests(), 1, 100)) {
+      problems.add("CONTACT_RATE_LIMIT_MAX_REQUESTS must be between 1 and 100");
+    }
     if (!apiProperties.isTrustForwardedHeaders() || !apiProperties.isTrustPrivateProxyHeaders()) {
       problems.add("production proxy headers must be trusted for accurate client rate limits");
     }
@@ -164,6 +173,9 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
     }
     if (outside(maintenanceProperties.getNotificationOutboxRetentionDays(), 1, 365)) {
       problems.add("NOTIFICATION_OUTBOX_RETENTION_DAYS must be between 1 and 365");
+    }
+    if (outside(maintenanceProperties.getContactSubmissionRetentionDays(), 30, 3_650)) {
+      problems.add("CONTACT_SUBMISSION_RETENTION_DAYS must be between 30 and 3650");
     }
   }
 
@@ -265,9 +277,19 @@ public class ProductionConfigurationValidator implements ApplicationRunner {
       }
     }
 
-    if (notificationProperties.getEmail().isEnabled()) {
-      if (text(notificationProperties.getEmail().getFrom()).isBlank()) problems.add("EMAIL_FROM is missing");
+    NotificationProperties.Email email = notificationProperties.getEmail();
+    if (email.isEnabled()) {
+      if (text(email.getFrom()).isBlank()) problems.add("EMAIL_FROM is missing");
       if (text(smtpHost).isBlank()) problems.add("SMTP_HOST is missing");
+    }
+    String contactRecipient = text(email.getContactRecipient());
+    if (!contactRecipient.isBlank()) {
+      if (!BASIC_EMAIL_PATTERN.matcher(contactRecipient).matches()) {
+        problems.add("CONTACT_RECIPIENT_EMAIL is invalid");
+      }
+      if (!email.isEnabled()) {
+        problems.add("EMAIL_NOTIFICATIONS_ENABLED must be true when CONTACT_RECIPIENT_EMAIL is configured");
+      }
     }
   }
 

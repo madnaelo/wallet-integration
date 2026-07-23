@@ -68,6 +68,8 @@ wallet:
     rate-limit-window-ms: ${API_RATE_LIMIT_WINDOW_MS:60000}
     rate-limit-max-requests: ${API_RATE_LIMIT_MAX_REQUESTS:120}
     auth-rate-limit-max-requests: ${API_AUTH_RATE_LIMIT_MAX_REQUESTS:20}
+    contact-rate-limit-window-ms: ${CONTACT_RATE_LIMIT_WINDOW_MS:3600000}
+    contact-rate-limit-max-requests: ${CONTACT_RATE_LIMIT_MAX_REQUESTS:5}
     rate-limit-key-pepper: ${API_RATE_LIMIT_KEY_PEPPER:}
     trust-forwarded-headers: ${API_TRUST_FORWARDED_HEADERS:true}
     trust-private-proxy-headers: ${API_TRUST_PRIVATE_PROXY_HEADERS:true}
@@ -121,6 +123,7 @@ wallet:
     dry-run-history-retention-days: ${DRY_RUN_HISTORY_RETENTION_DAYS:180}
     alert-retention-days: ${ALERT_RETENTION_DAYS:365}
     notification-outbox-retention-days: ${NOTIFICATION_OUTBOX_RETENTION_DAYS:30}
+    contact-submission-retention-days: ${CONTACT_SUBMISSION_RETENTION_DAYS:365}
   notifications:
     monitor-enabled: ${NOTIFICATIONS_MONITOR_ENABLED:true}
     monitor-fixed-delay-ms: ${NOTIFICATIONS_MONITOR_FIXED_DELAY_MS:900000}
@@ -147,6 +150,7 @@ wallet:
     email:
       enabled: ${EMAIL_NOTIFICATIONS_ENABLED:false}
       from: ${EMAIL_FROM:}
+      contact-recipient: ${CONTACT_RECIPIENT_EMAIL:}
     telegram:
       enabled: ${TELEGRAM_NOTIFICATIONS_ENABLED:false}
       bot-token: ${TELEGRAM_BOT_TOKEN:}

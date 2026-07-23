@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function LegalOperatorDisclosure() {
   return (
     <footer
@@ -11,7 +13,7 @@ export function LegalOperatorDisclosure() {
           operated by Syed Aqeel Ashiq as an individual based in Dubai, United
           Arab Emirates. Swap Assistant is a service name, not a separately
           incorporated company. Legal, privacy, and support questions can be
-          sent to <a href="mailto:aqeel613@yahoo.com">aqeel613@yahoo.com</a>.
+          sent through the <Link href="/contact">contact form</Link>.
           Nothing in this disclosure represents that the service or operator
           is licensed, endorsed, or approved by a financial or virtual-asset
           regulator.

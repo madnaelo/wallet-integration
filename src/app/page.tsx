@@ -130,6 +130,16 @@ export default function IntroPage() {
           </p>
         </div>
       </section>
+
+      <footer className="siteFooter">
+        <span>Swap Assistant is non-custodial. Review every wallet request before signing.</span>
+        <nav aria-label="Information and legal links">
+          <Link href="/fees">Fees & Risks</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/contact">Contact</Link>
+        </nav>
+      </footer>
     </main>
   );
 }

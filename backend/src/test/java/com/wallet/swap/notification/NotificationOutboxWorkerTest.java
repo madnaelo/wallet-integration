@@ -1,6 +1,7 @@
 package com.wallet.swap.notification;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -100,6 +101,58 @@ class NotificationOutboxWorkerTest {
         isNull());
     verify(repository).markSent(current.id());
     verify(repository).markSent(legacy.id());
+  }
+
+  @Test
+  void deliversContactEmailWithoutCreatingAlertDeliveryRecord() {
+    NotificationProperties properties = new NotificationProperties();
+    NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
+    EmailNotificationSender emailSender = mock(EmailNotificationSender.class);
+    ReverseProfitAlertRepository reverseProfitRepository =
+        mock(ReverseProfitAlertRepository.class);
+    FavoritePairAlertRepository favoritePairRepository =
+        mock(FavoritePairAlertRepository.class);
+    PriceAlertDeliveryRepository priceAlertRepository =
+        mock(PriceAlertDeliveryRepository.class);
+    NotificationOutboxItem contact = new NotificationOutboxItem(
+        UUID.randomUUID(),
+        "contact",
+        "email",
+        "operator@example.com",
+        "New contact message",
+        "A visitor submitted the contact form.",
+        "{}",
+        1);
+    when(repository.claimPending(eq(1), anyInt(), any()))
+        .thenReturn(List.of(contact))
+        .thenReturn(List.of());
+
+    NotificationOutboxWorker worker = new NotificationOutboxWorker(
+        properties,
+        repository,
+        emailSender,
+        mock(TelegramNotificationSender.class),
+        mock(PushNotificationSender.class),
+        mock(NotificationMessageFormatter.class),
+        reverseProfitRepository,
+        favoritePairRepository,
+        priceAlertRepository,
+        mock(OperationalMetricsService.class),
+        new ObjectMapper());
+
+    worker.deliverPending();
+
+    verify(emailSender).send(
+        "operator@example.com",
+        "New contact message",
+        "A visitor submitted the contact form.");
+    verify(repository).markSent(contact.id());
+    verify(reverseProfitRepository, times(0))
+        .saveDelivery(any(), any(), any(), anyBoolean(), any());
+    verify(favoritePairRepository, times(0))
+        .saveDelivery(any(), any(), any(), anyBoolean(), any());
+    verify(priceAlertRepository, times(0))
+        .saveDelivery(any(), any(), any(), anyBoolean(), any());
   }
 
   private NotificationOutboxItem priceAlertItem(String kind, String payload) {

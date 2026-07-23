@@ -59,6 +59,31 @@ class ApiRequestGuardFilterTest {
   }
 
   @Test
+  void appliesStrictIndependentRateLimitForContactForm() throws Exception {
+    ApiProperties properties = new ApiProperties();
+    properties.setContactRateLimitMaxRequests(1);
+    properties.setContactRateLimitWindowMs(3_600_000);
+    properties.setRateLimitMaxRequests(100);
+    ApiRequestGuardFilter filter = newFilter(properties);
+
+    MockHttpServletResponse firstResponse = new MockHttpServletResponse();
+    filter.doFilter(
+        apiRequest("POST", "/api/contact", "203.0.113.21"),
+        firstResponse,
+        flaggingChain(new AtomicBoolean(false)));
+    assertThat(firstResponse.getStatus()).isEqualTo(HttpStatus.OK.value());
+
+    MockHttpServletResponse secondResponse = new MockHttpServletResponse();
+    filter.doFilter(
+        apiRequest("POST", "/api/contact", "203.0.113.21"),
+        secondResponse,
+        flaggingChain(new AtomicBoolean(false)));
+
+    assertThat(secondResponse.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    assertThat(secondResponse.getHeader("Retry-After")).isNotBlank();
+  }
+
+  @Test
   void doesNotRateLimitHealthChecks() throws Exception {
     ApiProperties properties = new ApiProperties();
     properties.setRateLimitMaxRequests(1);

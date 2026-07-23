@@ -217,6 +217,7 @@ class ProductionConfigurationValidatorTest {
     var api = validApiProperties();
     api.setMaxRequestBodyBytes(100_000_000);
     api.setTrustForwardedHeaders(false);
+    api.setContactRateLimitMaxRequests(1_000);
     var limitOrders = validLimitOrderProperties();
     limitOrders.setSubmissionRetryFixedDelayMs(0);
     limitOrders.setStatusCheckBatchSize(10_000);
@@ -228,6 +229,7 @@ class ProductionConfigurationValidatorTest {
     notifications.getPrice().setRetryDelayMs(0);
     var maintenance = validMaintenanceProperties();
     maintenance.setDeleteBatchSize(100_000);
+    maintenance.setContactSubmissionRetentionDays(1);
 
     var configuration = new ProductionConfigurationValidator(
         "production",
@@ -245,15 +247,35 @@ class ProductionConfigurationValidatorTest {
     assertThatThrownBy(configuration::validate)
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("API_MAX_REQUEST_BODY_BYTES")
+        .hasMessageContaining("CONTACT_RATE_LIMIT_MAX_REQUESTS")
         .hasMessageContaining("proxy headers")
         .hasMessageContaining("LIMIT_ORDER_SUBMISSION_RETRY_FIXED_DELAY_MS")
         .hasMessageContaining("LIMIT_ORDER_STATUS_CHECK_BATCH_SIZE")
         .hasMessageContaining("MAINTENANCE_DELETE_BATCH_SIZE")
+        .hasMessageContaining("CONTACT_SUBMISSION_RETENTION_DAYS")
         .hasMessageContaining("NOTIFICATIONS_MONITOR_FIXED_DELAY_MS")
         .hasMessageContaining("NOTIFICATIONS_OUTBOX_BATCH_SIZE")
         .hasMessageContaining("NOTIFICATIONS_ELIGIBLE_STATUSES")
         .hasMessageContaining("COINGECKO_MAX_ATTEMPTS")
         .hasMessageContaining("COINGECKO_RETRY_DELAY_MS");
+  }
+
+  @Test
+  void rejectsInvalidOrUndeliverableContactRecipient() {
+    var notifications = validNotificationProperties();
+    notifications.getEmail().setContactRecipient("not-an-email");
+    var invalidAddress = productionConfiguration(validLimitOrderProperties(), notifications);
+
+    assertThatThrownBy(invalidAddress::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("CONTACT_RECIPIENT_EMAIL");
+
+    notifications.getEmail().setContactRecipient("operator@example.com");
+    var disabledEmail = productionConfiguration(validLimitOrderProperties(), notifications);
+
+    assertThatThrownBy(disabledEmail::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("EMAIL_NOTIFICATIONS_ENABLED");
   }
 
   private ProductionConfigurationValidator validConfiguration() {

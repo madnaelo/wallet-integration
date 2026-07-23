@@ -4209,6 +4209,7 @@ export default function Page() {
             <Link href="/fees">Fees & Risks</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>
+            <Link href="/contact">Contact</Link>
           </nav>
         </div>
       </footer>

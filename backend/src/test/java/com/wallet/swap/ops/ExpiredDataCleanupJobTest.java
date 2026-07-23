@@ -45,6 +45,7 @@ class ExpiredDataCleanupJobTest {
     when(expiredDataRepository.deleteOldFavoritePairAlerts(any(Instant.class), anyInt())).thenReturn(7);
     when(expiredDataRepository.deleteOldPriceAlertDeliveries(any(Instant.class), anyInt())).thenReturn(8);
     when(expiredDataRepository.deleteOldNotificationOutbox(any(Instant.class), anyInt())).thenReturn(9);
+    when(expiredDataRepository.deleteOldContactSubmissions(any(Instant.class), anyInt())).thenReturn(10);
     when(jobLockService.runIfAcquired(eq("expired-data-cleanup"), any(), any())).thenAnswer(invocation -> {
       invocation.getArgument(2, Runnable.class).run();
       return true;
@@ -69,6 +70,7 @@ class ExpiredDataCleanupJobTest {
     verify(expiredDataRepository).deleteOldFavoritePairAlerts(any(Instant.class), eq(2000));
     verify(expiredDataRepository).deleteOldPriceAlertDeliveries(any(Instant.class), eq(2000));
     verify(expiredDataRepository).deleteOldNotificationOutbox(any(Instant.class), eq(2000));
+    verify(expiredDataRepository).deleteOldContactSubmissions(any(Instant.class), eq(2000));
   }
 
   @Test

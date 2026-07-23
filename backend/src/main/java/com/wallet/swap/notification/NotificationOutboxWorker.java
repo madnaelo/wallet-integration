@@ -150,6 +150,9 @@ public class NotificationOutboxWorker {
           item.target(),
           sent,
           errorMessage);
+      case "contact" -> {
+        // Contact messages are persisted before notification delivery.
+      }
       default -> throw new IllegalArgumentException("Unsupported notification kind: " + item.notificationKind());
     }
   }

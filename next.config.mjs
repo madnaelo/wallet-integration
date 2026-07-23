@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 const backendProxyTarget = normalizeBackendProxyTarget(process.env.BACKEND_PROXY_TARGET);
+const developmentBackendOrigin = isDevelopment
+  ? normalizeDevelopmentConnectOrigin(
+      process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "http://localhost:8080"
+    )
+  : "";
 const providerCommercialPolicy = JSON.parse(
   readFileSync(new URL("./config/provider-commercial-policy.json", import.meta.url), "utf8")
 );
@@ -138,7 +143,7 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob:",
   "font-src 'self' data:",
-  `connect-src 'self'${isDevelopment ? " http://localhost:8080" : ""} https: wss:`,
+  `connect-src 'self'${developmentBackendOrigin ? ` ${developmentBackendOrigin}` : ""} https: wss:`,
   "frame-src 'self' https:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
@@ -200,6 +205,20 @@ function normalizeBackendProxyTarget(value) {
     throw new Error("BACKEND_PROXY_TARGET must use HTTPS outside development.");
   }
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+}
+
+function normalizeDevelopmentConnectOrigin(value) {
+  const raw = value?.trim();
+  if (!raw || raw.startsWith("/")) return "";
+  try {
+    const url = new URL(raw);
+    if (!/^https?:$/.test(url.protocol) || url.username || url.password) {
+      throw new Error();
+    }
+    return url.origin;
+  } catch {
+    throw new Error("NEXT_PUBLIC_BACKEND_BASE_URL must be an HTTP(S) URL or an absolute path.");
+  }
 }
 
 function readBoolean(value, fallback) {

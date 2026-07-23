@@ -63,6 +63,40 @@ test("intro explains custody boundaries and exposes crawlable metadata", async (
   await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
 });
 
+test("contact form works without a wallet and keeps the recipient inbox private", async ({ page }) => {
+  let submission: Record<string, unknown> | undefined;
+  await page.unroute("**/backend/api/**");
+  await page.route("**/backend/api/contact", async (route) => {
+    submission = route.request().postDataJSON();
+    await route.fulfill({
+      status: 202,
+      contentType: "application/json",
+      body: JSON.stringify({ accepted: true })
+    });
+  });
+
+  await page.goto("/contact");
+
+  await expect(page.getByRole("heading", { level: 1, name: "How can we help?" })).toBeVisible();
+  await expect(page.getByText(/do not need to connect or sign in with a wallet/i)).toBeVisible();
+  await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);
+  await page.getByLabel("Name (optional)", { exact: true }).fill("Browser test");
+  await page.getByLabel("Email address *", { exact: true }).fill("browser@example.invalid");
+  await page.getByLabel("Topic *", { exact: true }).selectOption("privacy");
+  await page.getByLabel("Message *", { exact: true }).fill("Please verify this contact form submission.");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Send message" }).click();
+
+  await expect(page.getByText("Thanks. Your message has been received.")).toBeVisible();
+  expect(submission).toMatchObject({
+    name: "Browser test",
+    email: "browser@example.invalid",
+    topic: "privacy",
+    message: "Please verify this contact form submission.",
+    website: ""
+  });
+});
+
 test("swap token picker restores keyboard focus and navigation stays available", async ({ page }) => {
   await page.goto("/swap");
 

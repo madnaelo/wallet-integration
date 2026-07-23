@@ -10,6 +10,7 @@ public class MaintenanceProperties {
   private int dryRunHistoryRetentionDays = 180;
   private int alertRetentionDays = 365;
   private int notificationOutboxRetentionDays = 30;
+  private int contactSubmissionRetentionDays = 365;
 
   public int getDryRunHistoryRetentionDays() {
     return dryRunHistoryRetentionDays;
@@ -34,6 +35,15 @@ public class MaintenanceProperties {
   public void setNotificationOutboxRetentionDays(int notificationOutboxRetentionDays) {
     this.notificationOutboxRetentionDays = notificationOutboxRetentionDays;
   }
+
+  public int getContactSubmissionRetentionDays() {
+    return contactSubmissionRetentionDays;
+  }
+
+  public void setContactSubmissionRetentionDays(int contactSubmissionRetentionDays) {
+    this.contactSubmissionRetentionDays = contactSubmissionRetentionDays;
+  }
+
   public long getCleanupFixedDelayMs() {
     return cleanupFixedDelayMs;
   }

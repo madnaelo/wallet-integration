@@ -267,7 +267,7 @@ Before public launch:
   unambiguous official commercial approval. Do not treat a successful quote as
   payout approval.
 - The confirmed operator is Syed Aqeel Ashiq acting personally from Dubai,
-  United Arab Emirates, with public contact aqeel613@yahoo.com. There is no
+  United Arab Emirates, with contact available through `/contact`. There is no
   incorporated Swap Assistant entity. Obtain VARA or qualified UAE counsel's
   written regulatory classification and counsel-reviewed Terms/Privacy
   language before broad commercial launch.

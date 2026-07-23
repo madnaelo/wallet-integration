@@ -157,6 +157,12 @@ For push notifications, set
 not commit the real file. Keep 1inch disabled until the API account has written
 commercial-use approval; enabling it also requires `ONEINCH_API_KEY`.
 
+The public contact form always stores accepted messages in PostgreSQL. To also
+notify a private inbox, set `EMAIL_NOTIFICATIONS_ENABLED=true`, configure the
+`SMTP_*` values and `EMAIL_FROM`, and set `CONTACT_RECIPIENT_EMAIL` inside
+`OCI_BACKEND_ENV`. The recipient address is server-only and must not be added
+to a `NEXT_PUBLIC_*` value or tracked documentation.
+
 `OCI_SSH_KNOWN_HOSTS` must contain the OCI host key line for
 `OCI_SSH_HOST`/`OCI_SSH_PORT`. Generate it once from a trusted machine with
 `ssh-keyscan -p 22 <oci-host>` and verify the fingerprint in the OCI console
@@ -377,6 +383,24 @@ curl -fsS \
 The operations summary reports in-memory monitor and notification-delivery
 counters since the backend process started. It is intentionally protected by the
 same admin key used for feature switches.
+
+Review recent contact messages:
+
+```bash
+curl -fsS \
+  -H "X-Admin-Key: $ADMIN_API_KEY" \
+  "https://wallet-api.84-235-254-97.sslip.io/api/admin/contact-submissions?status=new&limit=50"
+```
+
+Mark a reviewed message as resolved:
+
+```bash
+curl -fsS -X PATCH \
+  -H "X-Admin-Key: $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"resolved"}' \
+  "https://wallet-api.84-235-254-97.sslip.io/api/admin/contact-submissions/<message-id>"
+```
 
 Manual PostgreSQL backup on the OCI VM:
 

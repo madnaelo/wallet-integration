@@ -4,9 +4,9 @@ Status: sent July 23, 2026.
 
 Delivery record:
 
-- Sent from: aqeel613@gmail.com
+- Sent from: connected operator Gmail account
 - Sent to: varaconnect@vara.ae
-- CC: aqeel613@yahoo.com
+- CC: operator contact inbox
 - Gmail message ID: 19f8e401ed2818fd
 - Official contact page: https://www.vara.ae/en/contact/
 
@@ -76,4 +76,4 @@ Operator, Swap Assistant
 
 Dubai, United Arab Emirates
 
-aqeel613@yahoo.com
+Contact available through the Swap Assistant website

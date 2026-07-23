@@ -722,6 +722,245 @@ body {
   font-weight: 600;
 }
 
+.contactPage {
+  margin: 0 auto;
+  max-width: 980px;
+  padding: 34px 18px 70px;
+}
+
+.contactHeader {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 24px;
+}
+
+.contactHeader h1 {
+  font-size: 34px;
+  line-height: 1.1;
+  margin: 10px 0 12px;
+}
+
+.contactHeader > p:last-child {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 650px;
+}
+
+.contactEyebrow {
+  color: #8bd5ff;
+  font-size: 12px;
+  font-weight: 800;
+  margin: 24px 0 0;
+  text-transform: uppercase;
+}
+
+.contactLayout {
+  align-items: start;
+  display: grid;
+  gap: 28px;
+  margin-top: 28px;
+}
+
+.contactFormSection {
+  background: rgba(18, 26, 42, 0.88);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 22px;
+}
+
+.contactFormSection h2,
+.contactAside h2 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+
+.contactFormIntro,
+.contactAside p,
+.contactAside li {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.contactFormIntro {
+  margin: 0 0 20px;
+}
+
+.contactForm {
+  display: grid;
+  gap: 16px;
+  position: relative;
+}
+
+.contactField {
+  display: grid;
+  gap: 7px;
+}
+
+.contactField label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.contactField label span,
+.contactField small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.contactInput {
+  background: rgba(6, 12, 24, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  min-height: 44px;
+  outline: none;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+select.contactInput {
+  color-scheme: dark;
+}
+
+select.contactInput option {
+  background: #0b1220;
+  color: var(--text);
+}
+
+.contactInput:hover {
+  border-color: rgba(174, 198, 236, 0.3);
+}
+
+.contactInput:focus-visible {
+  border-color: rgba(110, 168, 254, 0.82);
+  box-shadow: 0 0 0 3px rgba(110, 168, 254, 0.16);
+}
+
+.contactTextarea {
+  line-height: 1.5;
+  min-height: 150px;
+  resize: vertical;
+}
+
+.contactConsent {
+  align-items: start;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  font-size: 13px;
+  gap: 10px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  line-height: 1.5;
+}
+
+.contactConsent input {
+  accent-color: var(--accent);
+  height: 16px;
+  margin: 2px 0 0;
+  width: 16px;
+}
+
+.contactConsent a,
+.contactAside a {
+  color: #8bb9ff;
+}
+
+.contactActions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.contactSubmit {
+  border-radius: 8px;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 132px;
+}
+
+.contactSpinner {
+  animation: contactSpinner 800ms linear infinite;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  border-top-color: #ffffff;
+  height: 15px;
+  width: 15px;
+}
+
+.contactStatus {
+  color: var(--ok);
+  flex: 1 1 220px;
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: 20px;
+}
+
+.contactStatusError {
+  color: var(--danger);
+}
+
+.contactAside {
+  border-left: 2px solid rgba(110, 168, 254, 0.45);
+  padding-left: 18px;
+}
+
+.contactAside ul {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 18px;
+  padding-left: 20px;
+}
+
+.contactAside p {
+  margin: 0;
+}
+
+.contactWebsiteTrap {
+  height: 1px;
+  left: -10000px;
+  overflow: hidden;
+  position: absolute;
+  top: auto;
+  width: 1px;
+}
+
+@keyframes contactSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 760px) {
+  .contactLayout {
+    grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.65fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .contactHeader h1 {
+    font-size: 28px;
+  }
+
+  .contactFormSection {
+    padding: 18px 14px;
+  }
+
+  .contactSubmit {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contactSpinner {
+    animation-duration: 1500ms;
+  }
+}
+
 .introPage {
   margin: 0 auto;
   max-width: 1220px;

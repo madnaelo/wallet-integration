@@ -45,7 +45,9 @@ export default function PrivacyPage() {
             favorite pairs, alert thresholds, notification preferences,
             Telegram chat identifiers, email settings, push-subscription
             endpoints and encryption keys, and operational records needed to
-            secure and run the service.
+            secure and run the service. If you use the contact form, we store
+            the name you provide, your reply email, selected topic, and
+            message.
           </p>
           <p>
             We can also receive technical information such as timestamps,
@@ -65,9 +67,10 @@ export default function PrivacyPage() {
           <p>
             We use this data to authenticate your wallet, provide saved
             features, request quotes, submit only the limit orders you sign,
-            deliver alerts, prevent abuse, investigate incidents, maintain
-            backups, and keep the service reliable. We do not sell personal
-            data or use it for third-party advertising.
+            deliver alerts, respond to contact messages, prevent abuse,
+            investigate incidents, maintain backups, and keep the service
+            reliable. We do not sell personal data or use it for third-party
+            advertising.
           </p>
           <p>
             Depending on the data and applicable law, processing is based on
@@ -132,10 +135,11 @@ export default function PrivacyPage() {
             Sign-in requests normally expire after 10 minutes and sessions
             after 7 days. Dry-run history is normally retained for up to 180
             days, alert-delivery records for up to 365 days, and pending or
-            completed notification-delivery records for up to 30 days. Other
-            saved records remain while needed to provide the feature, preserve
-            order evidence, meet security or legal duties, or until they are
-            removed through an available control.
+            completed notification-delivery records for up to 30 days.
+            Contact messages are normally retained for up to 365 days. Other
+            saved records remain while needed to provide the feature,
+            preserve order evidence, meet security or legal duties, or until
+            they are removed through an available control.
           </p>
           <p>
             You can disable notification channels, unlink push devices, remove
@@ -187,7 +191,7 @@ export default function PrivacyPage() {
             We may update this notice when the service, providers, or legal
             requirements change. Material changes will be reflected by the
             effective date above. Questions and privacy requests can be sent
-            using the contact address in the legal disclosure below.
+            using the <Link href="/contact">contact form</Link>.
           </p>
         </section>
 
