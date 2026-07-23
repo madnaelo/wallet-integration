@@ -12,7 +12,8 @@ rollback_container="${backend_container}-rollback"
 failed_container="${backend_container}-failed"
 postgres_container="${POSTGRES_CONTAINER_NAME:-wallet-postgres}"
 legacy_postgres_container="${postgres_container}-legacy"
-postgres_volume="${POSTGRES_VOLUME_NAME:-wallet-postgres-data}"
+configured_postgres_volume="${POSTGRES_VOLUME_NAME:-}"
+postgres_volume="${configured_postgres_volume:-wallet-postgres-data}"
 postgres_image="${POSTGRES_IMAGE:-docker.io/library/postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777}"
 backend_memory="${BACKEND_MEMORY:-520m}"
 backend_cpus="${BACKEND_CPUS:-1.0}"
@@ -229,6 +230,13 @@ container_uses_volume() {
     "$container_name" 2>/dev/null | grep -Fxq "$volume_name"
 }
 
+container_data_volume() {
+  local container_name="$1"
+  run_container inspect -f \
+    '{{range .Mounts}}{{if and (eq .Type "volume") (eq .Destination "/var/lib/postgresql/data")}}{{println .Name}}{{end}}{{end}}' \
+    "$container_name" 2>/dev/null || true
+}
+
 container_uses_network() {
   local container_name="$1"
   local network_name="$2"
@@ -390,6 +398,33 @@ done
 for database_container in "$postgres_container" "$legacy_postgres_container"; do
   assert_project_container "$database_container" database
 done
+
+active_postgres_volume=""
+for database_container in "$postgres_container" "$legacy_postgres_container"; do
+  if ! container_exists "$database_container"; then
+    continue
+  fi
+  container_volume="$(container_data_volume "$database_container")"
+  if [ -z "$container_volume" ]; then
+    fail "Owned PostgreSQL container must use a named volume at /var/lib/postgresql/data: $database_container"
+  fi
+  if [ -n "$active_postgres_volume" ] && [ "$active_postgres_volume" != "$container_volume" ]; then
+    fail "Owned PostgreSQL containers disagree on the production data volume."
+  fi
+  active_postgres_volume="$container_volume"
+done
+
+if [ -n "$active_postgres_volume" ] && [ "$active_postgres_volume" != "$postgres_volume" ]; then
+  if [ -n "$configured_postgres_volume" ]; then
+    fail "Configured PostgreSQL volume does not match the volume mounted by the owned database container."
+  fi
+  echo "Using production data volume verified through the owned PostgreSQL container: $active_postgres_volume" >&2
+  postgres_volume="$active_postgres_volume"
+fi
+if ! [[ "$postgres_volume" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+  fail "Invalid PostgreSQL volume name discovered from the owned database container."
+fi
+
 assert_project_network "$internal_network" database
 assert_project_volume "$postgres_volume"
 
