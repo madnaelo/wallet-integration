@@ -46,7 +46,8 @@ describe("provider monetization requests", () => {
       minBuyAmount: "950",
       fees: {
         zeroExFee: { amount: "3", token: BUY_TOKEN },
-        integratorFee: { amount: "2", token: BUY_TOKEN }
+        integratorFee: { amount: "2", token: BUY_TOKEN },
+        integratorFees: [{ amount: "2", token: BUY_TOKEN }]
       },
       route: {
         fills: [{ source: "Uniswap_V3", proportionBps: "10000", from: SELL_TOKEN, to: BUY_TOKEN }]

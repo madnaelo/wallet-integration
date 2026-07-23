@@ -106,8 +106,11 @@ function collectZeroXFees(body: Record<string, unknown>): QuoteFee[] {
   const fees = recordValue(body.fees);
   if (Object.keys(fees).length === 0) return [];
 
+  const integratorFees = Array.isArray(fees.integratorFees) && fees.integratorFees.length > 0
+    ? fees.integratorFees
+    : [fees.integratorFee];
   const lines: QuoteFee[] = [];
-  for (const fee of [fees.zeroExFee, fees.integratorFee, ...(Array.isArray(fees.integratorFees) ? fees.integratorFees : [])]) {
+  for (const fee of [fees.zeroExFee, ...integratorFees]) {
     const feeRecord = recordValue(fee);
     const amount = stringValue(feeRecord.amount);
     const token = stringValue(feeRecord.token);
@@ -119,10 +122,19 @@ function collectZeroXFees(body: Record<string, unknown>): QuoteFee[] {
 }
 
 function assertZeroXIntegratorFee(body: Record<string, unknown>, buyToken: string) {
-  const integratorFee = recordValue(recordValue(body.fees).integratorFee);
-  const amount = stringValue(integratorFee.amount);
-  const token = stringValue(integratorFee.token);
-  if (!/^\d+$/.test(amount) || BigInt(amount) <= 0n || !sameAsset(token, normalizeNativeToken(buyToken))) {
+  const fees = recordValue(body.fees);
+  const integratorFees = Array.isArray(fees.integratorFees) && fees.integratorFees.length > 0
+    ? fees.integratorFees
+    : [fees.integratorFee];
+  const expectedToken = normalizeNativeToken(buyToken);
+  const hasConfiguredFee = integratorFees.some((fee) => {
+    const feeRecord = recordValue(fee);
+    const amount = stringValue(feeRecord.amount);
+    return /^\d+$/.test(amount)
+      && BigInt(amount) > 0n
+      && sameAsset(stringValue(feeRecord.token), expectedToken);
+  });
+  if (!hasConfiguredFee) {
     throw new Error("0x did not include the configured service fee in this route.");
   }
 }
