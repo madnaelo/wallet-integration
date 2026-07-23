@@ -701,6 +701,27 @@ body {
   outline-offset: 3px;
 }
 
+.legalFinePrint {
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  margin-top: 32px;
+  padding-top: 14px;
+}
+
+.legalShell .legalFinePrint p {
+  color: #aeb9ca;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.legalFinePrint small {
+  font-size: 12px;
+}
+
+.legalFinePrint strong {
+  color: #c8d1df;
+  font-weight: 600;
+}
+
 .introPage {
   margin: 0 auto;
   max-width: 1220px;

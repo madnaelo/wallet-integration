@@ -1,11 +1,14 @@
 # VARA Regulatory-Perimeter Inquiry Draft
 
-Status: draft for operator review. Do not send automatically.
+Status: sent July 23, 2026.
 
-Intended channel:
+Delivery record:
 
-- VARA contact form: https://www.vara.ae/en/contact/
-- Operator email: aqeel613@yahoo.com
+- Sent from: aqeel613@gmail.com
+- Sent to: varaconnect@vara.ae
+- CC: aqeel613@yahoo.com
+- Gmail message ID: 19f8e401ed2818fd
+- Official contact page: https://www.vara.ae/en/contact/
 
 ## Subject
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LegalOperatorDisclosure } from "@/components/LegalOperatorDisclosure";
 
 export const metadata: Metadata = {
   title: "Privacy",
@@ -31,10 +32,9 @@ export default function PrivacyPage() {
         <section>
           <h2>Who Is Responsible</h2>
           <p>
-            Syed Aqeel Ashiq, an individual operator based in Dubai, United
-            Arab Emirates, is responsible for the personal data handled by Swap
-            Assistant. Privacy requests can be sent to{" "}
-            <a href="mailto:aqeel613@yahoo.com">aqeel613@yahoo.com</a>.
+            Swap Assistant&apos;s legal operator is responsible for the personal
+            data handled by the service. The operator&apos;s identity and
+            privacy contact are provided in the legal disclosure below.
           </p>
         </section>
 
@@ -186,10 +186,12 @@ export default function PrivacyPage() {
           <p>
             We may update this notice when the service, providers, or legal
             requirements change. Material changes will be reflected by the
-            effective date above. Questions and privacy requests can be sent to{" "}
-            <a href="mailto:aqeel613@yahoo.com">aqeel613@yahoo.com</a>.
+            effective date above. Questions and privacy requests can be sent
+            using the contact address in the legal disclosure below.
           </p>
         </section>
+
+        <LegalOperatorDisclosure />
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LegalOperatorDisclosure } from "@/components/LegalOperatorDisclosure";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -30,22 +31,6 @@ export default function TermsPage() {
           you agree to these terms, to use it only where lawful, and to review
           every wallet request before signing.
         </p>
-
-        <section>
-          <h2>Operator And Contact</h2>
-          <p>
-            Swap Assistant is operated by Syed Aqeel Ashiq as an individual
-            operator based in Dubai, United Arab Emirates. Swap Assistant is a
-            service name, not a separately incorporated company. Legal,
-            privacy, and support questions can be sent to{" "}
-            <a href="mailto:aqeel613@yahoo.com">aqeel613@yahoo.com</a>.
-          </p>
-          <p>
-            Nothing in these terms represents that Swap Assistant or its
-            operator is licensed, endorsed, or approved by a financial or
-            virtual-asset regulator.
-          </p>
-        </section>
 
         <section>
           <h2>Eligibility And Lawful Use</h2>
@@ -247,11 +232,10 @@ export default function TermsPage() {
             Dubai, without overriding mandatory rights that apply to you.
           </p>
           <p>
-            Before starting formal proceedings, please send the details of the
-            dispute to{" "}
-            <a href="mailto:aqeel613@yahoo.com">aqeel613@yahoo.com</a> and allow
-            30 days for an informal resolution. Subject to mandatory applicable
-            law, the courts of Dubai have exclusive jurisdiction.
+            Before starting formal proceedings, please use the contact address
+            in the legal disclosure below and allow 30 days for an informal
+            resolution. Subject to mandatory applicable law, the courts of
+            Dubai have exclusive jurisdiction.
           </p>
         </section>
 
@@ -263,6 +247,8 @@ export default function TermsPage() {
             accept the new version before storing that order.
           </p>
         </section>
+
+        <LegalOperatorDisclosure />
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LegalOperatorDisclosure } from "@/components/LegalOperatorDisclosure";
 
 export const metadata: Metadata = {
   title: "Fees & Risks",
@@ -69,10 +70,10 @@ export default function FeesPage() {
             available route before approving a transaction.
           </p>
           <p>
-            Platform or integrator fees are received by the individual
-            operator, Syed Aqeel Ashiq, or shared according to the selected
-            provider&apos;s commercial terms. This compensation supports the
-            service and creates a commercial interest in completed swaps.
+            Platform or integrator fees are received by Swap Assistant&apos;s
+            operator or shared according to the selected provider&apos;s
+            commercial terms. This compensation supports the service and
+            creates a commercial interest in completed swaps.
           </p>
           <p>
             Signed limit orders use third-party order protocols and do not
@@ -109,6 +110,8 @@ export default function FeesPage() {
             a transaction that looks unexpected.
           </p>
         </section>
+
+        <LegalOperatorDisclosure />
       </div>
     </main>
   );
