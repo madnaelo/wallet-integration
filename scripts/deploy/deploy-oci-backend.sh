@@ -460,19 +460,23 @@ for database_container in "$postgres_container" "$legacy_postgres_container"; do
   active_postgres_volume="$container_volume"
 done
 
-if [ -n "$active_postgres_volume" ] && [ "$active_postgres_volume" != "$postgres_volume" ]; then
-  if [ -n "$configured_postgres_volume" ]; then
-    fail "Configured PostgreSQL volume does not match the volume mounted by the owned database container."
+if [ -n "$active_postgres_volume" ]; then
+  if [ "$active_postgres_volume" != "$postgres_volume" ]; then
+    if [ -n "$configured_postgres_volume" ]; then
+      fail "Configured PostgreSQL volume does not match the volume mounted by the owned database container."
+    fi
+    postgres_volume="$active_postgres_volume"
   fi
-  echo "Using production data volume verified through the owned PostgreSQL container: $active_postgres_volume" >&2
-  postgres_volume="$active_postgres_volume"
+  echo "Using production data volume verified through the owned PostgreSQL container: $postgres_volume" >&2
 fi
 if ! [[ "$postgres_volume" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
   fail "Invalid PostgreSQL volume name discovered from the owned database container."
 fi
 
 assert_project_network "$internal_network" database
-assert_project_volume "$postgres_volume"
+if [ -z "$active_postgres_volume" ]; then
+  assert_project_volume "$postgres_volume"
+fi
 
 container_exists "$caddy_container" || fail "The configured Caddy container does not exist: $caddy_container"
 if ! network_exists "$proxy_network"; then

@@ -20,6 +20,8 @@ grep -Fq 'deploy_lock_file="$deploy_lock_dir/deploy.lock"' "$deploy_script"
 grep -Fq 'flock -w "$deploy_lock_timeout" 9' "$deploy_script"
 grep -Fq 'enforce_single_caddy_ingress_network' "$deploy_script"
 grep -Fq 'detach_container_network "$network_name" "$caddy_container"' "$deploy_script"
+grep -Fq 'Using production data volume verified through the owned PostgreSQL container' "$deploy_script"
+grep -Fq 'if [ -z "$active_postgres_volume" ]; then' "$deploy_script"
 grep -Fq 'COHOSTED_HEALTH_URLS=' "$release_workflow"
 grep -Fq 'COHOSTED_HEALTH_URL:' "$release_workflow"
 
