@@ -290,6 +290,13 @@ enforce_single_caddy_ingress_network() {
   done < <(container_network_names "$caddy_container")
 }
 
+reload_shared_caddy_after_network_normalization() {
+  run_container exec "$caddy_container" caddy validate --config /etc/caddy/Caddyfile >/dev/null \
+    || fail "Shared Caddy rejected its current configuration."
+  run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null \
+    || fail "Shared Caddy could not reload after ingress-network normalization."
+}
+
 assert_project_container() {
   local container_name="$1"
   local expected_role="$2"
@@ -501,6 +508,7 @@ if grep -Eq '^[[:space:]]*import[[:space:]]+/etc/caddy/sites/' "$caddyfile_path"
   [ -f "$caddy_site_path" ] \
     || fail "Shared Caddy layout is missing the Wallet site fragment: $caddy_site_path"
   enforce_single_caddy_ingress_network
+  reload_shared_caddy_after_network_normalization
 fi
 
 check_cohosted_health() {

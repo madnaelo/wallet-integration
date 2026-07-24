@@ -19,6 +19,7 @@ grep -Fq 'cp "$caddy_site_backup" "$caddy_site_path"' "$deploy_script"
 grep -Fq 'deploy_lock_file="$deploy_lock_dir/deploy.lock"' "$deploy_script"
 grep -Fq 'flock -w "$deploy_lock_timeout" 9' "$deploy_script"
 grep -Fq 'enforce_single_caddy_ingress_network' "$deploy_script"
+grep -Fq 'reload_shared_caddy_after_network_normalization' "$deploy_script"
 grep -Fq 'detach_container_network "$network_name" "$caddy_container"' "$deploy_script"
 grep -Fq 'Using production data volume verified through the owned PostgreSQL container' "$deploy_script"
 grep -Fq 'if [ -z "$active_postgres_volume" ]; then' "$deploy_script"
@@ -45,6 +46,13 @@ site_restore_line="$(grep -nF 'cp "$caddy_site_backup" "$caddy_site_path"' "$dep
 rollback_reload_line="$(grep -nF 'run_container exec "$caddy_container" caddy reload' "$deploy_script" | tail -n 1 | cut -d: -f1)"
 if (( site_restore_line >= rollback_reload_line )); then
   echo "Rollback must restore the Wallet site fragment before reloading Caddy." >&2
+  exit 1
+fi
+
+network_reload_line="$(grep -nF 'reload_shared_caddy_after_network_normalization' "$deploy_script" | tail -n 1 | cut -d: -f1)"
+cohosted_preflight_line="$(grep -nF 'A cohosted application was unhealthy before Wallet deployment' "$deploy_script" | head -n 1 | cut -d: -f1)"
+if (( network_reload_line >= cohosted_preflight_line )); then
+  echo "Shared Caddy must reload service discovery before the cohosted health preflight." >&2
   exit 1
 fi
 
