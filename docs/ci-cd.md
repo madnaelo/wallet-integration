@@ -211,6 +211,12 @@ managed ingress. Caddy imports separate application fragments: Wallet owns
 `Caddy-sites/uk-property-check.caddy`. Wallet writes only its fragment, validates
 the complete Caddy configuration and reloads Caddy in place.
 
+Wallet and UK Property Check acquire the same host-level deployment lock, so
+their releases queue instead of modifying the shared edge concurrently. Shared
+Caddy is kept single-homed on `reverse-proxy-edge`; obsolete network
+attachments are removed to prevent duplicate Podman host-port NAT rules and
+ambiguous service discovery.
+
 Every production Wallet release treats
 `https://84.235.254.97.sslip.io/api/v1/health` as a protected cohosted endpoint.
 The release cannot start when UK Property Check is unhealthy, and Wallet rolls

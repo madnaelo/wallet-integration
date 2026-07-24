@@ -132,6 +132,21 @@ else
   fail "Could not identify whether $engine is Docker or Podman."
 fi
 
+deploy_lock_timeout="${DEPLOY_LOCK_TIMEOUT_SECONDS:-1800}"
+if ! [[ "$deploy_lock_timeout" =~ ^[1-9][0-9]*$ ]]; then
+  fail "DEPLOY_LOCK_TIMEOUT_SECONDS must be a positive integer."
+fi
+command -v flock >/dev/null 2>&1 \
+  || fail "flock is required to serialize deployments on the shared host."
+deploy_lock_dir="${XDG_STATE_HOME:-$HOME/.local/state}/application-platform"
+mkdir -p "$deploy_lock_dir"
+chmod 700 "$deploy_lock_dir"
+deploy_lock_file="$deploy_lock_dir/deploy.lock"
+exec 9>"$deploy_lock_file"
+echo "Waiting for the shared-host deployment lock."
+flock -w "$deploy_lock_timeout" 9 \
+  || fail "Timed out waiting for another application deployment to finish."
+
 umask 077
 registry_auth_dir="$(mktemp -d "$deploy_path/.registry-auth.XXXXXX")"
 
@@ -251,6 +266,28 @@ container_uses_network() {
   run_container inspect -f \
     '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' \
     "$container_name" 2>/dev/null | grep -Fxq "$network_name"
+}
+
+container_network_names() {
+  local container_name="$1"
+  # Dollar-prefixed names in this expression belong to the Go template.
+  # shellcheck disable=SC2016
+  run_container inspect -f \
+    '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' \
+    "$container_name" 2>/dev/null || true
+}
+
+enforce_single_caddy_ingress_network() {
+  local network_name
+  container_uses_network "$caddy_container" "$proxy_network" \
+    || fail "Shared Caddy is not attached to the configured proxy network."
+
+  while IFS= read -r network_name; do
+    [ -n "$network_name" ] || continue
+    [ "$network_name" = "$proxy_network" ] && continue
+    detach_container_network "$network_name" "$caddy_container" \
+      || fail "Shared Caddy could not leave obsolete network $network_name."
+  done < <(container_network_names "$caddy_container")
 }
 
 assert_project_container() {
@@ -459,6 +496,7 @@ if grep -Eq '^[[:space:]]*import[[:space:]]+/etc/caddy/sites/' "$caddyfile_path"
   caddy_site_path="$caddy_sites_dir/wallet.caddy"
   [ -f "$caddy_site_path" ] \
     || fail "Shared Caddy layout is missing the Wallet site fragment: $caddy_site_path"
+  enforce_single_caddy_ingress_network
 fi
 
 check_cohosted_health() {
