@@ -15,9 +15,11 @@ legacy_postgres_container="${postgres_container}-legacy"
 configured_postgres_volume="${POSTGRES_VOLUME_NAME:-}"
 postgres_volume="${configured_postgres_volume:-wallet-postgres-data}"
 postgres_image="${POSTGRES_IMAGE:-docker.io/library/postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777}"
-backend_memory="${BACKEND_MEMORY:-520m}"
+backend_memory="${BACKEND_MEMORY:-448m}"
+backend_memory_swap="${BACKEND_MEMORY_SWAP:-768m}"
 backend_cpus="${BACKEND_CPUS:-1.0}"
-postgres_memory="${POSTGRES_MEMORY:-768m}"
+postgres_memory="${POSTGRES_MEMORY:-224m}"
+postgres_memory_swap="${POSTGRES_MEMORY_SWAP:-384m}"
 postgres_cpus="${POSTGRES_CPUS:-1.0}"
 app_version="${APP_VERSION:-${backend_image##*:}}"
 git_commit="${GIT_COMMIT:-}"
@@ -25,9 +27,13 @@ deployed_at="${DEPLOYED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 api_domain="${WALLET_API_DOMAIN:-}"
 caddyfile_path="${OCI_CADDYFILE_PATH:-}"
 caddy_container="${OCI_CADDY_CONTAINER:-}"
+cohosted_health_urls="${COHOSTED_HEALTH_URLS:-}"
+caddy_site_path=""
+shared_caddy_layout=false
 postgres_env_file=""
 registry_auth_dir=""
 registry_token_file="${GHCR_TOKEN_FILE:-}"
+caddy_site_backup=""
 
 fail() {
   echo "$*" >&2
@@ -372,6 +378,9 @@ cleanup() {
   if [ -n "$registry_token_file" ]; then
     rm -f "$registry_token_file"
   fi
+  if [ -n "$caddy_site_backup" ]; then
+    rm -f "$caddy_site_backup"
+  fi
 }
 trap cleanup EXIT
 
@@ -443,6 +452,48 @@ fi
 attach_container_network "$proxy_network" "$caddy_container" \
   || fail "Caddy container $caddy_container could not join proxy network $proxy_network."
 [ -f "$caddyfile_path" ] || fail "Configured Caddyfile does not exist: $caddyfile_path"
+caddy_site_path="$caddyfile_path"
+if grep -Eq '^[[:space:]]*import[[:space:]]+/etc/caddy/sites/' "$caddyfile_path"; then
+  shared_caddy_layout=true
+  caddy_sites_dir="${OCI_CADDY_SITES_DIR:-$(dirname "$caddyfile_path")/Caddy-sites}"
+  caddy_site_path="$caddy_sites_dir/wallet.caddy"
+  [ -f "$caddy_site_path" ] \
+    || fail "Shared Caddy layout is missing the Wallet site fragment: $caddy_site_path"
+fi
+
+check_cohosted_health() {
+  local url
+  local authority
+  local hostname
+  local attempt
+  local healthy
+  for url in $cohosted_health_urls; do
+    case "$url" in
+      https://*) ;;
+      *) fail "COHOSTED_HEALTH_URLS accepts only space-separated HTTPS URLs." ;;
+    esac
+    authority="${url#https://}"
+    authority="${authority%%/*}"
+    hostname="${authority%%:*}"
+    [ -n "$hostname" ] || return 1
+    healthy=false
+    for attempt in $(seq 1 7); do
+      if run_container exec "$caddy_container" curl --fail --silent --show-error \
+        --resolve "${hostname}:443:127.0.0.1" \
+        --connect-timeout 5 --max-time 15 "$url" >/dev/null; then
+        healthy=true
+        break
+      fi
+      if [ "$attempt" -lt 7 ]; then
+        sleep 2
+      fi
+    done
+    [ "$healthy" = "true" ] || return 1
+  done
+}
+
+check_cohosted_health \
+  || fail "A cohosted application was unhealthy before Wallet deployment; no Wallet release was started."
 
 if ! network_exists "$internal_network"; then
   create_database_network
@@ -505,6 +556,7 @@ run_postgres() {
     --label com.swapassistant.app=backend \
     --label com.swapassistant.role=database \
     --memory "$postgres_memory" \
+    --memory-swap "$postgres_memory_swap" \
     --cpus "$postgres_cpus" \
     --pids-limit 256 \
     "${log_args[@]}" \
@@ -671,16 +723,15 @@ extract_site_block() {
         if (depth == 0) exit
       }
     }
-  ' "$caddyfile_path"
+  ' "$caddy_site_path"
 }
 
 site_block="$(extract_site_block)"
 if [ -z "$site_block" ]; then
   fail "Caddy has no explicit $api_domain site block. Configure it once before deploying."
 fi
-if ! printf '%s\n' "$site_block" \
-  | grep -Eq "reverse_proxy[[:space:]]+$backend_container:8080([[:space:]]|$)"; then
-  fail "The existing $api_domain Caddy block does not route to $backend_container:8080."
+if ! printf '%s\n' "$site_block" | grep -Eq 'reverse_proxy[[:space:]]+[^[:space:]]+:8080([[:space:]]|$)'; then
+  fail "The existing $api_domain Caddy block has no valid backend route."
 fi
 run_container exec "$caddy_container" caddy validate --config /etc/caddy/Caddyfile >/dev/null \
   || fail "Caddy rejected its current configuration."
@@ -764,6 +815,7 @@ run_container run -d \
   --security-opt no-new-privileges \
   --cap-drop ALL \
   --memory "$backend_memory" \
+  --memory-swap "$backend_memory_swap" \
   --cpus "$backend_cpus" \
   --pids-limit 256 \
   "${backend_log_args[@]}" \
@@ -796,27 +848,59 @@ if container_exists "$backend_container"; then
 fi
 run_container rename "$candidate_container" "$backend_container"
 attach_container_network "$proxy_network" "$backend_container" "$backend_container"
-run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null
+if [ "$shared_caddy_layout" = "true" ]; then
+  caddy_site_backup="$(mktemp "$deploy_path/.wallet-caddy-site.XXXXXX")"
+  cp "$caddy_site_path" "$caddy_site_backup"
+  caddy_site_next="$(mktemp "$deploy_path/.wallet-caddy-next.XXXXXX")"
+  cat >"$caddy_site_next" <<CADDY_SITE
+# wallet-backend:${api_domain}
+${api_domain} {
+  encode zstd gzip
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+  reverse_proxy ${backend_container}:8080
+}
+CADDY_SITE
+  chmod 644 "$caddy_site_next"
+  mv "$caddy_site_next" "$caddy_site_path"
+fi
+caddy_reloaded=true
+if ! run_container exec "$caddy_container" caddy validate --config /etc/caddy/Caddyfile >/dev/null \
+  || ! run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null; then
+  caddy_reloaded=false
+fi
 
 health_url="${BACKEND_HEALTH_URL:-https://$api_domain/api/health}"
-health_curl_args=(--fail --silent --show-error --max-time 15)
-if [ -z "${BACKEND_HEALTH_URL:-}" ]; then
-  # Some OCI networks cannot hairpin through the instance's public address.
-  # Resolve the production hostname locally so this still validates Caddy and TLS.
-  health_curl_args+=(--resolve "$api_domain:443:127.0.0.1")
-fi
-external_healthy=false
-for attempt in $(seq 1 30); do
-  if health_body="$(curl "${health_curl_args[@]}" "$health_url" 2>/dev/null)" \
-    && printf '%s' "$health_body" | grep -qF "$git_commit"; then
-    external_healthy=true
-    break
+fetch_backend_health() {
+  if [ -n "${BACKEND_HEALTH_URL:-}" ]; then
+    curl --fail --silent --show-error --connect-timeout 5 --max-time 15 "$health_url"
+  else
+    # Validate the real TLS virtual host from inside Caddy. Podman hosts may not
+    # be able to hairpin through their own published ports.
+    run_container exec "$caddy_container" curl --fail --silent --show-error \
+      --resolve "$api_domain:443:127.0.0.1" \
+      --connect-timeout 5 --max-time 15 "$health_url"
   fi
-  sleep 5
-done
+}
+external_healthy=false
+if [ "$caddy_reloaded" = "true" ]; then
+  for attempt in $(seq 1 30); do
+    if health_body="$(fetch_backend_health 2>/dev/null)" \
+      && printf '%s' "$health_body" | grep -qF "$git_commit" \
+      && check_cohosted_health; then
+      external_healthy=true
+      break
+    fi
+    sleep 5
+  done
+fi
 
 if [ "$external_healthy" != "true" ]; then
-  echo "The promoted backend did not pass external build verification; rolling back." >&2
+  echo "The promoted backend or a protected cohosted application failed verification; rolling back." >&2
   run_container stop --time 20 "$backend_container" >/dev/null 2>&1 || true
   detach_container_network "$proxy_network" "$backend_container" >/dev/null 2>&1 || true
   run_container rename "$backend_container" "$failed_container" >/dev/null 2>&1 || true
@@ -824,8 +908,12 @@ if [ "$external_healthy" != "true" ]; then
     run_container rename "$rollback_container" "$backend_container"
     attach_container_network "$proxy_network" "$backend_container" "$backend_container"
     run_container start "$backend_container" >/dev/null
-    run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null || true
   fi
+  if [ "$shared_caddy_layout" = "true" ] && [ -n "$caddy_site_backup" ] \
+    && [ -f "$caddy_site_backup" ]; then
+    cp "$caddy_site_backup" "$caddy_site_path"
+  fi
+  run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null || true
   run_container rm -f "$failed_container" >/dev/null 2>&1 || true
   fail "Backend release failed and the previous release was restored."
 fi

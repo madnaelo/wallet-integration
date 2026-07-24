@@ -489,7 +489,7 @@ jobs:
           remote_token_file="$OCI_DEPLOY_PATH/.ghcr-token-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           printf '%s' "$GHCR_TOKEN" | ssh "${ssh_opts[@]}" \
             -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "set -e; umask 077; cat > '$remote_token_file'; trap 'rm -f $remote_token_file' EXIT; cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' APP_VERSION='$APP_VERSION' GIT_COMMIT='$GIT_COMMIT' DEPLOYED_AT='$deployed_at' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN_FILE='$remote_token_file' OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' WALLET_API_DOMAIN='$WALLET_API_DOMAIN' OCI_PROXY_NETWORK='$OCI_PROXY_NETWORK' OCI_INTERNAL_NETWORK='$OCI_INTERNAL_NETWORK' OCI_CONTAINER_ENGINE='$OCI_CONTAINER_ENGINE' OCI_CADDYFILE_PATH='$OCI_CADDYFILE_PATH' OCI_CADDY_CONTAINER='$OCI_CADDY_CONTAINER' ./scripts/deploy/deploy-oci-backend.sh"
+            "set -e; umask 077; cat > '$remote_token_file'; trap 'rm -f $remote_token_file' EXIT; cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' APP_VERSION='$APP_VERSION' GIT_COMMIT='$GIT_COMMIT' DEPLOYED_AT='$deployed_at' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN_FILE='$remote_token_file' OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' WALLET_API_DOMAIN='$WALLET_API_DOMAIN' OCI_PROXY_NETWORK='$OCI_PROXY_NETWORK' OCI_INTERNAL_NETWORK='$OCI_INTERNAL_NETWORK' OCI_CONTAINER_ENGINE='$OCI_CONTAINER_ENGINE' OCI_CADDYFILE_PATH='$OCI_CADDYFILE_PATH' OCI_CADDY_CONTAINER='$OCI_CADDY_CONTAINER' COHOSTED_HEALTH_URLS='https://${OCI_SSH_HOST}.sslip.io/api/v1/health' ./scripts/deploy/deploy-oci-backend.sh"
         env:
           BACKEND_IMAGE: ${{ needs.build.outputs.image }}
           APP_VERSION: ${{ needs.prepare.outputs.release_sha }}
@@ -663,6 +663,7 @@ jobs:
           FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://wallet-integration-theta.vercel.app' }}
           FRONTEND_HEALTH_URL: ${{ vars.PRODUCTION_FRONTEND_HEALTH_URL || 'https://wallet-integration-theta.vercel.app/api/health' }}
           BACKEND_HEALTH_URL: ${{ vars.PRODUCTION_BACKEND_HEALTH_URL || 'https://wallet-api.84-235-254-97.sslip.io/api/health' }}
+          COHOSTED_HEALTH_URL: https://84.235.254.97.sslip.io/api/v1/health
           ADMIN_OPS_URL: ${{ vars.PRODUCTION_ADMIN_OPS_URL || 'https://wallet-api.84-235-254-97.sslip.io/api/admin/ops/summary' }}
           ADMIN_API_KEY: ${{ secrets.PRODUCTION_ADMIN_API_KEY }}
           EXPECTED_COMMIT: ${{ needs.prepare.outputs.release_sha }}
@@ -670,10 +671,12 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in $(seq 1 12); do
-            if ./scripts/ops/check-production-health.sh; then
+            if ./scripts/ops/check-production-health.sh \
+              && curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                --connect-timeout 5 --max-time 15 "$COHOSTED_HEALTH_URL" >/dev/null; then
               exit 0
             fi
-            echo "Waiting for both production services ($attempt/12)."
+            echo "Waiting for Wallet and protected cohosted services ($attempt/12)."
             sleep 10
           done
           exit 1

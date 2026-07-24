@@ -54,6 +54,9 @@ jobs:
             koalaman/shellcheck-alpine@sha256:5921d946dac740cbeec2fb1c898747b6105e585130cc7f0602eec9a10f7ddb63 \
             shellcheck "${mounted_scripts[@]}"
 
+      - name: Validate cohosted deployment contract
+        run: bash scripts/tests/deploy-isolation-contract.sh
+
       - name: Lint Dockerfiles
         run: >-
           docker run --rm
