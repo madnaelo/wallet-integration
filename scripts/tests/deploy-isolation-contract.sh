@@ -24,6 +24,9 @@ grep -Fq 'deploy_lock_file="$deploy_lock_dir/deploy.lock"' "$deploy_script"
 grep -Fq 'flock -w "$deploy_lock_timeout" 9' "$deploy_script"
 grep -Fq 'assert_single_caddy_ingress_network' "$deploy_script"
 grep -Fq 'reload_shared_caddy_config' "$deploy_script"
+grep -Fq 'normalize_owned_caddy_site' "$deploy_script"
+grep -Fq 'run_privileged chcon --reference="$reference_site" "$caddy_site_path"' "$deploy_script"
+grep -Fq 'mktemp "$caddy_sites_dir/.wallet-caddy-next.XXXXXX"' "$deploy_script"
 grep -Fq 'Wallet deployment will not change ingress networks' "$deploy_script"
 grep -Fq 'Using production data volume verified through the owned PostgreSQL container' "$deploy_script"
 grep -Fq 'if [ -z "$active_postgres_volume" ]; then' "$deploy_script"
@@ -51,6 +54,10 @@ if grep -Eq '(attach_container_network|detach_container_network)[^#\n]*"\$caddy_
 fi
 if grep -Eq -- '--resolve .*:443:127[.]0[.]0[.]1|--insecure' "$deploy_script"; then
   echo "Shared-edge health must not depend on unsupported local TLS hairpinning." >&2
+  exit 1
+fi
+if grep -Fq 'mktemp "$deploy_path/.wallet-caddy' "$deploy_script"; then
+  echo "Atomic Wallet Caddy fragments must be created inside the relabeled sites directory." >&2
   exit 1
 fi
 if grep -Eq '(docker|podman)[[:space:]]+(system|image|builder|volume|network)[[:space:]]+prune' "$deploy_script"; then

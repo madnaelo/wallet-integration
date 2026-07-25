@@ -297,6 +297,27 @@ reload_shared_caddy_config() {
     || fail "Shared Caddy could not reload its current configuration."
 }
 
+normalize_owned_caddy_site() {
+  local candidate
+  local reference_site=""
+
+  chmod 755 "$caddy_sites_dir"
+  chmod 644 "$caddy_site_path"
+  if ! command -v chcon >/dev/null 2>&1; then
+    return 0
+  fi
+  for candidate in "$caddy_sites_dir"/*.caddy; do
+    if [ -f "$candidate" ] && [ "$candidate" != "$caddy_site_path" ]; then
+      reference_site="$candidate"
+      break
+    fi
+  done
+  [ -n "$reference_site" ] \
+    || fail "Shared Caddy has no peer site fragment for SELinux context verification."
+  run_privileged chcon --reference="$reference_site" "$caddy_site_path" \
+    || fail "Wallet could not restore the SELinux context of its Caddy site fragment."
+}
+
 assert_project_container() {
   local container_name="$1"
   local expected_role="$2"
@@ -506,6 +527,7 @@ if grep -Eq '^[[:space:]]*import[[:space:]]+/etc/caddy/sites/' "$caddyfile_path"
   [ -f "$caddy_site_path" ] \
     || fail "Shared Caddy layout is missing the Wallet site fragment: $caddy_site_path"
   assert_single_caddy_ingress_network
+  normalize_owned_caddy_site
   reload_shared_caddy_config
 else
   fail "Wallet production requires the shared Caddy site-fragment layout."
@@ -988,9 +1010,9 @@ fi
 run_container rename "$candidate_container" "$backend_container"
 attach_container_network "$proxy_network" "$backend_container" "$backend_container"
 if [ "$shared_caddy_layout" = "true" ]; then
-  caddy_site_backup="$(mktemp "$deploy_path/.wallet-caddy-site.XXXXXX")"
+  caddy_site_backup="$(mktemp "$caddy_sites_dir/.wallet-caddy-site.XXXXXX")"
   cp "$caddy_site_path" "$caddy_site_backup"
-  caddy_site_next="$(mktemp "$deploy_path/.wallet-caddy-next.XXXXXX")"
+  caddy_site_next="$(mktemp "$caddy_sites_dir/.wallet-caddy-next.XXXXXX")"
   cat >"$caddy_site_next" <<CADDY_SITE
 # wallet-backend:${api_domain}
 ${api_domain} {
@@ -1005,7 +1027,11 @@ ${api_domain} {
 }
 CADDY_SITE
   chmod 644 "$caddy_site_next"
+  if command -v chcon >/dev/null 2>&1; then
+    run_privileged chcon --reference="$caddy_site_path" "$caddy_site_next"
+  fi
   mv "$caddy_site_next" "$caddy_site_path"
+  normalize_owned_caddy_site
 fi
 caddy_reloaded=true
 if ! run_container exec "$caddy_container" caddy validate --config /etc/caddy/Caddyfile >/dev/null \
@@ -1050,6 +1076,7 @@ if [ "$external_healthy" != "true" ]; then
   if [ "$shared_caddy_layout" = "true" ] && [ -n "$caddy_site_backup" ] \
     && [ -f "$caddy_site_backup" ]; then
     cp "$caddy_site_backup" "$caddy_site_path"
+    normalize_owned_caddy_site
   fi
   run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null || true
   run_container rm -f "$failed_container" >/dev/null 2>&1 || true
