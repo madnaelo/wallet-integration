@@ -546,8 +546,10 @@ check_cohosted_health() {
 check_cohosted_health \
   || fail "A cohosted application was unhealthy before Wallet deployment; no Wallet release was started."
 
+database_network_recreated=false
 if ! network_exists "$internal_network"; then
   create_database_network
+  database_network_recreated=true
 fi
 if [ "$engine_kind" = "podman" ] && ! network_supports_container_dns "$internal_network"; then
   install_podman_dns_plugin
@@ -563,6 +565,7 @@ if [ "$engine_kind" = "podman" ] && ! network_supports_container_dns "$internal_
   done
   run_container network rm "$internal_network" >/dev/null
   create_database_network
+  database_network_recreated=true
   network_supports_container_dns "$internal_network" \
     || fail "Podman database network $internal_network still has no container DNS support."
 fi
@@ -740,17 +743,39 @@ find_reachable_postgres_ip() {
 }
 
 database_host="$postgres_container"
-if ! postgres_reachable_by_name; then
+if [ "$engine_kind" = "podman" ]; then
+  database_host="$(find_reachable_postgres_ip || true)"
+  if [ -z "$database_host" ]; then
+    fail "PostgreSQL is ready locally but has no verified private address on $internal_network."
+  fi
+  echo "Using PostgreSQL's verified private address for the Podman release." >&2
+elif ! postgres_reachable_by_name; then
   echo "Refreshing PostgreSQL network registration after a failed container DNS probe." >&2
   run_container restart --time 30 "$postgres_container" >/dev/null
   wait_for_postgres || fail "PostgreSQL did not recover after refreshing its network registration."
-fi
-if ! postgres_reachable_by_name; then
-  database_host="$(find_reachable_postgres_ip || true)"
-  if [ -z "$database_host" ]; then
-    fail "PostgreSQL is ready locally but is unreachable from other containers on $internal_network."
+  if ! postgres_reachable_by_name; then
+    database_host="$(find_reachable_postgres_ip || true)"
+    if [ -z "$database_host" ]; then
+      fail "PostgreSQL is ready locally but is unreachable from other containers on $internal_network."
+    fi
+    echo "Container DNS remains unavailable; using a verified private database address for this release." >&2
   fi
-  echo "Container DNS remains unavailable; using a verified private database address for this release." >&2
+fi
+
+if [ "$database_network_recreated" = "true" ] && container_exists "$backend_container"; then
+  echo "Restarting the existing backend after the one-time database-network migration." >&2
+  run_container restart --time 30 "$backend_container" >/dev/null
+  for attempt in $(seq 1 30); do
+    if run_container exec "$backend_container" \
+      wget -q -O /dev/null http://127.0.0.1:8080/api/health 2>/dev/null; then
+      break
+    fi
+    if [ "$attempt" = "30" ]; then
+      echo "Existing backend did not recover database health; continuing with an isolated candidate." >&2
+    else
+      sleep 2
+    fi
+  done
 fi
 
 detach_container_network "$proxy_network" "$postgres_container" \
