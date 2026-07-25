@@ -5,6 +5,7 @@ deploy_path="${OCI_DEPLOY_PATH:-/home/opc/wallet}"
 env_file="${DEPLOY_ENV_FILE:-$deploy_path/backend.env}"
 backend_image="${BACKEND_IMAGE:-}"
 proxy_network="${OCI_PROXY_NETWORK:-${OCI_CONTAINER_NETWORK:-}}"
+shared_proxy_network="reverse-proxy-edge"
 internal_network="${OCI_INTERNAL_NETWORK:-wallet-database}"
 backend_container="${BACKEND_CONTAINER_NAME:-wallet-backend}"
 candidate_container="${backend_container}-candidate"
@@ -63,11 +64,14 @@ fi
 if [ -z "$proxy_network" ]; then
   fail "OCI_PROXY_NETWORK is required and must name the existing Caddy proxy network."
 fi
+if [ "$proxy_network" != "$shared_proxy_network" ]; then
+  fail "OCI_PROXY_NETWORK must be $shared_proxy_network on the cohosted production server."
+fi
 if [ -z "$caddyfile_path" ] || [ -z "$caddy_container" ]; then
   fail "OCI_CADDYFILE_PATH and OCI_CADDY_CONTAINER are required."
 fi
 
-for resource_name in "$proxy_network" "$internal_network" "$backend_container" "$postgres_container" "$postgres_volume"; do
+for resource_name in "$proxy_network" "$shared_proxy_network" "$internal_network" "$backend_container" "$postgres_container" "$postgres_volume"; do
   if ! [[ "$resource_name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
     fail "Invalid container resource name: $resource_name"
   fi
@@ -277,24 +281,20 @@ container_network_names() {
     "$container_name" 2>/dev/null || true
 }
 
-enforce_single_caddy_ingress_network() {
-  local network_name
-  container_uses_network "$caddy_container" "$proxy_network" \
-    || fail "Shared Caddy is not attached to the configured proxy network."
+assert_single_caddy_ingress_network() {
+  local -a network_names=()
 
-  while IFS= read -r network_name; do
-    [ -n "$network_name" ] || continue
-    [ "$network_name" = "$proxy_network" ] && continue
-    detach_container_network "$network_name" "$caddy_container" \
-      || fail "Shared Caddy could not leave obsolete network $network_name."
-  done < <(container_network_names "$caddy_container")
+  mapfile -t network_names < <(container_network_names "$caddy_container" | sed '/^[[:space:]]*$/d')
+  if [ "${#network_names[@]}" -ne 1 ] || [ "${network_names[0]}" != "$proxy_network" ]; then
+    fail "Shared Caddy must be attached only to $proxy_network; Wallet deployment will not change ingress networks."
+  fi
 }
 
-reload_shared_caddy_after_network_normalization() {
+reload_shared_caddy_config() {
   run_container exec "$caddy_container" caddy validate --config /etc/caddy/Caddyfile >/dev/null \
     || fail "Shared Caddy rejected its current configuration."
   run_container exec "$caddy_container" caddy reload --config /etc/caddy/Caddyfile >/dev/null \
-    || fail "Shared Caddy could not reload after ingress-network normalization."
+    || fail "Shared Caddy could not reload its current configuration."
 }
 
 assert_project_container() {
@@ -497,8 +497,6 @@ if [ "$engine_kind" = "podman" ]; then
   network_supports_container_dns "$proxy_network" \
     || fail "Proxy network $proxy_network must support container DNS."
 fi
-attach_container_network "$proxy_network" "$caddy_container" \
-  || fail "Caddy container $caddy_container could not join proxy network $proxy_network."
 [ -f "$caddyfile_path" ] || fail "Configured Caddyfile does not exist: $caddyfile_path"
 caddy_site_path="$caddyfile_path"
 if grep -Eq '^[[:space:]]*import[[:space:]]+/etc/caddy/sites/' "$caddyfile_path"; then
@@ -507,8 +505,10 @@ if grep -Eq '^[[:space:]]*import[[:space:]]+/etc/caddy/sites/' "$caddyfile_path"
   caddy_site_path="$caddy_sites_dir/wallet.caddy"
   [ -f "$caddy_site_path" ] \
     || fail "Shared Caddy layout is missing the Wallet site fragment: $caddy_site_path"
-  enforce_single_caddy_ingress_network
-  reload_shared_caddy_after_network_normalization
+  assert_single_caddy_ingress_network
+  reload_shared_caddy_config
+else
+  fail "Wallet production requires the shared Caddy site-fragment layout."
 fi
 
 check_cohosted_health() {
@@ -529,6 +529,7 @@ check_cohosted_health() {
     healthy=false
     for attempt in $(seq 1 7); do
       if run_container exec "$caddy_container" curl --fail --silent --show-error \
+        --insecure \
         --resolve "${hostname}:443:127.0.0.1" \
         --connect-timeout 5 --max-time 15 "$url" >/dev/null; then
         healthy=true
@@ -932,6 +933,7 @@ fetch_backend_health() {
     # Validate the real TLS virtual host from inside Caddy. Podman hosts may not
     # be able to hairpin through their own published ports.
     run_container exec "$caddy_container" curl --fail --silent --show-error \
+      --insecure \
       --resolve "$api_domain:443:127.0.0.1" \
       --connect-timeout 5 --max-time 15 "$health_url"
   fi

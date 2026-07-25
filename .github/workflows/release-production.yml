@@ -296,7 +296,7 @@ jobs:
           COW_API_KEY: ${{ secrets.COW_API_KEY }}
           LIFI_API_KEY: ${{ secrets.LIFI_API_KEY }}
           WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
-          OCI_PROXY_NETWORK: ${{ vars.OCI_PROXY_NETWORK || secrets.OCI_PROXY_NETWORK || secrets.OCI_CONTAINER_NETWORK }}
+          OCI_PROXY_NETWORK: reverse-proxy-edge
           OCI_CADDYFILE_PATH: ${{ vars.OCI_CADDYFILE_PATH || secrets.OCI_CADDYFILE_PATH }}
           OCI_CADDY_CONTAINER: ${{ vars.OCI_CADDY_CONTAINER || secrets.OCI_CADDY_CONTAINER }}
           OCI_BACKUP_BUCKET: ${{ vars.OCI_BACKUP_BUCKET }}
@@ -499,7 +499,7 @@ jobs:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
           OCI_SSH_USER: ${{ secrets.OCI_SSH_USER }}
           WALLET_API_DOMAIN: ${{ secrets.WALLET_API_DOMAIN }}
-          OCI_PROXY_NETWORK: ${{ vars.OCI_PROXY_NETWORK || secrets.OCI_PROXY_NETWORK || secrets.OCI_CONTAINER_NETWORK }}
+          OCI_PROXY_NETWORK: reverse-proxy-edge
           OCI_INTERNAL_NETWORK: ${{ vars.OCI_DATABASE_NETWORK || 'wallet-database' }}
           OCI_CONTAINER_ENGINE: ${{ vars.OCI_CONTAINER_ENGINE || secrets.OCI_CONTAINER_ENGINE }}
           OCI_CADDYFILE_PATH: ${{ vars.OCI_CADDYFILE_PATH || secrets.OCI_CADDYFILE_PATH }}

@@ -87,8 +87,9 @@ OCI_SSH_PORT
 OCI_DEPLOY_PATH
 ```
 
-`OCI_CONTAINER_NETWORK` remains a temporary compatibility alias for
-`OCI_PROXY_NETWORK`; new configuration should use `OCI_PROXY_NETWORK`.
+The production workflow pins `OCI_PROXY_NETWORK=reverse-proxy-edge`. Legacy
+`OCI_CONTAINER_NETWORK` and repository-level proxy-network overrides are not
+used for production because a stale value could rehome the shared proxy.
 
 Required non-secret GitHub Environment variables:
 
@@ -213,9 +214,9 @@ the complete Caddy configuration and reloads Caddy in place.
 
 Wallet and UK Property Check acquire the same host-level deployment lock, so
 their releases queue instead of modifying the shared edge concurrently. Shared
-Caddy is kept single-homed on `reverse-proxy-edge`; obsolete network
-attachments are removed to prevent duplicate Podman host-port NAT rules and
-ambiguous service discovery.
+Caddy is kept single-homed on `reverse-proxy-edge`. Routine releases assert that
+exact topology and fail without changing Caddy network membership; explicit
+host recovery handles any legacy attachment.
 
 Every production Wallet release treats
 `https://84.235.254.97.sslip.io/api/v1/health` as a protected cohosted endpoint.

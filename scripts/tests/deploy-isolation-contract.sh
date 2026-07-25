@@ -14,20 +14,33 @@ grep -Fq 'postgres_memory="${POSTGRES_MEMORY:-224m}"' "$deploy_script"
 grep -Fq 'postgres_memory_swap="${POSTGRES_MEMORY_SWAP:-384m}"' "$deploy_script"
 grep -Fq 'Caddy-sites' "$deploy_script"
 grep -Fq 'run_container exec "$caddy_container" curl' "$deploy_script"
+grep -Fq -- '--insecure' "$deploy_script"
 grep -Fq 'fetch_backend_health' "$deploy_script"
 grep -Fq 'cp "$caddy_site_backup" "$caddy_site_path"' "$deploy_script"
 grep -Fq 'deploy_lock_file="$deploy_lock_dir/deploy.lock"' "$deploy_script"
 grep -Fq 'flock -w "$deploy_lock_timeout" 9' "$deploy_script"
-grep -Fq 'enforce_single_caddy_ingress_network' "$deploy_script"
-grep -Fq 'reload_shared_caddy_after_network_normalization' "$deploy_script"
-grep -Fq 'detach_container_network "$network_name" "$caddy_container"' "$deploy_script"
+grep -Fq 'assert_single_caddy_ingress_network' "$deploy_script"
+grep -Fq 'reload_shared_caddy_config' "$deploy_script"
+grep -Fq 'Wallet deployment will not change ingress networks' "$deploy_script"
 grep -Fq 'Using production data volume verified through the owned PostgreSQL container' "$deploy_script"
 grep -Fq 'if [ -z "$active_postgres_volume" ]; then' "$deploy_script"
 grep -Fq 'COHOSTED_HEALTH_URLS=' "$release_workflow"
 grep -Fq 'COHOSTED_HEALTH_URL:' "$release_workflow"
+if [ "$(grep -cF 'OCI_PROXY_NETWORK: reverse-proxy-edge' "$release_workflow")" -lt 2 ]; then
+  echo "Wallet production must pin the shared ingress network in every deploy job." >&2
+  exit 1
+fi
+if grep -Eq 'OCI_PROXY_NETWORK:.*(secrets|vars)[.]' "$release_workflow"; then
+  echo "A stale repository variable must never select the shared ingress network." >&2
+  exit 1
+fi
 
 if grep -Eq 'run_container[[:space:]]+(stop|rm)[^#\n]*"\$caddy_container"' "$deploy_script"; then
   echo "Wallet deployment must reload, never stop or replace, shared Caddy." >&2
+  exit 1
+fi
+if grep -Eq '(attach_container_network|detach_container_network)[^#\n]*"\$caddy_container"' "$deploy_script"; then
+  echo "Wallet deployment must never change shared Caddy network membership." >&2
   exit 1
 fi
 if grep -Eq '(docker|podman)[[:space:]]+(system|image|builder|volume|network)[[:space:]]+prune' "$deploy_script"; then
@@ -49,10 +62,11 @@ if (( site_restore_line >= rollback_reload_line )); then
   exit 1
 fi
 
-network_reload_line="$(grep -nF 'reload_shared_caddy_after_network_normalization' "$deploy_script" | tail -n 1 | cut -d: -f1)"
+network_assert_line="$(grep -nF 'assert_single_caddy_ingress_network' "$deploy_script" | tail -n 1 | cut -d: -f1)"
+network_reload_line="$(grep -nF 'reload_shared_caddy_config' "$deploy_script" | tail -n 1 | cut -d: -f1)"
 cohosted_preflight_line="$(grep -nF 'A cohosted application was unhealthy before Wallet deployment' "$deploy_script" | head -n 1 | cut -d: -f1)"
-if (( network_reload_line >= cohosted_preflight_line )); then
-  echo "Shared Caddy must reload service discovery before the cohosted health preflight." >&2
+if (( network_assert_line >= network_reload_line || network_reload_line >= cohosted_preflight_line )); then
+  echo "Shared Caddy topology must be asserted and reloaded before the cohosted health preflight." >&2
   exit 1
 fi
 
