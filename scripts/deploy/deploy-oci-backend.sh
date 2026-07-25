@@ -528,7 +528,7 @@ check_cohosted_health() {
     [ -n "$hostname" ] || return 1
     healthy=false
     for attempt in $(seq 1 7); do
-      if run_container exec "$caddy_container" curl --fail --silent --show-error \
+      if curl --fail --silent --show-error \
         --insecure \
         --resolve "${hostname}:443:127.0.0.1" \
         --connect-timeout 5 --max-time 15 "$url" >/dev/null; then
@@ -930,9 +930,9 @@ fetch_backend_health() {
   if [ -n "${BACKEND_HEALTH_URL:-}" ]; then
     curl --fail --silent --show-error --connect-timeout 5 --max-time 15 "$health_url"
   else
-    # Validate the real TLS virtual host from inside Caddy. Podman hosts may not
-    # be able to hairpin through their own published ports.
-    run_container exec "$caddy_container" curl --fail --silent --show-error \
+    # Validate the real TLS virtual host through Caddy's published host listener.
+    # This avoids Caddy self-loopback TLS while preserving Host/SNI routing.
+    curl --fail --silent --show-error \
       --insecure \
       --resolve "$api_domain:443:127.0.0.1" \
       --connect-timeout 5 --max-time 15 "$health_url"
