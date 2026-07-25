@@ -511,10 +511,54 @@ else
   fail "Wallet production requires the shared Caddy site-fragment layout."
 fi
 
+edge_redirect_healthy() {
+  local hostname="$1"
+  local path="$2"
+  local result
+
+  result="$(
+    curl --silent --show-error --output /dev/null \
+      --header "Host: ${hostname}" \
+      --connect-timeout 5 --max-time 15 \
+      --write-out '%{http_code} %{redirect_url}' \
+      "http://127.0.0.1${path}"
+  )" || return 1
+  [ "$result" = "308 https://${hostname}${path}" ]
+}
+
+caddy_upstream_for_hostname() {
+  local hostname="$1"
+  awk -v domain="$hostname" '
+    {
+      compact = $0
+      gsub(/[[:space:]]/, "", compact)
+      if (!inside && compact == domain "{") {
+        inside = 1
+        depth = 1
+        next
+      }
+      if (inside && $1 == "reverse_proxy") {
+        print $2
+        exit
+      }
+      if (inside) {
+        braces = $0
+        opens = gsub(/\{/, "{", braces)
+        braces = $0
+        closes = gsub(/\}/, "}", braces)
+        depth += opens - closes
+        if (depth == 0) exit
+      }
+    }
+  ' "$caddy_sites_dir"/*.caddy
+}
+
 check_cohosted_health() {
   local url
   local authority
   local hostname
+  local path
+  local upstream
   local attempt
   local healthy
   for url in $cohosted_health_urls; do
@@ -525,13 +569,32 @@ check_cohosted_health() {
     authority="${url#https://}"
     authority="${authority%%/*}"
     hostname="${authority%%:*}"
-    [ -n "$hostname" ] || return 1
+    if ! printf '%s' "$hostname" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then
+      echo "COHOSTED_HEALTH_URLS contains an invalid hostname." >&2
+      return 1
+    fi
+    path="${url#https://}"
+    path="${path#"$authority"}"
+    [ -n "$path" ] || path="/"
+    case "$path" in
+      /*) ;;
+      *) return 1 ;;
+    esac
+    if printf '%s' "$path" | grep -Eq '[[:space:][:cntrl:]]'; then
+      echo "COHOSTED_HEALTH_URLS contains an unsafe path." >&2
+      return 1
+    fi
+    upstream="$(caddy_upstream_for_hostname "$hostname")"
+    if ! printf '%s' "$upstream" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9_.-]*:[0-9]+$'; then
+      echo "No safe shared-Caddy upstream was found for ${hostname}." >&2
+      return 1
+    fi
     healthy=false
     for attempt in $(seq 1 7); do
-      if curl --fail --silent --show-error \
-        --insecure \
-        --resolve "${hostname}:443:127.0.0.1" \
-        --connect-timeout 5 --max-time 15 "$url" >/dev/null; then
+      if edge_redirect_healthy "$hostname" "$path" \
+        && run_container exec "$caddy_container" curl --fail --silent --show-error \
+          --connect-timeout 5 --max-time 15 \
+          "http://${upstream}${path}" >/dev/null; then
         healthy=true
         break
       fi
@@ -955,12 +1018,10 @@ fetch_backend_health() {
   if [ -n "${BACKEND_HEALTH_URL:-}" ]; then
     curl --fail --silent --show-error --connect-timeout 5 --max-time 15 "$health_url"
   else
-    # Validate the real TLS virtual host through Caddy's published host listener.
-    # This avoids Caddy self-loopback TLS while preserving Host/SNI routing.
-    curl --fail --silent --show-error \
-      --insecure \
-      --resolve "$api_domain:443:127.0.0.1" \
-      --connect-timeout 5 --max-time 15 "$health_url"
+    edge_redirect_healthy "$api_domain" "/api/health" \
+      && run_container exec "$caddy_container" curl --fail --silent --show-error \
+        --connect-timeout 5 --max-time 15 \
+        "http://${backend_container}:8080/api/health"
   fi
 }
 external_healthy=false

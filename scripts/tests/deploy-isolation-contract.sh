@@ -13,10 +13,11 @@ grep -Fq 'backend_memory_swap="${BACKEND_MEMORY_SWAP:-768m}"' "$deploy_script"
 grep -Fq 'postgres_memory="${POSTGRES_MEMORY:-224m}"' "$deploy_script"
 grep -Fq 'postgres_memory_swap="${POSTGRES_MEMORY_SWAP:-384m}"' "$deploy_script"
 grep -Fq 'Caddy-sites' "$deploy_script"
-grep -Fq 'curl --fail --silent --show-error' "$deploy_script"
-grep -Fq -- '--resolve "${hostname}:443:127.0.0.1"' "$deploy_script"
-grep -Fq -- '--resolve "$api_domain:443:127.0.0.1"' "$deploy_script"
-grep -Fq -- '--insecure' "$deploy_script"
+grep -Fq 'edge_redirect_healthy' "$deploy_script"
+grep -Fq 'caddy_upstream_for_hostname' "$deploy_script"
+grep -Fq -- '--header "Host: ${hostname}"' "$deploy_script"
+grep -Fq '"http://${upstream}${path}"' "$deploy_script"
+grep -Fq '"http://${backend_container}:8080/api/health"' "$deploy_script"
 grep -Fq 'fetch_backend_health' "$deploy_script"
 grep -Fq 'cp "$caddy_site_backup" "$caddy_site_path"' "$deploy_script"
 grep -Fq 'deploy_lock_file="$deploy_lock_dir/deploy.lock"' "$deploy_script"
@@ -48,8 +49,8 @@ if grep -Eq '(attach_container_network|detach_container_network)[^#\n]*"\$caddy_
   echo "Wallet deployment must never change shared Caddy network membership." >&2
   exit 1
 fi
-if grep -Fq 'run_container exec "$caddy_container" curl' "$deploy_script"; then
-  echo "Shared-edge health must use the published host listener, not Caddy self-loopback TLS." >&2
+if grep -Eq -- '--resolve .*:443:127[.]0[.]0[.]1|--insecure' "$deploy_script"; then
+  echo "Shared-edge health must not depend on unsupported local TLS hairpinning." >&2
   exit 1
 fi
 if grep -Eq '(docker|podman)[[:space:]]+(system|image|builder|volume|network)[[:space:]]+prune' "$deploy_script"; then
