@@ -271,6 +271,8 @@ jobs:
     if: needs.release-gate.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      proceed: ${{ steps.current-release.outputs.proceed }}
     permissions:
       contents: read
       packages: read
@@ -280,12 +282,39 @@ jobs:
       OCI_SSH_PORT: ${{ secrets.OCI_SSH_PORT || '22' }}
       OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH || '/home/opc/wallet' }}
     steps:
+      - name: Confirm release is still current before deployment
+        id: current-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.prepare.outputs.release_sha }}
+          RELEASE_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$RELEASE_BRANCH" != "master" ]; then
+            echo "Unexpected automatic release branch: $RELEASE_BRANCH" >&2
+            exit 1
+          fi
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$RELEASE_BRANCH" --jq '.object.sha')"
+          if [ "$current_sha" != "$RELEASE_SHA" ]; then
+            echo "::notice::Skipping superseded deployment $RELEASE_SHA; $RELEASE_BRANCH is now $current_sha."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
+        if: steps.current-release.outputs.proceed == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.prepare.outputs.release_sha }}
 
       - name: Validate deployment secrets
+        if: steps.current-release.outputs.proceed == 'true'
         shell: bash
         env:
           OCI_SSH_HOST: ${{ secrets.OCI_SSH_HOST }}
@@ -315,6 +344,7 @@ jobs:
           fi
 
       - name: Configure SSH
+        if: steps.current-release.outputs.proceed == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -329,6 +359,7 @@ jobs:
           OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
 
       - name: Upload deployment files
+        if: steps.current-release.outputs.proceed == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -465,6 +496,7 @@ jobs:
           OCI_BACKUP_OBJECT_PREFIX: ${{ vars.OCI_BACKUP_OBJECT_PREFIX || 'swap-assistant/postgres' }}
 
       - name: Deploy backend
+        if: steps.current-release.outputs.proceed == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -616,6 +648,7 @@ jobs:
       - prepare
       - deploy
       - frontend-stage
+    if: needs.deploy.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:

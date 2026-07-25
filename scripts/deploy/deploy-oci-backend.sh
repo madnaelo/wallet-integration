@@ -267,9 +267,16 @@ container_uses_network() {
   local network_name="$2"
   # Dollar-prefixed names in this expression belong to the Go template.
   # shellcheck disable=SC2016
-  run_container inspect -f \
+  if run_container inspect -f \
     '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' \
-    "$container_name" 2>/dev/null | grep -Fxq "$network_name"
+    "$container_name" 2>/dev/null | grep -Fxq "$network_name"; then
+    return 0
+  fi
+
+  # Docker and Podman do not expose identical inspect templates across all
+  # supported releases. Their network filter is a stable independent check.
+  run_container ps -a --filter "network=$network_name" --format '{{.Names}}' \
+    2>/dev/null | grep -Fxq "$container_name"
 }
 
 container_network_names() {

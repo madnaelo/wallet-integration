@@ -25,6 +25,7 @@ grep -Fq 'flock -w "$deploy_lock_timeout" 9' "$deploy_script"
 grep -Fq 'assert_single_caddy_ingress_network' "$deploy_script"
 grep -Fq 'reload_shared_caddy_config' "$deploy_script"
 grep -Fq 'normalize_owned_caddy_site' "$deploy_script"
+grep -Fq 'run_container ps -a --filter "network=$network_name"' "$deploy_script"
 grep -Fq 'run_privileged chcon --reference="$reference_site" "$caddy_site_path"' "$deploy_script"
 grep -Fq 'mktemp "$caddy_sites_dir/.wallet-caddy-next.XXXXXX"' "$deploy_script"
 grep -Fq 'Wallet deployment will not change ingress networks' "$deploy_script"
@@ -35,6 +36,9 @@ grep -Fq 'Using PostgreSQL'\''s verified private address for the Podman release.
 grep -Fq 'Restarting the existing backend after the one-time database-network migration.' "$deploy_script"
 grep -Fq 'COHOSTED_HEALTH_URLS=' "$release_workflow"
 grep -Fq 'COHOSTED_HEALTH_URL:' "$release_workflow"
+grep -Fq 'Confirm release is still current before deployment' "$release_workflow"
+grep -Fq "if: steps.current-release.outputs.proceed == 'true'" "$release_workflow"
+grep -Fq "if: needs.deploy.outputs.proceed == 'true'" "$release_workflow"
 if [ "$(grep -cF 'OCI_PROXY_NETWORK: reverse-proxy-edge' "$release_workflow")" -lt 2 ]; then
   echo "Wallet production must pin the shared ingress network in every deploy job." >&2
   exit 1

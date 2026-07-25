@@ -192,6 +192,13 @@ Sunday. It shares the production-release concurrency group, so recovery drills
 cannot overlap an OCI deployment. A failed check is visible in GitHub Actions
 and is also sent to the configured operator Telegram chat.
 
+Automatic releases verify the selected commit twice: after the immutable image
+is published and again immediately before any OCI file upload or host mutation.
+If `master` advanced while a build or staged frontend was running, the older
+release exits successfully without touching OCI or promoting its Vercel build.
+Manual releases remain explicit and may deploy an operator-selected commit from
+`master`.
+
 For the current OCI VM, these values match the manual deployment:
 
 ```text
@@ -210,7 +217,10 @@ attaching Swap Assistant's backend. It never deletes or recreates externally
 managed ingress. Caddy imports separate application fragments: Wallet owns
 `Caddy-sites/wallet.caddy`, while UK Property Check owns
 `Caddy-sites/uk-property-check.caddy`. Wallet writes only its fragment, validates
-the complete Caddy configuration and reloads Caddy in place.
+the complete Caddy configuration and reloads Caddy in place. Network membership
+is checked through both container inspection and the engine's network filter so
+supported Docker and Podman inspect-template differences cannot produce a false
+ownership failure.
 
 Wallet and UK Property Check acquire the same host-level deployment lock, so
 their releases queue instead of modifying the shared edge concurrently. Shared
@@ -221,14 +231,21 @@ host recovery handles any legacy attachment.
 Every production Wallet release treats
 `https://84.235.254.97.sslip.io/api/v1/health` as a protected cohosted endpoint.
 The release cannot start when UK Property Check is unhealthy, and Wallet rolls
-back if either API fails after promotion. On the VM, those checks run through
-the real HTTPS virtual hosts from inside Caddy because Podman hosts may not
-hairpin through their own published ports. The final GitHub Actions job verifies
-both services again from outside OCI.
+back if either API fails after promotion. The VM does not rely on local TLS
+hairpinning. It verifies Caddy's hostname-specific HTTP-to-HTTPS redirect,
+parses the validated application-owned site fragment to identify the exact
+upstream, and probes that upstream from Caddy's ingress network. The final
+GitHub Actions job independently verifies real public TLS for both services
+from outside OCI.
 
 Rollback restores the previous Wallet container and its application-owned Caddy
 fragment before reloading the shared proxy. CI enforces this contract and rejects
 host-wide pruning, shared-proxy replacement, or routine database restarts.
+Atomic Wallet fragment files are created inside the SELinux-relabeled
+`Caddy-sites` directory. Before every reload, the deployment normalizes the
+fragment's permissions and copies the SELinux context from the peer UK
+fragment. This prevents an atomic rename from making shared Caddy unable to
+read either the promoted or restored Wallet route.
 
 PostgreSQL is attached only to the dedicated `wallet-database` network and
 never publishes a host port; the backend joins that private network and the
@@ -239,6 +256,13 @@ bridge because CNI-based Podman disables container name resolution on internal
 networks. No other application receives the Swap Assistant backend environment
 or database network, and Caddy remains single-homed on the shared ingress
 network so host-port routing is deterministic.
+
+After a one-time Podman database-network migration, the existing backend is
+restarted so its resolver state reflects the replacement network. New
+candidates use a private PostgreSQL address only after a same-network
+`pg_isready` probe verifies it; the database port remains unpublished. This
+avoids depending on legacy CNI DNS behavior while keeping database traffic
+inside `wallet-database`.
 
 ## Vercel Environment
 
