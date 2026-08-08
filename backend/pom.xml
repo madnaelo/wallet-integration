@@ -26,7 +26,7 @@
     <jose4j.version>0.9.6</jose4j.version>
     <netty.version>4.1.136.Final</netty.version>
     <tomcat.version>10.1.57</tomcat.version>
-    <web3j.version>4.12.3</web3j.version>
+    <web3j.version>6.0.0</web3j.version>
     <webpush.version>5.1.2</webpush.version>
     <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
     <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
