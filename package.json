@@ -30,7 +30,7 @@
     "bitcoinjs-lib": "^7.0.1",
     "bigint-buffer": "file:vendor/bigint-buffer-safe",
     "ethers": "^6.13.2",
-    "next": "^15.5.21",
+    "next": "^16.2.10",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
