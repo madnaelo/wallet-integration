@@ -7,7 +7,7 @@ RUN mvn -q -DskipTests dependency:resolve
 COPY src ./src
 RUN mvn -q -DskipTests package
 
-FROM eclipse-temurin:17-jre-alpine@sha256:02320dd4ce20e243dfb915c686089cf9315c763084fafbb12d5c9993aee18b57
+FROM eclipse-temurin:24-jre-alpine@sha256:4044b6c87cb088885bcd0220f7dc7a8a4aab76577605fa471945d2e98270741f
 WORKDIR /app
 
 RUN apk upgrade --no-cache libexpat p11-kit p11-kit-trust \
