@@ -1,11 +1,12 @@
 # Production Legal Review Pack
 
 Prepared: July 19, 2026
-Last updated: July 23, 2026
+Last updated: September 16, 2026
 
-Status: engineering and legal-readiness review complete; a formal factual
-submission is pending review by VARA Ecosystem; qualified-counsel review
-remains pending.
+Status: VARA replied on August 27, 2026, identifying a high risk that the
+proposed service qualifies as a VA Activity and recommending qualified legal
+counsel. Final classification and counsel review remain pending. See the
+[response and next-decision record](vara-response-2026-08-27.md).
 
 This document is a factual handoff for legal counsel. It is not legal advice
 and must not be used to claim that Swap Assistant, its operator, or its public
@@ -25,6 +26,10 @@ Broad commercial launch remains gated on these decisions:
    document versions, and required follow-up date in the review log below.
 
 Software controls do not satisfy these legal gates by themselves.
+
+The August 27 response does not grant permission for a publicly reachable beta.
+Pausing public swap execution and new limit orders is recommended pending
+qualified advice; that recommendation has not been applied to the live product.
 
 ## Confirmed Operator Record
 
@@ -73,10 +78,16 @@ The authoritative software policy is
 collection. Runtime fee parameters are enabled only for providers whose policy
 status is `confirmed`.
 
+That software status records fee-mechanism evidence, not regulatory clearance
+or confirmation that the current individual operator satisfies every provider
+contract. In particular, LI.FI commercial operator eligibility remains
+unresolved under the current legal-entity requirement described in the
+[response record](vara-response-2026-08-27.md).
+
 | Provider | Quote use | Fee/commercial status | Production treatment |
 | --- | --- | --- | --- |
 | 0x | Enabled with API key | Official affiliate-fee documentation permits fees on current plans | Fee parameters allowed; live receipt test pending |
-| LI.FI | Enabled with API key/integrator | Partner Portal fee wallets configured | Fee parameter allowed; live receipt test pending |
+| LI.FI | Enabled with API key/integrator | Fee wallets configured; individual operator's commercial eligibility unresolved | Runtime still allows fees; eligibility and live receipt unresolved |
 | Odos | Adapter retained | Written account/plan confirmation pending | Disabled from production quote routing |
 | Velora/ParaSwap | Adapter retained | Partnership API and fee-sharing approval pending | Disabled from production quote routing |
 | 1inch | Disabled in production | Dev Plan active; commercial-use response pending | No production quotes or fee fields |
@@ -192,6 +203,6 @@ Do not mark this complete until a qualified reviewer fills every field.
 | Reviewer qualification/jurisdiction | Pending |
 | Documents and versions approved | Pending |
 | Approval date | Pending |
-| Regulatory classification | Formal VARA Ecosystem submission sent July 23, 2026; response pending |
+| Regulatory classification | VARA August 27 response identifies high risk of VA Activity; final classification pending |
 | Required launch restrictions | Pending |
 | Next review date | Pending |

@@ -2,6 +2,13 @@
 
 Last reviewed: July 23, 2026
 
+Regulatory update: September 16, 2026. VARA has responded with a high-risk
+assessment of the proposed activity. Commercial launch clearance and LI.FI
+eligibility for the individual operator remain unresolved; configured fee
+wallets do not resolve them. See the
+[response and next-decision record](legal/vara-response-2026-08-27.md).
+The operational and payout checks below have not been rerun for this update.
+
 This checklist tracks what is required before Swap Assistant can reliably collect
 platform fees in production.
 

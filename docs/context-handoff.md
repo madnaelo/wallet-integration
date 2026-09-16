@@ -27,6 +27,14 @@ Use this file first when restarting in a fresh context.
 The prompt files are the detailed AI pair-programming trail. The README and
 BRD are the current product/architecture summary.
 
+## Regulatory Status
+
+VARA's August 27, 2026 response identifies a high risk that the service is a
+regulated VA Activity. Classification and commercial launch clearance remain
+unresolved. Read [the response record](legal/vara-response-2026-08-27.md) before
+launch or monetization decisions. Its recommended execution pause has not been
+deployed. The owner requested no further email to VARA on September 16.
+
 ## Current Product Direction
 
 Swap Assistant is a non-custodial swap assistant:
