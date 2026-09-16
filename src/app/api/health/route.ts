@@ -5,8 +5,8 @@ import { getRateLimitReadiness } from "@/lib/server/rateLimit";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  const rateLimit = getRateLimitReadiness();
+export async function GET() {
+  const rateLimit = await getRateLimitReadiness();
   return NextResponse.json(
     {
       status: rateLimit.ready ? "ok" : "degraded",

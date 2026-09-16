@@ -323,6 +323,17 @@ The Vercel Upstash Marketplace integration injects `KV_REST_API_URL` and
 complete pair only; the runtime deliberately refuses to combine credentials from
 different pairs.
 
+Frontend `/api/health` also sends an authenticated Redis `PING` using those
+same credentials and a 2.5-second timeout. Results (including failures) and
+in-flight requests are shared for 60 seconds per warm server instance; no
+user keys or rate-limit counters are changed. A failed configured Redis
+dependency produces HTTP 503 even when a local fallback is permitted, so
+monitoring reports degradation instead of just checking configuration.
+The public response never includes credentials or upstream error text.
+This allows the existing production monitor to detect an unavailable or
+archived free-tier database. It does not guarantee against provider
+archival policies; restore the existing database in Upstash if necessary.
+
 The provider keys stay server-side in Vercel because they are used by the
 Next.js route handler, not by browser code. `NEXT_PUBLIC_*` values are public by
 design. Production builds fail if the backend proxy, distributed limiter,

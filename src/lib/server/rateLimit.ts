@@ -8,6 +8,7 @@ type Bucket = {
 
 type RateLimitDecision = { allowed: boolean; retryAfterMs: number; unavailable?: boolean };
 type RateLimitPolicy = { maxRequests?: number; windowMs?: number };
+type RateLimitReadiness = { ready: boolean; mode: "redis" | "memory" };
 
 type RedisResponse = {
   result?: unknown;
@@ -37,7 +38,9 @@ return {1, 0}
 
 const buckets = new Map<string, Bucket>();
 const MAX_MEMORY_BUCKETS = 50_000;
+const READINESS_CACHE_MS = 60_000;
 let lastSweepAt = 0;
+let redisReadiness: { expiresAt: number; result: Promise<boolean> } | undefined;
 
 export async function rateLimit(key: string, policy?: RateLimitPolicy): Promise<RateLimitDecision> {
   return rateLimitMany([key], policy);
@@ -106,36 +109,15 @@ async function redisRateLimitMany(
     (key) => `${env.RATE_LIMIT_REDIS_PREFIX}:rl:${hashKey(key)}`
   );
 
-  const response = await fetch(env.UPSTASH_REDIS_REST_URL.replace(/\/+$/, ""), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify([
-      "EVAL",
-      RATE_LIMIT_SCRIPT,
-      redisKeys.length,
-      ...redisKeys,
-      max,
-      windowMs
-    ]),
-    cache: "no-store",
-    signal: AbortSignal.timeout(2_500)
-  });
-
-  if (!response.ok) {
-    throw new Error(`Redis rate limiter returned HTTP ${response.status}`);
-  }
-
-  const payload = await response.json() as RedisResponse;
-  if (payload.error) throw new Error(payload.error);
-  if (!Array.isArray(payload.result) || payload.result.length < 2) {
+  const result = await sendRedisCommand([
+    "EVAL", RATE_LIMIT_SCRIPT, redisKeys.length, ...redisKeys, max, windowMs
+  ]);
+  if (!Array.isArray(result) || result.length < 2) {
     throw new Error("Redis rate limiter returned an invalid result");
   }
 
-  const allowed = Number(payload.result[0]);
-  const retryAfterMs = Number(payload.result[1]);
+  const allowed = Number(result[0]);
+  const retryAfterMs = Number(result[1]);
   if ((allowed !== 0 && allowed !== 1) || !Number.isFinite(retryAfterMs)) {
     throw new Error("Redis rate limiter returned an invalid decision");
   }
@@ -145,16 +127,47 @@ async function redisRateLimitMany(
   };
 }
 
+async function sendRedisCommand(command: (string | number)[]): Promise<unknown> {
+  const response = await fetch(env.UPSTASH_REDIS_REST_URL.replace(/\/+$/, ""), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(command),
+    cache: "no-store",
+    signal: AbortSignal.timeout(2_500)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Redis rate limiter returned HTTP ${response.status}`);
+  }
+
+  const payload = await response.json() as RedisResponse;
+  if (!payload || typeof payload !== "object" || payload.error) {
+    throw new Error("Redis command returned an invalid response");
+  }
+  return payload.result;
+}
+
 function hashKey(key: string): string {
   return createHmac("sha256", env.RATE_LIMIT_KEY_PEPPER).update(key).digest("hex");
 }
 
-export function getRateLimitReadiness() {
-  const redisConfigured = hasRedisConfiguration();
-  return {
-    ready: !env.RATE_LIMIT_REDIS_REQUIRED || redisConfigured,
-    mode: redisConfigured ? "redis" : "memory"
-  };
+export async function getRateLimitReadiness(): Promise<RateLimitReadiness> {
+  if (!hasRedisConfiguration()) {
+    return { ready: !env.RATE_LIMIT_REDIS_REQUIRED, mode: "memory" };
+  }
+
+  const now = Date.now();
+  if (!redisReadiness || now >= redisReadiness.expiresAt) {
+    // Share concurrent probes and cache failures too, so health polling stays bounded.
+    redisReadiness = {
+      expiresAt: now + READINESS_CACHE_MS,
+      result: sendRedisCommand(["PING"]).then((result) => result === "PONG", () => false)
+    };
+  }
+  return { ready: await redisReadiness.result, mode: "redis" };
 }
 
 function hasRedisConfiguration(): boolean {
