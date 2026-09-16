@@ -20,7 +20,7 @@
   <properties>
     <java.version>17</java.version>
     <bouncycastle.version>1.85</bouncycastle.version>
-    <async-http-client.version>2.16.0</async-http-client.version>
+    <async-http-client.version>3.0.11</async-http-client.version>
     <postgresql.version>42.7.13</postgresql.version>
     <httpclient.version>4.5.14</httpclient.version>
     <jose4j.version>0.9.6</jose4j.version>
