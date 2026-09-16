@@ -24,6 +24,15 @@ specific upstream advisory may be accepted only in
 date. Expired exceptions, new advisory roots, and unclassified findings fail
 CI. This keeps temporary upstream risk acceptance visible and time-bounded
 instead of disabling dependency auditing.
+
+Dependency compatibility notes (reviewed 2026-09-16): Next.js 15 uses patched
+Next.js, Sharp, PostCSS, and Nano ID releases through the committed lockfile.
+`jayson` is pinned to 4.1.3 within Solana web3.js's supported 4.x range: 4.2+
+introduces the vulnerable `stream-json` 1.x dependency, whose available fixed
+3.x release is not a drop-in replacement for Jayson's CommonJS imports.
+Remove the pin when Jayson provides a compatible patched dependency chain;
+do not override `stream-json` across major versions or suppress its advisory.
+
 - `Release Production`: starts only after CI succeeds for `master`,
   then waits for Security to pass for that exact commit. It publishes one
   immutable GHCR image and builds a production Vercel deployment without
