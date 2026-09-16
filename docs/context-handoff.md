@@ -12,6 +12,9 @@ Use this file first when restarting in a fresh context.
   project authentication when the user has authorized the account action.
 - Never write passwords, one-time authorization codes, API tokens, wallet
   private keys, or seed phrases into the repository or handoff documents.
+- Current operating country: Pakistan, as reported by the owner on September
+  16, 2026. Use Pakistan in current operator disclosures. Earlier Dubai
+  submissions are historical correspondence and must retain their original facts.
 
 ## Read Order
 
@@ -34,6 +37,8 @@ regulated VA Activity. Classification and commercial launch clearance remain
 unresolved. Read [the response record](legal/vara-response-2026-08-27.md) before
 launch or monetization decisions. Its recommended execution pause has not been
 deployed. The owner requested no further email to VARA on September 16.
+Later that day, the owner reported current operation from Pakistan; see the
+[current operator record](legal/production-legal-review.md#confirmed-operator-record).
 
 ## Current Product Direction
 

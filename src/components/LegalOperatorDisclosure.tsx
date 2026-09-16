@@ -10,8 +10,8 @@ export function LegalOperatorDisclosure() {
       <p>
         <small>
           <strong>Legal operator and contact.</strong> Swap Assistant is
-          operated by Syed Aqeel Ashiq as an individual based in Dubai, United
-          Arab Emirates. Swap Assistant is a service name, not a separately
+          operated from Pakistan by Syed Aqeel Ashiq as an individual.
+          Swap Assistant is a service name, not a separately
           incorporated company. Legal, privacy, and support questions can be
           sent through the <Link href="/contact">contact form</Link>.
           Nothing in this disclosure represents that the service or operator

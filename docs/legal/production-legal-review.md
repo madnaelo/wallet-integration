@@ -16,9 +16,9 @@ documents have been approved by a lawyer or regulator.
 
 Broad commercial launch remains gated on these decisions:
 
-1. Obtain VARA or UAE virtual-assets counsel's written classification of the product,
-   including whether operating or marketing it in or from Dubai requires a
-   VARA licence or another authorization.
+1. Obtain a written classification for the current Pakistan operating model
+   and intended markets, including whether any earlier Dubai activities or
+   continuing connections require separate consideration.
 2. Have counsel approve the Terms, Privacy Notice, fee disclosure, sanctions
    language, limit-order risk acceptance, liability allocation, and dispute
    provisions as one consistent document set.
@@ -34,7 +34,10 @@ qualified advice; that recommendation has not been applied to the live product.
 ## Confirmed Operator Record
 
 - Operator: Syed Aqeel Ashiq, acting personally as an individual.
-- Place of operation: Dubai, United Arab Emirates.
+- Current country of operation: Pakistan, as reported by the owner on
+  September 16, 2026. No city or exact relocation date was provided.
+- Earlier submissions described operation from Dubai and remain historical
+  records. The current disclosure does not retroactively change those facts.
 - Public legal, privacy, and support contact: `/contact`.
 - The private delivery inbox is configured only through `CONTACT_RECIPIENT_EMAIL`.
 - Public service name: Swap Assistant.
@@ -45,13 +48,15 @@ qualified advice; that recommendation has not been applied to the live product.
   Pakistan residents and not to impose a location block solely on that basis.
   This decision is not a regulatory exemption or legal-clearance conclusion.
 - The public Terms provisionally use applicable UAE federal and Dubai law and
-  Dubai courts, subject to mandatory rights and qualified review.
+  Dubai courts, subject to mandatory rights and qualified review. That
+  contractual choice is separate from the operating-country disclosure and
+  has not been changed by this location update.
 
 ## Product Facts For Counsel
 
 - Swap Assistant compares third-party swap quotes and can add a disclosed
   platform/integrator fee on approved provider routes.
-- The service is operated personally from Dubai under the service name Swap
+- The service is operated personally from Pakistan under the service name Swap
   Assistant; it is not currently operated through a company.
 - The normal swap flow is non-custodial. The app does not hold private keys or
   sign transactions. The user reviews and approves execution in a wallet.
@@ -121,7 +126,12 @@ user removes them where supported or an operational deletion policy applies.
 Counsel must review whether fixed retention periods, an account-data deletion
 workflow, and a formal data-subject request process are required before launch.
 
-## UAE And Dubai Review Questions
+## Jurisdiction Review Questions
+
+The owner reported current operation from Pakistan on September 16, 2026.
+Pakistan-specific classification and the implications for public terms remain
+unassessed in this factual disclosure update. The following UAE research
+relates to the previously reported operating model and correspondence.
 
 The UAE official data-protection portal describes rights, security, breach, and
 cross-border-transfer obligations under the UAE Personal Data Protection Law.
@@ -154,8 +164,8 @@ They also contain provisional eligibility, liability, governing-law, dispute,
 privacy-purpose, transfer, minors, and rights language. Before counsel can
 approve them, the following gaps must be closed:
 
-- whether Dubai and the online contact channel are sufficient or a full
-  service address and trade licence disclosure are required;
+- whether the operating-country disclosure and online contact channel are
+  sufficient or a full service address and trade licence disclosure are required;
 - enforceability of the provisional governing law, venue, dispute process,
   warranty disclaimer, and liability cap;
 - age, territory, sanctions, restricted-person, and restricted-jurisdiction
@@ -197,7 +207,7 @@ Do not mark this complete until a qualified reviewer fills every field.
 | --- | --- |
 | Operator legal name | Syed Aqeel Ashiq, individual operator |
 | Public legal/privacy contact | `/contact` (recipient address remains private) |
-| Place of operation | Dubai, United Arab Emirates |
+| Current country of operation | Pakistan; owner-reported September 16, 2026 |
 | Governing jurisdiction | UAE/Dubai provision added; qualified review pending |
 | Reviewer and firm | Pending |
 | Reviewer qualification/jurisdiction | Pending |

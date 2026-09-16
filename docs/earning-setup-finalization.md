@@ -273,11 +273,12 @@ Before public launch:
 - Keep `MONETIZED_SWAP_PROVIDERS` limited to providers with written or
   unambiguous official commercial approval. Do not treat a successful quote as
   payout approval.
-- The confirmed operator is Syed Aqeel Ashiq acting personally from Dubai,
-  United Arab Emirates, with contact available through `/contact`. There is no
-  incorporated Swap Assistant entity. Obtain VARA or qualified UAE counsel's
-  written regulatory classification and counsel-reviewed Terms/Privacy
-  language before broad commercial launch.
+- The operator is Syed Aqeel Ashiq acting personally from Pakistan, as reported
+  on September 16, 2026, with contact available through `/contact`. There is no
+  incorporated Swap Assistant entity. Obtain a written classification and
+  reviewed Terms/Privacy language for the current operating model and intended
+  markets before broad commercial launch; earlier Dubai correspondence remains
+  part of the historical record.
 - Keep the automated daily backup-freshness check and weekly isolated restore
   drill passing. The production release also creates and verifies an Object
   Storage backup before promoting the backend.
