@@ -24,6 +24,10 @@ These are engineering checks, not a legal review or real fee-payout test.
   confirmed swaps and null received revenue.
 - GitHub Actions lint, shell lint, Dockerfile lint, cohosted deployment contract,
   all three Compose configurations, whitespace validation and staged Gitleaks scan.
+- Linux frontend Docker build with only public synthetic settings. The resulting
+  non-root container started successfully; its admin gate and PWA manifest passed
+  HTTP assertions with external networking disabled. Packaging fixes include the
+  local dependency, provider policy and shared chain catalog.
 
 Unit/RPC/browser fixtures are synthetic. The only external provider probes were
 read-only 0x quotes, documented in [fee semantics](fee-evidence-semantics.md).
@@ -38,6 +42,11 @@ then returned HTTP 400. Repeated audit attempts and a minimal direct public-pack
 probe confirmed the upstream outage. The audit was NOT bypassed or reported as a
 fresh pass. All local checks above were rerun individually after that interruption.
 The existing CI audit gate remains enabled and must pass when npm recovers.
+GitHub [CI run 182](https://github.com/madnaelo/wallet-integration/actions/runs/35458595363)
+on implementation commit `770f65c` independently passed Backend, Repository
+Quality and Docker Compose Config. Frontend unit/preflight tests passed; its
+audit step failed with the same explicit npm maintenance HTTP 503, so subsequent
+frontend CI steps were skipped (those steps passed locally as recorded above).
 
 ## Scope
 
