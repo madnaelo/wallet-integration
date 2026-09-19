@@ -131,10 +131,10 @@ export default function RevenueDashboard() {
       <section><h2>First-party activity</h2>
         <dl className={styles.metrics}>
           {[["Quote requests","quote_requests"],["Quoted routes","quoted_routes"],["Review intent","reviewed_routes"],
-            ["Submitted routes","submitted_routes"],["Confirmed routes","independently_confirmed_routes"]].map(([label,name]) =>
+            ["Submitted transactions","submitted_routes"],["Confirmed transactions","independently_confirmed_routes"]].map(([label,name]) =>
             <div key={name}><dt>{label}</dt><dd>{report.funnel[name!] ?? 0}</dd></div>)}
         </dl>
-        <p>Quote-cohort counts. Review intent is best-effort and requires a signed-in wallet; it is not settlement evidence. Cached quotes are counted once.</p>
+        <p>Quote-cohort counts. Review intent is best-effort and requires a signed-in wallet; it is not settlement evidence. Each quote and its review are counted once. A reused quote can have multiple submitted transactions, each independently verified.</p>
         <div className={styles.tableWrap}><table><thead><tr><th>Provider</th><th>Outcome</th><th>Count</th></tr></thead><tbody>
           {report.providerOutcomes.map((row) => <tr key={row.provider+row.outcome}><td>{row.provider}</td><td>{row.outcome.replaceAll("_"," ")}</td><td>{row.count}</td></tr>)}
         </tbody></table></div>

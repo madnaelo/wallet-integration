@@ -25,13 +25,13 @@ for (const width of [1280,390]) {
         await new Promise(resolve => setTimeout(resolve,500));
       }
       const body = url.includes("/evidence") ? [{source:"synthetic_test",state:"RECEIVED",evidence:'{"fixture":true}'}]
-        : url.includes("/records") ? [{id:"record-1",state:"RECEIVED",reason:"finalized_exact_treasury_transfer",provider:"0x",
-          source_chain:1,transaction_hash:"0x"+"a".repeat(64),attempts:1,created_at:"2026-09-19T00:00:00Z"}]
+        : url.includes("/records") ? ["a","b"].map((hash) => ({id:"record-"+hash,state:"RECEIVED",reason:"finalized_exact_treasury_transfer",provider:"0x",
+          source_chain:1,transaction_hash:"0x"+hash.repeat(64),attempts:1,created_at:"2026-09-19T00:00:00Z"}))
         : {feeGroups:[{period:"2026-09-19T00:00:00Z",provider:"0x",chain:1,token:"0x"+"2".repeat(40),symbol:"USDC",decimals:6,
-          expected:"2000",accrued:null,received:"2000",submitted:1,not_verified:0,failed:0}],
+          expected:"4000",accrued:null,received:"4000",submitted:2,not_verified:0,failed:0}],
           volumeGroups:[{provider:"0x",chain:1,token:"0x"+"2".repeat(40),symbol:"USDC",decimals:6,
-            amount:"1000000",confirmed_swaps:1,measured_swaps:1}],
-          funnel:{quote_requests:2,quoted_routes:3,reviewed_routes:1,submitted_routes:1,independently_confirmed_routes:1},
+            amount:"2000000",confirmed_swaps:2,measured_swaps:2}],
+          funnel:{quote_requests:1,quoted_routes:1,reviewed_routes:1,submitted_routes:2,independently_confirmed_routes:2},
           providerOutcomes:[{provider:"lifi",outcome:"fee_validation_failed",count:1}],untrackedSubmissions:0,groupLimit:1000};
       await route.fulfill({contentType:"application/json",body:JSON.stringify(body)});
     });
@@ -43,7 +43,11 @@ for (const width of [1280,390]) {
     await expect(page.getByRole("columnheader",{name:"Accrued, not received"})).toBeVisible();
     await expect(page.getByRole("columnheader",{name:"Received",exact:true})).toBeAttached();
     await expect(page.getByText("fee validation failed",{exact:true})).toBeVisible();
-    await page.getByRole("button",{name:"Inspect",exact:true}).click();
+    for (const [label,count] of [["Quoted routes","1"],["Review intent","1"],["Submitted transactions","2"],["Confirmed transactions","2"]]) {
+      await expect(page.getByText(label!,{exact:true}).locator("..").locator("dd")).toHaveText(count!);
+    }
+    await expect(page.getByText("A reused quote can have multiple submitted transactions",{exact:false})).toBeVisible();
+    await page.getByRole("button",{name:"Inspect",exact:true}).first().click();
     await expect(page.locator("pre")).toContainText("synthetic_test");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({path:"test-results/revenue-"+width+".png",fullPage:true});

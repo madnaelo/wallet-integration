@@ -21,12 +21,15 @@
 Important files: `src/lib/server/revenueEvidence.ts`, `api/quote/route.ts`,
 `backend/.../revenue/RevenueIntegrity.java`, `RevenueService.java`,
 `RevenueRepository.java`, `RevenueSettlementVerifier.java`, and
-`db/migration/V30__trusted_revenue.sql`.
+`db/migration/V30__trusted_revenue.sql` and `V31__allow_reused_revenue_quotes.sql`.
 
 V30 backfills old non-dry-run history as `NOT_VERIFIED` without an earned amount,
-deduplicating by source chain and transaction. New records are unique by history,
-quote and chain/transaction. Missing quote evidence never adopts browser fee data.
-A forged identity or conflicting transaction binding is rejected.
+deduplicating by source chain and transaction. V31 retains unique history IDs and
+source-chain/transaction pairs, but lets multiple records reference one quote.
+A cached quote is evidence of terms, not a single-use authorization. Every
+transaction must independently satisfy the same ownership, transaction binding,
+time-window, finality and fee-transfer checks. Missing quote evidence never adopts
+browser fee data. A forged identity or conflicting transaction binding is rejected.
 
 ## States And Proof
 
@@ -79,6 +82,10 @@ decision. Back it up with the existing PostgreSQL backup workflow.
 Funnel counts use persisted first-party quote batches/routes, authenticated
 review intents, submissions and independent confirmations. Cached quote reuse is
 not another quote request; a review means swap intent, not measured screen view.
+Quoted and reviewed routes are distinct quote counts. `submitted_routes` and
+`independently_confirmed_routes` retain their API field names but count transactions,
+so they can exceed quoted routes when one quote is reused. Expected and verified
+fee amounts and confirmed volume are counted per transaction, never once per quote.
 Unsigned browsing is not tracked with an advertising identifier. Wallets and
 transaction data are not sent to third-party analytics. RPC/provider requests
 still carry the identifiers needed for their core service.

@@ -47,6 +47,7 @@ import type {
 import { isAppKitConfigured } from "@/lib/walletConfig";
 import { envPublic } from "@/lib/envPublic";
 import { buildQuoteUrl } from "@/lib/quoteClient";
+import { buildQuoteWarnings, formatFeeBps, formatSlippageBps, formatSlippageBpsAsPercent } from "@/lib/quoteWarnings";
 import { fetchRouteStatus, routeStatusDelayMs, shouldTrackRoute } from "@/lib/routeStatus";
 import { createRecipientWalletImport } from "@/lib/recipientWalletImport";
 import { swapLog } from "@/lib/swapLog";
@@ -4752,16 +4753,6 @@ function formatPriceAlertStatus(status: PriceAlertRule["status"]): string {
   }
 }
 
-function formatSlippageBps(slippageBps: number): string {
-  return `${formatSlippageBpsAsPercent(slippageBps)}%`;
-}
-
-function formatSlippageBpsAsPercent(slippageBps: number): string {
-  if (!Number.isFinite(slippageBps)) return "1";
-  const pct = slippageBps / 100;
-  return Number.isInteger(pct) ? String(pct) : String(Number(pct.toFixed(2)));
-}
-
 function formatSwapStatus(status: TxStatus): string {
   if (status === "idle") return "";
   return `${status[0]!.toUpperCase()}${status.slice(1)}`;
@@ -4785,36 +4776,6 @@ function waitForDelay(delayMs: number, signal: AbortSignal): Promise<void> {
 function quoteForHistory(quote: QuoteResponse): QuoteResponse {
   const { availableQuotes: _availableQuotes, quoteErrors: _quoteErrors, ...rest } = quote;
   return rest;
-}
-
-function buildQuoteWarnings({
-  quote,
-  slippageBps,
-  buyTokenFeesDeducted,
-  grossBuyAmount
-}: {
-  quote: QuoteResponse;
-  slippageBps: number | null;
-  buyTokenFeesDeducted: string;
-  grossBuyAmount: string;
-}): string[] {
-  const warnings: string[] = [];
-
-  if (slippageBps !== null && slippageBps >= 300) {
-    warnings.push(`Slippage is set to ${formatSlippageBps(slippageBps)}. The final amount can move before your wallet rejects the swap.`);
-  }
-
-  const effectiveFeeBps = calculateBps(buyTokenFeesDeducted, grossBuyAmount);
-  if (effectiveFeeBps >= 100) {
-    warnings.push(`Service fee is about ${formatFeeBps(effectiveFeeBps)} of the quoted output.`);
-  }
-
-  const quoteErrors = quote.quoteErrors ?? [];
-  if (quoteErrors.length > 0) {
-    warnings.push(formatProviderWarning(quoteErrors));
-  }
-
-  return warnings;
 }
 
 function formatQuoteOption(quote: QuoteResponse, buyToken: DisplayToken): string {
@@ -5228,23 +5189,6 @@ function multiplyDivideIntegerStrings(value: string, multiplier: string, divisor
   return ((BigInt(value) * BigInt(multiplier)) / divisorBigInt).toString();
 }
 
-function calculateBps(numerator: string, denominator: string): number {
-  if (!/^\d+$/.test(numerator) || !/^\d+$/.test(denominator)) return 0;
-  const denominatorBigInt = BigInt(denominator);
-  if (denominatorBigInt === 0n) return 0;
-  const bps = (BigInt(numerator) * 10_000n) / denominatorBigInt;
-  return bps > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Number(bps);
-}
-
-function formatProviderWarning(errors: QuoteResponse["quoteErrors"]): string {
-  const providerNames = (errors ?? [])
-    .map((error) => error.providerName || error.providerId)
-    .filter((name): name is string => Boolean(name));
-  const uniqueNames = Array.from(new Set(providerNames)).slice(0, 3);
-  const suffix = uniqueNames.length ? `: ${uniqueNames.join(", ")}` : "";
-  return `Some routes were unavailable${suffix}. The selected quote is still from a responding route.`;
-}
-
 function sumBuyTokenFees(lines: FeeLine[]): string {
   return lines
     .reduce((sum, line) => (/^\d+$/.test(line.buyTokenAmount ?? "") ? sum + BigInt(line.buyTokenAmount!) : sum), 0n)
@@ -5280,10 +5224,6 @@ function renderFeeDetail(fee: FeeLine) {
       <FeeEquivalent>{fee.buyTokenDisplay}</FeeEquivalent>
     </>
   );
-}
-
-function formatFeeBps(feeBps: number): string {
-  return `${formatDecimal(String(feeBps / 100), 4)}%`;
 }
 
 function formatOriginalFeeTotal(lines: FeeLine[]): string {

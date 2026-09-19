@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.web3j.crypto.Hash;
 
 class RevenueSettlementVerifierTest {
   private final RevenueRpcClient rpc = mock(RevenueRpcClient.class);
@@ -86,12 +85,5 @@ class RevenueSettlementVerifierTest {
   @Test void oldTransactionCannotBeReusedForNewQuote() {
     assertThat(verifier.verify(claim,new RevenueRepository.SignedQuote(quote,now.plusSeconds(90))).reason())
         .isEqualTo("outside_quote_binding_window");
-  }
-  private ObjectNode transfer(String token,String from,String to,long amount,int index) {
-    ObjectNode log = JSON.createObjectNode().put("address",token).put("data","0x"+String.format("%064x",amount))
-        .put("logIndex","0x"+Integer.toHexString(index));
-    log.putArray("topics").add(Hash.sha3String("Transfer(address,address,uint256)"))
-        .add("0x"+"0".repeat(24)+from.substring(2)).add("0x"+"0".repeat(24)+to.substring(2));
-    return log;
   }
 }

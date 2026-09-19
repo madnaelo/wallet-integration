@@ -150,8 +150,8 @@ public class RevenueRepository {
         GROUP BY 1,2,3,4,5 ORDER BY 1,2,3 LIMIT 1000
         """, start, end);
     Map<String, Object> funnel = jdbc.queryForMap("""
-        SELECT count(*) AS quoted_routes,count(DISTINCT q.batch_id) AS quote_requests,
-          count(q.reviewed_at) AS reviewed_routes,count(r.id) AS submitted_routes,
+        SELECT count(DISTINCT q.id) AS quoted_routes,count(DISTINCT q.batch_id) AS quote_requests,
+          count(DISTINCT q.id) FILTER (WHERE q.reviewed_at IS NOT NULL) AS reviewed_routes,count(r.id) AS submitted_routes,
           count(r.swap_verified_at) AS independently_confirmed_routes
         FROM revenue_quotes q LEFT JOIN revenue_records r ON r.quote_id=q.id
         WHERE q.quoted_at>=? AND q.quoted_at<?

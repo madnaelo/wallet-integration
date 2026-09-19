@@ -3,27 +3,49 @@
 Executed on September 19, 2026 in the E:\assignments\wallet working tree.
 These are engineering checks, not a legal review or real fee-payout test.
 
-## Passed
+## Final Review Cleanup
 
-- Frontend: 206 Vitest tests across 34 files.
+The complete `scripts/verify.ps1` passed after the cached-quote and warning fixes:
+
+- Frontend: 212 Vitest tests across 35 files, including source-token platform fee
+  warnings at 100/150 BPS, the below-threshold case and no addition of overlapping
+  source/destination fee percentages. Fee amounts and totals remain unchanged.
 - Deployment preflight: 5 Node tests, including fictional customer branding,
   protected-target conflicts and policy/credential failures.
+- npm dependency audit: zero vulnerabilities, with the audit gate enabled.
 - Type generation/typecheck, ESLint with zero warnings and Next.js production build.
 - Playwright: all 10 acceptance tests, including 390px/1280px admin layouts,
   noindex, credential-storage boundaries, evidence inspection and lock-after-request.
-  Screenshots were visually inspected.
-- Backend: Maven clean verify, 200 tests with none skipped and SpotBugs with zero
-  findings. Seven database tests used a disposable PostgreSQL 16 instance on
+  Reused-quote fixtures show one quoted/reviewed route and two submitted/confirmed
+  transactions. Both screenshots were visually inspected.
+- Backend: Maven clean verify, 207 tests with none skipped and SpotBugs with zero
+  findings. Fourteen database tests used a disposable PostgreSQL 16 instance on
   localhost:56439, with separately created random schemas.
-- V29-to-V30 upgrade with legacy duplicate transactions and browser-confirmed
-  entries; only one unverified record was backfilled and no received fee invented.
+- V29-to-V30-to-V31 upgrade with legacy duplicates; V30 was not edited. V31 keeps
+  history and chain/transaction uniqueness and permits multiple records per quote.
+- The PostgreSQL tests pass both distinct transactions through the real settlement
+  verifier with synthetic RPC responses and stored signed quotes. Each needs its
+  own finalized proof. Repeated transaction submissions never increase fee totals.
+  Wrong fees, unfinalized blocks, another transaction's receipt, changed calldata,
+  changed sender and out-of-window inclusion cannot borrow the other record's proof.
+  An unfinalized second transaction reaches RECEIVED only after its own finality.
+- Funnel quotes/reviews remain distinct; transaction counts and measured volume
+  count both verified transactions. Authentication/binding, settlement checks and
+  retry/lease implementation are unchanged.
+- All three Compose configurations and whitespace validation passed.
+
+## Earlier Runtime Checks
+
+The earlier branch verification also recorded the following checks. These are
+retained as historical evidence, not claimed as new real settlement tests:
+
 - Runtime HTTP smoke: isolated Spring Boot and PostgreSQL; an ephemeral wallet
   signed an authentication message only. Signed quote ingestion and review worked.
   Duplicate history stayed one record; invalid HMAC, absent admin key and altered
   amounts were rejected. Browser-confirmed history resulted in zero independently
   confirmed swaps and null received revenue.
-- GitHub Actions lint, shell lint, Dockerfile lint, cohosted deployment contract,
-  all three Compose configurations, whitespace validation and staged Gitleaks scan.
+- GitHub Actions lint, shell lint, Dockerfile lint, cohosted deployment contract
+  and staged Gitleaks scan.
 - Linux frontend Docker build with only public synthetic settings. The resulting
   non-root container started successfully; its admin gate and PWA manifest passed
   HTTP assertions with external networking disabled. Packaging fixes include the
@@ -33,20 +55,16 @@ Unit/RPC/browser fixtures are synthetic. The only external provider probes were
 read-only 0x quotes, documented in [fee semantics](fee-evidence-semantics.md).
 No wallet transaction, approval, order or real-money transfer was submitted.
 
-## External Audit Availability
+## CI Results
 
-The complete combined verification script passed after the initial fee review
-fixes. During the final larger implementation rerun, npm's bulk advisory endpoint
-returned HTTP 503 with an explicit maintenance response; npm's deprecated fallback
-then returned HTTP 400. Repeated audit attempts and a minimal direct public-package
-probe confirmed the upstream outage. The audit was NOT bypassed or reported as a
-fresh pass. All local checks above were rerun individually after that interruption.
-The existing CI audit gate remains enabled and must pass when npm recovers.
-GitHub [CI run 182](https://github.com/madnaelo/wallet-integration/actions/runs/35458595363)
-on implementation commit `770f65c` independently passed Backend, Repository
-Quality and Docker Compose Config. Frontend unit/preflight tests passed; its
-audit step failed with the same explicit npm maintenance HTTP 503, so subsequent
-frontend CI steps were skipped (those steps passed locally as recorded above).
+GitHub [CI run 183](https://github.com/madnaelo/wallet-integration/actions/runs/35458921216)
+for `7639ced` completed successfully: Frontend (including the production npm
+dependency audit), Backend, Repository Quality and Docker Compose Config.
+The production dependency audit gate remains enabled; nothing was bypassed.
+
+Historical context: [run 182](https://github.com/madnaelo/wallet-integration/actions/runs/35458595363)
+for `770f65c` encountered npm's temporary HTTP 503 maintenance outage during its
+audit step. The successful run 183 supersedes that temporary frontend CI failure.
 
 ## Scope
 
