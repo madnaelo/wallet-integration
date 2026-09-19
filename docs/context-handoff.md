@@ -2,6 +2,21 @@
 
 Use this file first when restarting in a fresh context.
 
+## Commercial Work In Progress
+
+September 19, 2026: the owner is exploring selling the reusable software to
+businesses instead of relying only on swap fees. Recommended initial model is a
+non-exclusive license plus scoped setup, with optional separate maintenance;
+ownership terms and pricing are proposals, not signed agreements.
+
+Work is on `feat/commercial-readiness`, based on `748420b`. Read the
+[pre-change audit](commercial-readiness-audit.md),
+[draft offer](commercial/software-offer.md) and
+[implementation roadmap](commercial/implementation-roadmap.md) for completed
+safeguards, executed checks and outstanding work. No new branding system,
+settlement ledger or admin revenue dashboard should be assumed complete. Do not
+merge/deploy this business-direction change merely because the branch exists.
+
 ## Project And Account Boundary
 
 - This repository is a personal project. Work only from

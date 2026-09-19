@@ -8,6 +8,16 @@ toward favorite pairs, reverse-swap profit checks, and notifications.
 The application never stores private keys, never takes custody of funds, and the
 backend never signs swap transactions.
 
+## Commercial Work
+
+The [implementation audit](docs/commercial-readiness-audit.md) distinguishes
+configured swap fees from verified earnings. The proposed next business model is
+a [non-exclusive software license plus setup](docs/commercial/software-offer.md),
+with [customer delivery requirements](docs/commercial/customer-delivery.md) and
+an explicit [implementation backlog](docs/commercial/implementation-roadmap.md).
+This is not a claim of completed white-label provisioning, audited revenue or
+operator/provider legal clearance.
+
 ## Current Product
 
 Implemented:
