@@ -10,7 +10,8 @@ import {
   recordValue,
   stringValue
 } from "@/lib/server/quoteNormalization";
-import type { PlatformFeeConfig } from "@/lib/server/platformFees";
+import { ZERO_ADDRESS, type PlatformFeeConfig } from "@/lib/server/platformFees";
+import { FeeValidationError } from "@/lib/server/feeValidationError";
 
 export type ZeroXClientConfig = {
   apiKey: string;
@@ -30,6 +31,9 @@ export class ZeroXClient implements DexAggregatorClient {
   }
 
   async getQuote(params: QuoteParams): Promise<QuoteResponse> {
+    if (this.cfg.platformFee.enabled && this.cfg.platformFee.recipient === ZERO_ADDRESS) {
+      throw new FeeValidationError("0x requires a non-zero FEE_RECIPIENT_ADDRESS for monetized routes.");
+    }
     const url = new URL("/swap/allowance-holder/quote", this.cfg.baseUrl);
 
     url.searchParams.set("chainId", String(params.chainId));
@@ -110,12 +114,17 @@ function collectZeroXFees(body: Record<string, unknown>): QuoteFee[] {
     ? fees.integratorFees
     : [fees.integratorFee];
   const lines: QuoteFee[] = [];
-  for (const fee of [fees.zeroExFee, ...integratorFees]) {
+  for (const [index, fee] of [fees.zeroExFee, ...integratorFees].entries()) {
     const feeRecord = recordValue(fee);
     const amount = stringValue(feeRecord.amount);
     const token = stringValue(feeRecord.token);
     if (amount && token) {
-      lines.push({ label: "Service fee", amount, token });
+      lines.push({
+        label: index === 0 ? "0x provider fee" : "Platform fee",
+        kind: index === 0 ? "provider" : "platform",
+        amount,
+        token
+      });
     }
   }
   return lines;
@@ -123,19 +132,33 @@ function collectZeroXFees(body: Record<string, unknown>): QuoteFee[] {
 
 function assertZeroXIntegratorFee(body: Record<string, unknown>, buyToken: string) {
   const fees = recordValue(body.fees);
-  const integratorFees = Array.isArray(fees.integratorFees) && fees.integratorFees.length > 0
+  if (fees.integratorFees != null && !Array.isArray(fees.integratorFees)) {
+    throw new FeeValidationError("0x returned invalid integrator fee details.");
+  }
+  const integratorFees = Array.isArray(fees.integratorFees)
     ? fees.integratorFees
     : [fees.integratorFee];
   const expectedToken = normalizeNativeToken(buyToken);
-  const hasConfiguredFee = integratorFees.some((fee) => {
+  const hasConfiguredFee = integratorFees.length === 1 && integratorFees.every((fee) => {
     const feeRecord = recordValue(fee);
     const amount = stringValue(feeRecord.amount);
-    return /^\d+$/.test(amount)
+    return /^\d{1,78}$/.test(amount)
       && BigInt(amount) > 0n
+      && BigInt(amount) <= (1n << 256n) - 1n
+      && (feeRecord.type === undefined || feeRecord.type === "volume")
       && sameAsset(stringValue(feeRecord.token), expectedToken);
   });
   if (!hasConfiguredFee) {
-    throw new Error("0x did not include the configured service fee in this route.");
+    throw new FeeValidationError("0x did not include the configured service fee in this route.");
+  }
+  // Only one recipient is requested. If both API shapes are present, they
+  // must describe the same charge, not two different fees or a hidden split.
+  if (fees.integratorFee != null && Array.isArray(fees.integratorFees)) {
+    const legacy = recordValue(fees.integratorFee);
+    const current = recordValue(integratorFees[0]);
+    if (legacy.amount !== current.amount || !sameAsset(stringValue(legacy.token), stringValue(current.token))) {
+      throw new FeeValidationError("0x returned conflicting integrator fee details.");
+    }
   }
 }
 

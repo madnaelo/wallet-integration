@@ -8,6 +8,7 @@ import {
 import { getAddressFamilyForChain } from "@/lib/ecosystems";
 import { isAddress, isSolanaAddress } from "@/lib/validation";
 import type { PlatformFeeConfig } from "@/lib/server/platformFees";
+import { FeeValidationError } from "@/lib/server/feeValidationError";
 import { acquireLifiRequestBudget } from "@/lib/server/providerRequestBudget";
 import {
   assertExecutableQuote,
@@ -53,6 +54,9 @@ export class LifiClient implements DexAggregatorClient {
     }
 
     const integrator = this.cfg.integrator?.trim();
+    if (this.cfg.platformFee.enabled && !integrator) {
+      throw new FeeValidationError("LI.FI requires LIFI_INTEGRATOR for monetized routes.");
+    }
     if (integrator) {
       url.searchParams.set("integrator", integrator);
       if (this.cfg.platformFee.enabled) url.searchParams.set("fee", String(this.cfg.platformFee.feeFraction));
@@ -97,7 +101,7 @@ export class LifiClient implements DexAggregatorClient {
           share: "Best route"
         }
       ],
-      serviceFees: collectLifiFees(estimate.feeCosts),
+      serviceFees: collectLifiFees(estimate.feeCosts, hasPlatformFee ? this.cfg.integrator?.trim() : undefined),
       platformFeeBps: hasPlatformFee ? this.cfg.platformFee.feeBps : undefined
     };
 
@@ -160,20 +164,44 @@ function assertSolanaTransactionRequest(fields: { data: string }) {
   }
 }
 
-function collectLifiFees(value: unknown): QuoteFee[] {
+function collectLifiFees(value: unknown, integrator?: string): QuoteFee[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((feeValue) => {
+  return value.flatMap<QuoteFee>((feeValue) => {
     const fee = recordValue(feeValue);
     const tokenDetails = recordValue(fee.token);
     const amount = uintStringValue(fee.amount);
     const token = stringValue(tokenDetails.address);
-    if (!amount || !token) return [];
-    return [{ label: feeLabel(stringValue(fee.name)), amount, token }];
+    const platformAmount = integrator ? integratorAllocation(fee, integrator) : 0n;
+    if (!amount || !token) {
+      if (platformAmount > 0n) throw new FeeValidationError("LI.FI omitted the cost of its integrator fee allocation.");
+      return [];
+    }
+    if (platformAmount > BigInt(amount)) {
+      throw new FeeValidationError("LI.FI returned an inconsistent fee allocation.");
+    }
+    const remainder = BigInt(amount) - platformAmount;
+    const kind = /gas/i.test(stringValue(fee.name)) ? "bridge" : "provider";
+    const lines: QuoteFee[] = [];
+    if (platformAmount > 0n) {
+      lines.push({ label: "Platform fee", kind: "platform", amount: platformAmount.toString(), token });
+    }
+    if (remainder > 0n) {
+      lines.push({ label: kind === "bridge" ? "Bridge fee" : "Provider fee", kind, amount: remainder.toString(), token });
+    }
+    return lines;
   });
 }
 
-function feeLabel(name: string): string {
-  return /gas/i.test(name) ? "Bridge fee" : "Service fee";
+function integratorAllocation(fee: Record<string, unknown>, integrator: string): bigint {
+  const recipients = recordValue(fee.feeSplit).recipients;
+  if (!Array.isArray(recipients)) return 0n;
+  return recipients.reduce<bigint>((sum, value) => {
+    const recipient = recordValue(value);
+    if (stringValue(recipient.name) !== integrator) return sum;
+    const amount = uintStringValue(recipient.fee);
+    if (!amount) throw new FeeValidationError("LI.FI returned an invalid integrator fee amount.");
+    return sum + BigInt(amount);
+  }, 0n);
 }
 
 function gasCostPrice(costs: unknown[]): string {
@@ -225,12 +253,12 @@ function assertLifiIntegratorFee(
   platformFee: PlatformFeeConfig
 ) {
   if (stringValue(body.integrator) !== integrator) {
-    throw new Error("LI.FI did not preserve the configured integration on this route.");
+    throw new FeeValidationError("LI.FI did not preserve the configured integration on this route.");
   }
 
   const returnedFee = Number(body.fee);
   if (!Number.isFinite(returnedFee) || Math.abs(returnedFee - platformFee.feeFraction) > 1e-12) {
-    throw new Error("LI.FI did not preserve the configured service fee on this route.");
+    throw new FeeValidationError("LI.FI did not preserve the configured service fee on this route.");
   }
 
   const expectedFee = (BigInt(params.sellAmount) * BigInt(platformFee.feeBps)) / 10_000n;
@@ -246,17 +274,10 @@ function assertLifiIntegratorFee(
     const feeToken = stringValue(recordValue(fee.token).address);
     if (!sameLifiAsset(feeToken, params.sellToken)) return total;
 
-    const recipients = recordValue(fee.feeSplit).recipients;
-    if (!Array.isArray(recipients)) return total;
-    return recipients.reduce<bigint>((recipientTotal, recipientValue) => {
-      const recipient = recordValue(recipientValue);
-      if (stringValue(recipient.name) !== integrator) return recipientTotal;
-      const amount = uintStringValue(recipient.fee);
-      return amount ? recipientTotal + BigInt(amount) : recipientTotal;
-    }, total);
+    return total + integratorAllocation(fee, integrator);
   }, 0n);
   if (returnedAmount < expectedFee) {
-    throw new Error("LI.FI did not include the configured service fee in this route.");
+    throw new FeeValidationError("LI.FI did not include the configured service fee in this route.");
   }
 }
 

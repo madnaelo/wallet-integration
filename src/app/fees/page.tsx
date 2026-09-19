@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalOperatorDisclosure } from "@/components/LegalOperatorDisclosure";
+import { configuredPlatformFeeBps } from "@/lib/server/platformFees";
 
 export const metadata: Metadata = {
   title: "Fees & Risks",
@@ -118,7 +119,6 @@ export default function FeesPage() {
 }
 
 function configuredPlatformFeePercent(): string {
-  const parsed = Number(process.env.PLATFORM_FEE_BPS ?? "20");
-  const basisPoints = Number.isFinite(parsed) && parsed >= 0 && parsed <= 300 ? parsed : 20;
+  const basisPoints = configuredPlatformFeeBps();
   return String(basisPoints / 100).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }

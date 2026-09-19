@@ -167,8 +167,9 @@ Action remaining:
 - Obtain the Velora/ParaSwap API key or confirmation of partner access.
 - Add `PARASWAP_API_KEY` to Vercel.
 - Run a small real swap and verify fee behavior.
-- If Velora does not reply, follow up or keep ParaSwap enabled only as a
-  best-effort public-rate-limit provider.
+- If Velora does not reply, keep ParaSwap disabled. An available public endpoint
+  or API key does not replace the commercial confirmation required by provider
+  policy.
 
 Reference:
 

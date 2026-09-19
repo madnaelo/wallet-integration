@@ -108,6 +108,7 @@ type QuoteValidationErrors = {
 };
 type FeeLine = {
   label: string;
+  kind?: "platform" | "provider" | "bridge";
   amount: string;
   token: DisplayToken;
   display: string;
@@ -3415,9 +3416,15 @@ export default function Page() {
                 </div>
               </div>
               <div className="kv">
-                <div className="subtle">Service fee</div>
+                <div className="subtle">Swap fees</div>
                 <div className="mono">{quoteSummary?.swapFeeTotal ?? ""}</div>
               </div>
+              {quoteSummary?.swapFeeLines.filter((fee) => fee.kind === "platform").map((fee, index) => (
+                <div className="kv" key={`platform-${fee.token.address}-${index}`}>
+                  <div className="subtle">Platform fee ({quoteSummary.platformFeeLabel})</div>
+                  <div className="mono feeAmount">{renderFeeDetail(fee)}</div>
+                </div>
+              ))}
               {quoteSummary?.warnings.length ? (
                 <div className="quoteWarnings" role="status" aria-live="polite">
                   {quoteSummary.warnings.map((warning) => (
@@ -3433,7 +3440,7 @@ export default function Page() {
                     <span className="subtle">Details</span>
                     <span className="mono">Minimum, fees, network</span>
                   </summary>
-                  {quoteSummary.swapFeeLines.map((fee, index) => (
+                  {quoteSummary.swapFeeLines.filter((fee) => fee.kind !== "platform").map((fee, index) => (
                     <div className="kv" key={`${fee.label}-${fee.token.address}-${index}`}>
                       <div className="subtle">{fee.label}</div>
                       <div className="mono feeAmount">{renderFeeDetail(fee)}</div>
@@ -3441,7 +3448,7 @@ export default function Page() {
                   ))}
                   {!quoteSummary.swapFeeLines.length && quoteSummary.platformFeeLabel ? (
                     <div className="kv">
-                      <div className="subtle">Service fee</div>
+                      <div className="subtle">Platform fee</div>
                       <div className="mono">{quoteSummary.platformFeeLabel}</div>
                     </div>
                   ) : null}
@@ -5159,13 +5166,14 @@ function formatRouteSummary(lines: RouteLine[], providerName?: string): string {
 function collectFeeLines(quote: QuoteResponse, tokenForAddress: (address: string) => DisplayToken): FeeLine[] {
   if (Array.isArray(quote.serviceFees) && quote.serviceFees.length) {
     return quote.serviceFees
-      .map((fee) => {
+      .map((fee): FeeLine | null => {
         const amount = stringValue(fee.amount);
         const tokenAddress = stringValue(fee.token);
         if (!amount || !tokenAddress) return null;
         const token = tokenForAddress(tokenAddress);
         return {
           label: stringValue(fee.label) || "Service fee",
+          kind: fee.kind,
           amount,
           token,
           display: formatTokenAmount(amount, token)

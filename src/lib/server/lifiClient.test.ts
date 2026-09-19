@@ -43,6 +43,41 @@ afterEach(() => {
 });
 
 describe("LI.FI routing", () => {
+  it("rejects an absent integrator before requesting a monetized quote", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(new LifiClient({ baseUrl: "https://li.quest", platformFee: feeConfig })
+      .getQuote(baseParams)).rejects.toThrow(/requires LIFI_INTEGRATOR/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([{ integrator: "someone-else" }, { fee: 0.003 }, { fee: null }])(
+    "rejects altered integration settings %#", async (override) => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(lifiResponse(override)));
+      await expect(createClient().getQuote(baseParams)).rejects.toMatchObject({ name: "FeeValidationError" });
+    }
+  );
+
+  it("rejects insufficient fee allocation", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(lifiResponse({}, "1")));
+    await expect(createClient().getQuote(baseParams)).rejects.toThrow(/configured service fee/);
+  });
+
+  it("rejects an allocation larger than the total disclosed cost", async () => {
+    const response = lifiResponse();
+    const body = await response.json();
+    body.estimate.feeCosts[0].amount = "1";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(body))));
+    await expect(createClient().getQuote(baseParams)).rejects.toThrow(/inconsistent fee allocation/);
+  });
+
+  it("rejects an allocation whose parent cost is missing", async () => {
+    const body = await lifiResponse().json();
+    delete body.estimate.feeCosts[0].amount;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(body))));
+    await expect(createClient().getQuote(baseParams)).rejects.toThrow(/omitted the cost/);
+  });
+
   it("requests an executable cross-chain route with monetization intact", async () => {
     const fetchMock = vi.fn().mockResolvedValue(lifiResponse({
       transactionRequest: {
@@ -185,7 +220,7 @@ function lifiResponse(
       approvalAddress: ROUTER,
       feeCosts: [{
         name: "LIFI Fixed Fee",
-        amount: integratorFeeAmount,
+        amount: (BigInt(integratorFeeAmount) + 1n).toString(),
         token: { address: integratorFeeToken },
         feeSplit: {
           recipients: [

@@ -41,6 +41,9 @@ function createEnabledClients(fromChainId: number, toChainId: number): DexAggreg
   const providers = policy.enabled;
   const clients: DexAggregatorClient[] = [];
   const platformFee = createPlatformFeeConfig();
+  if (policy.monetized.size > 0 && !platformFee.enabled) {
+    throw new Error("Monetized swap providers require a positive PLATFORM_FEE_BPS.");
+  }
   const sameChain = fromChainId === toChainId;
   const chain = sameChain ? getChainById(fromChainId) : undefined;
 

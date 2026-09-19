@@ -12,18 +12,22 @@ export type PlatformFeeConfig = {
   paraswapPartner: string;
 };
 
-export function createPlatformFeeConfig(): PlatformFeeConfig {
-  const rawRecipient = env.FEE_RECIPIENT_ADDRESS.trim() || env.AFFILIATE_ADDRESS.trim();
+type FeeEnvironment = Pick<typeof env,
+  "FEE_RECIPIENT_ADDRESS" | "AFFILIATE_ADDRESS" | "PLATFORM_FEE_BPS" | "PARASWAP_PARTNER"
+>;
+
+export function createPlatformFeeConfig(config: FeeEnvironment = env): PlatformFeeConfig {
+  const rawRecipient = config.FEE_RECIPIENT_ADDRESS.trim() || config.AFFILIATE_ADDRESS.trim();
   const recipient = normalizeRecipient(rawRecipient);
-  const feeBps = normalizeFeeBps(env.PLATFORM_FEE_BPS);
+  const feeBps = configuredPlatformFeeBps(config.PLATFORM_FEE_BPS);
 
   return {
-    enabled: feeBps > 0 && recipient !== ZERO_ADDRESS,
+    enabled: feeBps > 0,
     recipient,
     feeBps,
     feePercent: formatFeePercent(feeBps),
     feeFraction: feeBps / 10_000,
-    paraswapPartner: env.PARASWAP_PARTNER.trim() || "swapassistant"
+    paraswapPartner: config.PARASWAP_PARTNER.trim() || "swapassistant"
   };
 }
 
@@ -33,13 +37,13 @@ function normalizeRecipient(value: string): string {
   return getAddress(value);
 }
 
-function normalizeFeeBps(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  const rounded = Math.round(value);
-  if (rounded < 0 || rounded > 300) {
-    throw new Error("PLATFORM_FEE_BPS must be between 0 and 300.");
+export function configuredPlatformFeeBps(value: string = env.PLATFORM_FEE_BPS): number {
+  const normalized = value.trim();
+  const feeBps = Number(normalized);
+  if (!/^\d+$/.test(normalized) || !Number.isInteger(feeBps) || feeBps < 0 || feeBps > 300) {
+    throw new Error("PLATFORM_FEE_BPS must be a whole number between 0 and 300.");
   }
-  return rounded;
+  return feeBps;
 }
 
 function formatFeePercent(feeBps: number): string {

@@ -61,7 +61,8 @@ export const env = {
   LIFI_REQUEST_BUDGET_MAX: optionalNumber("LIFI_REQUEST_BUDGET_MAX", 100),
   AFFILIATE_ADDRESS: optional("AFFILIATE_ADDRESS", "0x0000000000000000000000000000000000000000"),
   FEE_RECIPIENT_ADDRESS: optional("FEE_RECIPIENT_ADDRESS", ""),
-  PLATFORM_FEE_BPS: optionalNumber("PLATFORM_FEE_BPS", 20),
+  // Keep invalid explicit values for strict validation; never substitute a fee.
+  PLATFORM_FEE_BPS: process.env.PLATFORM_FEE_BPS ?? "20",
   CORS_ALLOW_ORIGINS: optional("CORS_ALLOW_ORIGINS", "http://localhost:3000"),
   REQUIRE_ALLOWED_ORIGIN: optionalBoolean("REQUIRE_ALLOWED_ORIGIN", false),
   RATE_LIMIT_WINDOW_MS: optionalNumber("RATE_LIMIT_WINDOW_MS", 60_000),

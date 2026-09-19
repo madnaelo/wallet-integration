@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DexAggregatorClient, QuoteParams } from "@/lib/server/aggregator";
 import { MultiQuoteProvider } from "@/lib/server/multiQuoteProvider";
 import type { QuoteResponse } from "@/lib/types";
+import { FeeValidationError } from "@/lib/server/feeValidationError";
 
 const params: QuoteParams = {
   chainId: 1,
@@ -21,6 +22,23 @@ afterEach(() => {
 });
 
 describe("multi-provider quote fallback", () => {
+  it("isolates an unverified fee and still ranks healthy routes by net output", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const invalid = {
+      providerId: "invalid", providerName: "Invalid fee",
+      async getQuote(): Promise<QuoteResponse> {
+        throw new FeeValidationError("missing configured fee");
+      }
+    };
+    const result = await new MultiQuoteProvider([
+      successfulClient("lower", "199"), invalid, successfulClient("higher", "200")
+    ]).getQuote(params);
+    expect(result.availableQuotes?.map((quote) => quote.providerId)).toEqual(["higher", "lower"]);
+    expect(result.quoteErrors).toEqual([expect.objectContaining({ providerId: "invalid" })]);
+    expect(console.warn).toHaveBeenCalledWith(expect.objectContaining({ errorType: "FeeValidationError" }));
+  });
+
   it("returns a healthy provider quote when another provider is rate limited", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -55,6 +73,15 @@ describe("multi-provider quote fallback", () => {
     ]);
 
     await expect(provider.getQuote(params)).rejects.toMatchObject({ status: 422 });
+  });
+
+  it("does not misreport unverified fees as an unsupported token pair", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const invalid = {
+      providerId: "invalid", providerName: "Invalid fee",
+      async getQuote(): Promise<QuoteResponse> { throw new FeeValidationError("fee missing"); }
+    };
+    await expect(new MultiQuoteProvider([invalid]).getQuote(params)).rejects.toMatchObject({ status: 503 });
   });
 });
 

@@ -7,6 +7,7 @@ export type QuoteFee = {
   label: string;
   amount: string;
   token: string;
+  kind?: "platform" | "provider" | "bridge";
 };
 
 export type QuoteToken = {

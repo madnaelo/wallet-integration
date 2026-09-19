@@ -71,6 +71,10 @@ describe("provider monetization requests", () => {
     expect(quote.grossBuyAmount).toBe("1005");
     expect(quote.routeLines).toEqual([{ source: "Uniswap_V3", share: "100%" }]);
     expect(quote.serviceFees).toHaveLength(2);
+    expect(quote.serviceFees).toEqual([
+      { label: "0x provider fee", kind: "provider", amount: "3", token: BUY_TOKEN },
+      { label: "Platform fee", kind: "platform", amount: "2", token: BUY_TOKEN }
+    ]);
     expect(quote).not.toHaveProperty("transaction");
     expect(quote).not.toHaveProperty("fees");
     expect(quote).not.toHaveProperty("route");
@@ -129,7 +133,7 @@ describe("provider monetization requests", () => {
         approvalAddress: ALLOWANCE_TARGET,
         feeCosts: [{
           name: "LIFI Fixed Fee",
-          amount: "20000000000000",
+          amount: "20000000000001",
           token: { address: SELL_TOKEN },
           feeSplit: {
             recipients: [
@@ -165,6 +169,10 @@ describe("provider monetization requests", () => {
     expect(url.searchParams.get("toChain")).toBe(String(NATIVE_BITCOIN_CHAIN_ID));
     expect(quote.netBuyAmount).toBe("1000");
     expect(quote.grossBuyAmount).toBe("1000");
+    expect(quote.serviceFees).toEqual([
+      { label: "Platform fee", kind: "platform", amount: "20000000000000", token: SELL_TOKEN },
+      { label: "Provider fee", kind: "provider", amount: "1", token: SELL_TOKEN }
+    ]);
   });
 
   it("rejects a 0x quote when the configured affiliate fee is absent", async () => {
@@ -181,6 +189,32 @@ describe("provider monetization requests", () => {
       baseUrl: "https://api.0x.org",
       platformFee: feeConfig
     }).getQuote(params)).rejects.toThrow(/configured service fee/i);
+  });
+
+  it.each([
+    { integratorFee: { amount: "0", token: BUY_TOKEN } },
+    { integratorFee: { amount: "-1", token: BUY_TOKEN } },
+    { integratorFee: { amount: "2", token: SELL_TOKEN } },
+    { integratorFee: { amount: "9".repeat(79), token: BUY_TOKEN } },
+    { integratorFee: { amount: "2", token: BUY_TOKEN, type: "surplus" } },
+    { integratorFees: [{ amount: "2", token: BUY_TOKEN }, { amount: "3", token: BUY_TOKEN }] },
+    { integratorFees: [], integratorFee: { amount: "2", token: BUY_TOKEN } },
+    { integratorFees: {}, integratorFee: { amount: "2", token: BUY_TOKEN } },
+    { integratorFees: [{ amount: "2", token: BUY_TOKEN }], integratorFee: { amount: "3", token: BUY_TOKEN } }
+  ])("rejects inconsistent 0x fee shape %#", async (fees) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ fees })));
+    await expect(new ZeroXClient({ apiKey: "test-key", baseUrl: "https://api.0x.org", platformFee: feeConfig })
+      .getQuote(params)).rejects.toMatchObject({ name: "FeeValidationError" });
+  });
+
+  it("rejects a missing 0x recipient before spending a provider request", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(new ZeroXClient({
+      apiKey: "test-key", baseUrl: "https://api.0x.org",
+      platformFee: { ...feeConfig, recipient: "0x0000000000000000000000000000000000000000" }
+    }).getQuote(params)).rejects.toThrow(/non-zero FEE_RECIPIENT_ADDRESS/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
