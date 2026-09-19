@@ -46,8 +46,8 @@ describe("provider monetization requests", () => {
       minBuyAmount: "950",
       fees: {
         zeroExFee: { amount: "3", token: BUY_TOKEN },
-        integratorFee: { amount: "2", token: BUY_TOKEN },
-        integratorFees: [{ amount: "2", token: BUY_TOKEN }]
+        integratorFee: { amount: "20000000000000", token: SELL_TOKEN },
+        integratorFees: [{ amount: "20000000000000", token: SELL_TOKEN }]
       },
       route: {
         fills: [{ source: "Uniswap_V3", proportionBps: "10000", from: SELL_TOKEN, to: BUY_TOKEN }]
@@ -66,14 +66,14 @@ describe("provider monetization requests", () => {
     const url = requestUrl(fetchMock);
     expect(url.searchParams.get("swapFeeRecipient")).toBe(FEE_RECIPIENT);
     expect(url.searchParams.get("swapFeeBps")).toBe("20");
-    expect(url.searchParams.get("swapFeeToken")).toBe(BUY_TOKEN);
+    expect(url.searchParams.get("swapFeeToken")).toBe(SELL_TOKEN);
     expect(quote.netBuyAmount).toBe("1000");
-    expect(quote.grossBuyAmount).toBe("1005");
+    expect(quote.grossBuyAmount).toBe("1003");
     expect(quote.routeLines).toEqual([{ source: "Uniswap_V3", share: "100%" }]);
     expect(quote.serviceFees).toHaveLength(2);
     expect(quote.serviceFees).toEqual([
       { label: "0x provider fee", kind: "provider", amount: "3", token: BUY_TOKEN },
-      { label: "Platform fee", kind: "platform", amount: "2", token: BUY_TOKEN }
+      { label: "Platform fee", kind: "platform", amount: "20000000000000", token: SELL_TOKEN }
     ]);
     expect(quote).not.toHaveProperty("transaction");
     expect(quote).not.toHaveProperty("fees");
@@ -192,6 +192,8 @@ describe("provider monetization requests", () => {
   });
 
   it.each([
+    { integratorFee: { amount: "19999999999999", token: SELL_TOKEN } },
+    { integratorFee: { amount: "20000000000001", token: SELL_TOKEN } },
     { integratorFee: { amount: "0", token: BUY_TOKEN } },
     { integratorFee: { amount: "-1", token: BUY_TOKEN } },
     { integratorFee: { amount: "2", token: SELL_TOKEN } },
@@ -215,6 +217,17 @@ describe("provider monetization requests", () => {
       platformFee: { ...feeConfig, recipient: "0x0000000000000000000000000000000000000000" }
     }).getQuote(params)).rejects.toThrow(/non-zero FEE_RECIPIENT_ADDRESS/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses integer floor rounding for fractional base-unit fees", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      sellAmount: "100000001", buyAmount: "1000", minBuyAmount: "950",
+      fees: { integratorFee: { amount: "200000", token: SELL_TOKEN } },
+      transaction: { to: ROUTER, data: "0x1234", value: "0" }
+    })));
+    const result = await new ZeroXClient({ apiKey: "test", baseUrl: "https://api.0x.org", platformFee: feeConfig })
+      .getQuote({ ...params, sellAmount: "100000001" });
+    expect(result.serviceFees?.[0]?.amount).toBe("200000");
   });
 });
 

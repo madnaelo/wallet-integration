@@ -1,83 +1,72 @@
-# Commercial Implementation Roadmap
+# Commercial Implementation Status
 
-Status after the first commercial-readiness pass. The owner's stated direction
-is selling software; the attached ten-phase brief is retained as a technical
-backlog, not misrepresented as completed work.
+This branch implements the fee-hardening, trusted revenue, branding and deployment
+preflight work. It is not a production release, legal clearance or payout test.
 
-## Completed In This Pass
+## Implemented
 
-- Pre-change [implementation audit](../commercial-readiness-audit.md), including
-  exact fee parameters, policy, treasury configuration, persistence and trust gaps.
-- Strict whole-number fee parsing using the existing 300-BPS cap; explicit
-  invalid/zero monetized configuration no longer silently becomes a different fee.
-- Provider-local missing treasury/integrator rejection, preserving healthy-provider
-  fallback. 0x checks one nonzero fee in the requested token, bounds its amount and
-  rejects conflicting response shapes. This is not cryptographic payout proof.
-- LI.FI allocations are disclosed as platform plus remaining provider/bridge cost,
-  preserving total fees and net output. Invalid/missing parent cost is rejected.
-- Visible platform-fee amount/percentage and separate provider labels; fee-page
-  disclosure reads the same configuration validator.
-- Deterministic tests for configuration, policy, malformed/missing fees, cost
-  partitioning and failure isolation. Fee-validation errors have a distinct,
-  redacted log type; logs are not a durable accounting system.
-- Draft software offer and customer handover/acceptance checklist.
+- 0x fees use the sell token and must equal
+  `floor(sellAmount * PLATFORM_FEE_BPS / 10000)`. Positive but incorrect amounts,
+  conflicting fee shapes and mismatched denominations are rejected.
+- Source-token fee conversions are visibly approximate. The destination
+  "before fees" row is hidden when it cannot be reconstructed.
+- Durable signed server quote evidence, V30 migration, authenticated history
+  binding, idempotent records, independent settlement checks and bounded leases.
+- Protected revenue dashboard/API, separate expected/accrued/received amounts,
+  provider/chain/token/time breakdowns, verified volume, provider fee-validation
+  failures and first-party quote/review/submitted/confirmed funnel.
+- A shared brand contract across web, metadata, wallet connection, PWA and backend
+  messages; custom brands require their own operator disclosure.
+- Read-only deployment preflight checking customer resource isolation, reviewed
+  targets, origins, credentials, provider policy, brand assets and evidence setup.
+- Docker build context now includes its local dependency and provider policy;
+  Compose forwards the new settings without changing existing release targets.
 
-## Verification On September 19, 2026
+See [fee semantics](fee-evidence-semantics.md),
+[revenue operations](revenue-accounting.md) and
+[branding/preflight](branding-and-preflight.md) for mechanisms and commands.
 
-- Frontend: 189 tests passed across 31 files (`npm test`).
-- `npm run typecheck`, `npm run lint`, and `npm run build` passed.
-- Backend: 172 existing tests passed using Maven offline and the existing Java 17
-  toolchain. No production database was used; backend source/schema is unchanged.
-- Browser: all 7 existing Playwright acceptance tests passed on local port 4189,
-  including mobile picker bounds, sign-in gates, contact form and public metadata.
-  These are mocked public-flow tests, not a connected-wallet fee-payout test.
-- No real transactions, received revenue, new provider approvals or customer
-  deployments were tested. The new work is isolated on `feat/commercial-readiness`;
-  it has not been merged into the production release branch.
+## Evidence Boundaries
 
-Non-blocking tooling messages: Vite warns about a future native configuration
-loader default; the local browser runner reports conflicting color environment
-variables. Neither was hidden or treated as a product failure.
+Browser-confirmed history never establishes received revenue. Finalized standard
+ERC-20 treasury transfer logs can establish 0x receipt. LI.FI aggregate balances
+and delivery status do not establish a transaction's integrator payout.
+Native-token transfers need trace evidence; non-EVM sources need their own
+independent adapters. Those fees stay `NOT_VERIFIED`, not estimated earnings.
 
-## Next: A Coherent Licensed Deployment
+`ACCRUED` is a separate supported state, but no current provider adapter emits it
+without transaction-scoped accrual evidence. There is no invented accrual or USD
+valuation. Limit-order fees are not part of this swap-quote revenue pipeline.
 
-1. Implement one branding contract covering web, wallet, PWA and backend messages,
-   safe same-origin assets/support links, and documented operator/legal overrides.
-   Keep treasury/provider policy server-only. Test a second fictional brand
-   without publishing a customer deployment or changing production identity.
-2. Add a customer deployment preflight that verifies isolation and rejects missing
-   identity, credentials, allowed origins, fee configuration or release targets.
-3. Review dependency/source/asset licensing and prepare a sanitized handover
-   artifact; do not export the entire private repository history.
-4. Validate the offer through a scoped paid pilot before adding multi-tenancy,
-   subscription billing or an open-ended managed-service commitment.
+The quote-signing key is a server credential, not a wallet key. These controls
+detect browser/database payload substitution; they cannot guarantee integrity if
+the signing server, its secrets or the selected RPC itself is compromised.
 
-## Separate Track: Trusted Revenue Accounting
+## Verification And Rollout
 
-Still unimplemented from the attached brief: durable revenue model/migration,
-settlement reconciliation, protected admin dashboard and durable funnel metrics.
-Do not use browser-submitted `confirmed` history as authoritative revenue.
+See the [executed verification record](verification.md) for results and any
+external-service limitations on the final audit run.
 
-The implementation must use server-originated quote evidence bound to the
-authenticated owner and exact chain/assets/amounts/request, plus independent
-settlement verification. Retain idempotency, transaction boundaries, provenance,
-retry leases, bounded indexed aggregation and access checks. Old history without
-evidence must stay unverified. Dry runs are excluded from earned revenue.
+The repository's combined verification command covers frontend tests, preflight
+tests, audit, typecheck, lint, production build, Playwright, backend tests,
+SpotBugs and Compose validation. The additional database tests use only an
+explicit disposable database. See the revenue runbook for the opt-in variables.
 
-Use `EXPECTED`, `NOT_VERIFIED`, `ACCRUED`, `RECEIVED`, `FAILED` with documented
-transitions and an audit trail. A refund may still incur fees: verify the actual
-provider/chain result rather than automatically inventing a zero fee or payout.
-Accrued and later received amounts are stages of the same fee, not two earnings.
-Group raw amounts by chain/token/decimals; USD totals need price provenance and
-coverage. Missing valuations are unavailable, not zero.
+Revenue capture is disabled by default for backward-compatible rollout. Deploy
+and configure the backend first, then enable matching frontend runtime settings.
+When enabled, evidence-storage failure prevents a new quote from being returned.
+This branch does not alter production deployment targets or enable blocked
+providers. It must pass review before merging into the existing release branch.
 
-0x's buy-token response does not echo an independently signed treasury/rate
-assertion. Current checks establish fee presence/shape, not exact settlement.
-Resolve that evidence boundary before claiming the requested BPS or recipient has
-been proven on-chain. LI.FI delivery completion similarly does not prove integrator
-payout. Unprovable provider outcomes must stay `NOT_VERIFIED`.
+No real-money transaction or customer deployment is performed by these tests.
+Provider account eligibility, legal review, owner-approved payout testing and
+customer acceptance remain separate release gates, not unimplemented substitutes
+for the engineering requested here.
 
-Add the admin report only after those foundations: bounded pagination/time windows,
-provider/chain/token breakdowns, expected versus verified settlement, failure
-counts and privacy-conscious funnel metrics. No wallet addresses or transaction
-contents should go to third-party analytics by default.
+## Business Work Outside This Implementation
+
+The proposed offer remains a [non-exclusive license plus setup](software-offer.md).
+Before a customer handover, review dependency/source/asset licensing and the
+sanitized delivery artifact; exclude private Git history, secrets and regulatory
+correspondence. Validate the offer through a scoped paid pilot before taking on
+multi-tenancy, subscription billing or an open-ended managed-service obligation.

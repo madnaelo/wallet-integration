@@ -24,7 +24,8 @@ they are not a claim that customer provisioning is already automated.
 Before calling a deployment white-label, cover web headings/copy, wallet
 connection metadata, auth signature text, PWA name/icons, notification titles and
 bodies, metadata/social images, contact messages, fee label and support destination.
-The current product has hard-coded branding in these surfaces; changing a header
+The shared brand contract now covers these surfaces. Configure and verify it with
+the [branding and preflight runbook](branding-and-preflight.md); changing a header
 alone does not satisfy this checklist.
 
 The buyer must provide its real operator details, privacy/contact routing and

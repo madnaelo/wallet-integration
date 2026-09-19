@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "swap-assistant-pwa-";
 const CACHE_NAME = `${CACHE_PREFIX}v2`;
 const OFFLINE_URL = "/offline";
-const PRECACHE_URLS = [OFFLINE_URL, "/favicon.svg", "/apple-touch-icon.svg"];
+const PRECACHE_URLS = [OFFLINE_URL];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -46,12 +46,23 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
+  event.waitUntil(showPush(event));
+});
+
+async function showPush(event) {
   const payload = readPushPayload(event);
-  const title = payload.title || "Swap Assistant";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1500);
+  const manifest = await fetch("/manifest.webmanifest", { cache: "no-store", signal: controller.signal })
+    .then((response) => response.ok ? response.json() : {})
+    .catch(() => ({}))
+    .finally(() => clearTimeout(timeout));
+  const title = payload.title || manifest.name || "Swap alert";
+  const iconUrl = sanitizeNotificationUrl(manifest.icons && manifest.icons[0] && manifest.icons[0].src);
   const options = {
-    body: payload.body || "Open Swap Assistant to review your alert.",
-    icon: "/favicon.svg",
-    badge: "/favicon.svg",
+    body: payload.body || "Open the app to review your alert.",
+    icon: iconUrl === "/swap" ? "/icon-192.png" : iconUrl,
+    badge: iconUrl === "/swap" ? "/icon-192.png" : iconUrl,
     tag: payload.tag || "swap-assistant-alert",
     renotify: false,
     data: {
@@ -59,8 +70,8 @@ self.addEventListener("push", (event) => {
     }
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
-});
+  await self.registration.showNotification(title, options);
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

@@ -17,7 +17,8 @@ class SwapHistoryServiceTest {
 
   private final SwapHistoryRepository repository = mock(SwapHistoryRepository.class);
   private final WalletMutationLock walletMutationLock = mock(WalletMutationLock.class);
-  private final SwapHistoryService service = new SwapHistoryService(repository, walletMutationLock);
+  private final SwapHistoryService service = new SwapHistoryService(repository, walletMutationLock,
+      mock(com.wallet.swap.revenue.RevenueService.class));
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Test

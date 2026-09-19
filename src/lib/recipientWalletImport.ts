@@ -1,3 +1,4 @@
+import { BRAND } from "@/lib/brand";
 import {
   NATIVE_BITCOIN_NETWORK_ID,
   SOLANA_NETWORK_ID,
@@ -103,10 +104,10 @@ function getRecipientImportClient(projectId: string, origin: string): Promise<Re
     clientPromise = import("@walletconnect/sign-client").then(({ default: SignClient }) => SignClient.init({
       projectId,
       metadata: {
-        name: "Swap Assistant",
-        description: "Your Personal Swap Assistant",
+        name: BRAND.name,
+        description: "Your Personal " + BRAND.name,
         url: origin,
-        icons: []
+        icons: [new URL(BRAND.icon, origin).toString()]
       }
     }));
   }

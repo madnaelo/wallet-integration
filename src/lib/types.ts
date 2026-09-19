@@ -24,6 +24,7 @@ export type QuoteProviderError = {
 };
 
 export type QuoteResponse = {
+  revenueQuoteId?: string;
   quoteId?: string;
   providerQuoteId?: string;
   bridgeTool?: string;

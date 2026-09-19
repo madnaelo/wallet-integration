@@ -41,8 +41,10 @@ export class MultiQuoteProvider implements DexAggregatorClient {
     settled.forEach((result, index) => {
       const client = candidates[index]!;
       if (result.status === "fulfilled") {
+        params.onProviderOutcome?.({ provider: client.providerId, outcome: "quoted" });
         quotes.push(result.value.quote);
       } else {
+        params.onProviderOutcome?.({ provider: client.providerId, outcome: result.reason instanceof Error && result.reason.name === "FeeValidationError" ? "fee_validation_failed" : "unavailable" });
         logProviderResult(client, params.chainId, undefined, result.reason);
         quoteErrors.push(providerError(client.providerId, client.providerName, result.reason));
       }

@@ -1,11 +1,12 @@
+import { BRAND } from "@/lib/brand";
 import type { Metadata, Viewport } from "next";
 import { PwaClient } from "@/components/PwaClient";
 import "./globals.css";
 
 const siteUrl = getSiteUrl();
-const title = "Swap Assistant";
+const title = BRAND.name;
 const description = "Compare available crypto swap quotes, set price alerts, and create non-custodial limit orders while your wallet stays in control.";
-const ogImage = "/og-image.png";
+const ogImage = BRAND.socialImage;
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
@@ -65,10 +66,10 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/favicon.svg", type: "image/svg+xml" }
+      { url: BRAND.assetsBase + "/favicon.ico", sizes: "any" },
+      { url: BRAND.assetsBase + "/favicon.svg", type: "image/svg+xml" }
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+    apple: [{ url: BRAND.assetsBase + "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
   }
 };
 

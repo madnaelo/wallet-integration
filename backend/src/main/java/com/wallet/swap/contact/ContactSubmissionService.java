@@ -6,6 +6,7 @@ import com.wallet.swap.contact.ContactModels.ContactSubmissionRequest;
 import com.wallet.swap.contact.ContactModels.ContactSubmissionResponse;
 import com.wallet.swap.notification.NotificationOutboxRepository;
 import com.wallet.swap.config.NotificationProperties;
+import com.wallet.swap.config.BrandProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -34,14 +35,16 @@ public class ContactSubmissionService {
   private final ContactSubmissionRepository repository;
   private final NotificationOutboxRepository outboxRepository;
   private final NotificationProperties notificationProperties;
+  private final BrandProperties brand;
 
   public ContactSubmissionService(
       ContactSubmissionRepository repository,
       NotificationOutboxRepository outboxRepository,
-      NotificationProperties notificationProperties) {
+      NotificationProperties notificationProperties, BrandProperties brand) {
     this.repository = repository;
     this.outboxRepository = outboxRepository;
     this.notificationProperties = notificationProperties;
+    this.brand = brand;
   }
 
   @Transactional
@@ -87,10 +90,10 @@ public class ContactSubmissionService {
     if (!emailProperties.isEnabled() || recipient.isBlank()) return;
 
     String displayName = name == null ? "Not provided" : name;
-    String subject = "[Swap Assistant] New " + topicLabel(topic) + " message";
+    String subject = "[" + brand.name() + "] New " + topicLabel(topic) + " message";
     String body = String.join(
         System.lineSeparator(),
-        "A new message was received through the Swap Assistant contact form.",
+        "A new message was received through the " + brand.name() + " contact form.",
         "",
         "Reference: " + id,
         "Topic: " + topicLabel(topic),

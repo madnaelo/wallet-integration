@@ -19,12 +19,15 @@ public class SwapHistoryService {
 
   private final SwapHistoryRepository swapHistoryRepository;
   private final WalletMutationLock walletMutationLock;
+  private final com.wallet.swap.revenue.RevenueService revenueService;
 
   public SwapHistoryService(
       SwapHistoryRepository swapHistoryRepository,
-      WalletMutationLock walletMutationLock) {
+      WalletMutationLock walletMutationLock,
+      com.wallet.swap.revenue.RevenueService revenueService) {
     this.swapHistoryRepository = swapHistoryRepository;
     this.walletMutationLock = walletMutationLock;
+    this.revenueService = revenueService;
   }
 
   @Transactional
@@ -39,7 +42,9 @@ public class SwapHistoryService {
         && swapHistoryRepository.countForWallet(walletAddress) >= MAX_HISTORY_ENTRIES_PER_WALLET) {
       throw new ApiException(HttpStatus.CONFLICT, "History storage for this wallet is full.");
     }
-    return swapHistoryRepository.save(walletAddress, request);
+    SwapHistoryResponse saved = swapHistoryRepository.save(walletAddress, request);
+    revenueService.bind(walletAddress, request, saved);
+    return saved;
   }
 
   public List<SwapHistoryResponse> list(String walletAddress, int limit) {

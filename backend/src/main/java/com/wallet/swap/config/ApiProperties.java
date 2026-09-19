@@ -10,6 +10,10 @@ public class ApiProperties {
   private long rateLimitWindowMs = 60_000;
   private int rateLimitMaxRequests = 120;
   private int authRateLimitMaxRequests = 20;
+  private int revenueRateLimitMaxRequests = 600;
+
+  public int getRevenueRateLimitMaxRequests() { return revenueRateLimitMaxRequests; }
+  public void setRevenueRateLimitMaxRequests(int value) { revenueRateLimitMaxRequests = value; }
   private long contactRateLimitWindowMs = 3_600_000;
   private int contactRateLimitMaxRequests = 5;
   private String rateLimitKeyPepper = "";

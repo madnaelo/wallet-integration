@@ -1,4 +1,5 @@
 import type { QuoteResponse } from "@/lib/types";
+export type ProviderOutcome = { provider: string; outcome: "quoted" | "fee_validation_failed" | "unavailable" };
 
 export type QuoteParams = {
   chainId: number;
@@ -14,6 +15,7 @@ export type QuoteParams = {
   toAddress?: string;
   slippageBps?: number;
   signal?: AbortSignal;
+  onProviderOutcome?: (outcome: ProviderOutcome) => void;
 };
 
 export interface DexAggregatorClient {

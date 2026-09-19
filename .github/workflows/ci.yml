@@ -6,6 +6,7 @@ on:
     branches:
       - master
       - main
+      - feat/commercial-readiness
   workflow_dispatch:
 
 permissions:
@@ -112,6 +113,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Test isolated deployment preflight
+        run: npm run test:preflight
+
       - name: Audit frontend dependencies
         run: node scripts/check-npm-audit.mjs
 
@@ -152,6 +156,9 @@ jobs:
       DATABASE_URL: jdbc:postgresql://localhost:5432/wallet_ci
       DATABASE_USERNAME: wallet_ci
       DATABASE_PASSWORD: wallet_ci_password
+      REVENUE_TEST_DATABASE_URL: jdbc:postgresql://localhost:5432/wallet_ci
+      REVENUE_TEST_DATABASE_USERNAME: wallet_ci
+      REVENUE_TEST_DATABASE_PASSWORD: wallet_ci_password
       CORS_ALLOWED_ORIGINS: http://localhost:3000
       NOTIFICATIONS_MONITOR_ENABLED: "false"
       LIMIT_ORDER_ORDERBOOK_SUBMISSION_ENABLED: "false"

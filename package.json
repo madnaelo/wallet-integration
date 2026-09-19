@@ -12,6 +12,8 @@
     "start:standalone": "node scripts/start-standalone.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:preflight": "node --test scripts/tests/deployment-preflight.test.mjs",
+    "preflight:deployment": "node scripts/deployment-preflight.mjs",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
     "generate:vapid": "node scripts/generate-vapid-keys.mjs"

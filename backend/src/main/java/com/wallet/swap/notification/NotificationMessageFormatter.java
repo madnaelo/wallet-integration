@@ -1,6 +1,7 @@
 package com.wallet.swap.notification;
 
 import com.wallet.swap.config.NotificationProperties;
+import com.wallet.swap.config.BrandProperties;
 import com.wallet.swap.pricealert.PriceAlertModels.PriceAlertOpportunity;
 import com.wallet.swap.notification.FavoritePairModels.FavoritePairOpportunity;
 import com.wallet.swap.notification.ReverseProfitModels.ReverseProfitOpportunity;
@@ -19,9 +20,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Component
 public class NotificationMessageFormatter {
   private final NotificationProperties properties;
+  private final BrandProperties brand;
 
-  public NotificationMessageFormatter(NotificationProperties properties) {
+  public NotificationMessageFormatter(NotificationProperties properties, BrandProperties brand) {
     this.properties = properties;
+    this.brand = brand;
   }
 
   public String subject(ReverseProfitOpportunity opportunity) {
@@ -61,7 +64,7 @@ public class NotificationMessageFormatter {
 
         Review this swap:
         %s
-        """.formatted(
+        """.replace("Swap Assistant", brand.name()).formatted(
         lossAlert ? "Loss protection alert" : "Reverse swap opportunity",
         amount(opportunity.originalSellAmount()),
         opportunity.candidate().sellTokenSymbol(),
@@ -88,7 +91,7 @@ public class NotificationMessageFormatter {
 
         Review this swap:
         %s
-        """.formatted(
+        """.replace("Swap Assistant", brand.name()).formatted(
         opportunity.candidate().sellTokenSymbol(),
         opportunity.candidate().buyTokenSymbol(),
         opportunity.candidate().sellTokenSymbol(),
@@ -117,7 +120,7 @@ public class NotificationMessageFormatter {
 
         Review this swap:
         %s
-        """.formatted(
+        """.replace("Swap Assistant", brand.name()).formatted(
         opportunity.candidate().sellTokenSymbol(),
         opportunity.candidate().buyTokenSymbol(),
         amount(toHuman(opportunity.candidate().sellAmountRaw(), opportunity.candidate().sellTokenDecimals())),
@@ -164,7 +167,7 @@ public class NotificationMessageFormatter {
   public PushNotificationPayload pushPayload(PriceAlertOpportunity opportunity) {
     return new PushNotificationPayload(
         subject(opportunity),
-        "%s to %s reached your target. Open Swap Assistant to review and approve from your wallet.".formatted(
+        ("%s to %s reached your target. Open " + brand.name() + " to review and approve from your wallet.").formatted(
             opportunity.candidate().sellTokenSymbol(),
             opportunity.candidate().buyTokenSymbol()),
         priceAlertUrl(opportunity),

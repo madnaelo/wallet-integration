@@ -1,16 +1,17 @@
+import { BRAND } from "@/lib/brand";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalOperatorDisclosure } from "@/components/LegalOperatorDisclosure";
 
 export const metadata: Metadata = {
   title: "Privacy",
-  description: "Privacy summary for Swap Assistant.",
+  description: "Privacy summary for " + BRAND.name + ".",
   alternates: {
     canonical: "/privacy"
   },
   openGraph: {
-    title: "Swap Assistant Privacy",
-    description: "How Swap Assistant handles wallet addresses, saved activity, alerts, and notification details.",
+    title: BRAND.name + " Privacy",
+    description: "How " + BRAND.name + " handles wallet addresses, saved activity, alerts, and notification details.",
     url: "/privacy"
   }
 };
@@ -23,16 +24,16 @@ export default function PrivacyPage() {
           Back to swap
         </Link>
         <h1>Privacy Notice</h1>
-        <p>Effective July 23, 2026.</p>
+        <p>Effective September 19, 2026.</p>
         <p>
-          Swap Assistant stores the minimum product data needed for your swap
+          {BRAND.name} stores the minimum product data needed for your swap
           history, favorites, alerts, and notification preferences.
         </p>
 
         <section>
           <h2>Who Is Responsible</h2>
           <p>
-            Swap Assistant&apos;s legal operator is responsible for the personal
+            {BRAND.name}&apos;s legal operator is responsible for the personal
             data handled by the service. The operator&apos;s identity and
             privacy contact are provided in the legal disclosure below.
           </p>
@@ -59,6 +60,13 @@ export default function PrivacyPage() {
             payload, its signature and hashes, the accepted terms version, and
             order status. This is necessary to submit, reconcile, and cancel
             the exact order you authorized.
+          </p>
+          <p>
+            We also keep quote, fee, and transaction evidence to check fees and
+            resolve discrepancies. This can include the wallet address, selected
+            assets, amounts, provider, and transaction identifier. Our own
+            reporting counts quotes, swap reviews, submissions, and verified
+            completions; it does not send this activity to third-party analytics.
           </p>
         </section>
 
@@ -142,6 +150,12 @@ export default function PrivacyPage() {
             they are removed through an available control.
           </p>
           <p>
+            Unused quote evidence is normally removed after 90 days. Evidence
+            supporting a submitted transaction, including its original quote
+            batch, is kept for reconciliation, disputes, and accounting. It is
+            not automatically removed with unused quotes.
+          </p>
+          <p>
             You can disable notification channels, unlink push devices, remove
             favorites, cancel eligible limit orders, and disconnect your
             wallet. Public blockchain records and data retained independently
@@ -169,7 +183,7 @@ export default function PrivacyPage() {
         <section>
           <h2>Children</h2>
           <p>
-            Swap Assistant is not intended for anyone under 18, and we do not
+            {BRAND.name} is not intended for anyone under 18, and we do not
             knowingly collect personal data from children. Contact us if you
             believe a child has supplied personal data.
           </p>

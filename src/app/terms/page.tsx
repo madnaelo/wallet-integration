@@ -1,15 +1,16 @@
+import { BRAND } from "@/lib/brand";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalOperatorDisclosure } from "@/components/LegalOperatorDisclosure";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
-  description: "Terms of use for Swap Assistant.",
+  description: "Terms of use for " + BRAND.name + ".",
   alternates: {
     canonical: "/terms"
   },
   openGraph: {
-    title: "Swap Assistant Terms",
+    title: BRAND.name + " Terms",
     description: "Terms for non-custodial swaps, alerts, and wallet-signed limit orders.",
     url: "/terms"
   }
@@ -27,7 +28,7 @@ export default function TermsPage() {
           Effective July 23, 2026. Limit Order Terms version 2026-07-17.1.
         </p>
         <p>
-          These terms govern your use of Swap Assistant. By using the service,
+          These terms govern your use of {BRAND.name}. By using the service,
           you agree to these terms, to use it only where lawful, and to review
           every wallet request before signing.
         </p>
@@ -41,7 +42,7 @@ export default function TermsPage() {
             lawful in every country.
           </p>
           <p>
-            Do not use Swap Assistant for unlawful activity, sanctions
+            Do not use {BRAND.name} for unlawful activity, sanctions
             evasion, market abuse, fraud, or transactions involving blocked,
             sanctioned, stolen, or illicit assets or parties. You must not
             interfere with the service, bypass security or request limits, or
@@ -52,18 +53,18 @@ export default function TermsPage() {
         <section>
           <h2>Non-Custodial Service</h2>
           <p>
-            Swap Assistant provides quote comparison, saved history, favorites,
+            {BRAND.name} provides quote comparison, saved history, favorites,
             alerts, and wallet-assisted swap execution. It does not custody
             funds, control wallet assets, store private keys or seed phrases,
             or sign ordinary swap transactions for you. You retain control of
             your wallet and decide whether to approve each wallet request.
           </p>
           <p>
-            Swap Assistant can prepare transaction data or transmit an exact
+            {BRAND.name} can prepare transaction data or transmit an exact
             wallet-signed protocol order to a selected third-party service.
             Blockchain networks, wallet providers, protocols, solvers, and
             liquidity venues perform the resulting transaction or order fill.
-            Swap Assistant is not the buyer, seller, custodian, or counterparty
+            {BRAND.name} is not the buyer, seller, custodian, or counterparty
             to your swap.
           </p>
         </section>
@@ -74,7 +75,7 @@ export default function TermsPage() {
             Quotes, routes, token lists, wallet connection, notifications, and
             blockchain data can depend on third-party providers. Their
             availability, terms, security controls, rate limits, and output can
-            change independently of Swap Assistant.
+            change independently of {BRAND.name}.
           </p>
           <p>
             Your use of a wallet, protocol, network, or route can also be
@@ -89,7 +90,7 @@ export default function TermsPage() {
           <p>
             You control your wallet, balances, approvals, recovery details, and
             device security. Token names and symbols can be copied, so verify
-            the network and contract address. Swap Assistant will never ask for
+            the network and contract address. {BRAND.name} will never ask for
             a seed phrase or private key.
           </p>
         </section>
@@ -97,7 +98,7 @@ export default function TermsPage() {
         <section>
           <h2>No Financial Advice</h2>
           <p>
-            Swap Assistant does not provide investment, tax, legal, accounting, or
+            {BRAND.name} does not provide investment, tax, legal, accounting, or
             financial advice. Alerts and quote comparisons are tools for your
             own review.
           </p>
@@ -107,12 +108,12 @@ export default function TermsPage() {
           <h2>Fees</h2>
           <p>
             Quotes can include network costs, provider fees, and a disclosed
-            Swap Assistant platform fee on supported routes. Review the trade
+            {BRAND.name} platform fee on supported routes. Review the trade
             summary and your wallet confirmation before signing. Fee behavior
             can differ by provider and route.
           </p>
           <p>
-            Swap Assistant can receive different compensation from different
+            {BRAND.name} can receive different compensation from different
             providers. Available routes are ranked by the receiving amount
             returned for the user after disclosed service fees, and you remain
             free to choose another route before signing.
@@ -143,7 +144,7 @@ export default function TermsPage() {
             A limit order authorizes a supported protocol to fill only the
             token, amount, minimum receive amount, recipient, network, and
             expiry contained in the order you sign. The signature does not give
-            Swap Assistant your private key or permission to change those terms.
+            {BRAND.name} your private key or permission to change those terms.
           </p>
           <p>
             Execution is not guaranteed and can fail because of liquidity,
@@ -167,7 +168,7 @@ export default function TermsPage() {
           <h2>Taxes</h2>
           <p>
             You are responsible for determining and reporting taxes, duties,
-            and records that apply to your transactions. Swap Assistant does
+            and records that apply to your transactions. {BRAND.name} does
             not calculate or file them for you.
           </p>
         </section>
@@ -175,7 +176,7 @@ export default function TermsPage() {
         <section>
           <h2>Availability</h2>
           <p>
-            Swap Assistant may be updated, paused, rate limited, or unavailable at
+            {BRAND.name} may be updated, paused, rate limited, or unavailable at
             any time. We may disable providers, chains, tokens, alerts, or
             features when needed for security, compliance, reliability, or
             provider availability.
@@ -185,7 +186,7 @@ export default function TermsPage() {
         <section>
           <h2>Disclaimer</h2>
           <p>
-            To the fullest extent permitted by law, Swap Assistant is provided
+            To the fullest extent permitted by law, {BRAND.name} is provided
             on an &quot;as is&quot; and &quot;as available&quot; basis, without
             a guarantee of availability, accuracy, security, execution, price,
             profit, merchantability, non-infringement, or fitness for a

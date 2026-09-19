@@ -1,4 +1,6 @@
 "use client";
+import { BRAND } from "@/lib/brand";
+
 
 import Image from "next/image";
 import Link from "next/link";
@@ -121,15 +123,15 @@ const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
       "It needs enough token balance and approval in your wallet when execution happens.",
       "You can review the exact terms before signing. This signature is not a transfer.",
       "If token approval is needed, your wallet asks separately and the network may charge gas.",
-      "If a pair cannot be safely ordered yet, Swap Assistant keeps it as an alert instead."
+      "If a pair cannot be safely ordered yet, " + BRAND.name + " keeps it as an alert instead."
     ],
     securityTitle: "How We Keep It Safe",
     securityBody:
       "Your wallet signs the exact tokens, amount, price, recipient, and expiry. If anyone changes those terms, the signature no longer works.",
     securityFootnote:
-      "Swap Assistant does not hold your funds or private keys. Supported pairs use trusted signed-order protocols.",
+      BRAND.name + " does not hold your funds or private keys. Supported pairs use trusted signed-order protocols.",
     terms:
-      "I understand this order may not fill, and it needs enough balance and exact token approval in my wallet. A token approval may cost network gas. Swap Assistant may submit only the exact terms I review and sign."
+      "I understand this order may not fill, and it needs enough balance and exact token approval in my wallet. A token approval may cost network gas. " + BRAND.name + " may submit only the exact terms I review and sign."
   },
   crypto: {
     label: "Crypto",
@@ -151,11 +153,11 @@ const LIMIT_ORDER_LANGUAGE_COPY: Record<LimitOrderLanguage, {
     ],
     securityTitle: "Signed-Order Security",
     securityBody:
-      "Swap Assistant stores the signed payload and a hash of the terms. A changed order cannot pass provider verification.",
+      BRAND.name + " stores the signed payload and a hash of the terms. A changed order cannot pass provider verification.",
     securityFootnote:
       "Current adapters: CoW Protocol first, with 1inch Orderbook fallback where supported.",
     terms:
-      "I understand execution is not guaranteed. Prices, liquidity, allowance, balance, gas cost, and expiry can stop execution. Swap Assistant may submit only the exact signed terms shown here."
+      "I understand execution is not guaranteed. Prices, liquidity, allowance, balance, gas cost, and expiry can stop execution. " + BRAND.name + " may submit only the exact signed terms shown here."
   },
   expert: {
     label: "Expert",
@@ -682,8 +684,8 @@ export default function LimitOrdersPage() {
       <header className="header">
       <div className="headerTop">
         <div className="headerCopy">
-          <h1 className="h1">Swap Assistant</h1>
-          <div className="subtle">Your Personal Swap Assistant. Get the best price for your swaps.</div>
+          <h1 className="h1">{BRAND.name}</h1>
+          <div className="subtle">Your Personal {BRAND.name}. Get the best price for your swaps.</div>
         </div>
         <div className="walletActions">
           <button

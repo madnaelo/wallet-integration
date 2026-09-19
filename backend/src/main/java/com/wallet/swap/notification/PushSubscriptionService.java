@@ -4,6 +4,7 @@ import com.wallet.swap.common.ApiException;
 import com.wallet.swap.common.WalletMutationLock;
 import com.wallet.swap.config.ApiRateLimiter;
 import com.wallet.swap.config.NotificationProperties;
+import com.wallet.swap.config.BrandProperties;
 import com.wallet.swap.notification.NotificationMessageFormatter.PushNotificationPayload;
 import com.wallet.swap.notification.NotificationModels.PushNotificationTestRequest;
 import com.wallet.swap.notification.NotificationModels.PushNotificationTestResponse;
@@ -29,6 +30,7 @@ public class PushSubscriptionService {
   private final WalletMutationLock walletMutationLock;
   private final PushNotificationSender pushNotificationSender;
   private final ApiRateLimiter apiRateLimiter;
+  private final BrandProperties brand;
 
   public PushSubscriptionService(
       NotificationProperties properties,
@@ -36,13 +38,14 @@ public class PushSubscriptionService {
       NotificationPreferenceService preferenceService,
       WalletMutationLock walletMutationLock,
       PushNotificationSender pushNotificationSender,
-      ApiRateLimiter apiRateLimiter) {
+      ApiRateLimiter apiRateLimiter, BrandProperties brand) {
     this.properties = properties;
     this.pushSubscriptionRepository = pushSubscriptionRepository;
     this.preferenceService = preferenceService;
     this.walletMutationLock = walletMutationLock;
     this.pushNotificationSender = pushNotificationSender;
     this.apiRateLimiter = apiRateLimiter;
+    this.brand = brand;
   }
 
   public boolean isAvailable() {
@@ -123,7 +126,7 @@ public class PushSubscriptionService {
           walletAddress,
           endpoint,
           new PushNotificationPayload(
-              "Swap Assistant test",
+              brand.name() + " test",
               "Push notifications are working on this device.",
               "/swap#preferences",
               "swap-assistant-push-test"));

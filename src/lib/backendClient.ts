@@ -326,6 +326,11 @@ export async function logoutBackendSession(backendBaseUrl: string, session?: Bac
   });
 }
 
+export async function reviewRevenueQuote(backendBaseUrl: string, session: BackendSession, id: string): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return;
+  await backendFetch(backendBaseUrl, `/api/revenue/quotes/${id}/review`, { method: "POST", headers: authHeaders(session) });
+}
+
 export async function saveSwapHistory(
   backendBaseUrl: string,
   session: BackendSession,

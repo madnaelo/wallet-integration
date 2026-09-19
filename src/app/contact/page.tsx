@@ -1,16 +1,17 @@
+import { BRAND } from "@/lib/brand";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "./ContactForm";
 
 export const metadata: Metadata = {
   title: "Contact",
-  description: "Contact Swap Assistant about support, privacy, partnerships, or legal questions.",
+  description: "Contact " + BRAND.name + " about support, privacy, partnerships, or legal questions.",
   alternates: {
     canonical: "/contact"
   },
   openGraph: {
-    title: "Contact Swap Assistant",
-    description: "Send Swap Assistant a support, privacy, partnership, or legal message.",
+    title: "Contact " + BRAND.name,
+    description: "Send " + BRAND.name + " a support, privacy, partnership, or legal message.",
     url: "/contact"
   }
 };
@@ -22,7 +23,7 @@ export default function ContactPage() {
         <Link className="legalBackLink" href="/swap">
           Back to swap
         </Link>
-        <p className="contactEyebrow">Contact Swap Assistant</p>
+        <p className="contactEyebrow">Contact {BRAND.name}</p>
         <h1>How can we help?</h1>
         <p>
           Send a support, privacy, partnership, or legal question. You do not

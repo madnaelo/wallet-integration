@@ -1,9 +1,10 @@
+import { BRAND } from "@/lib/brand";
 import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Swap Assistant",
-    short_name: "Swap Assistant",
+    name: BRAND.name,
+    short_name: BRAND.shortName,
     description: "Compare available swap prices, set alerts, and keep your wallet in control.",
     id: "/swap",
     start_url: "/swap",
@@ -15,19 +16,19 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["finance", "productivity", "utilities"],
     icons: [
       {
-        src: "/icon-192.png",
+        src: BRAND.icon,
         sizes: "192x192",
         type: "image/png",
         purpose: "any"
       },
       {
-        src: "/icon-512.png",
+        src: BRAND.assetsBase + "/icon-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any"
       },
       {
-        src: "/icon-maskable-512.png",
+        src: BRAND.assetsBase + "/icon-maskable-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable"

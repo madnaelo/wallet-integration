@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "mode": "customer",
+  "repository": "customer/river-swap",
+  "releaseBranch": "main",
+  "frontendProjectId": "replace_with_customer_project",
+  "frontendOrgId": "replace_with_customer_org",
+  "frontendUrl": "https://swap.customer.example",
+  "backendUrl": "https://api.customer.example",
+  "allowedOrigins": [],
+  "backendDirectory": "/srv/river-swap",
+  "backendContainer": "river-backend",
+  "postgresContainer": "river-postgres",
+  "postgresVolume": "river-postgres-data",
+  "internalNetwork": "river-database",
+  "databaseName": "river_swap",
+  "redisPrefix": "river-swap-production",
+  "brandName": "River Swap",
+  "providerAccountsReviewed": false
+}

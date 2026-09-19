@@ -1,4 +1,8 @@
 "use client";
+import { BRAND } from "@/lib/brand";
+
+import { approximateFee, DestinationFeeOutput, FeeEquivalent } from "@/components/FeeDisclosure";
+import { reviewRevenueQuote } from "@/lib/backendClient";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -169,12 +173,12 @@ const SWAP_TOUR_STEPS: TourStep[] = [
   {
     target: "wallet",
     title: "Connect Wallet",
-    body: "Connect your wallet so Swap Assistant can read your public address, prepare quotes, and save history for you. This is harmless: funds cannot move until you approve a later transaction inside your wallet app."
+    body: "Connect your wallet so " + BRAND.name + " can read your public address, prepare quotes, and save history for you. This is harmless: funds cannot move until you approve a later transaction inside your wallet app."
   },
   {
     target: "amount",
     title: "Start with the amount",
-    body: "Enter how much you want to sell. Swap Assistant formats the amount for the selected token."
+    body: "Enter how much you want to sell. " + BRAND.name + " formats the amount for the selected token."
   },
   {
     target: "tokens",
@@ -190,7 +194,7 @@ const SWAP_TOUR_STEPS: TourStep[] = [
   {
     target: "quote",
     title: "Get a quote",
-    body: "Swap Assistant compares available routes and shows the best quote it can find. This does not move funds."
+    body: BRAND.name + " compares available routes and shows the best quote it can find. This does not move funds."
   },
   {
     target: "summary",
@@ -2247,7 +2251,9 @@ export default function Page() {
         slippageBps
       });
 
-      const res = await fetch(url, { method: "GET" });
+      const requestUrl = new URL(url, window.location.origin);
+      if (walletAddress) requestUrl.searchParams.set("historyWallet", walletAddress);
+      const res = await fetch(requestUrl, { method: "GET" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg = body?.error ?? body?.message ?? "A quote is unavailable right now. Try again in a moment.";
@@ -2422,6 +2428,11 @@ export default function Page() {
   }
 
   async function executeSwap() {
+    if (quote?.revenueQuoteId && backendSession && isSessionForWallet(backendSession, walletAddress)) {
+      void reviewRevenueQuote(envPublic.BACKEND_BASE_URL, backendSession, quote.revenueQuoteId).catch(() => {
+        // Optional first-party review telemetry must never block a wallet action.
+      });
+    }
     setActionError("");
     setWalletRequestNotice("");
     if (!quote) {
@@ -2649,6 +2660,7 @@ export default function Page() {
       providerName: stringValue(quote.providerName) || "Best route",
       sellHuman,
       grossBuyHuman: formatTokenAmount(grossBuyAmount, buyDisplayToken),
+      hasOtherTokenFees: swapFeeLines.some((fee) => !isSameToken(fee.token, buyDisplayToken)),
       buyHuman: formatTokenAmount(netBuyAmount, buyDisplayToken),
       minBuyHuman: netMinBuyAmount ? formatTokenAmount(netMinBuyAmount, buyDisplayToken) : "",
       rate: formatPairRate(quote.sellAmount, sellDisplayToken, grossBuyAmount, buyDisplayToken, rateInverted),
@@ -2796,8 +2808,8 @@ export default function Page() {
       <div className="header">
         <div className="headerTop">
           <div className="headerCopy">
-            <h1 className="h1">Swap Assistant</h1>
-            <div className="subtle">Your Personal Swap Assistant. Get the best price for your swaps.</div>
+            <h1 className="h1">{BRAND.name}</h1>
+            <div className="subtle">Your Personal {BRAND.name}. Get the best price for your swaps.</div>
           </div>
           <div className="walletActions" data-tour="wallet">
             {walletAddress ? (
@@ -3452,10 +3464,7 @@ export default function Page() {
                       <div className="mono">{quoteSummary.platformFeeLabel}</div>
                     </div>
                   ) : null}
-                  <div className="kv">
-                    <div className="subtle">Before fees</div>
-                    <div className="mono">{quoteSummary.grossBuyHuman}</div>
-                  </div>
+                  <DestinationFeeOutput amount={quoteSummary.grossBuyHuman} hasOtherTokenFees={quoteSummary.hasOtherTokenFees} />
                   <div className="kv">
                     <div className="subtle">Minimum received</div>
                     <div className="mono">{quoteSummary.minBuyHuman || "Not provided"}</div>
@@ -3752,7 +3761,7 @@ export default function Page() {
                 <div>
                   <strong>Connect your wallet to manage alerts</strong>
                   <p>
-                    Swap Assistant uses your public wallet address to keep your history, favorite pairs, and notification
+                    {BRAND.name} uses your public wallet address to keep your history, favorite pairs, and notification
                     settings separate from other users. Connecting does not allow the app to move funds.
                   </p>
                 </div>
@@ -3765,7 +3774,7 @@ export default function Page() {
                 <div>
                   <strong>Sign in to manage preferences</strong>
                   <p>
-                    Sign one message from your wallet so Swap Assistant can load settings for this address. This is not
+                    Sign one message from your wallet so {BRAND.name} can load settings for this address. This is not
                     a transaction and cannot move funds.
                   </p>
                 </div>
@@ -3999,7 +4008,7 @@ export default function Page() {
               <div>
                 <strong>Connect your wallet to save favorite pairs</strong>
                 <p>
-                  Swap Assistant uses your public wallet address to keep your favorite pairs and alert targets private
+                  {BRAND.name} uses your public wallet address to keep your favorite pairs and alert targets private
                   to this wallet. Connecting does not allow the app to move funds.
                 </p>
               </div>
@@ -4012,7 +4021,7 @@ export default function Page() {
               <div>
                 <strong>Sign in to manage favorites</strong>
                 <p>
-                  Sign one message from your wallet so Swap Assistant can load favorites for this address. This is not a
+                  Sign one message from your wallet so {BRAND.name} can load favorites for this address. This is not a
                   transaction and cannot move funds.
                 </p>
               </div>
@@ -4183,13 +4192,13 @@ export default function Page() {
               <div className="label">Wallet sign-in</div>
               <h2 id="wallet-sign-title">Approve a safe sign-in message</h2>
               <p>
-                Swap Assistant asks for a message signature to prove this wallet is yours, so it can load
+                {BRAND.name} asks for a message signature to prove this wallet is yours, so it can load
                 {getWalletSignPromptResourceLabel(walletSignPrompt.target)} for this public address. This is not a
                 transaction and cannot move funds.
               </p>
               <div className="walletSignPromptInstruction">
                 {walletSignPrompt.isMobile
-                  ? `After you tap Continue, ${normalizeWalletApprovalName(walletSignPrompt.walletName)} may open. Approve the sign-in message there, then return to Swap Assistant.`
+                  ? `After you tap Continue, ${normalizeWalletApprovalName(walletSignPrompt.walletName)} may open. Approve the sign-in message there, then return to ${BRAND.name}.`
                   : `After you click Continue, approve the message in ${normalizeWalletApprovalName(walletSignPrompt.walletName)}. If you connected from your phone, open that wallet app and approve it there.`}
               </div>
             </div>
@@ -4206,7 +4215,7 @@ export default function Page() {
       ) : null}
 
       <footer className="siteFooter">
-        <span>Swap Assistant is non-custodial. Review every wallet request before signing.</span>
+        <span>{BRAND.name} is non-custodial. Review every wallet request before signing.</span>
         <div className="footerMeta">
           <span className="versionLabel" title={`Build ${envPublic.APP_VERSION}`}>
             Build {formatBuildVersion(envPublic.APP_VERSION)}
@@ -4216,7 +4225,7 @@ export default function Page() {
             <Link href="/fees">Fees & Risks</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>
-            <Link href="/contact">Contact</Link>
+            <Link href={BRAND.supportPath}>Contact</Link>
           </nav>
         </div>
       </footer>
@@ -4355,7 +4364,7 @@ function buildWalletApprovalNotice(walletName: string, action: WalletApprovalAct
   const actionText = getWalletApprovalActionText(action);
   const safetyHint = action === "signIn" ? " This cannot move funds." : "";
 
-  return `${actionText} in ${walletLabel}, then return to Swap Assistant.${safetyHint}`;
+  return `${actionText} in ${walletLabel}, then return to ${BRAND.name}.${safetyHint}`;
 }
 
 function getWalletSignPromptResourceLabel(target: WalletApprovalNoticeTarget): string {
@@ -5022,11 +5031,11 @@ function getMobilePushSupportMessage(): string {
     Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
   const isIos = /iPhone|iPad|iPod/i.test(userAgent);
   if (isIos && !isStandalone) {
-    return "Install Swap Assistant on this device first, then enable push notifications from the installed app.";
+    return "Install " + BRAND.name + " on this device first, then enable push notifications from the installed app.";
   }
 
   if (isLikelyEmbeddedMobileBrowser(userAgent)) {
-    return "Push notifications usually do not work inside wallet app web views. Open Swap Assistant in Chrome, Edge, Safari, or the installed app, then enable push notifications.";
+    return "Push notifications usually do not work inside wallet app web views. Open " + BRAND.name + " in Chrome, Edge, Safari, or the installed app, then enable push notifications.";
   }
 
   return "";
@@ -5256,7 +5265,8 @@ function isSameToken(a: DisplayToken, b: DisplayToken): boolean {
 function formatConvertedFeeTotal(lines: FeeLine[], buyToken: DisplayToken): string {
   const buyTokenTotal = sumBuyTokenFees(lines);
   const unconvertedFees = lines.filter((line) => !line.buyTokenAmount);
-  const convertedDisplay = formatTokenAmount(buyTokenTotal, buyToken);
+  const approximate = lines.some((line) => line.buyTokenAmount && !isSameToken(line.token, buyToken));
+  const convertedDisplay = approximateFee(formatTokenAmount(buyTokenTotal, buyToken), approximate);
 
   if (!unconvertedFees.length) return convertedDisplay;
   return `${convertedDisplay} + ${formatOriginalFeeTotal(unconvertedFees)}`;
@@ -5267,7 +5277,7 @@ function renderFeeDetail(fee: FeeLine) {
   return (
     <>
       <span>{fee.display}</span>
-      <span className="feeEquivalent">{fee.buyTokenDisplay}</span>
+      <FeeEquivalent>{fee.buyTokenDisplay}</FeeEquivalent>
     </>
   );
 }

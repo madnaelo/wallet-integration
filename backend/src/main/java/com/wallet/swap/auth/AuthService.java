@@ -4,6 +4,7 @@ import com.wallet.swap.auth.AuthModels.NonceResponse;
 import com.wallet.swap.auth.AuthModels.VerifyResponse;
 import com.wallet.swap.common.ApiException;
 import com.wallet.swap.config.AuthProperties;
+import com.wallet.swap.config.BrandProperties;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import java.security.SecureRandom;
@@ -28,16 +29,18 @@ public class AuthService {
   private final AuthRepository authRepository;
   private final EthereumSignatureVerifier signatureVerifier;
   private final TokenHasher tokenHasher;
+  private final BrandProperties brand;
 
   public AuthService(
       AuthProperties authProperties,
       AuthRepository authRepository,
       EthereumSignatureVerifier signatureVerifier,
-      TokenHasher tokenHasher) {
+      TokenHasher tokenHasher, BrandProperties brand) {
     this.authProperties = authProperties;
     this.authRepository = authRepository;
     this.signatureVerifier = signatureVerifier;
     this.tokenHasher = tokenHasher;
+    this.brand = brand;
   }
 
   @Transactional
@@ -177,7 +180,7 @@ public class AuthService {
   }
 
   private String buildSignInMessage(UUID nonceId, String walletAddress, String nonce, Instant expiresAt) {
-    return """
+    return brand.render("""
         Sign in to Swap Assistant.
 
         This proves ownership of wallet %s.
@@ -194,7 +197,7 @@ public class AuthService {
         nonBlank(authProperties.getSigningUri(), "http://localhost:3000"),
         nonceId,
         nonce,
-        expiresAt);
+        expiresAt));
   }
 
   private String secureToken(int bytes) {

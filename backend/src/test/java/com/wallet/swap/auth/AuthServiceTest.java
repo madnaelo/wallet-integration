@@ -24,7 +24,8 @@ class AuthServiceTest {
   private final EthereumSignatureVerifier signatureVerifier = mock(EthereumSignatureVerifier.class);
   private final TokenHasher tokenHasher = mock(TokenHasher.class);
   private final AuthProperties properties = new AuthProperties();
-  private final AuthService service = new AuthService(properties, repository, signatureVerifier, tokenHasher);
+  private final AuthService service = new AuthService(properties, repository, signatureVerifier, tokenHasher,
+      new com.wallet.swap.config.BrandProperties(null));
 
   @Test
   void locksAndConsumesNonceInsideTransactionalVerification() throws Exception {

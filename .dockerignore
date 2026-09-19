@@ -9,3 +9,9 @@
 !src/**
 !public/
 !public/**
+!vendor/
+!vendor/bigint-buffer-safe/
+!vendor/bigint-buffer-safe/**
+!config/
+!config/provider-commercial-policy.json
+!config/supported-evm-chains.json

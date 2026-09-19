@@ -25,6 +25,7 @@ function Invoke-CheckedCommand {
 Push-Location $repoRoot
 try {
   Invoke-CheckedCommand $npmExe @("test") "Frontend tests"
+  Invoke-CheckedCommand $npmExe @("run", "test:preflight") "Deployment preflight tests"
   Invoke-CheckedCommand $npmExe @("audit", "--audit-level=moderate") "Frontend dependency audit"
   Invoke-CheckedCommand $npmExe @("run", "typecheck") "Frontend type check"
   Invoke-CheckedCommand $npmExe @("run", "lint") "Frontend lint"

@@ -1,4 +1,6 @@
 "use client";
+import { BRAND } from "@/lib/brand";
+
 
 import { createAppKit } from "@reown/appkit/react";
 import { BitcoinAdapter } from "@reown/appkit-adapter-bitcoin";
@@ -33,10 +35,10 @@ type AppKitMetadataWithRedirect = {
   };
 };
 const metadata: AppKitMetadataWithRedirect = {
-  name: "Swap Assistant",
-  description: "Your Personal Swap Assistant",
+  name: BRAND.name,
+  description: "Your Personal " + BRAND.name,
   url: appUrl,
-  icons: [new URL("/icon-192.png", appUrl).toString()],
+  icons: [new URL(BRAND.icon, appUrl).toString()],
   redirect: {
     universal: appUrl
   }

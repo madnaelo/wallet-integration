@@ -61,7 +61,7 @@ class PushSubscriptionServiceTest {
         preferenceService,
         walletMutationLock,
         pushNotificationSender,
-        apiRateLimiter);
+        apiRateLimiter, new com.wallet.swap.config.BrandProperties(null));
   }
 
   @Test

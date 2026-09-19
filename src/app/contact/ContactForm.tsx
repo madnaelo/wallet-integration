@@ -1,4 +1,6 @@
 "use client";
+import { BRAND } from "@/lib/brand";
+
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
@@ -114,7 +116,7 @@ export function ContactForm() {
         <label className="contactConsent">
           <input name="privacyAccepted" type="checkbox" required />
           <span>
-            I understand that my details will be stored so Swap Assistant can
+            I understand that my details will be stored so {BRAND.name} can
             review and respond to this message, as described in the{" "}
             <Link href="/privacy">Privacy Notice</Link>.
           </span>

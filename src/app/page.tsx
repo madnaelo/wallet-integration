@@ -1,3 +1,4 @@
+import { BRAND } from "@/lib/brand";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
     canonical: "/"
   },
   openGraph: {
-    title: "Swap Assistant",
+    title: BRAND.name,
     description:
       "Compare crypto swap routes, save useful history, and receive price alerts while your wallet stays in control.",
     url: "/"
@@ -43,10 +44,10 @@ const features = [
 ];
 
 const safetyPoints = [
-  "Connecting a wallet lets Swap Assistant read your public wallet address.",
+  "Connecting a wallet lets " + BRAND.name + " read your public wallet address.",
   "Signing in only proves that the wallet is yours, so your history and alerts can be saved for that wallet.",
-  "Swap Assistant never asks for your seed phrase or private key.",
-  "Swap Assistant cannot move your funds. Funds move only after you approve the transaction inside your wallet app.",
+  BRAND.name + " never asks for your seed phrase or private key.",
+  BRAND.name + " cannot move your funds. Funds move only after you approve the transaction inside your wallet app.",
   "You can review tokens, amounts, recipient, fees, slippage, and network cost before confirming."
 ];
 
@@ -67,10 +68,10 @@ export default function IntroPage() {
         <div className="introHeroShade" aria-hidden="true" />
         <div className="introHeroCopy">
           <p className="introEyebrow">Non-custodial swap assistant</p>
-          <h1 id="intro-title">Swap Assistant</h1>
+          <h1 id="intro-title">{BRAND.name}</h1>
           <p className="introLead">
             Your personal swap assistant. Compare prices, review costs, save useful history, and receive price alerts
-            while staying in control. Swap Assistant cannot move funds by itself; every swap still needs your approval inside
+            while staying in control. {BRAND.name} cannot move funds by itself; every swap still needs your approval inside
             your wallet app.
           </p>
           <div className="introActions">
@@ -88,7 +89,7 @@ export default function IntroPage() {
         <div className="introSectionHeader introSafetyHeader">
           <h2 id="safety-title">Designed For Wallet Safety</h2>
           <p>
-            Your wallet stays in control. Swap Assistant helps you compare and remember, but only your wallet can approve
+            Your wallet stays in control. {BRAND.name} helps you compare and remember, but only your wallet can approve
             movement of funds.
           </p>
         </div>
@@ -101,7 +102,7 @@ export default function IntroPage() {
 
       <section className="introSection" aria-labelledby="features-title">
         <div className="introSectionHeader">
-          <h2 id="features-title">What Swap Assistant Helps You Do</h2>
+          <h2 id="features-title">What {BRAND.name} Helps You Do</h2>
           <p>
             Built for people who want simple swap decisions without handing control to an app.
           </p>
@@ -126,18 +127,18 @@ export default function IntroPage() {
           <h2 id="limit-orders-title">Limit Orders With Guardrails</h2>
           <p>
             Limit Orders use clear risk acceptance and exact terms approved in your wallet. If a pair cannot be handled
-            safely as an automatic order, Swap Assistant keeps it as an alert for you to review and approve yourself.
+            safely as an automatic order, {BRAND.name} keeps it as an alert for you to review and approve yourself.
           </p>
         </div>
       </section>
 
       <footer className="siteFooter">
-        <span>Swap Assistant is non-custodial. Review every wallet request before signing.</span>
+        <span>{BRAND.name} is non-custodial. Review every wallet request before signing.</span>
         <nav aria-label="Information and legal links">
           <Link href="/fees">Fees & Risks</Link>
           <Link href="/terms">Terms</Link>
           <Link href="/privacy">Privacy</Link>
-          <Link href="/contact">Contact</Link>
+          <Link href={BRAND.supportPath}>Contact</Link>
         </nav>
       </footer>
     </main>

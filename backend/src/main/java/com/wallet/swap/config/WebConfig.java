@@ -9,6 +9,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 @EnableConfigurationProperties({
+    BrandProperties.class,
+    com.wallet.swap.revenue.RevenueProperties.class,
     ApiProperties.class,
     AuthProperties.class,
     FeatureProperties.class,

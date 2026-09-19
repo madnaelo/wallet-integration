@@ -114,7 +114,7 @@ class NotificationMessageFormatterTest {
   private NotificationMessageFormatter formatter(String appUrl) {
     NotificationProperties properties = new NotificationProperties();
     properties.setAppUrl(appUrl);
-    return new NotificationMessageFormatter(properties);
+    return new NotificationMessageFormatter(properties, new com.wallet.swap.config.BrandProperties(null));
   }
 
   private ReverseProfitCandidate reverseCandidate() {

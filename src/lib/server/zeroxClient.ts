@@ -54,7 +54,7 @@ export class ZeroXClient implements DexAggregatorClient {
     if (this.cfg.platformFee.enabled) {
       url.searchParams.set("swapFeeRecipient", this.cfg.platformFee.recipient);
       url.searchParams.set("swapFeeBps", String(this.cfg.platformFee.feeBps));
-      url.searchParams.set("swapFeeToken", buyToken);
+      url.searchParams.set("swapFeeToken", sellToken);
     }
 
     const res = await fetch(url.toString(), {
@@ -70,7 +70,7 @@ export class ZeroXClient implements DexAggregatorClient {
     const body = await readZeroXResponse(res);
 
     if (this.cfg.platformFee.enabled) {
-      assertZeroXIntegratorFee(body, params.buyToken);
+      assertZeroXIntegratorFee(body, params, this.cfg.platformFee.feeBps);
     }
 
     return this.normalizeZeroXQuote(body, params);
@@ -130,7 +130,13 @@ function collectZeroXFees(body: Record<string, unknown>): QuoteFee[] {
   return lines;
 }
 
-function assertZeroXIntegratorFee(body: Record<string, unknown>, buyToken: string) {
+function assertZeroXIntegratorFee(body: Record<string, unknown>, params: QuoteParams, feeBps: number) {
+  // Exact-input sell-token fees have a deterministic base, unlike a fee
+  // reconstructed from net destination output. Solidity integer division floors.
+  const expectedAmount = BigInt(params.sellAmount) * BigInt(feeBps) / 10_000n;
+  if (body.sellAmount != null && stringValue(body.sellAmount) !== params.sellAmount) {
+    throw new FeeValidationError("0x changed the requested sell amount.");
+  }
   const fees = recordValue(body.fees);
   if (fees.integratorFees != null && !Array.isArray(fees.integratorFees)) {
     throw new FeeValidationError("0x returned invalid integrator fee details.");
@@ -138,12 +144,13 @@ function assertZeroXIntegratorFee(body: Record<string, unknown>, buyToken: strin
   const integratorFees = Array.isArray(fees.integratorFees)
     ? fees.integratorFees
     : [fees.integratorFee];
-  const expectedToken = normalizeNativeToken(buyToken);
+  const expectedToken = normalizeNativeToken(params.sellToken);
   const hasConfiguredFee = integratorFees.length === 1 && integratorFees.every((fee) => {
     const feeRecord = recordValue(fee);
     const amount = stringValue(feeRecord.amount);
     return /^\d{1,78}$/.test(amount)
       && BigInt(amount) > 0n
+      && BigInt(amount) === expectedAmount
       && BigInt(amount) <= (1n << 256n) - 1n
       && (feeRecord.type === undefined || feeRecord.type === "volume")
       && sameAsset(stringValue(feeRecord.token), expectedToken);

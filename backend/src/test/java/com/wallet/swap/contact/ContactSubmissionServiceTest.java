@@ -31,7 +31,8 @@ class ContactSubmissionServiceTest {
   @BeforeEach
   void setUp() {
     notificationProperties = new NotificationProperties();
-    service = new ContactSubmissionService(repository, outboxRepository, notificationProperties);
+    service = new ContactSubmissionService(repository, outboxRepository, notificationProperties,
+        new com.wallet.swap.config.BrandProperties(null));
   }
 
   @Test

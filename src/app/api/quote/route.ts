@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { captureRevenueEvidence } from "@/lib/server/revenueEvidence";
+import type { ProviderOutcome, QuoteParams } from "@/lib/server/aggregator";
 import { getClientIp } from "@/lib/server/ip";
 import { rateLimitMany } from "@/lib/server/rateLimit";
 import { quoteCache } from "@/lib/server/cache";
@@ -33,6 +35,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const takerAddress = searchParams.get("takerAddress") ?? "";
+  const historyOwner = isAddress(takerAddress) ? takerAddress : (searchParams.get("historyWallet") ?? "");
   const rl = await rateLimitMany([
     `quote-ip:${ip}`,
     `quote-wallet:${normalizeWalletKey(takerAddress) || "missing"}`
@@ -146,6 +149,7 @@ export async function GET(req: NextRequest) {
     normalizeAssetKey(buyToken, toChainId),
     sellAmount,
     normalizeWalletKey(takerAddress),
+    normalizeWalletKey(historyOwner),
     normalizeWalletKey(toAddress),
     slippageBps ?? "default"
   ].join(":");
@@ -157,7 +161,8 @@ export async function GET(req: NextRequest) {
   try {
     const client = createQuoteClient(fromChainId, toChainId);
 
-    const quote = await client.getQuote({
+    const outcomes: ProviderOutcome[] = [];
+    const params: QuoteParams = {
       sellToken,
       sellTokenSymbol: sellTokenInfo.symbol,
       sellTokenDecimals: sellTokenInfo.decimals,
@@ -169,8 +174,17 @@ export async function GET(req: NextRequest) {
       toAddress: toAddress || undefined,
       chainId: fromChainId,
       buyChainId: toChainId,
-      slippageBps
-    });
+      slippageBps,
+      onProviderOutcome: (outcome) => outcomes.push(outcome)
+    };
+    let quote: QuoteResponse;
+    try {
+      quote = await client.getQuote(params);
+    } catch (error) {
+      await captureRevenueEvidence(null, params, historyOwner, outcomes);
+      throw error;
+    }
+    await captureRevenueEvidence(quote, params, historyOwner, outcomes);
 
     quoteCache.set(cacheKey, quote);
 

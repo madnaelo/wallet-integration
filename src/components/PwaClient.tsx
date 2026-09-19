@@ -1,4 +1,6 @@
 "use client";
+import { BRAND } from "@/lib/brand";
+
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -61,9 +63,9 @@ export function PwaClient() {
   }
 
   return (
-    <div className="installPrompt" role="region" aria-label="Install Swap Assistant">
+    <div className="installPrompt" role="region" aria-label={"Install " + BRAND.name}>
       <div>
-        <strong>Install Swap Assistant</strong>
+        <strong>Install {BRAND.name}</strong>
         <span>Open faster and receive push notifications on this device.</span>
       </div>
       <button className="installPromptAction" type="button" onClick={install}>

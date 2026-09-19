@@ -1,11 +1,13 @@
+import { BRAND } from "@/lib/brand";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalOperatorDisclosure } from "@/components/LegalOperatorDisclosure";
 import { configuredPlatformFeeBps } from "@/lib/server/platformFees";
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Fees & Risks",
-  description: "Fee, quote, execution, and alert disclosures for Swap Assistant.",
+  description: "Fee, quote, execution, and alert disclosures for " + BRAND.name + ".",
   alternates: {
     canonical: "/fees"
   },
@@ -28,8 +30,8 @@ export default function FeesPage() {
         <h1>Fees & Risks</h1>
         <p>Effective July 23, 2026.</p>
         <p>
-          Swap Assistant is a non-custodial swap assistant. Your wallet signs and
-          submits transactions. Swap Assistant does not hold private keys, seed
+          {BRAND.name} is a non-custodial swap assistant. Your wallet signs and
+          submits transactions. {BRAND.name} does not hold private keys, seed
           phrases, or user funds.
         </p>
 
@@ -51,7 +53,7 @@ export default function FeesPage() {
         <section>
           <h2>Platform Fees</h2>
           <p>
-            Swap Assistant currently configures a platform fee of up to{" "}
+            {BRAND.name} currently configures a platform fee of up to{" "}
             <strong>{platformFeePercent}%</strong> on swap routes that support
             integrator fees. The quote includes this fee before you choose a
             route, and the trade summary shows it when the provider returns a
@@ -64,14 +66,14 @@ export default function FeesPage() {
             by provider, chain, token, route, and provider account.
           </p>
           <p>
-            Swap Assistant can receive different compensation from different
+            {BRAND.name} can receive different compensation from different
             providers. Quotes are ranked by the receiving amount returned for
             the user after disclosed service fees, not by the compensation Swap
             Assistant expects to receive. You can review and choose another
             available route before approving a transaction.
           </p>
           <p>
-            Platform or integrator fees are received by Swap Assistant&apos;s
+            Platform or integrator fees are received by {BRAND.name}&apos;s
             operator or shared according to the selected provider&apos;s
             commercial terms. This compensation supports the service and
             creates a commercial interest in completed swaps.

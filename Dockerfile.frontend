@@ -2,6 +2,7 @@ FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+COPY vendor/bigint-buffer-safe ./vendor/bigint-buffer-safe
 RUN npm ci --ignore-scripts
 
 FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS builder
@@ -15,6 +16,11 @@ ARG NEXT_PUBLIC_SITE_URL
 ARG NEXT_PUBLIC_APP_VERSION
 ARG NEXT_PUBLIC_COMMIT_TIMESTAMP
 ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
+ARG NEXT_PUBLIC_BRAND_NAME
+ARG NEXT_PUBLIC_BRAND_SHORT_NAME
+ARG NEXT_PUBLIC_BRAND_ASSETS_BASE
+ARG NEXT_PUBLIC_BRAND_SUPPORT_PATH
+ARG NEXT_PUBLIC_OPERATOR_DISCLOSURE
 
 ENV NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=$NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
 ENV NEXT_PUBLIC_ALLOWED_CHAIN_IDS=$NEXT_PUBLIC_ALLOWED_CHAIN_IDS
@@ -24,11 +30,18 @@ ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
 ENV NEXT_PUBLIC_COMMIT_TIMESTAMP=$NEXT_PUBLIC_COMMIT_TIMESTAMP
 ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+ENV NEXT_PUBLIC_BRAND_NAME=$NEXT_PUBLIC_BRAND_NAME
+ENV NEXT_PUBLIC_BRAND_SHORT_NAME=$NEXT_PUBLIC_BRAND_SHORT_NAME
+ENV NEXT_PUBLIC_BRAND_ASSETS_BASE=$NEXT_PUBLIC_BRAND_ASSETS_BASE
+ENV NEXT_PUBLIC_BRAND_SUPPORT_PATH=$NEXT_PUBLIC_BRAND_SUPPORT_PATH
+ENV NEXT_PUBLIC_OPERATOR_DISCLOSURE=$NEXT_PUBLIC_OPERATOR_DISCLOSURE
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/vendor ./vendor
 COPY package.json package-lock.json .eslintrc.json next.config.mjs next-env.d.ts tsconfig.json ./
 COPY src ./src
+COPY config/provider-commercial-policy.json config/supported-evm-chains.json ./config/
 COPY public ./public
 RUN npm run build
 
@@ -54,6 +67,7 @@ RUN rm -rf \
   && adduser -S app -G app
 
 COPY --from=builder --chown=app:app /app/public ./public
+COPY --from=builder --chown=app:app /app/config/provider-commercial-policy.json ./config/provider-commercial-policy.json
 COPY --from=builder --chown=app:app /app/.next/standalone ./
 COPY --from=builder --chown=app:app /app/.next/static ./.next/static
 
