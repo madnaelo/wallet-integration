@@ -2,6 +2,7 @@ import { BRAND } from "@/lib/brand";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "./ContactForm";
+import { commercialEnquiry } from "@/lib/commercial";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -16,7 +17,8 @@ export const metadata: Metadata = {
   }
 };
 
-export default function ContactPage() {
+export default async function ContactPage({ searchParams }: { searchParams: Promise<{ enquiry?: string | string[] }> }) {
+  const enquiry = commercialEnquiry((await searchParams).enquiry);
   return (
     <main className="contactPage">
       <header className="contactHeader">
@@ -32,7 +34,7 @@ export default function ContactPage() {
       </header>
 
       <div className="contactLayout">
-        <ContactForm />
+        <ContactForm initialTopic={enquiry.topic} initialMessage={enquiry.message} />
         <aside className="contactAside" aria-labelledby="contact-safety-title">
           <h2 id="contact-safety-title">Before you send</h2>
           <ul>

@@ -187,6 +187,17 @@ const nextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders
+      },
+      {
+        source: "/demo",
+        headers: [
+          { key: "Content-Security-Policy", value: contentSecurityPolicy
+            .replace(/connect-src[^;]+/, "connect-src 'none'")
+            .replace(/frame-src[^;]+/, "frame-src 'none'")
+            .replace(/worker-src[^;]+/, "worker-src 'none'") },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+          { key: "X-Robots-Tag", value: "noindex, follow" }
+        ]
       }
     ];
   }

@@ -15,11 +15,26 @@ configured swap fees from verified earnings. The proposed next business model is
 a [non-exclusive software license plus setup](docs/commercial/software-offer.md),
 with [customer delivery requirements](docs/commercial/customer-delivery.md) and
 the [implementation status](docs/commercial/implementation-roadmap.md).
-The branch includes [trusted revenue evidence and an admin dashboard](docs/commercial/revenue-accounting.md)
+The product includes [trusted revenue evidence and an admin dashboard](docs/commercial/revenue-accounting.md)
 and [configurable branding with deployment preflight](docs/commercial/branding-and-preflight.md).
 This is not a claim of automated customer provisioning, guaranteed payouts or
 operator/provider legal clearance. Revenue capture requires coordinated backend
 and frontend runtime configuration before enabling it.
+
+For prospects: [business page](https://wallet-integration-theta.vercel.app/business)
+and [safe synthetic demo](https://wallet-integration-theta.vercel.app/demo).
+The demo cannot connect a real wallet, submit swaps/orders, collect fees or save
+real account data. Its [boundary and checks](docs/commercial/public-demo.md) are
+separate from the existing live application; no live revenue setting is enabled.
+
+Sales kit: [one-pager](docs/commercial/sales-one-pager.md),
+[demo script](docs/commercial/demo-script.md),
+[pilot offer / single price source](docs/commercial/pilot-offer.md),
+[SOW](docs/commercial/pilot-sow-template.md),
+[three outreach messages](docs/commercial/outreach-messages.md),
+[qualification](docs/commercial/prospect-qualification.md) and
+[empty tracker](docs/commercial/sales-tracker.md).
+Next milestone: a qualified demo request, not another product feature.
 
 ## Current Product
 

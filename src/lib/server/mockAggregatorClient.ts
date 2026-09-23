@@ -7,19 +7,22 @@ export class MockAggregatorClient implements DexAggregatorClient {
   providerName = "Demo quote";
 
   async getQuote(params: QuoteParams): Promise<QuoteResponse> {
-    const buyAmount = quoteBuyAmount(params.sellAmount);
-
-    return normalizeQuote(params, this, {
-      buyAmount,
-      minBuyAmount: toMinAmount(buyAmount, params.slippageBps),
-      to: params.takerAddress,
-      data: "0x",
-      value: "0",
-      gas: "21000",
-      allowanceTarget: params.takerAddress,
-      routeLines: [{ source: "Demo route", share: "100%" }]
-    });
+    return buildMockQuote(params);
   }
+}
+
+// Shared synthetic quote builder; never calls a provider or signs a transaction.
+export function buildMockQuote(params: QuoteParams, buyAmount = quoteBuyAmount(params.sellAmount)): QuoteResponse {
+  return normalizeQuote(params, { providerId: "mock", providerName: "Demo quote" }, {
+    buyAmount,
+    minBuyAmount: toMinAmount(buyAmount, params.slippageBps),
+    to: params.takerAddress,
+    data: "0x",
+    value: "0",
+    gas: "21000",
+    allowanceTarget: params.takerAddress,
+    routeLines: [{ source: "Demo route", share: "100%" }]
+  });
 }
 
 function quoteBuyAmount(sellAmount: string): string {

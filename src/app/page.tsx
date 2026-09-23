@@ -75,6 +75,7 @@ export default function IntroPage() {
             your wallet app.
           </p>
           <div className="introActions">
+            <a href="/business" className="introSecondaryAction">For teams</a>
             <Link className="btn btnPrimary introPrimaryAction" href="/swap">
               Open Swap
             </Link>

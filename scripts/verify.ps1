@@ -1,3 +1,5 @@
+param([ValidateRange(1, 16)][int]$TestWorkers = 2)
+
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
@@ -24,8 +26,9 @@ function Invoke-CheckedCommand {
 
 Push-Location $repoRoot
 try {
-  Invoke-CheckedCommand $npmExe @("test") "Frontend tests"
+  Invoke-CheckedCommand $npmExe @("test", "--", "--maxWorkers=$TestWorkers") "Frontend tests"
   Invoke-CheckedCommand $npmExe @("run", "test:preflight") "Deployment preflight tests"
+  Invoke-CheckedCommand $npmExe @("run", "preflight:demo") "Synthetic demo boundary"
   Invoke-CheckedCommand $npmExe @("audit", "--audit-level=moderate") "Frontend dependency audit"
   Invoke-CheckedCommand $npmExe @("run", "typecheck") "Frontend type check"
   Invoke-CheckedCommand $npmExe @("run", "lint") "Frontend lint"

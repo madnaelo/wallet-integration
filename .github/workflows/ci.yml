@@ -116,6 +116,9 @@ jobs:
       - name: Test isolated deployment preflight
         run: npm run test:preflight
 
+      - name: Validate synthetic demo boundary
+        run: npm run preflight:demo
+
       - name: Audit frontend dependencies
         run: node scripts/check-npm-audit.mjs
 

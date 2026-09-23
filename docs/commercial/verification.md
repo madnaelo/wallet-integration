@@ -1,5 +1,36 @@
 # Commercial Branch Verification
 
+## Sales And Demo Verification: September 23, 2026
+
+The approved `75ac0f1` was fast-forwarded into master without rewriting V30/V31.
+[Master CI 185](https://github.com/madnaelo/wallet-integration/actions/runs/35710071254)
+and Security passed. The subsequent release scan blocked AsyncHttpClient 2.16.0
+for CVE-2026-85721. It is updated to the same-series patched 2.16.1; the container
+gate remains enabled. See [upstream releases](https://github.com/AsyncHttpClient/async-http-client/releases).
+
+The sales/demo changes passed the complete local verification script:
+
+- 222 frontend tests, 5 deployment-preflight tests and the demo import-boundary check.
+- npm audit: zero vulnerabilities; typecheck, zero-warning lint and production build.
+- 12 Playwright cases including 390px/1440px sales/demo workflows, image loading,
+  no demo wallet/API requests, CSP/noindex, enquiry prefill and mocked form submission.
+- 207 backend tests, none skipped, including 14 tests on a dedicated disposable
+  PostgreSQL 16 database. V29/V30/V31 upgrade and independent reused-quote evidence pass.
+- SpotBugs: zero findings. All three Docker Compose configurations validated.
+- Desktop/mobile demo and business screenshots visually inspected. The hero background
+  was subsequently reduced to avoid competing with the foreground text.
+
+Initial unrestricted local test workers caused import timeouts on the laptop;
+the full suite passed with two workers. `verify.ps1 -TestWorkers` now bounds local
+concurrency without weakening timeouts or assertions. No feature was disabled.
+
+No real transaction/order, fee collection, provider credential change or regulatory
+record change was made. The protected production contact-list API was reachable;
+email forwarding has not been verified. Public deployment smoke checks and final
+CI/release status must be taken from the release run, not inferred from local tests.
+
+## Earlier Accounting Verification
+
 Executed on September 19, 2026 in the E:\assignments\wallet working tree.
 These are engineering checks, not a legal review or real fee-payout test.
 

@@ -3,6 +3,7 @@ import { BRAND } from "@/lib/brand";
 
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -14,19 +15,22 @@ const DEVELOPMENT_RELOAD_KEY = "swap-assistant.pwa.dev-cleanup.v1";
 const PWA_CACHE_PREFIX = "swap-assistant-pwa-";
 
 export function PwaClient() {
+  const pathname = usePathname();
+  const commercialPage = pathname === "/demo" || pathname === "/business";
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState<boolean>(true);
 
   useEffect(() => {
-    if (!isServiceWorkerSupported()) return;
+    if (commercialPage || !isServiceWorkerSupported()) return;
     if (process.env.NODE_ENV === "production") {
       void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
       return;
     }
     void removeDevelopmentServiceWorker().catch(() => undefined);
-  }, []);
+  }, [commercialPage]);
 
   useEffect(() => {
+    if (commercialPage) return;
     setDismissed(localStorage.getItem(INSTALL_DISMISSED_KEY) === "true");
 
     const onBeforeInstallPrompt = (event: Event) => {
@@ -37,14 +41,14 @@ export function PwaClient() {
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     return () => window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-  }, []);
+  }, [commercialPage]);
 
   const visible = useMemo(
     () => Boolean(installPrompt) && !dismissed && !isStandaloneDisplay(),
     [dismissed, installPrompt]
   );
 
-  if (!visible) return null;
+  if (commercialPage || !visible) return null;
 
   async function install() {
     if (!installPrompt) return;

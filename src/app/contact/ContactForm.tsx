@@ -13,7 +13,10 @@ import { envPublic } from "@/lib/envPublic";
 
 type FormState = "idle" | "submitting" | "success" | "error";
 
-export function ContactForm() {
+export function ContactForm({ initialTopic = "general", initialMessage = "" }: {
+  initialTopic?: ContactSubmissionRequest["topic"];
+  initialMessage?: string;
+}) {
   const [formState, setFormState] = useState<FormState>("idle");
   const [message, setMessage] = useState("");
 
@@ -90,7 +93,7 @@ export function ContactForm() {
 
         <div className="contactField">
           <label htmlFor="contact-topic">Topic *</label>
-          <select className="contactInput" id="contact-topic" name="topic" defaultValue="general" required>
+          <select className="contactInput" id="contact-topic" name="topic" defaultValue={initialTopic} required>
             <option value="general">General question</option>
             <option value="technical">Technical problem</option>
             <option value="privacy">Privacy request</option>
@@ -108,6 +111,7 @@ export function ContactForm() {
             minLength={10}
             maxLength={3000}
             rows={7}
+            defaultValue={initialMessage}
             required
           />
           <small>10 to 3,000 characters.</small>

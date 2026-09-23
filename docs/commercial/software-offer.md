@@ -1,6 +1,7 @@
 # Licensed Product Offer (Draft)
 
-Status: internal proposal, September 19, 2026. Not a published offer, signed
+Status: updated September 22, 2026. Public software/demo positioning is published
+at `/business`; this document is internal rationale, not a signed
 license, legal opinion, or promise of revenue. No customer has been contacted.
 
 ## Recommendation
@@ -52,8 +53,8 @@ No agreement or ownership history has been verified merely by drafting this file
 | Signed limit orders | Supported protocol-verifiable pairs only. Do not advertise every token or native BTC as automatically executable. |
 | Fee configuration | Integrator fee request/response safeguards; not proof of payout or an earnings guarantee. |
 | CI/CD and operations | Existing project pipeline is a starting point, not permission to deploy a customer's copy into Aqeel's resources. |
-| Branding | Customer configuration and remaining hard-coded web/backend/legal copy still need a coherent implementation. A turnkey white-label configurator is not yet delivered. |
-| Revenue reporting | Trusted settlement ledger and admin revenue dashboard are not implemented. Browser history must not be presented as audited revenue. |
+| Branding | Shared brand configuration and deployment preflight exist. Customer configuration and operator/legal copy still require scoped review; no multi-tenant configurator is offered. |
+| Revenue reporting | Trusted settlement ledger and protected admin reporting exist. Independent evidence is required; unsupported proof stays unverified. Browser history is not audited revenue. |
 
 ## First Sale Process
 
@@ -64,8 +65,8 @@ No agreement or ownership history has been verified merely by drafting this file
 3. Propose a fixed-price paid pilot with explicit acceptance criteria and a
    limited defect-correction period. Customer-specific features are separate.
 4. Agree license and statement of work before distributing source or credentials.
-   Decide a deposit/acceptance payment schedule with the buyer. Pricing is not
-   approved or published in this draft; do not invent validated willingness to pay.
+   Use the current [pilot offer](pilot-offer.md) for test pricing and proposed
+   payment milestones; do not invent validated willingness to pay.
 5. Deploy into separate customer-owned accounts and complete the
    [delivery checklist](customer-delivery.md). Provider approval, operator
    eligibility and owner-signed fund tests are explicit prerequisites to live use.
@@ -80,7 +81,8 @@ Do not build a large sales/tenant platform before learning whether this offer se
 
 - License ownership and redistribution terms need an actual agreement. Do not
   assume all dependency code, logos or third-party assets can be sublicensed.
-- Pilot price and support commitment need a scoped customer brief; there is no
+- The test pilot price and support window are defined in [pilot-offer.md](pilot-offer.md).
+  An actual commitment still needs a scoped customer agreement; there is no
   signed buyer, recurring revenue, or measured acquisition cost yet.
 - The owner's regulatory correspondence remains relevant. Software licensing
   is not automatically a legal exemption. Preserve the
