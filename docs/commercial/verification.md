@@ -2,6 +2,18 @@
 
 ## Sales And Demo Verification: September 23, 2026
 
+Release `66106d1` passed master CI/Security and
+[Release Production](https://github.com/madnaelo/wallet-integration/actions/runs/35832581744),
+including the patched backend container scan. Both live health endpoints returned
+that exact revision. A labelled Partnership test enquiry returned HTTP 202, was
+found exactly once in the protected inbox and was marked resolved. This proves
+storage and inbox access, not automated email delivery.
+
+The live mobile test exposed a pre-hydration form submission race. Contact fields
+are now disabled until the client handler is mounted; the form also declares POST
+so a native fallback cannot place contact details in a GET query. A delayed-script
+browser regression checks this boundary explicitly.
+
 The approved `75ac0f1` was fast-forwarded into master without rewriting V30/V31.
 [Master CI 185](https://github.com/madnaelo/wallet-integration/actions/runs/35710071254)
 and Security passed. The subsequent release scan blocked AsyncHttpClient 2.16.0

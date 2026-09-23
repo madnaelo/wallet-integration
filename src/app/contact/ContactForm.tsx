@@ -2,7 +2,7 @@
 import { BRAND } from "@/lib/brand";
 
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BackendClientError,
@@ -19,6 +19,8 @@ export function ContactForm({ initialTopic = "general", initialMessage = "" }: {
 }) {
   const [formState, setFormState] = useState<FormState>("idle");
   const [message, setMessage] = useState("");
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,7 +55,8 @@ export function ContactForm({ initialTopic = "general", initialMessage = "" }: {
         email address you provide.
       </p>
 
-      <form className="contactForm" onSubmit={handleSubmit}>
+      <form className="contactForm" method="post" onSubmit={handleSubmit}>
+        <fieldset className="contactFormFields" disabled={!ready} aria-busy={!ready}>
         <div className="contactWebsiteTrap" aria-hidden="true">
           <label htmlFor="contact-website">Website</label>
           <input
@@ -145,6 +148,8 @@ export function ContactForm({ initialTopic = "general", initialMessage = "" }: {
             {message}
           </div>
         </div>
+        </fieldset>
+        <noscript>JavaScript is required to send this form. Enable it and reload this page.</noscript>
       </form>
     </section>
   );

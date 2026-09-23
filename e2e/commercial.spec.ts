@@ -1,5 +1,20 @@
 import { expect, test } from "@playwright/test";
 
+test("contact cannot submit private form fields before hydration", async ({ page }) => {
+  let releaseScripts!: () => void;
+  const gate = new Promise<void>(resolve => { releaseScripts = resolve; });
+  await page.route("**/_next/static/**/*.js", async route => { await gate; await route.continue(); });
+  const navigation = page.goto("/contact?enquiry=branded-demo", { waitUntil: "commit" });
+  try {
+    await navigation;
+    await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
+    await expect(page.getByLabel("Email address *")).toBeDisabled();
+    await expect(page.locator("form")).toHaveAttribute("method", "post");
+  } finally { releaseScripts(); }
+  await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
+  await expect(page.getByLabel("Topic *")).toHaveValue("partnership");
+});
+
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
   test(`safe demo and sales contact at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);

@@ -786,6 +786,15 @@ body {
   margin: 0 0 20px;
 }
 
+.contactFormFields {
+  display: grid;
+  gap: 16px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
 .contactForm {
   display: grid;
   gap: 16px;
