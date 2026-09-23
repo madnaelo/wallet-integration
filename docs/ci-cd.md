@@ -173,6 +173,19 @@ notify a private inbox, set `EMAIL_NOTIFICATIONS_ENABLED=true`, configure the
 `OCI_BACKEND_ENV`. The recipient address is server-only and must not be added
 to a `NEXT_PUBLIC_*` value or tracked documentation.
 
+Production email settings can also be managed separately without replacing the
+complete `OCI_BACKEND_ENV` secret. In the GitHub `production` environment, set variables
+`EMAIL_NOTIFICATIONS_ENABLED=true`, `SMTP_HOST`, `SMTP_PORT` and `EMAIL_FROM`
+(for example, `Swap Assistant <sender@example.com>`), and environment secrets
+`SMTP_USERNAME`, `SMTP_PASSWORD` and `CONTACT_RECIPIENT_EMAIL`. The release job
+overrides only these backend settings and requires authenticated STARTTLS with
+certificate hostname verification. Use port 587 for Gmail; use an app password,
+not the account login password. These credentials are never sent to Vercel.
+Set the variable `EMAIL_NOTIFICATIONS_ENABLED=false` to disable forwarding at
+the next release. If the variable is unset, the original `OCI_BACKEND_ENV` values
+are preserved. `SMTP_STARTTLS_REQUIRED` defaults to true; disable it only for a
+local test mail server, never an Internet SMTP server.
+
 `OCI_SSH_KNOWN_HOSTS` must contain the OCI host key line for
 `OCI_SSH_HOST`/`OCI_SSH_PORT`. Generate it once from a trusted machine with
 `ssh-keyscan -p 22 <oci-host>` and verify the fingerprint in the OCI console

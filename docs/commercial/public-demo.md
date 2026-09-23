@@ -48,9 +48,12 @@ required for this public demo.
 
 The existing contact service stores enquiries transactionally and can queue an
 operator email only when email delivery and a contact recipient are configured.
-The saved production configuration currently has neither SMTP credentials nor
-a contact recipient; do not claim automated email forwarding is verified.
-Review the protected contact inbox daily using the existing commands in
+Production uses backend-only SMTP secrets with the sender name Swap Assistant;
+the configured operator receives new enquiries in their email inbox. SMTP
+acceptance is not proof of inbox placement: check Spam and the protected delivery
+metrics during smoke testing. The database inbox remains the durable source if
+mail delivery fails; existing retries apply, with no historical-message replay.
+Review the protected contact inbox using the existing commands in
 [CI/CD operations](../ci-cd.md), reply personally by email, and mark each message
 reviewed/resolved. Do not paste the admin key into the public demo or tracker.
 No prospect outreach has been sent as part of this implementation.

@@ -393,6 +393,25 @@ jobs:
           )"
           unset admin_api_key
           echo "::add-mask::$rate_limit_key_pepper"
+          if [ -n "$EMAIL_NOTIFICATIONS_ENABLED" ]; then
+            case "$EMAIL_NOTIFICATIONS_ENABLED" in
+              true)
+                for name in SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD EMAIL_FROM CONTACT_RECIPIENT_EMAIL; do
+                  value="${!name:-}"
+                  if [[ -z "$value" || "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+                    echo "$name must be configured as a nonempty single-line value for email forwarding." >&2
+                    exit 1
+                  fi
+                done
+                if ! [[ "$SMTP_PORT" =~ ^[1-9][0-9]{0,4}$ ]] || (( SMTP_PORT > 65535 )); then
+                  echo "SMTP_PORT must be a valid TCP port." >&2
+                  exit 1
+                fi
+                ;;
+              false) ;;
+              *) echo "EMAIL_NOTIFICATIONS_ENABLED must be true or false." >&2; exit 1 ;;
+            esac
+          fi
           for name in COW_API_KEY LIFI_API_KEY; do
             value="${!name:-}"
             if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
@@ -430,6 +449,17 @@ jobs:
           {
             printf '%s\n' "$OCI_BACKEND_ENV"
             printf '\nAPP_ENVIRONMENT=production\n'
+            if [ -n "$EMAIL_NOTIFICATIONS_ENABLED" ]; then
+              printf 'EMAIL_NOTIFICATIONS_ENABLED=%s\n' "$EMAIL_NOTIFICATIONS_ENABLED"
+              if [ "$EMAIL_NOTIFICATIONS_ENABLED" = true ]; then
+                for name in SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD EMAIL_FROM CONTACT_RECIPIENT_EMAIL; do
+                  printf '%s=%s\n' "$name" "${!name}"
+                done
+                printf 'SMTP_AUTH=true\nSMTP_STARTTLS_ENABLE=true\nSMTP_STARTTLS_REQUIRED=true\n'
+              else
+                printf 'CONTACT_RECIPIENT_EMAIL=\n'
+              fi
+            fi
             printf 'AUTH_SESSION_COOKIE_SAME_SITE=Lax\n'
             printf 'AUTH_SESSION_COOKIE_PATH=/backend\n'
             printf 'AUTH_SESSION_COOKIE_SECURE=true\n'
@@ -492,6 +522,13 @@ jobs:
           COW_API_KEY: ${{ secrets.COW_API_KEY }}
           LIFI_API_KEY: ${{ secrets.LIFI_API_KEY }}
           OCI_BACKUP_BUCKET: ${{ vars.OCI_BACKUP_BUCKET }}
+          EMAIL_NOTIFICATIONS_ENABLED: ${{ vars.EMAIL_NOTIFICATIONS_ENABLED }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          CONTACT_RECIPIENT_EMAIL: ${{ secrets.CONTACT_RECIPIENT_EMAIL }}
           OCI_BACKUP_NAMESPACE: ${{ vars.OCI_BACKUP_NAMESPACE }}
           OCI_BACKUP_OBJECT_PREFIX: ${{ vars.OCI_BACKUP_OBJECT_PREFIX || 'swap-assistant/postgres' }}
 
