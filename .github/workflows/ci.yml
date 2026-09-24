@@ -60,6 +60,9 @@ jobs:
       - name: Validate cohosted deployment contract
         run: bash scripts/tests/deploy-isolation-contract.sh
 
+      - name: Inject collector deployment failures
+        run: bash scripts/tests/radar-deploy-rollback.sh
+
       - name: Lint Dockerfiles
         run: >-
           docker run --rm

@@ -2,7 +2,7 @@
 # Sourced only by the locked Swap Assistant release, after Flyway and backend health.
 # shellcheck disable=SC2034,SC2154
 deploy_private_radar() (
-  set -euo pipefail
+  set -Eeuo pipefail
   local enabled radar_container rollback bootstrap egress runtime_env bootstrap_env credentials
   enabled="$(read_env_value MARKET_RADAR_INTERNAL_ENABLED || true)"
   radar_container=wallet-market-radar
@@ -113,7 +113,7 @@ PY
       run_container start "$radar_container" >/dev/null
     fi
   }
-  trap 'rollback_radar' ERR
+  trap 'code=$?; trap - ERR; rollback_radar || true; exit "$code"' ERR
   # Egress for official Binance feeds; no published ports and no reverse-proxy membership.
   run_container create --name "$radar_container" --restart unless-stopped --network "$egress" \
     --env-file "$runtime_env" --label com.swapassistant.app=backend --label com.swapassistant.role=market-radar \
@@ -136,8 +136,11 @@ PY
     rollback_radar
     fail "Private Binance collector did not receive live updates; previous collector restored."
   fi
+  if ! check_cohosted_health; then
+    rollback_radar
+    fail "A protected cohosted health check failed; prior collector restored."
+  fi
   trap - ERR
   if container_exists "$rollback"; then run_container rm -f "$rollback" >/dev/null; fi
-  check_cohosted_health || fail "A protected cohosted health check failed after collector deployment."
   echo "Private Binance research collector is receiving live updates. No public collector port; commercial live disabled."
 )
