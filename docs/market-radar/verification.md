@@ -19,7 +19,7 @@ No sender credentials appear in this document.
 - Production frontend build passed with /market-radar and isolated demo.
 - 16 Chromium acceptance tests passed across existing flows and Radar at 1440/390/320px.
 - Collector Docker build succeeded with isolated runtime dependencies (ws/pg).
-- Full frontend suite: 290 tests passed, including actual isolated PostgreSQL tests.
+- Full frontend suite: 292 tests passed, including actual isolated PostgreSQL tests.
 - Earlier DB setup timeout under concurrent Docker/Java load was resolved by an
   isolated rerun; no production timeout or isolation guard was weakened.
 - Backend verify: 217 tests passed, zero skipped; SpotBugs reported zero issues

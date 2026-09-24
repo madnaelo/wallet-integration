@@ -17,7 +17,8 @@ ENV NODE_ENV=production
 ENV RADAR_MODE=disabled
 ENV RADAR_BIND_ADDRESS=0.0.0.0
 ENV NODE_OPTIONS=--max-old-space-size=256
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-v1.22.22 \
+RUN apk upgrade --no-cache libcrypto3 libssl3 \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-v1.22.22 \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg
 COPY --from=runtime-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/.market-radar ./dist
