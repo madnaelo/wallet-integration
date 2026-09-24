@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.UUID;
+import jakarta.validation.Valid;
+import com.wallet.swap.growth.GrowthAttribution;
 
 public final class ContactModels {
   private ContactModels() {}
@@ -15,7 +17,12 @@ public final class ContactModels {
       @NotBlank @Email @Size(max = 254) String email,
       @NotBlank @Size(max = 32) String topic,
       @NotBlank @Size(min = 10, max = 3_000) String message,
-      @Size(max = 200) String website) {}
+      @Size(max = 200) String website,
+      @Valid GrowthAttribution attribution) {
+    public ContactSubmissionRequest(String name, String email, String topic, String message, String website) {
+      this(name, email, topic, message, website, null);
+    }
+  }
 
   public record ContactSubmissionResponse(boolean accepted) {}
 
@@ -27,7 +34,8 @@ public final class ContactModels {
       String message,
       String status,
       Instant createdAt,
-      Instant updatedAt) {}
+      Instant updatedAt,
+      GrowthAttribution attribution) {}
 
   public record ContactStatusUpdateRequest(
       @NotBlank

@@ -22,8 +22,8 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
   return (
     <main className="contactPage">
       <header className="contactHeader">
-        <Link className="legalBackLink" href="/swap">
-          Back to swap
+        <Link className="legalBackLink" href={enquiry.topic === "partnership" ? "/business" : "/swap"}>
+          {enquiry.topic === "partnership" ? "Back to teams" : "Back to swap"}
         </Link>
         <p className="contactEyebrow">Contact {BRAND.name}</p>
         <h1>How can we help?</h1>

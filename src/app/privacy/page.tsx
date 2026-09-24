@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           Back to swap
         </Link>
         <h1>Privacy Notice</h1>
-        <p>Effective September 19, 2026.</p>
+        <p>Effective September 24, 2026.</p>
         <p>
           {BRAND.name} stores the minimum product data needed for your swap
           history, favorites, alerts, and notification preferences.
@@ -68,6 +68,12 @@ export default function PrivacyPage() {
             reporting counts quotes, swap reviews, submissions, and verified
             completions; it does not send this activity to third-party analytics.
           </p>
+        </section>
+
+        <section>
+          <h2>Business Enquiries And Attribution</h2>
+          <p>On public business and contact pages, our first-party reporting counts page openings and demo-link clicks. It does not identify unique visitors or prove that a visitor is a qualified buyer. We record only known page paths, a broad referral source and short campaign labels, not full referring URLs, wallet activity or transaction details. No advertising pixels, analytics cookies or analytics browser storage are used.</p>
+          <p>These reporting events are normally retained for up to 90 days. If you send a contact message, the same limited attribution and your enquiry type may be retained with that message for up to 365 days. Do Not Track and Global Privacy Control signals disable optional browser reporting and attribution. The isolated demo sends no analytics requests; demo-link clicks are not counted as verified demo views.</p>
         </section>
 
         <section>

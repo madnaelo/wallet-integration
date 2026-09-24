@@ -8,6 +8,22 @@ toward favorite pairs, reverse-swap profit checks, and notifications.
 The application never stores private keys, never takes custody of funds, and the
 backend never signs swap transactions.
 
+## Evaluate For Your Team
+
+[Explore the safe demo](https://getswapradar.xyz/demo?utm_source=github&utm_medium=readme&utm_campaign=product_eval)
+without a wallet, account or funds. For a branded deployment, see the
+[software offer](https://getswapradar.xyz/business?utm_source=github&utm_medium=readme&utm_campaign=product_eval),
+[wallet integration](https://getswapradar.xyz/for-wallets) or
+[agency delivery](https://getswapradar.xyz/for-web3-agencies) pages.
+
+![Synthetic product demo: quote comparison and transaction review](public/business-demo.png)
+
+The architecture combines a Next.js application, a Spring Boot/PostgreSQL
+backend and an isolated Market Radar collector. Provider routing, wallet
+authorization and independently reconciled revenue remain separate concerns.
+Public Radar is synthetic; private exchange research is not commercial data
+licensing. Customer deployment and provider permissions require a scoped review.
+
 ## Commercial Work
 
 The [implementation audit](docs/commercial-readiness-audit.md) distinguishes
@@ -35,7 +51,10 @@ Sales kit: [one-pager](docs/commercial/sales-one-pager.md),
 [SOW](docs/commercial/pilot-sow-template.md),
 [three outreach messages](docs/commercial/outreach-messages.md),
 [qualification](docs/commercial/prospect-qualification.md) and
-[empty tracker](docs/commercial/sales-tracker.md).
+[tracker template](docs/commercial/sales-tracker.md).
+Growth: [buyer intent](docs/growth/keyword-map.md),
+[public-source prospects](docs/growth/prospects.csv) and
+[measurement/operations](docs/growth/operations.md).
 Next milestone: a qualified demo request, not another product feature.
 
 ## Current Product

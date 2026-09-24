@@ -10,6 +10,7 @@ import {
   type ContactSubmissionRequest
 } from "@/lib/backendClient";
 import { envPublic } from "@/lib/envPublic";
+import { currentAttribution, GrowthTracker } from "@/components/GrowthTracker";
 
 type FormState = "idle" | "submitting" | "success" | "error";
 
@@ -31,7 +32,8 @@ export function ContactForm({ initialTopic = "general", initialMessage = "" }: {
       email: String(data.get("email") ?? ""),
       topic: String(data.get("topic") ?? "general") as ContactSubmissionRequest["topic"],
       message: String(data.get("message") ?? ""),
-      website: String(data.get("website") ?? "")
+      website: String(data.get("website") ?? ""),
+      attribution: currentAttribution()
     };
 
     setFormState("submitting");
@@ -49,6 +51,7 @@ export function ContactForm({ initialTopic = "general", initialMessage = "" }: {
 
   return (
     <section className="contactFormSection" aria-labelledby="contact-form-title">
+      <GrowthTracker />
       <h2 id="contact-form-title">Send a message</h2>
       <p className="contactFormIntro">
         Fields marked with an asterisk are required. We will reply using the

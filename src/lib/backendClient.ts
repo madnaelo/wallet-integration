@@ -105,6 +105,7 @@ export type FeatureFlags = {
 };
 
 export type ContactSubmissionRequest = {
+  attribution?: import("./growth").Attribution;
   name?: string;
   email: string;
   topic: "general" | "technical" | "privacy" | "partnership" | "legal";

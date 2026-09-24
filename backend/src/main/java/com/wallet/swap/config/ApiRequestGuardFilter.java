@@ -169,6 +169,7 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
   }
 
   private int maxRequestsFor(String path) {
+    if (path.equals("/api/growth/events")) return Math.max(1, Math.min(30, apiProperties.getRateLimitMaxRequests()));
     if (path.equals("/api/internal/revenue/quotes")) {
       return Math.max(1, Math.min(6000, apiProperties.getRevenueRateLimitMaxRequests()));
     }
@@ -182,6 +183,7 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
   }
 
   private String rateLimitGroup(String path) {
+    if (path.equals("/api/growth/events")) return "growth";
     if (path.equals("/api/internal/revenue/quotes")) return "revenue-ingest";
     if (path.equals("/api/contact")) return "contact";
     if (path.startsWith("/api/auth/")) return "auth";
