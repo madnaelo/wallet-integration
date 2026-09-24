@@ -78,6 +78,13 @@ for (const viewport of [
         exact: true,
       }),
     ).toBeVisible();
+    const footerLink = page.locator("footer a").first();
+    await expect(footerLink).toHaveCSS("color", "rgb(114, 215, 189)");
+    await page.keyboard.press("Tab");
+    await footerLink.focus();
+    await expect(footerLink).toHaveCSS("outline-style", "solid");
+    await expect(footerLink).toHaveCSS("outline-width", "2px");
+    await footerLink.blur();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

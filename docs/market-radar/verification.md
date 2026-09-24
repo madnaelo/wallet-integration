@@ -119,3 +119,18 @@ with that SHA, verify /business and /demo#market-radar, and confirm
 off on the shared production host until rights and resource activation are reviewed.
 These are acceptance requirements; the final delivery report records actual release
 run and deployed-revision results rather than implying that CI itself is deployment.
+
+First controlled release:
+[35963735679](https://github.com/madnaelo/wallet-integration/actions/runs/35963735679)
+passed. Both production health endpoints returned 200 and commit
+174212dac85883947d61069ddd7dd7ecb0645702; the backend database reported healthy.
+/business, /demo and /market-radar returned 200. The public proxy reported
+liveEnabled=false; market requests returned 503 rather than research data.
+The deployed demo retained connect-src 'none' and noindex. A final visual review
+added explicit high-contrast footer/alert links and keyboard-focus regression
+assertions; the final delivery report identifies that follow-up release.
+
+The local follow-up test run overlapped a production build and hit a token-registry
+test deadline, with a subsequent mock-count failure. Running it alone passed all
+286 non-database tests without changing deadlines or test assertions. Six database
+tests remain covered by the separate isolated PostgreSQL CI job, as described above.
