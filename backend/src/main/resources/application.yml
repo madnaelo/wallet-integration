@@ -68,6 +68,7 @@ spring:
 wallet:
   market-radar:
     live-enabled: ${MARKET_RADAR_LIVE_ENABLED:false}
+    internal-enabled: ${MARKET_RADAR_INTERNAL_ENABLED:false}
     maximum-watched-pairs: ${RADAR_ON_DEMAND_MARKETS:5}
     alert-delay-ms: 15000
   brand:

@@ -37,6 +37,7 @@
     "bitcoinjs-lib": "^7.0.1",
     "bigint-buffer": "file:vendor/bigint-buffer-safe",
     "ethers": "^6.13.2",
+    "lucide-react": "1.48.0",
     "next": "^15.5.24",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",

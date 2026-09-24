@@ -80,6 +80,7 @@ export default function MarketRadarPage() {
         <Link href="/privacy">Privacy</Link>
         <Link href="/contact">Contact</Link>
         <Link href="/business">For teams</Link>
+        <Link href="/admin/market-radar">Internal workspace</Link>
       </footer>
     </main>
   );

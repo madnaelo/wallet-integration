@@ -1107,4 +1107,10 @@ for legacy_network in wallet-internal wallet-db; do
   run_container network rm "$legacy_network" >/dev/null 2>&1 || true
 done
 
+# The isolated collector starts only after migrations and API promotion succeed.
+# The separately linted helper is installed under the configured deployment root.
+# shellcheck source=/dev/null
+source "$deploy_path/scripts/deploy/deploy-oci-radar.sh"
+deploy_private_radar
+
 echo "Backend is healthy at $health_url and serves commit $git_commit."

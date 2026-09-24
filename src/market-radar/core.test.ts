@@ -29,6 +29,21 @@ const snap: OrderBookSnapshot = {
   ],
 };
 
+it("private internal enablement never grants commercial rights", () => {
+  expect(
+    commercialRadarEnabled({
+      MARKET_RADAR_INTERNAL_ENABLED: "true",
+      MARKET_RADAR_LIVE_ENABLED: "true",
+    }),
+  ).toBe(false);
+  expect(permittedVenues("research", ["binance", "bybit", "okx"])).toEqual([
+    "binance",
+  ]);
+  expect(permittedVenues("commercial", ["binance", "bybit", "okx"])).toEqual(
+    [],
+  );
+});
+
 describe("order book integrity", () => {
   it("reconstructs Binance absolute quantities and deletions", () => {
     const b = new ReconstructedBook("binance");

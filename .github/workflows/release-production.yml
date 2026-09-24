@@ -125,6 +125,7 @@ jobs:
       security-events: write
     outputs:
       image: ${{ steps.publish.outputs.image }}
+      radar_image: ${{ steps.publish-radar.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -207,6 +208,43 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ github.token }}
+
+      - name: Build isolated Radar collector
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: services/market-radar/Dockerfile
+          load: true
+          push: false
+          tags: ghcr.io/madnaelo/wallet-market-radar:sha-${{ needs.prepare.outputs.release_sha }}
+          labels: org.opencontainers.image.revision=${{ needs.prepare.outputs.release_sha }}
+          cache-from: type=gha,scope=radar
+          cache-to: type=gha,scope=radar,mode=max
+
+      - name: Scan isolated Radar collector
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/madnaelo/wallet-market-radar:sha-${{ needs.prepare.outputs.release_sha }}
+          scanners: vuln
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          timeout: 10m
+
+      - name: Publish scanned Radar collector
+        id: publish-radar
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_tag="ghcr.io/madnaelo/wallet-market-radar:sha-${{ needs.prepare.outputs.release_sha }}"
+          docker push "$image_tag"
+          image_ref="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image_tag" | grep -F 'ghcr.io/madnaelo/wallet-market-radar@sha256:' | head -n 1)"
+          if ! [[ "$image_ref" =~ ^ghcr\.io/madnaelo/wallet-market-radar@sha256:[0-9a-f]{64}$ ]]; then
+            echo "Could not resolve scanned Radar image digest." >&2
+            exit 1
+          fi
+          echo "image=$image_ref" >> "$GITHUB_OUTPUT"
 
       - name: Publish scanned image
         id: publish
@@ -392,6 +430,10 @@ jobs:
               python3 -c 'import base64, hashlib, hmac, sys; key = sys.stdin.buffer.read(); digest = hmac.new(key, b"swap-assistant/api-rate-limit-key/v1", hashlib.sha256).digest(); print(base64.urlsafe_b64encode(digest).rstrip(b"=").decode())'
           )"
           unset admin_api_key
+          case "$MARKET_RADAR_INTERNAL_ENABLED" in
+            true|false) ;;
+            *) echo "MARKET_RADAR_INTERNAL_ENABLED must be true or false." >&2; exit 1 ;;
+          esac
           echo "::add-mask::$rate_limit_key_pepper"
           if [ -n "$EMAIL_NOTIFICATIONS_ENABLED" ]; then
             case "$EMAIL_NOTIFICATIONS_ENABLED" in
@@ -437,6 +479,7 @@ jobs:
             "mkdir -p '$OCI_DEPLOY_PATH/scripts/deploy' '$OCI_DEPLOY_PATH/infra/systemd'"
           scp "${ssh_opts[@]}" -i ~/.ssh/oci_deploy_key -P "$OCI_SSH_PORT" \
             scripts/deploy/deploy-oci-backend.sh \
+            scripts/deploy/deploy-oci-radar.sh \
             scripts/deploy/backup-oci-postgres.sh \
             scripts/deploy/check-postgres-backup.sh \
             scripts/deploy/install-oci-cli.sh \
@@ -449,6 +492,9 @@ jobs:
           {
             printf '%s\n' "$OCI_BACKEND_ENV"
             printf '\nAPP_ENVIRONMENT=production\n'
+            printf 'MARKET_RADAR_LIVE_ENABLED=false\n'
+            printf 'MARKET_RADAR_INTERNAL_ENABLED=%s\n' "$MARKET_RADAR_INTERNAL_ENABLED"
+            printf 'RADAR_ON_DEMAND_MARKETS=5\n'
             if [ -n "$EMAIL_NOTIFICATIONS_ENABLED" ]; then
               printf 'EMAIL_NOTIFICATIONS_ENABLED=%s\n' "$EMAIL_NOTIFICATIONS_ENABLED"
               if [ "$EMAIL_NOTIFICATIONS_ENABLED" = true ]; then
@@ -523,6 +569,7 @@ jobs:
           LIFI_API_KEY: ${{ secrets.LIFI_API_KEY }}
           OCI_BACKUP_BUCKET: ${{ vars.OCI_BACKUP_BUCKET }}
           EMAIL_NOTIFICATIONS_ENABLED: ${{ vars.EMAIL_NOTIFICATIONS_ENABLED }}
+          MARKET_RADAR_INTERNAL_ENABLED: ${{ vars.MARKET_RADAR_INTERNAL_ENABLED || 'false' }}
           SMTP_HOST: ${{ vars.SMTP_HOST }}
           SMTP_PORT: ${{ vars.SMTP_PORT }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
@@ -545,7 +592,7 @@ jobs:
             -o StrictHostKeyChecking=yes
           )
           deployed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          for name in BACKEND_IMAGE APP_VERSION GIT_COMMIT GHCR_USERNAME OCI_DEPLOY_PATH \
+          for name in BACKEND_IMAGE RADAR_IMAGE APP_VERSION GIT_COMMIT GHCR_USERNAME OCI_DEPLOY_PATH \
             WALLET_API_DOMAIN OCI_PROXY_NETWORK OCI_INTERNAL_NETWORK OCI_CONTAINER_ENGINE \
             OCI_CADDYFILE_PATH OCI_CADDY_CONTAINER; do
             value="${!name:-}"
@@ -558,9 +605,10 @@ jobs:
           remote_token_file="$OCI_DEPLOY_PATH/.ghcr-token-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           printf '%s' "$GHCR_TOKEN" | ssh "${ssh_opts[@]}" \
             -i ~/.ssh/oci_deploy_key -p "$OCI_SSH_PORT" "$OCI_SSH_USER@$OCI_SSH_HOST" \
-            "set -e; umask 077; cat > '$remote_token_file'; trap 'rm -f $remote_token_file' EXIT; cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' APP_VERSION='$APP_VERSION' GIT_COMMIT='$GIT_COMMIT' DEPLOYED_AT='$deployed_at' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN_FILE='$remote_token_file' OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' WALLET_API_DOMAIN='$WALLET_API_DOMAIN' OCI_PROXY_NETWORK='$OCI_PROXY_NETWORK' OCI_INTERNAL_NETWORK='$OCI_INTERNAL_NETWORK' OCI_CONTAINER_ENGINE='$OCI_CONTAINER_ENGINE' OCI_CADDYFILE_PATH='$OCI_CADDYFILE_PATH' OCI_CADDY_CONTAINER='$OCI_CADDY_CONTAINER' COHOSTED_HEALTH_URLS='https://${OCI_SSH_HOST}.sslip.io/api/v1/health' ./scripts/deploy/deploy-oci-backend.sh"
+            "set -e; umask 077; cat > '$remote_token_file'; trap 'rm -f $remote_token_file' EXIT; cd '$OCI_DEPLOY_PATH' && BACKEND_IMAGE='$BACKEND_IMAGE' RADAR_IMAGE='$RADAR_IMAGE' APP_VERSION='$APP_VERSION' GIT_COMMIT='$GIT_COMMIT' DEPLOYED_AT='$deployed_at' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN_FILE='$remote_token_file' OCI_DEPLOY_PATH='$OCI_DEPLOY_PATH' WALLET_API_DOMAIN='$WALLET_API_DOMAIN' OCI_PROXY_NETWORK='$OCI_PROXY_NETWORK' OCI_INTERNAL_NETWORK='$OCI_INTERNAL_NETWORK' OCI_CONTAINER_ENGINE='$OCI_CONTAINER_ENGINE' OCI_CADDYFILE_PATH='$OCI_CADDYFILE_PATH' OCI_CADDY_CONTAINER='$OCI_CADDY_CONTAINER' COHOSTED_HEALTH_URLS='https://${OCI_SSH_HOST}.sslip.io/api/v1/health' ./scripts/deploy/deploy-oci-backend.sh"
         env:
           BACKEND_IMAGE: ${{ needs.build.outputs.image }}
+          RADAR_IMAGE: ${{ needs.build.outputs.radar_image }}
           APP_VERSION: ${{ needs.prepare.outputs.release_sha }}
           GIT_COMMIT: ${{ needs.prepare.outputs.release_sha }}
           GHCR_USERNAME: ${{ github.actor }}

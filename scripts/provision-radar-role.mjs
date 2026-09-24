@@ -4,9 +4,20 @@ import pg from "pg";
 // Neither the collector nor the frontend ever receives this administrator credential.
 const admin = process.env.RADAR_ADMIN_DATABASE_URL;
 const password = process.env.RADAR_DATABASE_PASSWORD;
-if (!admin || !password || password.length < 32 || password.length > 256) {
+if (
+  (!admin &&
+    !(
+      process.env.PGHOST &&
+      process.env.PGDATABASE &&
+      process.env.PGUSER &&
+      process.env.PGPASSWORD
+    )) ||
+  !password ||
+  password.length < 32 ||
+  password.length > 256
+) {
   throw new Error(
-    "Set RADAR_ADMIN_DATABASE_URL and a strong RADAR_DATABASE_PASSWORD (32-256 characters).",
+    "Set the administrator database connection and a strong RADAR_DATABASE_PASSWORD (32-256 characters).",
   );
 }
 const client = new pg.Client({

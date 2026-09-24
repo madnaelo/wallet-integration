@@ -22,6 +22,7 @@ RUN apk upgrade --no-cache libcrypto3 libssl3 \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg
 COPY --from=runtime-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/.market-radar ./dist
+COPY --chown=node:node scripts/provision-radar-role.mjs ./provision-radar-role.mjs
 USER node
 EXPOSE 8092
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD node -e "fetch('http://127.0.0.1:8092/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"

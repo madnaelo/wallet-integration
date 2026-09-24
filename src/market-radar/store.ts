@@ -83,16 +83,15 @@ export class RadarStore {
     );
   }
   async watchedPairs(limit: number): Promise<string[]> {
-    if (this.audience !== "commercial") return [];
     if (!Number.isInteger(limit) || limit < 0 || limit > 50)
       throw new Error("Invalid watch bound");
     return (
       await this.pool.query<{ pair_key: string }>(
         `SELECT pair_key FROM (
-      SELECT pair_key,0 priority FROM market_radar.alert_rules UNION ALL
-      SELECT pair_key,1 priority FROM market_radar.watches WHERE expires_at>now()) watches
+      SELECT pair_key,0 priority FROM market_radar.alert_rules WHERE $2='commercial' UNION ALL
+      SELECT pair_key,1 priority FROM market_radar.watches WHERE expires_at>now() AND audience=$2) watches
       GROUP BY pair_key ORDER BY min(priority),pair_key LIMIT $1`,
-        [limit],
+        [limit, this.audience],
       )
     ).rows.map((row) => row.pair_key);
   }

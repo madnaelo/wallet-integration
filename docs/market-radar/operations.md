@@ -2,22 +2,24 @@
 
 ## Current rollout
 
-Synthetic /demo#market-radar is ON. Commercial live is OFF. Collector defaults
-disabled and is an optional separately named Compose workload, not automatically
-started beside transaction services. No exchange API keys are required.
+Synthetic /demo#market-radar is ON. Commercial live is OFF. The optional private
+workspace /admin/market-radar uses the existing X-Admin-Key protection, not wallet
+connection or a query parameter. No exchange API keys are required.
 
 - MARKET_RADAR_LIVE_ENABLED=false: both frontend server and Java.
+- MARKET_RADAR_INTERNAL_ENABLED=false by default: independent Java private-read gate.
 - RADAR_MODE=disabled: collector default; research only by deliberate operator choice.
 - RADAR_VENUES=binance: only currently research-permitted adapter.
 - Bybit/OKX and commercial collection fail startup if requested without code-reviewed rights.
 
-This release deploys the feature-gated UI/API/schema through existing master CI.
-There is no reason to consume production host resources collecting data that
-cannot yet be displayed commercially.
+The controlled release accepts repository variable MARKET_RADAR_INTERNAL_ENABLED=true
+to deploy the bounded Binance research collector and open authenticated private reads.
+It explicitly writes MARKET_RADAR_LIVE_ENABLED=false. Neither policy's commercial
+venue allowlist changes. See [Private live deployment](private-live.md).
 
 ## Private research setup
 
-1. Run the existing isolated/local backend so Flyway applies V32. Never reuse
+1. Run the existing isolated/local backend so Flyway applies V32 and V33. Never reuse
    production DB credentials in an experiment.
 2. Set RADAR_ADMIN_DATABASE_URL and a random RADAR_DATABASE_PASSWORD of at least
    32 characters privately. Run node scripts/provision-radar-role.mjs once.
@@ -28,7 +30,9 @@ cannot yet be displayed commercially.
    Set RADAR_MINIMUM_VENUES=1 explicitly for single-venue research; public remains off.
 4. npm run radar:build then npm run radar:start. Defaults bind 127.0.0.1:8092.
    Use authenticated /internal/markets and /internal/snapshot?pair=BASE/QUOTE/SPOT.
-   Never forward research endpoints through the public application proxy.
+   Never forward the collector's /internal endpoints through a public proxy.
+   The Java /api/admin/market-radar endpoints authenticate each request before reading
+   bounded, fresh Binance research projections from PostgreSQL.
 5. Stop with Ctrl+C; graceful shutdown drains bounded writes. SIGTERM works in Docker.
 
 For Docker, copy infra/market-radar.env.example into an ignored private environment

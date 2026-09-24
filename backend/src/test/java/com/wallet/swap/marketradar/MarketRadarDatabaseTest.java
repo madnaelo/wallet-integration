@@ -77,7 +77,7 @@ class MarketRadarDatabaseTest {
   void reset() {
     jdbc.execute(
         "TRUNCATE"
-            + " market_radar.latest,market_radar.alert_rules,market_radar.watches,market_radar.events,notification_outbox");
+            + " market_radar.latest,market_radar.markets,market_radar.alert_rules,market_radar.watches,market_radar.events,notification_outbox");
     jdbc.update(
         "INSERT INTO market_radar.latest(pair_key,audience,observed_at,snapshot)"
             + " VALUES('TEST/USDT/SPOT','commercial',?,?::jsonb)",
@@ -88,6 +88,94 @@ class MarketRadarDatabaseTest {
   private AlertRule rule(AlertType type) {
     return transaction.execute(
         status -> alerts.save(WALLET, new AlertRequest("TEST/USDT/SPOT", type, 60, 60)));
+  }
+
+  private MarketRadarReadService privateReader() {
+    return new MarketRadarReadService(
+        new MarketRadarPolicy(true),
+        new MarketRadarInternalPolicy(true),
+        jdbc,
+        JSON,
+        new MarketRadarWatchBudget(jdbc, 2));
+  }
+
+  private void researchFixture(String venue, long at) throws Exception {
+    jdbc.update(
+        "INSERT INTO market_radar.markets(pair_key,audience,discovered_at,venues)"
+            + " VALUES('TEST/USDT/SPOT','research',?,?::jsonb)",
+        System.currentTimeMillis(),
+        "[\"binance\"]");
+    var snapshot = JSON.createObjectNode().put("freshness", "LIVE").put("observedAt", at);
+    snapshot.putArray("venues").addObject().put("venue", venue);
+    snapshot.putArray("supplyZones");
+    snapshot.putArray("demandZones");
+    snapshot.putArray("previousZones");
+    snapshot.putArray("rawOrderBook").add("must never leave the service");
+    jdbc.update(
+        "INSERT INTO market_radar.latest(pair_key,audience,observed_at,snapshot)"
+            + " VALUES('TEST/USDT/SPOT','research',?,?::jsonb)",
+        at,
+        JSON.writeValueAsString(snapshot));
+  }
+
+  @Test
+  void privateResearchReadCannotEnablePublicDataAndOnlyReturnsDerivedOutput() throws Exception {
+    researchFixture("binance", System.currentTimeMillis());
+    var read = privateReader();
+    assertThat(read.researchMarkets("TEST")).hasSize(1);
+    var snapshot = transaction.execute(status -> read.researchSnapshot("TEST/USDT/SPOT"));
+    assertThat(snapshot.path("venues").get(0).path("venue").asText()).isEqualTo("binance");
+    assertThat(snapshot.has("rawOrderBook")).isFalse();
+    assertThatThrownBy(() -> read.markets("TEST")).hasMessageContaining("not available");
+    assertThatThrownBy(() -> transaction.execute(status -> read.snapshot("TEST/USDT/SPOT")))
+        .hasMessageContaining("not available");
+    assertThat(jdbc.queryForObject("SELECT audience FROM market_radar.watches", String.class))
+        .isEqualTo("research");
+  }
+
+  @Test
+  void privateWatchBudgetDoesNotUseOrConsumeCommercialCapacity() {
+    var budget = new MarketRadarWatchBudget(jdbc, 1);
+    transaction.executeWithoutResult(status -> budget.reserve("PUBLIC/USDT/SPOT"));
+    transaction.executeWithoutResult(status -> budget.reserveResearch("PRIVATE/USDT/SPOT"));
+    transaction.executeWithoutResult(status -> budget.reserveResearch("PRIVATE/USDT/SPOT"));
+    assertThatThrownBy(
+            () ->
+                transaction.executeWithoutResult(
+                    status -> budget.reserveResearch("OTHER/USDT/SPOT")))
+        .hasMessageContaining("full");
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM market_radar.watches", Integer.class))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void privateReadsRejectUnapprovedVenueEvenInFreshResearchSnapshot() throws Exception {
+    researchFixture("bybit", System.currentTimeMillis());
+    assertThatThrownBy(
+            () -> transaction.execute(status -> privateReader().researchSnapshot("TEST/USDT/SPOT")))
+        .hasMessageContaining("temporarily unavailable");
+    jdbc.update(
+        "UPDATE market_radar.latest SET"
+            + " snapshot=jsonb_set(snapshot,'{venues}','[{\"venue\":\"binance\"}]') ||"
+            + " '{\"supplyZones\":[{\"venues\":[{\"venue\":\"okx\"}]}]}'::jsonb WHERE"
+            + " audience='research'");
+    assertThatThrownBy(
+            () -> transaction.execute(status -> privateReader().researchSnapshot("TEST/USDT/SPOT")))
+        .hasMessageContaining("temporarily unavailable");
+  }
+
+  @Test
+  void privateReadNeverFallsBackToCommercialOrStaleSnapshot() throws Exception {
+    researchFixture("binance", System.currentTimeMillis() - 60000);
+    var snapshot =
+        transaction.execute(status -> privateReader().researchSnapshot("TEST/USDT/SPOT"));
+    assertThat(snapshot.path("status").asText()).isEqualTo("BUILDING");
+    assertThat(snapshot.has("venues")).isFalse();
+    jdbc.update("UPDATE market_radar.markets SET venues='[\"binance\",\"okx\"]'::jsonb");
+    assertThat(privateReader().researchMarkets("TEST")).isEmpty();
+    assertThatThrownBy(
+            () -> transaction.execute(status -> privateReader().researchSnapshot("TEST/USDT/SPOT")))
+        .hasMessageContaining("coverage");
   }
 
   @Test

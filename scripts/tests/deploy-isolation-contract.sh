@@ -92,3 +92,18 @@ if (( network_assert_line >= network_reload_line || network_reload_line >= cohos
 fi
 
 echo "Wallet cohosted deployment contract passed."
+
+radar_script="scripts/deploy/deploy-oci-radar.sh"
+for contract in 'assert_project_container "$name" market-radar' \
+  'assert_project_network "$egress" market-radar-egress' \
+  '"RADAR_MODE": "research", "RADAR_VENUES": "binance"' \
+  '"MARKET_RADAR_LIVE_ENABLED": "false"' \
+  '--memory 384m --memory-swap 384m --cpus 0.5' \
+  'rollback_radar' 'check_cohosted_health'; do
+  grep -Fq -- "$contract" "$radar_script" || { echo "Missing private Radar guard: $contract" >&2; exit 1; }
+done
+if grep -Eq -- '(--publish|--network host|--privileged|system prune|volume prune|\$proxy_network)' "$radar_script"; then
+  echo "Private Radar must not expose ports or mutate shared ingress/resources." >&2
+  exit 1
+fi
+echo "Private Radar deployment isolation contract passed."

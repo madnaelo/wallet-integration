@@ -27,6 +27,12 @@ describe.skipIf(!allowed)("PostgreSQL Radar persistence", () => {
       "utf8",
     ).replaceAll("${marketRadarSchema}", "market_radar");
     await pool.query(migration);
+    await pool.query(
+      readFileSync(
+        "backend/src/main/resources/db/migration/V33__market_radar_watch_audiences.sql",
+        "utf8",
+      ).replaceAll("${marketRadarSchema}", "market_radar"),
+    );
     store = new RadarStore(connection!, "research", [60000]);
   }, 30000);
   afterAll(async () => {
@@ -38,7 +44,7 @@ describe.skipIf(!allowed)("PostgreSQL Radar persistence", () => {
     await store.close();
     store = new RadarStore(connection!, "research", [60000]);
     await pool.query(
-      "TRUNCATE market_radar.latest,market_radar.observations,market_radar.outcomes,market_radar.signals,market_radar.events CASCADE",
+      "TRUNCATE market_radar.latest,market_radar.observations,market_radar.outcomes,market_radar.signals,market_radar.events,market_radar.watches,market_radar.alert_rules CASCADE",
     );
   });
   function snapshot(at: number) {
@@ -49,6 +55,18 @@ describe.skipIf(!allowed)("PostgreSQL Radar persistence", () => {
     value.venues = value.venues.slice(0, 3);
     return value;
   }
+  it("isolates private watches from commercial watches and wallet alerts", async () => {
+    await pool.query(
+      "INSERT INTO market_radar.watches(pair_key,audience,expires_at) VALUES('PRIVATE/USDT/SPOT','research',now()+interval '1 minute'),('PUBLIC/USDT/SPOT','commercial',now()+interval '1 minute'),('OLD/USDT/SPOT','research',now()-interval '1 minute')",
+    );
+    expect(await store.watchedPairs(5)).toEqual(["PRIVATE/USDT/SPOT"]);
+    const commercial = new RadarStore(connection!, "commercial");
+    try {
+      expect(await commercial.watchedPairs(5)).toEqual(["PUBLIC/USDT/SPOT"]);
+    } finally {
+      await commercial.close();
+    }
+  });
   it("stores immutable signals idempotently and evaluates finalized sampled outcomes", async () => {
     const at = Date.now() - 120000;
     const value = snapshot(at);

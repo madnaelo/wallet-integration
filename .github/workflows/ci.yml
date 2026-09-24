@@ -8,6 +8,7 @@ on:
       - main
       - feat/commercial-readiness
       - feat/market-radar-v1
+      - feat/market-radar-private-live
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,101 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 0;
+  flex-wrap: wrap;
+}
+.header a {
+  color: #72d7bd;
+  font-size: 14px;
+}
+.header h1 {
+  font-size: 28px;
+  margin: 10px 0 0;
+}
+.header button,
+.access button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid #299d87;
+  border-radius: 6px;
+  padding: 10px 16px;
+  color: var(--text);
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+}
+.header button:focus-visible,
+.access button:focus-visible {
+  outline: 2px solid #72d7bd;
+  outline-offset: 3px;
+}
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+  border-block: 1px solid var(--border);
+  color: #72d7bd;
+  font-size: 13px;
+}
+.notice span {
+  color: var(--muted);
+  margin-left: auto;
+}
+.access {
+  max-width: 620px;
+  padding: 28px 0;
+}
+.access h2 {
+  font-size: 22px;
+}
+.access p,
+.context {
+  color: var(--muted);
+  line-height: 1.7;
+  font-size: 14px;
+}
+.access form {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+  padding-top: 12px;
+}
+.access input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 16px;
+}
+.access button {
+  background: #137c69;
+  color: white;
+}
+.access button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.error {
+  color: #ffb4aa;
+  line-height: 1.6;
+  padding: 16px 0;
+}
+@media (max-width: 600px) {
+  .notice span {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+  .header h1 {
+    font-size: 25px;
+  }
+}
