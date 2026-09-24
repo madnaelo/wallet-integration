@@ -27,7 +27,8 @@ V32__market_radar.sql creates a separate market_radar schema. V1-V31 are unchang
 - latest: one compact snapshot per pair/audience.
 - markets: qualifying discovery records with venue provenance.
 - watches: bounded expiring on-demand requests.
-- observations: sampled price/lifecycle, at most one row per 10-second bucket.
+- observations: sampled price/lifecycle; the queue limits writes to one per pair
+  per 10-second interval. Timestamps are actual observations, not aligned buckets.
 - signals: material immutable zone/snapshot, scoring version and configuration.
 - outcomes: horizon, due time, lease, attempts, result and coverage status.
 - events: material analytical transitions, durable fanout cursor.
