@@ -8,6 +8,21 @@ release_workflow=".github/workflows/release-production.yml"
 
 bash -n "$deploy_script"
 
+# Exercise the actual route predicate without running any deployment actions.
+eval "$(sed -n '/^site_block_has_backend_route() {$/,/^}$/p' "$deploy_script")"
+site_block_has_backend_route $'example.test {\n  reverse_proxy wallet-backend:8080\n}'
+site_block_has_backend_route $'example.test {\n  reverse_proxy 10.0.0.4:8080 {\n  }\n}'
+for invalid in '' 'reverse_proxy wallet-backend:8081' 'reverse_proxy wallet-backend:80800' 'respond 200'; do
+  if site_block_has_backend_route "$invalid"; then
+    echo "Invalid backend route was accepted: $invalid" >&2
+    exit 1
+  fi
+done
+large_site_block="$(printf 'reverse_proxy wallet-backend:8080\n'; printf '# trailing comment %0100000d\n' 0)"
+for ((attempt = 0; attempt < 100; attempt++)); do
+  site_block_has_backend_route "$large_site_block"
+done
+
 grep -Fq 'backend_memory="${BACKEND_MEMORY:-448m}"' "$deploy_script"
 grep -Fq 'backend_memory_swap="${BACKEND_MEMORY_SWAP:-768m}"' "$deploy_script"
 grep -Fq 'postgres_memory="${POSTGRES_MEMORY:-224m}"' "$deploy_script"
