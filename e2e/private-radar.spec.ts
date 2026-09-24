@@ -22,6 +22,7 @@ for (const width of [1440, 390]) {
       const snapshot = syntheticRadar(0);
       snapshot.observedAt = Date.now();
       snapshot.calculatedAt = Date.now();
+      snapshot.coverage = "LIMITED_COVERAGE";
       snapshot.venues = [
         {
           venue: "binance",
@@ -88,7 +89,9 @@ test("invalid private authorization does not display derived market data", async
   await page.goto("/admin/market-radar");
   await page.getByLabel("Admin access key").fill("invalid");
   await page.getByRole("button", { name: "Open private Radar" }).click();
-  await expect(page.getByRole("main").getByRole("alert")).toContainText("Owner access denied");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Owner access denied",
+  );
   await expect(
     page.getByRole("heading", { name: "Next Supply Zone" }),
   ).toHaveCount(0);
@@ -96,12 +99,15 @@ test("invalid private authorization does not display derived market data", async
 
 test("locking fences a late private snapshot response", async ({ page }) => {
   let release: (() => void) | undefined;
-  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   let pending = false;
   await page.route("**/api/admin/market-radar/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/status")) return route.fulfill({ json: {} });
-    if (path.endsWith("/markets")) return route.fulfill({ json: [{ key: "SOL/USDT/SPOT" }] });
+    if (path.endsWith("/markets"))
+      return route.fulfill({ json: [{ key: "SOL/USDT/SPOT" }] });
     pending = true;
     await gate;
     await route.fulfill({ json: syntheticRadar(0) }).catch(() => {});
@@ -112,7 +118,11 @@ test("locking fences a late private snapshot response", async ({ page }) => {
   await expect.poll(() => pending).toBe(true);
   await page.getByRole("button", { name: "Lock workspace" }).click();
   release?.();
-  await expect(page.getByRole("heading", { name: "Owner access" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Next Supply Zone" })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Owner access" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Next Supply Zone" }),
+  ).toHaveCount(0);
   await expect(page.getByLabel("Admin access key")).toHaveValue("");
 });

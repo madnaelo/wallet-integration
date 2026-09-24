@@ -66,7 +66,8 @@ export default function PrivateRadar() {
           redirect: "error",
           signal: controller.signal,
         });
-        if (generation.current !== current) throw new Error("Workspace was locked.");
+        if (generation.current !== current)
+          throw new Error("Workspace was locked.");
         if (!response.ok) {
           if ([401, 403].includes(response.status)) {
             clear();
@@ -297,11 +298,13 @@ export default function PrivateRadar() {
           {error}
         </p>
       ) : null}
-      <p className={layout.disclaimer}>
-        These zones describe observed market liquidity and trading structure.
-        They are not guaranteed reversal points or personalized financial
-        advice.
-      </p>
+      {!snapshot ? (
+        <p className={layout.disclaimer}>
+          These zones describe observed market liquidity and trading structure.
+          They are not guaranteed reversal points or personalized financial
+          advice.
+        </p>
+      ) : null}
       <footer className={layout.footer}>
         <Link href="/market-radar">Public Radar</Link>
         <Link href="/demo">Synthetic demo</Link>
