@@ -6,7 +6,7 @@ Baseline: 2026-09-24, 18:03 UTC. Scope: this growth launch, not a claim about al
 |---|---|---|
 | Public sitemap URLs | 16 | Live XML, not indexed-page count |
 | Pages indexed | Not yet established | New Google property processing; one business URL indexing request accepted |
-| Bing URLs discovered | 9 before new-page rollout | Sitemap Success; seven additional URLs now available |
+| Bing URLs discovered | 16 after resubmission | Sitemap Success, no reported sitemap errors/warnings; not indexing proof |
 | Organic impressions | Not yet reported | Google/Bing reporting not mature |
 | Organic clicks | Not yet reported | Do not substitute synthetic traffic |
 | Relevant visitors | Not measured as unique people | Anonymous page observations cannot qualify a buyer |

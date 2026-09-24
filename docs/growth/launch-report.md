@@ -25,13 +25,15 @@ The [keyword map](keyword-map.md) records actual Google/Bing result observations
 
 - Google Domain property verified using a TXT record in the existing Spaceship zone. Sitemap submitted. Google's live inspection of `/business` reported "URL is available to Google" / "Page can be indexed"; its indexing request was accepted into the crawl queue. That is not confirmation of indexing.
 - Google's sitemap report initially said "Couldn't fetch" while direct HTTP checks returned valid XML and the live URL test succeeded. Do not silently convert this to an indexing success.
-- Bing site verified using the requested CNAME. Sitemap status became **Success**, with nine original URLs discovered before the seven new pages were deployed. Discovery is not ranking or indexing proof.
+- Bing site verified using the requested CNAME. After resubmission, sitemap status became **Success**, with all **16 URLs discovered** and no reported sitemap errors or warnings. Discovery is not ranking or indexing proof.
 - No hosting record, unrelated domain, nameserver, paid service or commercial Radar gate was changed.
 - IndexNow was evaluated against its [official protocol](https://www.indexnow.org/documentation). No continuous publisher or additional credential was deployed in this phase; verified sitemap ingestion and Google's manual priority request are the active submission mechanisms.
 
 ## Live Audit
 
 Initial live `/business` PageSpeed mobile lab result: Performance 99, Accessibility 96, Best Practices 100, SEO 100; FCP 1.2s, LCP 1.8s, TBT 10ms, CLS 0. [Saved report](https://pagespeed.web.dev/analysis/https-getswapradar-xyz-business/4cbanoq46x?form_factor=mobile). Its contrast finding led to a darker eyebrow text color. These are Lighthouse lab observations, not field Core Web Vitals. CrUX did not have enough real-user data.
+
+The [post-release mobile run](https://pagespeed.web.dev/analysis/https-getswapradar-xyz-business/scca7ippn7?form_factor=mobile), captured at 18:15 UTC, reported Performance **99**, Accessibility **100**, Best Practices **100**, SEO **100**, FCP 1.2s, LCP 1.8s, TBT 10ms, CLS 0 and Speed Index 1.7s. CrUX still reports no field data.
 
 Post-release verification against `https://getswapradar.xyz`:
 
@@ -40,7 +42,7 @@ Post-release verification against `https://getswapradar.xyz`:
 - Sitemap contains 16 canonical-domain URLs. Robots points to that sitemap and excludes API/backend/admin paths. Buyer/guide schemas parse as JSON and include visible FAQ/breadcrumb evidence. No fabricated review schema.
 - 22 production HTTP/security/build checks passed: correct revision, www redirect, API/admin noindex, private Radar anonymous 401, public live snapshot 503, internal Binance-only mode, untrusted-origin rejection and signing domain. No wallet signature or real quote/transaction was executed.
 - A mobile form submission persisted exactly once with `qa_release` attribution and its notification reached the configured Yahoo **Inbox**, verified by the message/reference. The five-second QA assertion expired before observing the toast; the retry first checked storage and did not resend that enquiry.
-- A separate labelled desktop form submission displayed the real success confirmation; its attribution and resolved admin state were verified. Its notification reached SMTP `sent` on attempt 2 through the existing bounded retry worker; Chrome disconnected before a second inbox-placement check. Both are QA, not leads. One labelled anonymous event was submitted twice with the same ID and stored once. The admin dashboard opened with the existing key, cleared on lock, and denied an anonymous report request.
+- A separate labelled desktop form submission displayed the real success confirmation; its attribution and resolved admin state were verified. Its notification reached SMTP `sent` on attempt 2 through the existing bounded retry worker and was subsequently verified in Yahoo **Inbox** after reconnecting Chrome. Both are QA, not leads. One labelled anonymous event was submitted twice with the same ID and stored once. The admin dashboard opened with the existing key, cleared on lock, and denied an anonymous report request.
 
 Private evidence: `.dev/growth/live-audit.json`, `.dev/growth/production-boundaries.json`, contact verification JSON, screenshots and `.dev/growth-production-browser.log`. Accessibility injection used a separate bypass-CSP context; the actual demo security/browser tests did **not** bypass CSP. QA observations are excluded from business metrics.
 
@@ -93,6 +95,10 @@ Actual initial outreach on 2026-09-24: **Who Develop, Bytez3 and Pixelfield**, i
 - Complete the free ImprovMX signup password/terms step if a forwarding alias is wanted; account/DNS/delivery work can then continue.
 - Approve or decline Product Hunt's requested read-only GitHub profile/email access before listing work continues. No repository permission was requested.
 - A valid business postal address is needed before considering jurisdictions/campaigns that require one, including US commercial email. No US outreach was sent without it.
-- Chrome disconnected after the successful live verification. Reconnect the existing profile/extension to resume the Google sitemap error recheck, Bing refresh and pending account screens. The deployed 16-URL sitemap itself is independently verified; no claim is made that Google/Bing have already indexed the seven new pages.
+- Google accepted sitemap resubmission after browser reconnection but still displayed its earlier fetch error. Bing now reports Success with all 16 URLs discovered. No claim is made that the seven new pages have already been indexed.
+
+## Deployment Follow-up
+
+The documentation-only release of `ba7589a` passed CI/security but stopped before backend replacement/frontend promotion on an intermittent shell route-check failure. The valid Caddy site was rejected by a `printf | grep -q` pipeline under `pipefail`; an isolated repeat reproduced the failure with unchanged input. The route predicate now uses a here-string, preserving the existing validation rule without a producer pipe. The existing deployment contract exercises valid and invalid ports plus 100 repeated checks of a large site block. The already verified `8588dfc` application remained healthy; no cohosted application or security gate was bypassed. Final release/revision evidence is recorded separately after the normal pipeline completes.
 
 No new trading feature, provider, chain, Radar algorithm, custody capability, paid service or automatic trading was added. Technical growth readiness does not change regulatory records or grant legal clearance.

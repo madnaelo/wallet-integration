@@ -894,11 +894,16 @@ extract_site_block() {
   ' "$caddy_site_path"
 }
 
+site_block_has_backend_route() {
+  # A here-string avoids SIGPIPE from grep -q closing a producer under pipefail.
+  grep -Eq 'reverse_proxy[[:space:]]+[^[:space:]]+:8080([[:space:]]|$)' <<< "$1"
+}
+
 site_block="$(extract_site_block)"
 if [ -z "$site_block" ]; then
   fail "Caddy has no explicit $api_domain site block. Configure it once before deploying."
 fi
-if ! printf '%s\n' "$site_block" | grep -Eq 'reverse_proxy[[:space:]]+[^[:space:]]+:8080([[:space:]]|$)'; then
+if ! site_block_has_backend_route "$site_block"; then
   fail "The existing $api_domain Caddy block has no valid backend route."
 fi
 run_container exec "$caddy_container" caddy validate --config /etc/caddy/Caddyfile >/dev/null \
