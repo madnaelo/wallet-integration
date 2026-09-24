@@ -39,3 +39,4 @@ infra/*.env
 tsconfig.tsbuildinfo
 /playwright-report/
 /test-results/
+/.market-radar/

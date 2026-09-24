@@ -708,6 +708,7 @@ export default function LimitOrdersPage() {
         <ul className="appMenu">
           <li><Link className="appMenuLink" href="/">Intro</Link></li>
           <li><Link className="appMenuLink" href="/swap">Swap</Link></li>
+          <li><Link className="appMenuLink" href="/market-radar">Market Radar</Link></li>
           <li><Link className="appMenuLink" href="/swap#favorites">Favorites</Link></li>
           <li>
             <Link className="appMenuLink appMenuLinkActive" href="/limit-orders" aria-current="page">

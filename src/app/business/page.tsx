@@ -18,6 +18,7 @@ const capabilities = [
   ["Quotes & review", "Compare normalized routes, inspect expected output, fees, slippage and minimum received before wallet approval."],
   ["Same-chain & cross-chain", "Provider-supported routes through 0x and LI.FI. Availability depends on the assets, networks and your approved accounts."],
   ["Activity & alerts", "Wallet-authenticated history, favorite pairs and price, reverse-profit and loss alerts. Delivery depends on configured channels and device support."],
+  ["Market Radar", "See where observed liquidity is concentrated and whether supply and demand zones are strengthening, weakening or being absorbed. Explore the synthetic demo; live coverage requires approved market-data rights. No guaranteed predictions or automatic trading."],
   ["Validation & reconciliation", "Transaction checks, delivery tracking and independent fee evidence. Expected, accrued and received fees stay separate; unsupported proof stays unverified."],
   ["Deployment & handover", "Brand configuration, isolated deployment checks, automated tests, release controls, backups and build/run documentation."]
 ];

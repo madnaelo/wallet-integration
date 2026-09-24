@@ -56,7 +56,8 @@ class RevenueDatabaseTest {
         """,OWNER,TREASURY,TX,SELL,BUY);
     Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema).target("30").cleanDisabled(true).load().migrate();
     // Exercise an existing V30 installation before applying the quote-reuse upgrade.
-    Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema).cleanDisabled(true).load().migrate();
+    Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema)
+        .placeholders(Map.of("marketRadarSchema",schema+"_radar")).cleanDisabled(true).load().migrate();
     migratedLegacyRecords = jdbc.queryForObject("SELECT count(*) FROM revenue_records",Integer.class);
     legacyAmountsUnverified = jdbc.queryForObject("""
         SELECT bool_and(state='NOT_VERIFIED' AND quote_id IS NULL AND verified_fee IS NULL AND next_check_at IS NULL)
@@ -67,6 +68,7 @@ class RevenueDatabaseTest {
     repository = new RevenueRepository(jdbc,JSON,integrity);
   }
   @AfterAll static void cleanup() {
+    if (root != null && schema != null && schema.matches("revenue_test_[0-9a-f]{32}")) root.execute("DROP SCHEMA IF EXISTS "+schema+"_radar CASCADE");
     if (root != null && schema != null && schema.matches("revenue_test_[0-9a-f]{32}")) root.execute("DROP SCHEMA "+schema+" CASCADE");
   }
   @BeforeEach void emptyOwnTestSchema() {

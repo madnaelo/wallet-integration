@@ -613,6 +613,35 @@ async function backendFetch<T>(backendBaseUrl: string, path: string, init: Reque
   return body as T;
 }
 
+export type RadarAlertRule = {
+  id: string;
+  pairKey: string;
+  eventType: string;
+  minimumScore: number;
+  cooldownMinutes: number;
+};
+export function listRadarMarkets(base: string, query: string, signal?: AbortSignal): Promise<{key: string}[]> {
+  return backendFetch(base, `/api/market-radar/markets?q=${encodeURIComponent(query)}`, { method: "GET", signal });
+}
+export function getRadarSnapshot(
+  base: string, pair: string, signal?: AbortSignal
+): Promise<import("@/market-radar/types").MarketRadarSnapshot | {status: string; message?: string}> {
+  return backendFetch(base, `/api/market-radar/snapshot?pair=${encodeURIComponent(pair)}`, { method: "GET", signal });
+}
+export function listRadarAlerts(base: string, session: BackendSession): Promise<RadarAlertRule[]> {
+  return backendFetch(base, "/api/market-radar/alerts", { method: "GET", headers: authHeaders(session) });
+}
+export function saveRadarAlert(base: string, session: BackendSession, rule: Omit<RadarAlertRule, "id">): Promise<RadarAlertRule> {
+  return backendFetch(base, "/api/market-radar/alerts", {
+    method: "POST", headers: authHeaders(session), body: JSON.stringify(rule)
+  });
+}
+export function deleteRadarAlert(base: string, session: BackendSession, id: string): Promise<void> {
+  return backendFetch(base, `/api/market-radar/alerts/${encodeURIComponent(id)}`, {
+    method: "DELETE", headers: authHeaders(session)
+  });
+}
+
 function authHeaders(session?: BackendSession | null): HeadersInit {
   return session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {};
 }

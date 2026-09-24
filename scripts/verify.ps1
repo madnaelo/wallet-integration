@@ -29,6 +29,9 @@ try {
   Invoke-CheckedCommand $npmExe @("test", "--", "--maxWorkers=$TestWorkers") "Frontend tests"
   Invoke-CheckedCommand $npmExe @("run", "test:preflight") "Deployment preflight tests"
   Invoke-CheckedCommand $npmExe @("run", "preflight:demo") "Synthetic demo boundary"
+  Invoke-CheckedCommand $npmExe @("run", "radar:build") "Market Radar collector build"
+  Invoke-CheckedCommand $npmExe @("audit", "--omit=dev", "--audit-level=moderate", "--prefix", "services/market-radar") "Collector dependency audit"
+  Invoke-CheckedCommand $npmExe @("run", "radar:load") "Synthetic Market Radar load test"
   Invoke-CheckedCommand $npmExe @("audit", "--audit-level=moderate") "Frontend dependency audit"
   Invoke-CheckedCommand $npmExe @("run", "typecheck") "Frontend type check"
   Invoke-CheckedCommand $npmExe @("run", "lint") "Frontend lint"
@@ -46,6 +49,7 @@ try {
   if (Get-Command docker -ErrorAction SilentlyContinue) {
     $dockerExe = (Get-Command docker).Source
     Invoke-CheckedCommand $dockerExe @("compose", "config", "--quiet") "Local Compose validation"
+    Invoke-CheckedCommand $dockerExe @("compose", "--env-file", "infra/market-radar.env.example", "-f", "docker-compose.market-radar.yml", "--profile", "market-radar", "config", "--quiet") "Optional Market Radar Compose validation"
     Invoke-CheckedCommand $dockerExe @(
       "compose",
       "--env-file",

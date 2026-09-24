@@ -17,7 +17,11 @@
     "preflight:deployment": "node scripts/deployment-preflight.mjs",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
-    "generate:vapid": "node scripts/generate-vapid-keys.mjs"
+    "generate:vapid": "node scripts/generate-vapid-keys.mjs",
+    "radar:build": "tsc -p tsconfig.radar.json",
+    "radar:start": "node .market-radar/main.js",
+    "radar:test": "vitest run src/market-radar",
+    "radar:load": "node .market-radar/load-test.js"
   },
   "dependencies": {
     "@1inch/limit-order-sdk": "^5.3.0",
@@ -39,6 +43,10 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/ws": "8.18.1",
+    "pg": "8.23.0",
+    "@types/pg": "8.23.1",
+    "ws": "^8.21.0",
     "@playwright/test": "^1.61.0",
     "@types/node": "^20.14.10",
     "@types/qrcode": "^1.5.6",

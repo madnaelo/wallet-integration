@@ -7,6 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const allowed = new Set([
   "src/app/demo/DemoExperience.tsx", "src/components/TokenPicker.tsx",
   "src/lib/demo.ts", "src/lib/commercial.ts", "src/lib/units.ts",
+  "src/components/market-radar/RadarDemo.tsx", "src/components/market-radar/RadarView.tsx", "src/lib/marketRadarDemo.ts",
   "src/lib/server/mockAggregatorClient.ts", "src/lib/server/quoteNormalization.ts"
 ]);
 const visited = new Set();

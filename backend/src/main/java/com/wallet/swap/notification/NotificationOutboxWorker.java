@@ -116,6 +116,9 @@ public class NotificationOutboxWorker {
 
   private void sendPush(NotificationOutboxItem item) throws JsonProcessingException {
     switch (item.notificationKind()) {
+      case "market_radar" -> pushSender.send(item.target(),
+          com.wallet.swap.marketradar.MarketRadarMessages.push(properties,
+              objectMapper.readValue(item.payloadJson(), com.wallet.swap.marketradar.MarketRadarModels.RadarNotification.class)));
       case "reverse_profit" -> pushSender.send(
           item.target(),
           messageFormatter.pushPayload(objectMapper.readValue(item.payloadJson(), ReverseProfitOpportunity.class)));
@@ -150,8 +153,8 @@ public class NotificationOutboxWorker {
           item.target(),
           sent,
           errorMessage);
-      case "contact" -> {
-        // Contact messages are persisted before notification delivery.
+      case "contact", "market_radar" -> {
+        // Contact enquiries and Radar events are persisted before notification delivery.
       }
       default -> throw new IllegalArgumentException("Unsupported notification kind: " + item.notificationKind());
     }

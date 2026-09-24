@@ -5,6 +5,11 @@
 !next.config.mjs
 !next-env.d.ts
 !tsconfig.json
+!tsconfig.radar.json
+!services/
+!services/market-radar/
+!services/market-radar/package.json
+!services/market-radar/package-lock.json
 !src/
 !src/**
 !public/

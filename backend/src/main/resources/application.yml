@@ -41,6 +41,8 @@ spring:
       keepalive-time: ${DATABASE_KEEPALIVE_MS:300000}
   flyway:
     enabled: true
+    placeholders:
+      marketRadarSchema: market_radar
     clean-disabled: true
     validate-on-migrate: true
   lifecycle:
@@ -64,6 +66,10 @@ spring:
           writetimeout: ${SMTP_WRITE_TIMEOUT_MS:10000}
 
 wallet:
+  market-radar:
+    live-enabled: ${MARKET_RADAR_LIVE_ENABLED:false}
+    maximum-watched-pairs: ${RADAR_ON_DEMAND_MARKETS:5}
+    alert-delay-ms: 15000
   brand:
     name: ${NEXT_PUBLIC_BRAND_NAME:Swap Assistant}
   revenue:

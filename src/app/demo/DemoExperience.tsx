@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TokenPicker } from "@/components/TokenPicker";
+import { RadarDemo } from "@/components/market-radar/RadarDemo";
 import { DEMO_TOKENS, DEMO_NETWORKS, demoQuotes, demoAmount } from "@/lib/demo";
 import { COMMERCIAL } from "@/lib/commercial";
 import styles from "./demo.module.css";
@@ -16,7 +17,8 @@ export default function DemoExperience() {
   const [connected, setConnected] = useState(false);
   const [reviewed, setReviewed] = useState(false);
   const [routeIndex, setRouteIndex] = useState(0);
-  const [view, setView] = useState<"Swap" | "Activity" | "Alerts">("Swap");
+  const [view, setView] = useState<"Swap" | "Activity" | "Alerts" | "Market Radar">("Swap");
+  useEffect(()=>{if(window.location.hash==="#market-radar")setView("Market Radar");},[]);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [target, setTarget] = useState("2600");
   const [savedTarget, setSavedTarget] = useState("");
@@ -37,10 +39,10 @@ export default function DemoExperience() {
         {connected ? "Sample wallet connected · Disconnect" : "Use sample wallet"}
       </button>
     </header>
-    <div className={styles.tabs} role="tablist" aria-label="Demo views">{(["Swap", "Activity", "Alerts"] as const).map((tab, index, tabs) => <button key={tab} role="tab" id={`tab-${tab}`} aria-controls={`panel-${tab}`} aria-selected={view === tab} tabIndex={view === tab ? 0 : -1} onKeyDown={event => {
+    <div className={styles.tabs} role="tablist" aria-label="Demo views">{(["Swap", "Activity", "Alerts", "Market Radar"] as const).map((tab, index, tabs) => <button key={tab} role="tab" id={`tab-${tab.replaceAll(" ","-")}`} aria-controls={`panel-${tab.replaceAll(" ","-")}`} aria-selected={view === tab} tabIndex={view === tab ? 0 : -1} onKeyDown={event => {
       const next = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
       if (next < 0) return;
-      event.preventDefault(); setView(tabs[next]); document.getElementById(`tab-${tabs[next]}`)?.focus();
+      event.preventDefault(); setView(tabs[next]); document.getElementById(`tab-${tabs[next].replaceAll(" ","-")}`)?.focus();
     }} onClick={() => setView(tab)} type="button">{tab}</button>)}</div>
     {view === "Swap" && <section id="panel-Swap" role="tabpanel" aria-labelledby="tab-Swap" className={styles.workspace}>
       <div className={styles.form}>
@@ -73,6 +75,7 @@ export default function DemoExperience() {
       {activity.length ? <div className={styles.tableWrap}><table><thead><tr><th>Pair</th><th>Output</th><th>Route</th><th>Status</th></tr></thead><tbody>{activity.map((item, i) => <tr key={i}><td>{item.pair}</td><td>{item.output}</td><td>{item.route}</td><td>Preview only</td></tr>)}</tbody></table></div> : <p>No previews yet.</p>}
       <p>In a customer deployment, wallet sign-in protects saved history. Private admin reporting keeps expected, accrued and received fees separate and requires independent settlement evidence.</p>
     </section>}
+    {view === "Market Radar" && <section id="panel-Market-Radar" role="tabpanel" aria-labelledby="tab-Market-Radar"><RadarDemo/></section>}
     {view === "Alerts" && <section id="panel-Alerts" role="tabpanel" aria-labelledby="tab-Alerts" className={styles.secondaryPanel}>
       <h2>Sample price alert</h2><p>ETH to USDC on Ethereum. Explore an alert preference; no notification will be sent.</p>
       <form className={styles.alertForm} onSubmit={event => { event.preventDefault(); const rate = Number(target); if (Number.isFinite(rate) && rate > 0 && rate <= 1000000) setSavedTarget(target); }}>

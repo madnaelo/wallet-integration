@@ -317,6 +317,15 @@ the fee-recipient, provider monetization, and launch revenue checklist. The
 counsel handoff and unresolved regulatory launch gates are recorded in
 [docs/legal/production-legal-review.md](docs/legal/production-legal-review.md).
 
+## Market Radar
+
+Market Radar is an integrated, read-only intelligence module. Its synthetic demo
+is public; live commercial feeds remain disabled pending written data rights.
+See [architecture](docs/market-radar/architecture.md),
+[operations](docs/market-radar/operations.md),
+[data rights](docs/market-radar/data-rights.md) and
+[verification](docs/market-radar/verification.md). It never executes trades.
+
 ## Prompt Trail
 
 The `docs/prompt*_f.md` files preserve the AI pair-programming task sequence:

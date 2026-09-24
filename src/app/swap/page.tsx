@@ -2853,6 +2853,7 @@ export default function Page() {
         </div>
         <nav className="appNav" aria-label="Main navigation">
           <ul className="appMenu">
+            <li><Link className="appMenuLink" href="/market-radar">Market Radar</Link></li>
             <li>
               <Link className="appMenuLink" href="/">
                 Intro

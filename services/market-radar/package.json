@@ -1,0 +1,19 @@
+{
+  "name": "swap-assistant-market-radar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Isolated, read-only market intelligence collector",
+  "engines": {
+    "node": ">=22.0.0 <25"
+  },
+  "dependencies": {
+    "pg": "8.23.0",
+    "ws": "8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "@types/pg": "8.23.1",
+    "@types/ws": "8.18.1",
+    "typescript": "5.9.3"
+  }
+}

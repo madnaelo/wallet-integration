@@ -6,6 +6,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return [
     {
+      url: new URL("/market-radar", baseUrl).toString(),
+      ...(lastModified ? { lastModified } : {}),
+      changeFrequency: "weekly",
+      priority: 0.7
+    },
+    {
       url: new URL("/business", baseUrl).toString(),
       ...(lastModified ? { lastModified } : {}),
       changeFrequency: "monthly",

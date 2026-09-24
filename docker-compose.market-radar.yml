@@ -1,0 +1,39 @@
+name: swap-assistant-market-radar
+services:
+  collector:
+    profiles: ["market-radar"]
+    build:
+      context: .
+      dockerfile: services/market-radar/Dockerfile
+    image: swap-assistant-market-radar:${RADAR_IMAGE_TAG:-local}
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 80
+    cpus: 1.0
+    mem_limit: 384m
+    memswap_limit: 384m
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    ports: ["127.0.0.1:${RADAR_LOCAL_PORT:-8092}:8092"]
+    environment:
+      RADAR_MODE: ${RADAR_MODE:-disabled}
+      RADAR_DATABASE_URL: ${RADAR_DATABASE_URL:-}
+      RADAR_INTERNAL_TOKEN: ${RADAR_INTERNAL_TOKEN:-}
+      RADAR_PUBLIC_READ_TOKEN: ${RADAR_PUBLIC_READ_TOKEN:-}
+      MARKET_RADAR_LIVE_ENABLED: ${MARKET_RADAR_LIVE_ENABLED:-false}
+      RADAR_VENUES: ${RADAR_VENUES:-binance}
+      RADAR_CONTINUOUS_MARKETS: ${RADAR_CONTINUOUS_MARKETS:-5}
+      RADAR_ON_DEMAND_MARKETS: ${RADAR_ON_DEMAND_MARKETS:-5}
+      RADAR_MINIMUM_VENUES: ${RADAR_MINIMUM_VENUES:-2}
+      RADAR_RETENTION_DAYS: ${RADAR_RETENTION_DAYS:-7}
+      RADAR_AUDIT_HORIZONS_MS: ${RADAR_AUDIT_HORIZONS_MS:-3600000,14400000,86400000}
+    networks: [default, database]
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+networks:
+  database:
+    external: true
+    name: ${RADAR_DATABASE_NETWORK:-swap-assistant-dev_default}
