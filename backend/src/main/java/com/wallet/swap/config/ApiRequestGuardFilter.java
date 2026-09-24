@@ -108,6 +108,7 @@ public class ApiRequestGuardFilter extends OncePerRequestFilter {
     response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     response.setHeader("X-Permitted-Cross-Domain-Policies", "none");
     response.setHeader("Cache-Control", "no-store");
+    response.setHeader("X-Robots-Tag", "noindex, nofollow");
     response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   }
 

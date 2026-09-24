@@ -34,6 +34,7 @@ class ApiRequestGuardFilterTest {
     assertThat(chainCalled).isFalse();
     assertThat(response.getStatus()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE.value());
     assertThat(response.getContentAsString()).contains("Request body is too large.");
+    assertThat(response.getHeader("X-Robots-Tag")).isEqualTo("noindex, nofollow");
   }
 
   @Test
@@ -97,6 +98,7 @@ class ApiRequestGuardFilterTest {
 
     assertThat(chainCalled).isTrue();
     assertThat(response.getStatus()).isEqualTo(HttpStatus.OK.value());
+    assertThat(response.getHeader("X-Robots-Tag")).isEqualTo("noindex, nofollow");
   }
 
   @Test

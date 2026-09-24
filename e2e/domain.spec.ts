@@ -10,8 +10,10 @@ test("public metadata and discovery use one canonical origin", async ({ page, re
   }
   const structured = JSON.parse(await page.locator('script[type="application/ld+json"]').innerText());
   expect(new URL(structured.url).origin).toBe(origin);
-  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", origin + "/");
-  await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute("content", new RegExp(`^${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`));
+  const ogUrl = await page.locator('meta[property="og:url"]').getAttribute("content");
+  expect(new URL(ogUrl!).href).toBe(origin + "/");
+  const socialImage = await page.locator('meta[name="twitter:image"]').getAttribute("content");
+  expect(new URL(socialImage!).origin).toBe(origin);
 
   for (const path of ["/business", "/market-radar"]) {
     const response = await page.goto(path);
@@ -32,13 +34,16 @@ test("public metadata and discovery use one canonical origin", async ({ page, re
   for (const path of ["/admin/", "/api/", "/backend/"]) expect(await robots.text()).toContain(`Disallow: ${path}`);
 });
 
-test("demo and private workspace stay noindex on the production domain", async ({ page }) => {
+test("demo, API and private workspace stay noindex on the production domain", async ({ page, request }) => {
   for (const path of ["/demo", "/admin/market-radar"]) {
     const response = await page.goto(path);
     expect(response?.status()).toBe(200);
+    expect(response?.headers()["x-robots-tag"]).toContain("noindex");
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
     if (path === "/demo") expect(response?.headers()["content-security-policy"]).toContain("connect-src 'none'");
   }
   await expect(page.getByLabel("Admin access key")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Next Supply Zone" })).toHaveCount(0);
+  const health = await request.get("/api/health");
+  expect(health.headers()["x-robots-tag"]).toContain("noindex");
 });

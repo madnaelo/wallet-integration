@@ -188,6 +188,10 @@ const nextConfig = {
         source: "/:path*",
         headers: securityHeaders
       },
+      ...["/api/:path*", "/backend/:path*", "/admin/:path*"].map((source) => ({
+        source,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }]
+      })),
       {
         source: "/demo",
         headers: [

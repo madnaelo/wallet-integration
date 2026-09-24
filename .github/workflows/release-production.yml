@@ -496,7 +496,7 @@ jobs:
               import { frontendDomainEnvironment } from "./scripts/deploy/frontend-domain-env.mjs";
               for (const [key, value] of Object.entries(frontendDomainEnvironment(
                 process.env.PRODUCTION_FRONTEND_URL, "https://wallet-integration-theta.vercel.app"
-              ))) console.log(`${key}=${value}`);
+              ))) console.log(key + "=" + value);
             '
             printf 'MARKET_RADAR_LIVE_ENABLED=false\n'
             printf 'MARKET_RADAR_INTERNAL_ENABLED=%s\n' "$MARKET_RADAR_INTERNAL_ENABLED"
