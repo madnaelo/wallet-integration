@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/growth/events", route => route.fulfill({ status: 204 }));
+});
+
 test("contact cannot submit private form fields before hydration", async ({ page }) => {
   let releaseScripts!: () => void;
   const gate = new Promise<void>(resolve => { releaseScripts = resolve; });
@@ -54,7 +58,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     expect(unsafeRequests).toEqual([]);
     expect(errors).toEqual([]);
     await page.goto("/business");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Swap Assistant");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Branded crypto swap software");
     const productImage = page.getByRole("img", { name: "Swap Assistant demonstration with sample wallet, token selection, route comparison and fee review" });
     await productImage.scrollIntoViewIfNeeded();
     await expect.poll(() => productImage.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);

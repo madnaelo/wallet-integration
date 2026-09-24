@@ -51,6 +51,7 @@ public class ExpiredDataCleanupJob {
 
   private void deleteExpiredRows() {
     Instant now = Instant.now();
+    deleteOlderThan(90, now, expiredDataRepository::deleteOldGrowthEvents);
     int nonces = deleteInBatches(limit -> authRepository.deleteExpiredNonces(now, limit));
     int sessions = deleteInBatches(limit -> authRepository.deleteExpiredSessions(now, limit));
     int telegramCodes = deleteInBatches(limit -> telegramLinkCodeRepository.deleteExpired(now, limit));

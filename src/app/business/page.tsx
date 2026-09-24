@@ -4,6 +4,7 @@ import { BRAND } from "@/lib/brand";
 import { COMMERCIAL } from "@/lib/commercial";
 import { CommercialNav, CommercialFooter } from "@/components/CommercialNav";
 import styles from "./business.module.css";
+import { GrowthTracker } from "@/components/GrowthTracker";
 
 export const metadata: Metadata = {
   title: "Branded Non-Custodial Swap Software for Teams",
@@ -25,14 +26,15 @@ const capabilities = [
 
 export default function BusinessPage() {
   return <main className={styles.page}>
+    <GrowthTracker />
     <CommercialNav active="business" />
     <section className={styles.hero} aria-labelledby="business-title">
       <Image className={styles.heroImage} src="/business-demo.png" alt="" fill priority sizes="100vw" />
       <div className={styles.heroCopy}>
         <p className={styles.eyebrow}>For Web3 products, wallets & agencies</p>
-        <h1 id="business-title">{BRAND.name}<br /><span>for your product.</span></h1>
+        <h1 id="business-title">Branded crypto swap software.</h1>
         <p className={styles.lead}>Launch a branded non-custodial swap experience without rebuilding the wallet, routing and transaction workflow.</p>
-        <p>Your users keep their wallets. Your team operates its own deployment and approved provider accounts. We provide the reusable product and a scoped setup service.</p>
+        <p>{BRAND.name} gives wallet teams, Web3 products and agencies a working foundation: wallet handoffs, quote review, transaction tracking, alerts and release controls. License a branded deployment, with integration and setup scoped around your product.</p>
         <div className={styles.actions}>
           <a className={styles.primary} href={COMMERCIAL.demoRequest}>Request a branded demo</a>
           <a className={styles.secondary} href={COMMERCIAL.demoPath}>Explore the safe demo <span aria-hidden="true">&rarr;</span></a>
@@ -46,6 +48,16 @@ export default function BusinessPage() {
       <p className={styles.sectionLead}>Adding a swap API is only part of the job. Wallet handoffs, different networks, inconsistent quotes, transaction review and delivery states all need a coherent experience.</p>
       <div className={styles.capabilities}>{capabilities.map(([title, body]) => <article key={title}><h3>{title}</h3><p>{body}</p></article>)}</div>
       <a href={COMMERCIAL.demoPath} className={styles.productImage}><Image src="/business-demo.png" alt="Swap Assistant demonstration with sample wallet, token selection, route comparison and fee review" width={1440} height={1000} sizes="(max-width: 760px) 100vw, 1116px" /></a>
+    </section>
+    <section className={styles.band} aria-labelledby="buyer-fit">
+      <h2 id="buyer-fit">Reuse the workflow. Keep your engineering focused.</h2>
+      <p>Start by checking fit, not by committing to a platform. Compare the existing demo against the screens, networks and operational controls your team would otherwise need to build and maintain.</p>
+      <div className={styles.capabilities}>
+        <article><h3><a href="/for-wallets">For wallet products</a></h3><p>Review connection, approvals and recipient behavior against your wallet model before agreeing an integration scope.</p></article>
+        <article><h3><a href="/for-web3-agencies">For Web3 agencies</a></h3><p>Offer an existing swap workflow for a client project, with a defined handover and separately licensed customer deployment.</p></article>
+        <article><h3><a href="/crypto-swap-integration">For engineering teams</a></h3><p>See the frontend, backend and provider boundaries, and what a scoped integration includes.</p></article>
+      </div>
+      <p><a href="/white-label-crypto-swap">Review the branded deployment offer</a> or <a href="/guides/build-vs-license-crypto-swaps">compare building with licensing</a>.</p>
     </section>
     <section className={`${styles.band} ${styles.trust}`} aria-labelledby="trust-title">
       <div><p className={styles.eyebrow}>A clear custody boundary</p><h2 id="trust-title">Their keys.<br />Their approval.</h2></div>

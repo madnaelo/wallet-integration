@@ -1,11 +1,14 @@
 import type { MetadataRoute } from "next";
 import { getSiteUrl } from "@/lib/siteUrl";
+import { buyerPages, guidePages } from "@/lib/growthContent";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = getSiteUrl();
   const lastModified = getCommitDate();
 
   return [
+    ...[...buyerPages, ...guidePages].map(page => ({ url: new URL(page.path, baseUrl).toString(),
+      ...(lastModified ? { lastModified } : {}), changeFrequency: "monthly" as const, priority: 0.7 })),
     {
       url: new URL("/market-radar", baseUrl).toString(),
       ...(lastModified ? { lastModified } : {}),

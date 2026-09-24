@@ -61,6 +61,7 @@ public class ContactSubmissionService {
     String dedupeHash = dedupeHash(email, topic, message, Instant.now());
 
     if (repository.insert(id, dedupeHash, name, email, topic, message)) {
+      repository.saveAttribution(id, com.wallet.swap.growth.GrowthAttribution.sanitize(request.attribution()));
       enqueueOperatorNotification(id, name, email, topic, message);
     }
     return new ContactSubmissionResponse(true);

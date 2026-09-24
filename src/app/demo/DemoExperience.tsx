@@ -9,7 +9,7 @@ import styles from "./demo.module.css";
 
 type Activity = { pair: string; output: string; route: string };
 
-export default function DemoExperience() {
+export default function DemoExperience({ contactHref = COMMERCIAL.demoRequest }: { contactHref?: string }) {
   const [source, setSource] = useState(DEMO_TOKENS[0]);
   const [destination, setDestination] = useState(DEMO_TOKENS[1]);
   const [amount, setAmount] = useState("1");
@@ -83,6 +83,6 @@ export default function DemoExperience() {
       </form><p role="status">{savedTarget ? `Sample alert saved at ${savedTarget} USDC. Nothing is scheduled or sent.` : ""}</p>
       <p>Configured deployments support price, reverse-profit and loss alerts. Telegram, email and push require account setup and supported devices.</p>
     </section>}
-    <aside className={styles.next}><div><h2>See this under your brand.</h2><p>Existing capabilities, your provider accounts, one isolated deployment.</p></div><a href={COMMERCIAL.demoRequest}>Request a branded demo <span aria-hidden="true">&rarr;</span></a></aside>
+    <aside className={styles.next}><div><h2>See this under your brand.</h2><p>Existing capabilities, your provider accounts, one isolated deployment.</p></div><a href={contactHref}>Request a branded demo <span aria-hidden="true">&rarr;</span></a></aside>
   </div>;
 }
