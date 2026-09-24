@@ -293,7 +293,7 @@ Set these in the Vercel project for Production:
 ```text
 NEXT_PUBLIC_BACKEND_BASE_URL=/backend
 BACKEND_PROXY_TARGET=https://wallet-api.84-235-254-97.sslip.io
-NEXT_PUBLIC_SITE_URL=https://wallet-integration-theta.vercel.app
+NEXT_PUBLIC_SITE_URL=https://getswapradar.xyz
 # NEXT_PUBLIC_APP_VERSION and NEXT_PUBLIC_COMMIT_TIMESTAMP are injected by the release workflow.
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
 NEXT_PUBLIC_ALLOWED_CHAIN_IDS=1,42161,10,8453,137,56,43114
@@ -316,7 +316,7 @@ MONETIZED_SWAP_PROVIDERS=0x,lifi
 AFFILIATE_ADDRESS=...
 FEE_RECIPIENT_ADDRESS=...
 PLATFORM_FEE_BPS=20
-CORS_ALLOW_ORIGINS=https://wallet-integration-theta.vercel.app
+CORS_ALLOW_ORIGINS=https://getswapradar.xyz,https://wallet-integration-theta.vercel.app
 REQUIRE_ALLOWED_ORIGIN=true
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=30
@@ -441,7 +441,7 @@ curl -fsS https://wallet-api.84-235-254-97.sslip.io/api/health
 Production monitor locally:
 
 ```bash
-FRONTEND_URL=https://wallet-integration-theta.vercel.app \
+FRONTEND_URL=https://getswapradar.xyz \
 BACKEND_HEALTH_URL=https://wallet-api.84-235-254-97.sslip.io/api/health \
 ./scripts/ops/check-production-health.sh
 ```

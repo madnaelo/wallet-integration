@@ -492,6 +492,12 @@ jobs:
           {
             printf '%s\n' "$OCI_BACKEND_ENV"
             printf '\nAPP_ENVIRONMENT=production\n'
+            node --input-type=module -e '
+              import { frontendDomainEnvironment } from "./scripts/deploy/frontend-domain-env.mjs";
+              for (const [key, value] of Object.entries(frontendDomainEnvironment(
+                process.env.PRODUCTION_FRONTEND_URL, "https://wallet-integration-theta.vercel.app"
+              ))) console.log(`${key}=${value}`);
+            '
             printf 'MARKET_RADAR_LIVE_ENABLED=false\n'
             printf 'MARKET_RADAR_INTERNAL_ENABLED=%s\n' "$MARKET_RADAR_INTERNAL_ENABLED"
             printf 'RADAR_ON_DEMAND_MARKETS=5\n'
@@ -570,6 +576,7 @@ jobs:
           OCI_BACKUP_BUCKET: ${{ vars.OCI_BACKUP_BUCKET }}
           EMAIL_NOTIFICATIONS_ENABLED: ${{ vars.EMAIL_NOTIFICATIONS_ENABLED }}
           MARKET_RADAR_INTERNAL_ENABLED: ${{ vars.MARKET_RADAR_INTERNAL_ENABLED || 'false' }}
+          PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://getswapradar.xyz' }}
           SMTP_HOST: ${{ vars.SMTP_HOST }}
           SMTP_PORT: ${{ vars.SMTP_PORT }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
@@ -738,7 +745,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: production
-      url: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://wallet-integration-theta.vercel.app' }}
+      url: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://getswapradar.xyz' }}
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       VERCEL_DEPLOY_MODE: promote
@@ -778,8 +785,8 @@ jobs:
       - name: Verify frontend and backend commit
         shell: bash
         env:
-          FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://wallet-integration-theta.vercel.app' }}
-          FRONTEND_HEALTH_URL: ${{ vars.PRODUCTION_FRONTEND_HEALTH_URL || 'https://wallet-integration-theta.vercel.app/api/health' }}
+          FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL || 'https://getswapradar.xyz' }}
+          FRONTEND_HEALTH_URL: ${{ vars.PRODUCTION_FRONTEND_HEALTH_URL || 'https://getswapradar.xyz/api/health' }}
           BACKEND_HEALTH_URL: ${{ vars.PRODUCTION_BACKEND_HEALTH_URL || 'https://wallet-api.84-235-254-97.sslip.io/api/health' }}
           COHOSTED_HEALTH_URL: https://84.235.254.97.sslip.io/api/v1/health
           ADMIN_OPS_URL: ${{ vars.PRODUCTION_ADMIN_OPS_URL || 'https://wallet-api.84-235-254-97.sslip.io/api/admin/ops/summary' }}

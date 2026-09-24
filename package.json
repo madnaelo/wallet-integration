@@ -12,7 +12,7 @@
     "start:standalone": "node scripts/start-standalone.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:preflight": "node --test scripts/tests/deployment-preflight.test.mjs",
+    "test:preflight": "node --test scripts/tests/deployment-preflight.test.mjs scripts/tests/frontend-domain-env.test.mjs",
     "preflight:demo": "node scripts/demo-preflight.mjs",
     "preflight:deployment": "node scripts/deployment-preflight.mjs",
     "lint": "eslint . --max-warnings=0",

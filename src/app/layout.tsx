@@ -1,4 +1,5 @@
 import { BRAND } from "@/lib/brand";
+import { getSiteUrl } from "@/lib/siteUrl";
 import type { Metadata, Viewport } from "next";
 import { PwaClient } from "@/components/PwaClient";
 import "./globals.css";
@@ -109,13 +110,4 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </body>
     </html>
   );
-}
-
-function getSiteUrl(): URL {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://swapassistant.app";
-  try {
-    return new URL(raw);
-  } catch {
-    return new URL("https://swapassistant.app");
-  }
 }

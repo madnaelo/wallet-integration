@@ -14,7 +14,7 @@ wallet connection, route review, activity and alerts. We license it under your
 brand and deploy it in your accounts, with a bounded setup service.
 
 Would a short branded demo be useful? The no-funds preview is
-https://wallet-integration-theta.vercel.app/demo. We can start by email; no call
+https://getswapradar.xyz/demo. We can start by email; no call
 needed. If it is not relevant, just let me know and I will not follow up.
 
 Aqeel

@@ -21,8 +21,10 @@ This is not a claim of automated customer provisioning, guaranteed payouts or
 operator/provider legal clearance. Revenue capture requires coordinated backend
 and frontend runtime configuration before enabling it.
 
-For prospects: [business page](https://wallet-integration-theta.vercel.app/business)
-and [safe synthetic demo](https://wallet-integration-theta.vercel.app/demo).
+Production: [getswapradar.xyz](https://getswapradar.xyz).
+For prospects: [business page](https://getswapradar.xyz/business)
+and [safe synthetic demo](https://getswapradar.xyz/demo).
+Domain operations: [canonical production domain](docs/production-domain.md).
 The demo cannot connect a real wallet, submit swaps/orders, collect fees or save
 real account data. Its [boundary and checks](docs/commercial/public-demo.md) are
 separate from the existing live application; no live revenue setting is enabled.

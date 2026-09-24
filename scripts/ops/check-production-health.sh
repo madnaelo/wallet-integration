@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-frontend_url="${FRONTEND_URL:-https://wallet-integration-theta.vercel.app}"
+frontend_url="${FRONTEND_URL:-https://getswapradar.xyz}"
 frontend_health_url="${FRONTEND_HEALTH_URL:-${frontend_url%/}/api/health}"
 backend_health_url="${BACKEND_HEALTH_URL:-https://wallet-api.84-235-254-97.sslip.io/api/health}"
 admin_ops_url="${ADMIN_OPS_URL:-https://wallet-api.84-235-254-97.sslip.io/api/admin/ops/summary}"

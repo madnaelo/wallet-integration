@@ -27,7 +27,7 @@ it non-exclusively, with setup/integration scoped separately.
 [the pilot offer](pilot-offer.md). No unlimited development, new protocols, custody,
 liquidity, legal services or 24/7 operations. A written license and scope come first.
 
-[Explore the demo](https://wallet-integration-theta.vercel.app/demo) or
-[request a branded demo](https://wallet-integration-theta.vercel.app/contact?enquiry=branded-demo).
+[Explore the demo](https://getswapradar.xyz/demo) or
+[request a branded demo](https://getswapradar.xyz/contact?enquiry=branded-demo).
 Tell us your product, audience and target networks. Email/form is sufficient;
 a call is optional. No earnings or regulatory status is guaranteed.
