@@ -36,6 +36,7 @@ jobs:
     outputs:
       release_sha: ${{ steps.release.outputs.release_sha }}
       committed_at: ${{ steps.release.outputs.committed_at }}
+      discovery_base: ${{ steps.discovery-base.outputs.commit }}
     steps:
       - name: Checkout release history
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -114,6 +115,23 @@ jobs:
             fi
           done
 
+      - name: Record deployed content baseline
+        id: discovery-base
+        continue-on-error: true
+        run: |
+          node --input-type=module -e '
+            import { appendFileSync } from "node:fs";
+            const response = await fetch("https://getswapradar.xyz/api/health", {
+              redirect: "error", signal: AbortSignal.timeout(15000)
+            });
+            if (!response.ok) throw new Error("Content baseline health request failed");
+            const body = await response.json();
+            if (body.status !== "ok" || !/^[a-f0-9]{40}$/.test(body.build?.commit ?? "")) {
+              throw new Error("No valid deployed content baseline");
+            }
+            appendFileSync(process.env.GITHUB_OUTPUT, "commit=" + body.build.commit + "\n");
+          '
+
   build:
     name: Test, scan, and publish image
     needs: prepare
@@ -163,6 +181,8 @@ jobs:
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Refresh runtime OS fixes even when application/dependency layers are unchanged.
+          no-cache-filters: runtime
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -218,6 +238,7 @@ jobs:
           push: false
           tags: ghcr.io/madnaelo/wallet-market-radar:sha-${{ needs.prepare.outputs.release_sha }}
           labels: org.opencontainers.image.revision=${{ needs.prepare.outputs.release_sha }}
+          no-cache-filters: runner
           cache-from: type=gha,scope=radar
           cache-to: type=gha,scope=radar,mode=max
 
@@ -781,7 +802,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.prepare.outputs.release_sha }}
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Verify frontend and backend commit
         shell: bash
@@ -816,5 +837,6 @@ jobs:
         continue-on-error: true
         env:
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+          INDEXNOW_BASE_COMMIT: ${{ needs.prepare.outputs.discovery_base }}
           EXPECTED_COMMIT: ${{ needs.prepare.outputs.release_sha }}
         run: node scripts/submit-indexnow.mjs

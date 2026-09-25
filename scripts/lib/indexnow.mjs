@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+
 export const INDEXNOW_ORIGIN = "https://getswapradar.xyz";
 export const INDEXNOW_PATHS = ["/", "/business", "/white-label-crypto-swap", "/crypto-swap-integration",
   "/for-wallets", "/for-web3-agencies", "/guides/build-vs-license-crypto-swaps",
@@ -22,6 +24,14 @@ export function changedPublicPaths(files) {
     }
   }
   return [...changed];
+}
+
+export function changedPathsSinceDeployment(baseCommit, git = execFileSync) {
+  if (baseCommit && !/^[a-f0-9]{40}$/.test(baseCommit)) throw new Error("Invalid deployed content baseline");
+  // Include content from earlier commits whose release failed or was superseded.
+  const files = git("git", ["diff", "--name-only", baseCommit || "HEAD^", "HEAD"], { encoding: "utf8" })
+    .trim().split(/\r?\n/);
+  return changedPublicPaths(files);
 }
 
 export function submission(key, paths) {
