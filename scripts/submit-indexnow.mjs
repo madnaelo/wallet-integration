@@ -1,8 +1,6 @@
-import { execFileSync } from "node:child_process";
-import { changedPublicPaths, notifyIndexNow } from "./lib/indexnow.mjs";
+import { changedPathsSinceDeployment, notifyIndexNow } from "./lib/indexnow.mjs";
 
-const files = execFileSync("git", ["diff", "--name-only", "HEAD^", "HEAD"], { encoding: "utf8" }).trim().split(/\r?\n/);
-const paths = changedPublicPaths(files);
+const paths = changedPathsSinceDeployment(process.env.INDEXNOW_BASE_COMMIT);
 if (!paths.length) {
   console.log("No public content changes; no IndexNow submission");
 } else if (!process.env.INDEXNOW_KEY) {
