@@ -16,8 +16,8 @@ Inbox checked at 04:55 UTC: **0 replies, 0 demo requests, 0 bounce notices obser
 | Cumulative contacts | 8; all individual sent receipts retained privately |
 | Organic enquiries / qualified demos | 0 observed; no qualified organic attribution established |
 | Pilot / customers / revenue | 0 / 0 / 0 for this campaign |
-| Domain email | Free forwarding account requires owner password/terms step; not advertised or used yet |
-| External listings | Product Hunt draft in progress, not yet a verified public listing; GitHub remains public and linked |
+| Domain email | `hello@getswapradar.xyz` forwards through Spaceship to the owner's Gmail; real test received in Spam despite passing authentication; not yet advertised |
+| External listings | Product Hunt scheduled for September 26 at 00:01 PT / 07:01 UTC; not live or indexed yet. GitHub linked with useful guide references. [Distribution register](distribution.md) |
 | Paid spend | 0 |
 
 SEO evidence: [keyword baseline](search-baseline-2026-09-25.md), [Search Console](search-console-2026-09-25.md). Content work improves existing pages rather than multiplying near-duplicates: widget/custom/licensed comparison, concrete wallet integration acceptance checks, official references, internal links, clearer branded-software offer and email-first CTA. IndexNow only notifies allowlisted public content after exact-revision production health verification.
@@ -25,6 +25,12 @@ SEO evidence: [keyword baseline](search-baseline-2026-09-25.md), [Search Console
 Next outreach: original September 24 contacts become eligible September 29-October 1; new September 25 contacts September 30-October 2. Check replies/objections first, send at most one useful follow-up, then stop. No follow-up was due or sent this cycle. Private evidence: `.dev/growth/outreach-cycle-2.json` and `.dev/growth/sales-tracker.csv`.
 
 The earlier cycle below is preserved as history. SEO is ongoing; indexing is not a qualified conversation.
+
+### Release Evidence
+
+Growth changes merged in `0bd8c15b69b9c2dea93747b78262aa9c761884e3` (PR 50). [CI](https://github.com/madnaelo/wallet-integration/actions/runs/36097087836) and [Security](https://github.com/madnaelo/wallet-integration/actions/runs/36097087848) passed. Local checks: 296 unit tests passed, 7 database-dependent tests skipped locally and covered in CI, 28 Playwright tests passed, 12 preflight tests passed; lint, typecheck, build, production dependency audit and demo safety passed.
+
+[Release 36097278773](https://github.com/madnaelo/wallet-integration/actions/runs/36097278773) correctly blocked the backend image: cached libexpat 2.8.4-r0 was flagged HIGH, with 2.8.5-r0 reported fixed. No vulnerable image was deployed by this release. The runtime stages now bypass Docker's layer cache so existing package-upgrade commands actually run for each release; build/dependency caching and blocking scans remain. See [Docker's cache explanation](https://docs.docker.com/build/cache/invalidation/). Final deployed revision and IndexNow receipt must be verified from the subsequent release, not inferred from green source CI.
 
 ## September 24 Baseline
 

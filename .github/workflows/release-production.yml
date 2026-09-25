@@ -163,6 +163,8 @@ jobs:
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Refresh runtime OS fixes even when application/dependency layers are unchanged.
+          no-cache-filters: runtime
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -218,6 +220,7 @@ jobs:
           push: false
           tags: ghcr.io/madnaelo/wallet-market-radar:sha-${{ needs.prepare.outputs.release_sha }}
           labels: org.opencontainers.image.revision=${{ needs.prepare.outputs.release_sha }}
+          no-cache-filters: runner
           cache-from: type=gha,scope=radar
           cache-to: type=gha,scope=radar,mode=max
 
