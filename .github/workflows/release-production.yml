@@ -781,6 +781,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.prepare.outputs.release_sha }}
+          fetch-depth: 2
 
       - name: Verify frontend and backend commit
         shell: bash
@@ -805,3 +806,15 @@ jobs:
             sleep 10
           done
           exit 1
+
+      - name: Setup Node for content discovery notification
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Notify IndexNow of changed public content
+        continue-on-error: true
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+          EXPECTED_COMMIT: ${{ needs.prepare.outputs.release_sha }}
+        run: node scripts/submit-indexnow.mjs

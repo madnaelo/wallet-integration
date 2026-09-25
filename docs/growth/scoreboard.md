@@ -1,5 +1,33 @@
 # Growth Scoreboard
 
+## September 25 Cycle
+
+Inbox checked at 04:55 UTC: **0 replies, 0 demo requests, 0 bounce notices observed** across the eight contacted companies. SENT is not proof of delivery. No positive reply, pilot, customer or campaign revenue is established.
+
+| Metric | Current evidence |
+|---|---|
+| Google indexing | `/business` individually confirmed indexed; eight other inspected buyer/guide/Radar URLs unindexed |
+| Google sitemap | Older report still Couldn't fetch; live Google fetch succeeds; reporting recheck pending |
+| Google impressions / clicks / CTR | Processing; unavailable, not zero |
+| Bing sitemap | Success, 16 discovered, no errors/warnings; indexed total and traffic unavailable |
+| Requested target queries | 13 queries x 2 engines; no domain result on inspected first pages; deeper rank unknown |
+| Prioritized prospects | 57: A6 / B34 / C17; [qualification](qualification.md), not proven demand |
+| New contacts | 5 personalized Gmail messages: Tech Alchemy, Web3 Engineering, Soken, Blocksmith, Web3 Labs |
+| Cumulative contacts | 8; all individual sent receipts retained privately |
+| Organic enquiries / qualified demos | 0 observed; no qualified organic attribution established |
+| Pilot / customers / revenue | 0 / 0 / 0 for this campaign |
+| Domain email | Free forwarding account requires owner password/terms step; not advertised or used yet |
+| External listings | Product Hunt draft in progress, not yet a verified public listing; GitHub remains public and linked |
+| Paid spend | 0 |
+
+SEO evidence: [keyword baseline](search-baseline-2026-09-25.md), [Search Console](search-console-2026-09-25.md). Content work improves existing pages rather than multiplying near-duplicates: widget/custom/licensed comparison, concrete wallet integration acceptance checks, official references, internal links, clearer branded-software offer and email-first CTA. IndexNow only notifies allowlisted public content after exact-revision production health verification.
+
+Next outreach: original September 24 contacts become eligible September 29-October 1; new September 25 contacts September 30-October 2. Check replies/objections first, send at most one useful follow-up, then stop. No follow-up was due or sent this cycle. Private evidence: `.dev/growth/outreach-cycle-2.json` and `.dev/growth/sales-tracker.csv`.
+
+The earlier cycle below is preserved as history. SEO is ongoing; indexing is not a qualified conversation.
+
+## September 24 Baseline
+
 Baseline: 2026-09-24, 18:03 UTC. Scope: this growth launch, not a claim about all historical project activity. Update from actual search dashboards, protected enquiries and private correspondence. Tests, spam and automatic replies are not qualified interest.
 
 | Metric | Verified position | Meaning / source |

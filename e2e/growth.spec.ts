@@ -71,6 +71,20 @@ test("privacy signals disable observations and contact attribution", async ({ pa
   expect(page.url()).not.toContain("utm_source");
 });
 
+test("delivery comparison stays contained and accessible on narrow screens", async ({ page }) => {
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/guides/build-vs-license-crypto-swaps");
+    const comparison = page.getByRole("region", { name: "What each approach actually delivers", exact: true });
+    await expect(comparison).toHaveAttribute("tabindex", "0");
+    await expect(comparison.getByRole("columnheader")).toHaveCount(4);
+    await expect(comparison.getByRole("rowheader")).toHaveCount(6);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByRole("heading", { name: "Further technical reading" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Related reading" }).getByRole("link").first()).toHaveAttribute("href", /^\//);
+  }
+});
+
 test("enquiries require admin access and remain noindex", async ({ page }) => {
   const calls: string[] = [];
   page.on("request", request => { if (request.url().includes("/api/admin")) calls.push(request.url()); });

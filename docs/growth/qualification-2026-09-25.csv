@@ -1,0 +1,58 @@
+id,company,pool,tier,reason,next_action
+P01,Who Develop,agency,A,Focused Web3 consultancy with wallet and cross-chain delivery,Sent Sep24; one follow-up Sep29-Oct1 only if no response
+P02,Bytez3,agency,A,Focused wallet-adapter and DeFi studio,Sent Sep24; one follow-up Sep29-Oct1 only if no response
+P03,Pixelfield,agency,A,Reachable product agency with wallet application service,Sent Sep24; one follow-up Sep29-Oct1 only if no response
+P04,Digisol,agency,B,Direct frontend fit but legal entity and current buying need unverified,Qualify business channel before contact
+P05,CryptoHub Agency,agency,B,Next.js wallet flows fit but entity and active client need unverified,Qualify business channel before contact
+P06,Tomnitive,agency,B,Relevant studio services but no confirmed repeat wallet engagement,Find concrete reuse brief
+P07,MagnusMage,agency,B,Wallet case fits but chain coverage and procurement unknown,Confirm compatible project
+P08,AproveiTech,agency,B,Wallet and white-label services may overlap our offer,Identify gap before pitching
+P09,Linum Labs,agency,B,Relevant engineering but no buying signal,Identify reusable application need
+P10,LimeChain,agency,B,Bulgarian Lime Labs entity; wallet expertise without buying signal,Use appropriate partnership channel; do not assume UK rules
+P11,INC4,agency,B,Protocol-focused services only indirect application fit,Qualify application-layer need
+P12,4soft,agency,B,DeFi case supports capability not licensing demand,Find wallet-facing engagement
+P13,EvaCodes,agency,B,Network overlap requires scoping and entity verification,Qualify supported routes and contact
+P14,Blaize,agency,B,Own cross-chain expertise; reuse appetite unknown,Seek narrow complementary brief
+P15,Rather Labs,agency,B,Broad blockchain work without specific wallet buyer signal,Qualify relevant engagement
+P16,ND Labs,agency,C,Own white-label wallet and swap foundation overlaps offer,Deprioritize unless specific gap emerges
+P17,MetaLamp,agency,B,Existing DEX frontend expertise; plausible future-client reuse,Ask about application reuse not missing capability
+P18,RedDuck,agency,B,Specialist engineering fit but no current licence need,Verify suitable business channel
+P19,Codezeros,agency,B,Relevant service range but buyer intent unverified,Qualify client-specific workflow
+P20,Labrys,agency,B,Protocol integration evidence but no application licence signal,Qualify delivery scope and channel
+P21,Exaud,agency,B,Documented DeFi partnership only indirect fit,Validate wallet-facing application need
+P22,IdeaSoft,agency,B,Enterprise platform scope may exceed narrow application offer,Qualify small pilot owner
+P23,Applied Blockchain,agency,B,Giano embedded wallet and partnership channel; larger bespoke delivery,Check external-wallet complement before outreach
+P24,Boosty Labs,agency,B,Wallet services fit but active brief unverified,Qualify repeat delivery need
+P25,Unicsoft,agency,C,Existing EVM white-label framework overlaps solution,Deprioritize until concrete gap
+P26,Cheesecake Labs,agency,B,Wallet work relevant but Stellar mismatch must not be implied supported,Qualify supported EVM route need
+P27,openGeeksLab,agency,C,Current operating availability not verified,Reconfirm active team before contact
+P28,4IRE,agency,C,Own white-label finance offering and heavier scope,Deprioritize for first pilot
+P29,Peiko,agency,B,Wallet integration service fits but entity and active need unverified,Qualify appropriate channel
+P30,PixelPlex,agency,C,Broad existing wallet and protocol capabilities reduce near-term differentiation,Deprioritize first batch
+P31,Rock'n'Block,agency,C,Own provider-agnostic swap rails and DEX work overlap directly,Do not pitch replacement routing
+P32,SFXDX,agency,B,Digital-asset relevance without confirmed application buying need,Qualify delivery model
+P33,Synodus,agency,B,Wallet project relevance but no repeat swap need established,Qualify brief and contact rules
+P34,Debut Infotech,agency,C,Existing wallet product/services overlap and no differentiated brief,Deprioritize first batch
+P35,Technoloader,agency,B,Wallet services fit but entity and current need unverified,Qualify business contact
+P36,Moon Technolabs,agency,C,Broad custom wallet delivery with weak specific reuse signal,Deprioritize first batch
+P37,Interexy,agency,C,Broad custom wallet delivery without differentiated licence need,Deprioritize first batch
+P38,Innowise,agency,C,Larger procurement and broad capabilities lower first-pilot reach,Deprioritize first batch
+P39,SoluLab,agency,C,Own broad wallet/DeFi offering with weak differentiation,Deprioritize first batch
+P40,Rapid Innovation,agency,C,Broad established delivery; no narrow current reuse signal,Deprioritize first batch
+P41,Oodles Blockchain,agency,B,Relevant blockchain service pool but unverified current buyer,Qualify concrete app-layer need
+P42,Web3.0UK,agency,B,UK office listed but linked Indian entity and incomplete legal links,Verify contracting entity before contact
+P43,Tech Alchemy,agency,A,Active UK company 10443169; dApp product delivery and business contact verified,Sent Sep25; one follow-up Sep30-Oct2 only if no response
+P44,Web3 Labs,partner,B,Web3j/Chainlens complement application workflow but weaker direct buying need,Sent Sep25; one follow-up Sep30-Oct2 only if no response
+P45,Protofire,partner,C,Protocol/infrastructure specialization far from first app licence buyer,Deprioritize first batch
+P46,CoinFabrik,partner,B,Technical service complement but no demonstrated licence demand,Explore referral only after specific fit
+P47,CoinFabric,agency,C,Current company activity and reachability not confirmed,Verify before contact
+P48,Dysnix,partner,B,Infrastructure complement more plausible than direct application purchase,Qualify referral fit
+P49,Blockstars,agency,B,Web3 service relevance without active buyer signal,Qualify concrete application brief
+P50,Antier,agency,C,Own broad white-label offering competes with this scope,Deprioritize first batch
+P51,Blocksmith,partner,B,Active UK company 11181831; Uniswap research and product work complement application layer,Sent Sep25; one follow-up Sep30-Oct2 only if no response
+P52,Web3 Engineering,agency,A,Active UK company 14969249; ENGC wallet and transaction-simulation work,Sent Sep25; one follow-up Sep30-Oct2 only if no response
+P53,Soken,agency,A,Active UK company 15253906; explicit wallet/dashboard full-stack development,Sent Sep25; one follow-up Sep30-Oct2 only if no response
+P54,Credium,product,B,Self-hosted device-key wallet fits but only support contact found,Find legitimate partnership channel; do not use support
+P55,Guarda,product,C,Established wallet already offers developed swap product,Deprioritize direct licence pitch
+P56,Qastle,product,B,Public partnership channel but US outreach requirements and technical fit unresolved,Hold; verify appropriate sender details and scope
+P57,Meton,product,C,Own white-label wallet offering and partner user thresholds overlap,Deprioritize direct licence pitch
