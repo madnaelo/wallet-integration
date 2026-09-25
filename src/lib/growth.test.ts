@@ -33,4 +33,15 @@ describe("growth attribution", () => {
       expect(JSON.stringify(page)).not.toMatch(/saves \d+ months|\d+% success rate/i);
     }
   });
+  it("keeps useful comparison and acceptance evidence in the existing guides", () => {
+    const comparison = guidePages.find(p => p.path === "/guides/build-vs-license-crypto-swaps")!;
+    expect(comparison.comparison?.headers).toHaveLength(4);
+    for (const row of comparison.comparison!.rows) expect(row).toHaveLength(4);
+    const walletGuide = guidePages.find(p => p.path === "/guides/add-swaps-to-a-wallet")!;
+    expect(JSON.stringify(walletGuide)).toContain("Allowance completed, swap rejected");
+    for (const page of [comparison, walletGuide]) {
+      expect(page.reviewedOn).toBe("2026-09-25");
+      for (const [url] of page.sources!) expect(new URL(url).protocol).toBe("https:");
+    }
+  });
 });

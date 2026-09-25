@@ -16,6 +16,9 @@ without a wallet, account or funds. For a branded deployment, see the
 [wallet integration](https://getswapradar.xyz/for-wallets) or
 [agency delivery](https://getswapradar.xyz/for-web3-agencies) pages.
 
+For integration planning, compare [widgets, custom builds and licensed software](https://getswapradar.xyz/guides/build-vs-license-crypto-swaps)
+or use the [wallet integration acceptance checklist](https://getswapradar.xyz/guides/add-swaps-to-a-wallet).
+
 ![Synthetic product demo: quote comparison and transaction review](public/business-demo.png)
 
 The architecture combines a Next.js application, a Spring Boot/PostgreSQL
