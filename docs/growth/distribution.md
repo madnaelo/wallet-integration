@@ -2,6 +2,8 @@
 
 Updated September 25, 2026. A submission is not an indexed backlink, endorsement, qualified visitor or sale. No paid listings, fake reviews or reciprocal-link spam.
 
+September 29 verification: the [launch page](https://www.producthunt.com/products/swap-assistant?launch=swap-assistant) now visibly says Launched this week and presents the product, maker comment and canonical website link. The earlier Scheduled state below is retained as submission history. This is an actual live listing, not proof of search indexing or qualified referral traffic. No prospect comment or demo request was observed.
+
 | Channel | Actual action / status | Evidence and next action |
 |---|---|---|
 | Product Hunt | Free launch scheduled for September 26, 2026 at 00:01 Pacific / 07:01 UTC / 11:01 Dubai. Scheduler confirmed success and prelaunch dashboard shows Scheduled. Not yet live. | [Product](https://www.producthunt.com/products/swap-assistant), [launch](https://www.producthunt.com/products/swap-assistant?launch=swap-assistant). Check public visibility after launch; do not claim featuring or indexing. |

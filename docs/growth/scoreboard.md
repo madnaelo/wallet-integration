@@ -1,5 +1,20 @@
 # Growth Scoreboard
 
+## September 29 Resume
+
+Inbox and existing threads rechecked at approximately 09:01 UTC: **0 prospect replies, 0 demo requests and 0 bounce notices observed**. The five stored contact submissions are all identified internal QA tests and excluded. No qualified organic enquiry, pilot, customer or campaign revenue is established.
+
+- Google individually confirms `/white-label-crypto-swap`, `/crypto-swap-integration`, `/for-wallets` and `/for-web3-agencies` are now indexed over HTTPS. These four were unindexed on September 25; `/business` had already been confirmed indexed then.
+- Search Performance (Web, 3-month selection, available chart September 23-26) now reports **1 property-level impression, 0 clicks, 0% CTR**. Six page rows each show one impression: home, business and the four buyer pages. Do not sum URL rows into six property impressions. Query breakdown is unavailable. The displayed average position of 1 for this tiny observation is **not** evidence of ranking first for any target buyer keyword.
+- Aggregate Page Indexing is still processing. The sitemap report still shows the earlier Couldn't fetch/Unknown result. This is not a claim of sitemap Success; prior actual Google live fetch succeeded. New release verification must recheck public XML/robots accessibility.
+- Product Hunt listing is now live, with the actual software description, maker comment, website link and synthetic-demo boundary. [Launch](https://www.producthunt.com/products/swap-assistant?launch=swap-assistant). No buyer enquiry or referral sale is attributable to it yet.
+- Eight distinct companies contacted in total, including the five September 25 sends. The September 24 batch received exactly one in-thread follow-up today: Who Develop, Bytez3 and Pixelfield. No further unsolicited follow-up to these three. The September 25 batch remains eligible September 30-October 2 after a fresh reply/objection check.
+- Qualification remains 57 prospects: **A6 / B34 / C17**. No new batch was sent merely because work resumed. Paid spend remains zero.
+
+PR 51 merged as `19cd2764d0467d321cd5301991b705b39b4df072`; [CI](https://github.com/madnaelo/wallet-integration/actions/runs/36546199928) and [Security](https://github.com/madnaelo/wallet-integration/actions/runs/36546199839) passed. [Release 36546515295](https://github.com/madnaelo/wallet-integration/actions/runs/36546515295) passed the previous OS vulnerability issue but correctly blocked newly flagged Jackson databind 2.21.4 (CVE-2026-68497). The compatible Jackson BOM patch 2.21.6 is required before deployment, not a scan exception. Final rollout evidence belongs in the subsequent release and PR checks.
+
+Private follow-up receipts: `.dev/growth/followup-2026-09-29-1.json` through `-3.json`; tracker updated to stop without a reply. These remain private, not customer endorsements. The September 25 observations below remain historical, not current aggregate search metrics.
+
 ## September 25 Cycle
 
 Inbox checked at 04:55 UTC: **0 replies, 0 demo requests, 0 bounce notices observed** across the eight contacted companies. SENT is not proof of delivery. No positive reply, pilot, customer or campaign revenue is established.
