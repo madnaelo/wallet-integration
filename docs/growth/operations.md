@@ -33,7 +33,9 @@ Track researched, contacted, replied, positive, demo-requested, pilot-discussion
 
 ## Email
 
-Existing authenticated SMTP contact delivery remains the baseline. Free forwarding and authenticated outbound are separate capabilities. ImprovMX's free plan supports one domain/25 aliases/500 forwarded messages per day but no SMTP sends ([pricing](https://improvmx.com/pricing/), checked 2026-09-24). Account setup requires owner password/terms acceptance. Do not claim an alias works until a real test is delivered. Do not spoof the domain through Gmail or publish guessed DKIM records. No paid subscription or nameserver migration is authorized.
+Existing authenticated SMTP contact delivery remains the baseline. On September 25, Spaceship's included forwarding was configured for `hello@getswapradar.xyz` to the owner's existing Gmail inbox. One real message from the owner's authorized test SMTP account arrived through Spaceship, with SPF/DKIM/DMARC passing, but Gmail placed it in Spam. Forwarding is verified; reliable Inbox placement is not. Monitor Spam as well as Inbox before using this as the sole enquiry channel. There is no catch-all and no new paid service or nameserver migration.
+
+Free forwarding and authenticated outbound are separate capabilities. Continue individual outreach from the existing authenticated Gmail account. No domain SMTP sending identity was provisioned; do not spoof the domain through Gmail or publish guessed DKIM records. The abandoned ImprovMX signup is no longer needed. Website contact storage and its authenticated SMTP/outbox configuration are unchanged.
 
 ## Search Visibility
 

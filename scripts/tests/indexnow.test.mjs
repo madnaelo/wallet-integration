@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { changedPublicPaths, submission, notifyIndexNow } from "../lib/indexnow.mjs";
+import { changedPublicPaths, changedPathsSinceDeployment, submission, notifyIndexNow } from "../lib/indexnow.mjs";
 
 const key = "test-proof-only-1234";
 const commit = "a".repeat(40);
@@ -9,6 +9,20 @@ test("only real public content changes trigger notifications", () => {
   assert.deepEqual(changedPublicPaths(["src/app/business/page.tsx"]), ["/business"]);
   assert.equal(changedPublicPaths(["src/lib/growthContent.ts"]).length, 7);
 });
+test("includes content across failed releases and skips an unchanged deployed span", () => {
+  let args;
+  const git = (command, input) => { assert.equal(command, "git"); args = input; return "src/lib/growthContent.ts\nbackend/Dockerfile\n"; };
+  assert.equal(changedPathsSinceDeployment(commit, git).length, 7);
+  assert.deepEqual(args, ["diff", "--name-only", commit, "HEAD"]);
+  assert.deepEqual(changedPathsSinceDeployment(commit, () => ""), []);
+  changedPathsSinceDeployment(undefined, git);
+  assert.equal(args[2], "HEAD^");
+  for (const bad of ["--output=leak", "main", "a\n".repeat(20)]) {
+    assert.throws(() => changedPathsSinceDeployment(bad, () => assert.fail("must not call git")));
+  }
+  assert.throws(() => changedPathsSinceDeployment(commit, () => { throw new Error("missing commit"); }), /missing commit/);
+});
+
 test("rejects private, query-string, external, oversized and malformed submissions", () => {
   for (const path of ["/demo", "/admin", "/api/quote", "//evil.test", "/business?wallet=secret", "/business#private"]) {
     assert.throws(() => submission(key, [path]));
