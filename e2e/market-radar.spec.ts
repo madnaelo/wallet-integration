@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/growth/events", route => route.fulfill({ status: 204 }));
+});
+
 for (const viewport of [
   { width: 1440, height: 1000 },
   { width: 390, height: 844 },

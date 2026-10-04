@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/growth/events", route => route.fulfill({ status: 204 }));
+});
+
 test("public metadata and discovery use one canonical origin", async ({ page, request }) => {
   await page.goto("/");
   const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");

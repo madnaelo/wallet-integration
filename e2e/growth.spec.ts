@@ -85,12 +85,20 @@ test("guide collection is discoverable, crawlable and usable without JavaScript"
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       const links = page.getByRole("region", { name: "Choose your starting point" }).getByRole("link");
       expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute("href")))).toEqual(guidePages.map(guide => guide.path));
-      const schema = JSON.parse(await page.locator('script[type="application/ld+json"]').innerText());
+      const schemas = (await page.locator('script[type="application/ld+json"]').allTextContents()).map(text => JSON.parse(text));
+      const schema = schemas.find(item => item["@type"] === "CollectionPage");
+      expect(schema).toBeDefined();
       expect(schema.mainEntity.itemListElement.map((item: { url: string }) => new URL(item.url).pathname)).toEqual(guidePages.map(guide => guide.path));
+      const image = page.getByRole("img", { name: "Synthetic Swap Assistant demo with token selection and route comparison", exact: true });
+      await image.scrollIntoViewIfNeeded();
+      await expect.poll(() => image.evaluate(node => (node as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      await page.getByRole("heading", { level: 1 }).scrollIntoViewIfNeeded();
       await page.screenshot({ path: `test-results/guides-${width}.png`, fullPage: true });
     }
     await page.getByRole("link", { name: guidePages[0].h1, exact: true }).click();
-    const graph = JSON.parse(await page.locator('script[type="application/ld+json"]').innerText())["@graph"];
+    const schemas = (await page.locator('script[type="application/ld+json"]').allTextContents()).map(text => JSON.parse(text));
+    const graph = schemas.find(item => item["@graph"])?.["@graph"];
+    expect(graph).toBeDefined();
     expect(graph[0].itemListElement.map((item: { position: number }) => item.position)).toEqual([1, 2, 3]);
     await page.getByRole("navigation", { name: "Breadcrumb", exact: true }).getByRole("link", { name: "Guides", exact: true }).click();
     await expect(page).toHaveURL(/\/guides$/);
