@@ -25,6 +25,7 @@ const ethereumTokens = [
 ];
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/growth/events", route => route.fulfill({ status: 204 }));
   await page.addInitScript(() => {
     window.localStorage.setItem("wallet.swapAssistant.swapTour.v1", "done");
   });
