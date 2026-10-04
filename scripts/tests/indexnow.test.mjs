@@ -7,12 +7,13 @@ const commit = "a".repeat(40);
 test("only real public content changes trigger notifications", () => {
   assert.deepEqual(changedPublicPaths(["backend/pom.xml", "docs/growth/scoreboard.md", "src/app/demo/page.tsx", "src/app/admin/page.tsx"]), []);
   assert.deepEqual(changedPublicPaths(["src/app/business/page.tsx"]), ["/business"]);
-  assert.equal(changedPublicPaths(["src/lib/growthContent.ts"]).length, 7);
+  assert.equal(changedPublicPaths(["src/lib/growthContent.ts"]).length, 8);
+  assert.deepEqual(changedPublicPaths(["src/app/guides/page.tsx"]), ["/guides"]);
 });
 test("includes content across failed releases and skips an unchanged deployed span", () => {
   let args;
   const git = (command, input) => { assert.equal(command, "git"); args = input; return "src/lib/growthContent.ts\nbackend/Dockerfile\n"; };
-  assert.equal(changedPathsSinceDeployment(commit, git).length, 7);
+  assert.equal(changedPathsSinceDeployment(commit, git).length, 8);
   assert.deepEqual(args, ["diff", "--name-only", commit, "HEAD"]);
   assert.deepEqual(changedPathsSinceDeployment(commit, () => ""), []);
   changedPathsSinceDeployment(undefined, git);

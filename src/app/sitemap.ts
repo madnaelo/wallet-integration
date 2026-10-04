@@ -4,71 +4,61 @@ import { buyerPages, guidePages } from "@/lib/growthContent";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = getSiteUrl();
-  const lastModified = getCommitDate();
+  // A deployment timestamp is not a page modification date. Omit lastmod until
+  // significant content changes can be tracked accurately for each URL.
 
   return [
     ...[...buyerPages, ...guidePages].map(page => ({ url: new URL(page.path, baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}), changeFrequency: "monthly" as const, priority: 0.7 })),
+      changeFrequency: "monthly" as const, priority: 0.7 })),
+    {
+      url: new URL("/guides", baseUrl).toString(),
+      changeFrequency: "monthly",
+      priority: 0.7
+    },
     {
       url: new URL("/market-radar", baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}),
       changeFrequency: "weekly",
       priority: 0.7
     },
     {
       url: new URL("/business", baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}),
       changeFrequency: "monthly",
       priority: 0.8
     },
     {
       url: new URL("/", baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}),
       changeFrequency: "weekly",
       priority: 1
     },
     {
       url: new URL("/swap", baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}),
       changeFrequency: "daily",
       priority: 0.9
     },
     {
       url: new URL("/fees", baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}),
       changeFrequency: "monthly",
       priority: 0.6
     },
     {
       url: new URL("/limit-orders", baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}),
       changeFrequency: "weekly",
       priority: 0.6
     },
     {
       url: new URL("/terms", baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}),
       changeFrequency: "monthly",
       priority: 0.5
     },
     {
       url: new URL("/privacy", baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}),
       changeFrequency: "monthly",
       priority: 0.5
     },
     {
       url: new URL("/contact", baseUrl).toString(),
-      ...(lastModified ? { lastModified } : {}),
       changeFrequency: "monthly",
       priority: 0.4
     }
   ];
-}
-
-function getCommitDate(): Date | undefined {
-  const raw = process.env.NEXT_PUBLIC_COMMIT_TIMESTAMP?.trim();
-  if (!raw) return undefined;
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? undefined : date;
 }

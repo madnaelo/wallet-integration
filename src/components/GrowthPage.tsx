@@ -21,7 +21,8 @@ export function GrowthPage({ page, guide = false }: { page: PageContent; guide?:
   const schema = { "@context": "https://schema.org", "@graph": [
     { "@type": "BreadcrumbList", itemListElement: [
       { "@type": "ListItem", position: 1, name: "For teams", item: new URL("/business", base).href },
-      { "@type": "ListItem", position: 2, name: page.h1, item: new URL(page.path, base).href }
+      ...(guide ? [{ "@type": "ListItem", position: 2, name: "Guides", item: new URL("/guides", base).href }] : []),
+      { "@type": "ListItem", position: guide ? 3 : 2, name: page.h1, item: new URL(page.path, base).href }
     ] },
     { "@type": "FAQPage", mainEntity: page.faq.map(([question, answer]) => ({ "@type": "Question", name: question,
       acceptedAnswer: { "@type": "Answer", text: answer } })) }
@@ -30,7 +31,7 @@ export function GrowthPage({ page, guide = false }: { page: PageContent; guide?:
     <GrowthTracker /><CommercialNav />
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
     <header className={`${styles.band} ${styles.introduction}`}>
-      <nav aria-label="Breadcrumb"><a href="/business">For teams</a><span aria-hidden="true"> / </span><span>{guide ? "Guide" : "Solutions"}</span></nav>
+      <nav aria-label="Breadcrumb"><a href="/business">For teams</a><span aria-hidden="true"> / </span>{guide ? <a href="/guides">Guides</a> : <span>Solutions</span>}</nav>
       <p className={styles.eyebrow}>{page.audience}</p><h1>{page.h1}</h1><p className={styles.lead}>{page.intro}</p>
       {page.reviewedOn && <p className={styles.caption}>Reviewed <time dateTime={page.reviewedOn}>{page.reviewedOn}</time></p>}
       <div className={styles.actions}><a className={styles.primary} href={COMMERCIAL.demoPath}>See the demo</a><a className={styles.secondary} href={COMMERCIAL.demoRequest}>Request a branded demo</a></div>

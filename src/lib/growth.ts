@@ -1,4 +1,4 @@
-export const GROWTH_PATHS = ["/", "/business", "/white-label-crypto-swap", "/crypto-swap-integration",
+export const GROWTH_PATHS = ["/", "/business", "/guides", "/white-label-crypto-swap", "/crypto-swap-integration",
   "/for-wallets", "/for-web3-agencies", "/guides/build-vs-license-crypto-swaps",
   "/guides/add-swaps-to-a-wallet", "/guides/non-custodial-swap-architecture", "/market-radar", "/demo", "/contact"] as const;
 export type Attribution = { landingPage: string; referrer: string; utmSource: string; utmMedium: string;

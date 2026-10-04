@@ -71,6 +71,34 @@ test("privacy signals disable observations and contact attribution", async ({ pa
   expect(page.url()).not.toContain("utm_source");
 });
 
+test("guide collection is discoverable, crawlable and usable without JavaScript", async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
+  const page = await context.newPage();
+  try {
+    for (const width of [320, 390, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/business");
+      await page.getByRole("navigation", { name: "Business navigation" }).getByRole("link", { name: "Guides", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Crypto Swap Integration Guides");
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/guides$/);
+      await expect(page.getByRole("navigation", { name: "Business navigation" }).getByRole("link", { name: "Guides", exact: true })).toHaveAttribute("aria-current", "page");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      const links = page.getByRole("region", { name: "Choose your starting point" }).getByRole("link");
+      expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute("href")))).toEqual(guidePages.map(guide => guide.path));
+      const schema = JSON.parse(await page.locator('script[type="application/ld+json"]').innerText());
+      expect(schema.mainEntity.itemListElement.map((item: { url: string }) => new URL(item.url).pathname)).toEqual(guidePages.map(guide => guide.path));
+      await page.screenshot({ path: `test-results/guides-${width}.png`, fullPage: true });
+    }
+    await page.getByRole("link", { name: guidePages[0].h1, exact: true }).click();
+    const graph = JSON.parse(await page.locator('script[type="application/ld+json"]').innerText())["@graph"];
+    expect(graph[0].itemListElement.map((item: { position: number }) => item.position)).toEqual([1, 2, 3]);
+    await page.getByRole("navigation", { name: "Breadcrumb", exact: true }).getByRole("link", { name: "Guides", exact: true }).click();
+    await expect(page).toHaveURL(/\/guides$/);
+  } finally {
+    await context.close();
+  }
+});
+
 test("delivery comparison stays contained and accessible on narrow screens", async ({ page }) => {
   for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: 900 });

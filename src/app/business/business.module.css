@@ -49,6 +49,10 @@
 .evidenceImage figcaption { margin-top: 12px; color: #43585f; font-size: 13px; line-height: 1.5; }
 .reading { max-width: 900px; margin: auto; }
 .reading .band { padding-block: 28px; }
+.guideList { padding-top: 0; }
+.guideList ol { list-style: none; padding: 0; margin: 0; }
+.guideList li { border-top: 1px solid #b9cdcd; padding: 24px 0; }
+.guideList p { max-width: 790px; margin-bottom: 0; }
 .checklist { padding-left: 24px; line-height: 1.8; }
 .checklist li { padding: 5px 0; }
 .faq { border-top: 1px solid #b9cdcd; padding: 18px 0; }
@@ -72,4 +76,5 @@
   .footer { padding: 24px 20px; }
 }
 @media(max-width:430px) { .capabilities { grid-template-columns: 1fr; }.actions > a { width: 100%; }.wordmark span { font-size: 12px; } }
+@media(max-width:360px) { .nav nav { gap: 10px; font-size: 12px; } }
 @media(prefers-reduced-motion:reduce) { .page * { scroll-behavior: auto; } }

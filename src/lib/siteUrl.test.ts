@@ -26,11 +26,19 @@ describe("canonical production domain", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://getswapradar.xyz");
     const urls = sitemap().map((entry) => new URL(entry.url));
     expect(urls.every((url) => url.origin === "https://getswapradar.xyz")).toBe(true);
-    expect(urls.map((url) => url.pathname)).toEqual(expect.arrayContaining(["/", "/business", "/market-radar"]));
+    expect(urls.map((url) => url.pathname)).toEqual(expect.arrayContaining(["/", "/business", "/guides", "/market-radar"]));
     expect(urls.some((url) => /^\/(admin|api|backend|demo)(\/|$)/.test(url.pathname))).toBe(false);
     expect(robots()).toEqual({
       rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/backend/", "/admin/", "/offline"] },
       sitemap: "https://getswapradar.xyz/sitemap.xml",
     });
+  });
+
+  it("does not claim that every page changed when an unrelated commit is deployed", () => {
+    vi.stubEnv("NEXT_PUBLIC_COMMIT_TIMESTAMP", "2026-10-01T12:00:00Z");
+    const before = sitemap();
+    vi.stubEnv("NEXT_PUBLIC_COMMIT_TIMESTAMP", "2026-10-04T12:00:00Z");
+    expect(sitemap()).toEqual(before);
+    expect(before.every(entry => entry.lastModified === undefined)).toBe(true);
   });
 });

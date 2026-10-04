@@ -21,6 +21,11 @@ class GrowthTest {
   @Test void absentAttributionIsValid() {
     assertThat(GrowthAttribution.sanitize(null).enquiryType()).isEqualTo("general");
   }
+  @Test void preservesGuideCollectionButNotArbitraryGuideUrls() {
+    var a = GrowthAttribution.sanitize(new GrowthAttribution("/guides", "google", "", "", "", "general"));
+    assertThat(a.landingPage()).isEqualTo("/guides");
+    assertThat(GrowthAttribution.sanitize(new GrowthAttribution("/guides?wallet=private", "google", "", "", "", "general")).landingPage()).isEmpty();
+  }
   @Test void rejectsInventedConversionsAndDemoEventsBeforePersistence() {
     var jdbc = mock(JdbcTemplate.class); var controller = new GrowthController(jdbc, mock(AdminAuthService.class));
     for (String event : new String[]{"enquiry_submitted", "paid", "wallet_login"}) {
