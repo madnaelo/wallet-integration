@@ -18,7 +18,11 @@ export default function DemoExperience({ contactHref = COMMERCIAL.demoRequest }:
   const [reviewed, setReviewed] = useState(false);
   const [routeIndex, setRouteIndex] = useState(0);
   const [view, setView] = useState<"Swap" | "Activity" | "Alerts" | "Market Radar">("Swap");
-  useEffect(()=>{if(window.location.hash==="#market-radar")setView("Market Radar");},[]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (window.location.hash === "#market-radar") setView("Market Radar");
+    setReady(true);
+  }, []);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [target, setTarget] = useState("2600");
   const [savedTarget, setSavedTarget] = useState("");
@@ -34,6 +38,7 @@ export default function DemoExperience({ contactHref = COMMERCIAL.demoRequest }:
   }
   return <div className={styles.shell}>
     <div className={styles.banner}><strong>Interactive demonstration</strong><span>Sample prices and wallet only. No real transactions, orders or fees.</span></div>
+    <fieldset className={styles.controls} disabled={!ready} aria-busy={!ready} aria-label="Interactive sample">
     <header className={styles.header}><div><p className={styles.eyebrow}>Your brand, your swap experience</p><h1>Swap Assistant</h1><p>A preview for your product team.</p></div>
       <button type="button" className={styles.wallet} onClick={() => { setConnected(!connected); resetReview(); }}>
         {connected ? "Sample wallet connected · Disconnect" : "Use sample wallet"}
@@ -83,6 +88,7 @@ export default function DemoExperience({ contactHref = COMMERCIAL.demoRequest }:
       </form><p role="status">{savedTarget ? `Sample alert saved at ${savedTarget} USDC. Nothing is scheduled or sent.` : ""}</p>
       <p>Configured deployments support price, reverse-profit and loss alerts. Telegram, email and push require account setup and supported devices.</p>
     </section>}
+    </fieldset>
     <aside className={styles.next}><div><h2>See this under your brand.</h2><p>Existing capabilities, your provider accounts, one isolated deployment.</p></div><a href={contactHref}>Request a branded demo <span aria-hidden="true">&rarr;</span></a></aside>
   </div>;
 }

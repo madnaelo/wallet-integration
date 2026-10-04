@@ -4,6 +4,27 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/growth/events", route => route.fulfill({ status: 204 }));
 });
 
+test("demo controls wait for hydration before accepting interaction", async ({ page }) => {
+  let releaseScripts!: () => void;
+  const gate = new Promise<void>(resolve => { releaseScripts = resolve; });
+  await page.route("**/_next/static/**/*.js", async route => { await gate; await route.continue(); });
+  try {
+    const response = await page.goto("/demo", { waitUntil: "commit" });
+    expect(response?.headers()["content-security-policy"]).toContain("connect-src 'none'");
+    await expect(page.getByRole("button", { name: "Use sample wallet", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "You sell: ETH", exact: true })).toBeDisabled();
+    await expect(page.getByRole("tab", { name: "Market Radar", exact: true })).toBeDisabled();
+    await expect(page.getByRole("textbox", { name: "Amount", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Review sample quote", exact: true })).toBeDisabled();
+  } finally {
+    releaseScripts();
+  }
+  await expect(page.getByRole("button", { name: "Use sample wallet", exact: true })).toBeEnabled();
+  await page.getByRole("tab", { name: "Market Radar", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Market Radar", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Next Supply Zone", exact: true })).toBeVisible();
+});
+
 test("contact cannot submit private form fields before hydration", async ({ page }) => {
   let releaseScripts!: () => void;
   const gate = new Promise<void>(resolve => { releaseScripts = resolve; });
