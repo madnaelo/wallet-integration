@@ -25,6 +25,7 @@ const ethereumTokens = [
 ];
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/growth/events", route => route.fulfill({ status: 204 }));
   await page.addInitScript(() => {
     window.localStorage.setItem("wallet.swapAssistant.swapTour.v1", "done");
   });
@@ -141,7 +142,7 @@ test("limit orders disclose safeguards before accepting an order", async ({ page
   await expect(page.getByText("No custody of funds")).toBeVisible();
   await expect(page.getByRole("region", { name: "Limit order form" })).toBeVisible();
   await expect(page.getByText("Showing popular tokens while the full list is unavailable.")).toHaveCount(0);
-  expect(requestedTokenChains).toEqual(["1"]);
+  await expect.poll(() => requestedTokenChains).toEqual(["1"]);
 });
 
 test("mobile token picker remains inside the viewport", async ({ page }) => {
