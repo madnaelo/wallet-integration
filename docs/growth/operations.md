@@ -2,9 +2,13 @@
 
 Goal: one real, relevant prospect requests a demo, then a scoped pilot conversation. Page counts and synthetic tests are not success.
 
+## Current Direction: Organic Only
+
+The owner stopped outbound acquisition on October 4, 2026. Do not send new prospecting emails or follow-ups, including previously due follow-ups. Do not substitute contact-form pitches or direct messages. This instruction supersedes the historical prospect workflow and sending guidance below until explicitly reauthorized. Continue SEO, useful content and honest measurement. Existing opt-in product notifications and contact delivery remain unchanged.
+
 ## Scope And Measurement
 
-- Four distinct buyer pages and three practical guides. No new trading feature, provider, network or Radar algorithm.
+- Four distinct buyer pages and three practical guides, collected at `/guides`. No new trading feature, provider, network or Radar algorithm.
 - First-party anonymous events: landing, demo CTA and contact opened. Unique event IDs make a repeated request idempotent; they are not persistent visitor IDs.
 - The demo deliberately has no analytics request, cookies or storage. Actual demo views are **not measured**. A CTA click is not a completed demo view.
 - Only accepted server contact submissions count as stored enquiries. Browser events cannot create a submitted/paid conversion. Stored enquiries still require manual qualification and exclusion of tests/spam.
@@ -35,7 +39,7 @@ Track researched, contacted, replied, positive, demo-requested, pilot-discussion
 
 Existing authenticated SMTP contact delivery remains the baseline. On September 25, Spaceship's included forwarding was configured for `hello@getswapradar.xyz` to the owner's existing Gmail inbox. One real message from the owner's authorized test SMTP account arrived through Spaceship, with SPF/DKIM/DMARC passing, but Gmail placed it in Spam. Forwarding is verified; reliable Inbox placement is not. Monitor Spam as well as Inbox before using this as the sole enquiry channel. There is no catch-all and no new paid service or nameserver migration.
 
-Free forwarding and authenticated outbound are separate capabilities. Continue individual outreach from the existing authenticated Gmail account. No domain SMTP sending identity was provisioned; do not spoof the domain through Gmail or publish guessed DKIM records. The abandoned ImprovMX signup is no longer needed. Website contact storage and its authenticated SMTP/outbox configuration are unchanged.
+Free forwarding and authenticated outbound are separate capabilities. Past individual outreach used the existing authenticated Gmail account; further outreach is stopped. No domain SMTP sending identity was provisioned; do not spoof the domain through Gmail or publish guessed DKIM records. The abandoned ImprovMX signup is no longer needed. Website contact storage and its authenticated SMTP/outbox configuration are unchanged.
 
 ## Search Visibility
 

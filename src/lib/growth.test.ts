@@ -23,6 +23,12 @@ describe("growth attribution", () => {
   it("does not attribute same-origin transitions as external referrals", () => {
     expect(attributionFromUrl(new URL("https://site.test/business"), "https://site.test/demo").referrer).toBe("direct");
   });
+  it("retains the guide collection as an organic landing page", () => {
+    const attribution = attributionFromUrl(new URL("https://site.test/guides"), "https://www.google.com/search?q=swaps");
+    expect(attribution.landingPage).toBe("/guides");
+    expect(attribution.referrer).toBe("google");
+    expect(attributedLink("/demo", attribution)).toContain("landing=%2Fguides");
+  });
   it("publishes distinct pages with valid links and no made-up proof", () => {
     const pages = [...buyerPages, ...guidePages];
     for (const field of ["path", "title", "description", "h1"] as const) expect(new Set(pages.map(p => p[field])).size).toBe(pages.length);

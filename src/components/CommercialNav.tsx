@@ -3,7 +3,7 @@ import { BRAND } from "@/lib/brand";
 import { COMMERCIAL } from "@/lib/commercial";
 import styles from "@/app/business/business.module.css";
 
-export function CommercialNav({ active, contactHref = COMMERCIAL.demoRequest }: { active?: "business" | "demo"; contactHref?: string }) {
+export function CommercialNav({ active, contactHref = COMMERCIAL.demoRequest }: { active?: "business" | "demo" | "guides"; contactHref?: string }) {
   return <header className={styles.nav}>
     <a className={styles.wordmark} href={COMMERCIAL.businessPath}>
       <Image src={BRAND.icon} alt="" width={30} height={30} />{BRAND.name}<span>for teams</span>
@@ -11,6 +11,7 @@ export function CommercialNav({ active, contactHref = COMMERCIAL.demoRequest }: 
     <nav aria-label="Business navigation">
       <a href={COMMERCIAL.businessPath} aria-current={active === "business" ? "page" : undefined}>For teams</a>
       <a href={COMMERCIAL.demoPath} aria-current={active === "demo" ? "page" : undefined}>Interactive demo</a>
+      <a href="/guides" aria-current={active === "guides" ? "page" : undefined}>Guides</a>
       <a href={contactHref}>Get in touch</a>
     </nav>
   </header>;

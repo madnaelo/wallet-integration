@@ -6,7 +6,7 @@ import java.util.Set;
 public record GrowthAttribution(@Size(max=100) String landingPage, @Size(max=32) String referrer,
     @Size(max=48) String utmSource, @Size(max=48) String utmMedium, @Size(max=48) String utmCampaign,
     @Size(max=32) String enquiryType) {
-  public static final Set<String> PAGES = Set.of("/", "/business", "/white-label-crypto-swap", "/crypto-swap-integration",
+  public static final Set<String> PAGES = Set.of("/", "/business", "/guides", "/white-label-crypto-swap", "/crypto-swap-integration",
       "/for-wallets", "/for-web3-agencies", "/guides/build-vs-license-crypto-swaps", "/guides/add-swaps-to-a-wallet",
       "/guides/non-custodial-swap-architecture", "/market-radar", "/demo", "/contact");
   private static final Set<String> SOURCES = Set.of("google", "bing", "github", "linkedin", "producthunt", "other", "direct");

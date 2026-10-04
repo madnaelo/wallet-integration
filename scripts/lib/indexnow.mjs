@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 
 export const INDEXNOW_ORIGIN = "https://getswapradar.xyz";
-export const INDEXNOW_PATHS = ["/", "/business", "/white-label-crypto-swap", "/crypto-swap-integration",
+export const INDEXNOW_PATHS = ["/", "/business", "/guides", "/white-label-crypto-swap", "/crypto-swap-integration",
   "/for-wallets", "/for-web3-agencies", "/guides/build-vs-license-crypto-swaps",
   "/guides/add-swaps-to-a-wallet", "/guides/non-custodial-swap-architecture", "/market-radar"];
 

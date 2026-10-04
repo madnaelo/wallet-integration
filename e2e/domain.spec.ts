@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/growth/events", route => route.fulfill({ status: 204 }));
+});
+
 test("public metadata and discovery use one canonical origin", async ({ page, request }) => {
   await page.goto("/");
   const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");
@@ -15,7 +19,7 @@ test("public metadata and discovery use one canonical origin", async ({ page, re
   const socialImage = await page.locator('meta[name="twitter:image"]').getAttribute("content");
   expect(new URL(socialImage!).origin).toBe(origin);
 
-  for (const path of ["/business", "/market-radar"]) {
+  for (const path of ["/business", "/guides", "/market-radar"]) {
     const response = await page.goto(path);
     expect(response?.status()).toBe(200);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", origin + path);
@@ -27,6 +31,8 @@ test("public metadata and discovery use one canonical origin", async ({ page, re
   expect(sitemap.status()).toBe(200);
   const urls = [...(await sitemap.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => new URL(match[1]));
   expect(urls.length).toBeGreaterThan(2);
+  expect(urls.map(url => url.pathname)).toContain("/guides");
+  expect(await sitemap.text()).not.toContain("<lastmod>");
   expect(urls.every((url) => url.origin === origin)).toBe(true);
   expect(urls.some((url) => /^\/(admin|api|backend|demo)(\/|$)/.test(url.pathname))).toBe(false);
   const robots = await request.get("/robots.txt");

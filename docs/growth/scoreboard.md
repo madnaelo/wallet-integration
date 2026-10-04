@@ -1,5 +1,18 @@
 # Growth Scoreboard
 
+## October 4: Organic Search Only
+
+The owner stopped outbound acquisition. No new prospecting emails, follow-ups, contact-form pitches or substitute direct messages are authorized. This supersedes every historical follow-up date below. Product notifications and contact-enquiry delivery are unchanged.
+
+- Authenticated Google URL Inspection now confirms all three existing guides and public `/market-radar` are indexed over HTTPS. Each guide has one valid breadcrumb item. These four URLs were unindexed at the September 29 inspection.
+- Google Performance, Web with the 3-month selection, reports **1 property-level impression, 0 clicks, 0% CTR**, with the available chart spanning September 23-29. Query details remain unavailable. This is not evidence of first-place ranking or buyer demand.
+- The sitemap report still says **Couldn't fetch / Unknown / 0 discovered**, last read September 29. An October 4 Google live URL test says **URL is available to Google**; a direct HTTPS request also returns valid XML with status 200. A successful live fetch is not proof the sitemap-processing report has recovered. No deletion or repeated resubmission was performed.
+- Aggregate Page Indexing remains processing; HTTPS reports eight HTTPS URLs and no non-HTTPS URLs. Do not treat this as a complete indexed-page count.
+- Bing reports sitemap **Success**, last crawled October 1, 16 discovered URLs, zero errors/warnings. Its available performance chart reports zero clicks and zero impressions (July 4-October 3 selection, available table rows October 1-2). Discovery is not proof all URLs are indexed.
+- No fresh claim about keyword rankings, replies, enquiries or sales is made this cycle; earlier observations below retain their original dates. No outreach, paid promotion, artificial engagement or trades were performed.
+
+The scoped release adds `/guides`, links it from the existing business navigation and guide breadcrumbs, and removes deployment-derived `lastmod` values from the sitemap. Dates must describe significant page changes, not unrelated releases: [Google's official guidance](https://developers.google.com/search/blog/2023/06/sitemaps-lastmod-ping). No existing article's review date was artificially advanced. See [October verification](verification-2026-10-04.md) for test and release evidence.
+
 ## September 29 Resume
 
 Inbox and existing threads rechecked at approximately 09:01 UTC: **0 prospect replies, 0 demo requests and 0 bounce notices observed**. The five stored contact submissions are all identified internal QA tests and excluded. No qualified organic enquiry, pilot, customer or campaign revenue is established.
