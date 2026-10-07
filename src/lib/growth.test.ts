@@ -36,6 +36,12 @@ describe("growth attribution", () => {
       expect(GROWTH_PATHS).toContain(page.path);
       expect(page.sections.length).toBeGreaterThanOrEqual(4);
       for (const [path] of page.related) expect(GROWTH_PATHS).toContain(path);
+      for (const section of page.sections) for (const [href] of section.links ?? []) {
+        const url = new URL(href, "https://site.test");
+        expect(url.origin).toBe("https://site.test");
+        expect(GROWTH_PATHS).toContain(url.pathname);
+        if (url.hash) expect(pages.find(p => p.path === url.pathname)?.sections.some(s => s.id === url.hash.slice(1))).toBe(true);
+      }
       expect(JSON.stringify(page)).not.toMatch(/saves \d+ months|\d+% success rate/i);
     }
   });
@@ -46,8 +52,13 @@ describe("growth attribution", () => {
     const walletGuide = guidePages.find(p => p.path === "/guides/add-swaps-to-a-wallet")!;
     expect(JSON.stringify(walletGuide)).toContain("Allowance completed, swap rejected");
     for (const page of [comparison, walletGuide]) {
-      expect(page.reviewedOn).toBe("2026-09-25");
       for (const [url] of page.sources!) expect(new URL(url).protocol).toBe("https:");
     }
+    expect(comparison.reviewedOn).toBe("2026-09-25");
+    expect(walletGuide.reviewedOn).toBe("2026-10-05");
+    expect(walletGuide.sections.filter(s => s.id === "acceptance-checklist")).toHaveLength(1);
+    const example = walletGuide.sections.find(s => s.id === "worked-example")!;
+    expect(example.paragraphs.join(" ")).toContain("Illustrative scope");
+    expect(example.paragraphs.join(" ")).toContain("does not expose a customer returnUrl callback");
   });
 });

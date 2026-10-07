@@ -26,11 +26,8 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
           {enquiry.topic === "partnership" ? "Back to teams" : "Back to swap"}
         </Link>
         <p className="contactEyebrow">Contact {BRAND.name}</p>
-        <h1>How can we help?</h1>
-        <p>
-          Send a support, privacy, partnership, or legal question. You do not
-          need to connect or sign in with a wallet.
-        </p>
+        <h1>{enquiry.heading}</h1>
+        <p>{enquiry.introduction}</p>
       </header>
 
       <div className="contactLayout">
@@ -39,13 +36,18 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
           <h2 id="contact-safety-title">Before you send</h2>
           <ul>
             <li>Never include a seed phrase, private key, password, or one-time code.</li>
-            <li>For a swap problem, include the network and public transaction hash when available.</li>
+            <li>{enquiry.topic === "partnership"
+              ? "Share only a non-confidential outline. The prompts in the message are optional; unknown details can wait for the fit review."
+              : "For a swap problem, include the network and public transaction hash when available."}</li>
             <li>Contact messages are normally retained for up to 365 days.</li>
           </ul>
           <p>
             Details are used to review and respond to your message. Read the{" "}
             <Link href="/privacy">Privacy Notice</Link> for more information.
           </p>
+          {enquiry.topic === "partnership" && <p>
+            Need support or have a privacy or legal question instead? <a href="/contact">Use general contact</a>.
+          </p>}
         </aside>
       </div>
     </main>
