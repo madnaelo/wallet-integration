@@ -1,5 +1,9 @@
 # Growth Scoreboard
 
+## October 5: Wallet Journey Review Baseline
+
+Read-only evidence and reporting windows are recorded in the [bounded wallet-journey review](wallet-journey-review-2026-10-05.md). Google now reports 69 impressions and zero clicks in its available September 23-October 3 window, mostly Radar queries. Both edited wallet pages have one impression and zero clicks each. Bing reports zero clicks/impressions in its available window. All five returned stored enquiries are explicitly labelled QA and excluded; no qualified enquiry is established. Sitemap processing remains unresolved despite a successful current Google live fetch. No outreach, new submission, deployment or background monitoring was performed for this baseline.
+
 ## October 4: Organic Search Only
 
 The owner stopped outbound acquisition. No new prospecting emails, follow-ups, contact-form pitches or substitute direct messages are authorized. This supersedes every historical follow-up date below. Product notifications and contact-enquiry delivery are unchanged.

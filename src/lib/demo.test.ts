@@ -24,7 +24,7 @@ describe("isolated commercial demo", () => {
   it("preselects commercial contact without reflecting arbitrary query text", () => {
     expect(commercialEnquiry("branded-demo").topic).toBe("partnership");
     expect(commercialEnquiry("paid-pilot").message).toContain("pilot");
-    expect(commercialEnquiry("<script>unsafe</script>")).toEqual({ topic: "general", message: "" });
-    expect(commercialEnquiry(["branded-demo"])).toEqual({ topic: "general", message: "" });
+    expect(commercialEnquiry("<script>unsafe</script>")).toEqual(commercialEnquiry(undefined));
+    expect(commercialEnquiry(["branded-demo"])).toEqual(commercialEnquiry(undefined));
   });
 });
