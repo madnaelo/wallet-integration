@@ -241,6 +241,19 @@ jobs:
       - name: Test and analyze
         run: mvn -B -ntp clean verify
 
+      - name: Build backend runtime image
+        run: docker build --pull -t swap-assistant-backend-ci .
+
+      - name: Scan backend runtime image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: swap-assistant-backend-ci
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          timeout: 10m
+
       - name: Verify Flyway migrations and application startup
         shell: bash
         run: |
