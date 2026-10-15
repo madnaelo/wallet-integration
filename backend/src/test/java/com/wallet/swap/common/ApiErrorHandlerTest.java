@@ -19,7 +19,7 @@ class ApiErrorHandlerTest {
   @Test
   void mapsUnknownApiPathsToNotFound() {
     ResponseEntity<Map<String, String>> response = handler.handleNotFound(
-        new NoResourceFoundException(HttpMethod.GET, "/api/unknown"));
+        new NoResourceFoundException(HttpMethod.GET, "/api/unknown", "/api/unknown"));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     assertThat(response.getBody()).containsEntry("error", "Endpoint not found.");

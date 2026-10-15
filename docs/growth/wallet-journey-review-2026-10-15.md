@@ -15,6 +15,12 @@ provider, migration, Radar permission, account agreement or commercial term is
 changed. Merge/deployment requires the owner's separate confirmation; the review
 request does not silently override the earlier review-only instruction.
 
+**Subsequent release update:** the owner explicitly authorized merge/deployment
+after checks. PR #58 and its master merge passed CI/Security. The release then
+stopped safely on new backend container findings, before deployment. See the
+[release repair evidence](../backend-security-release-2026-10-15.md). The review
+observations below remain dated baseline evidence, not a deployment receipt.
+
 ## Findings Fixed
 
 1. **Production dependency gate:** October 15's existing audit rejected Next.js

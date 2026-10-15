@@ -11,7 +11,8 @@ The workflows are in `.github/workflows`.
 
 - `CI`: tests, audits, typechecks, lints, and builds the frontend; runs
   Playwright acceptance tests against the standalone production artifact on
-  desktop and mobile viewports; tests the backend; applies every Flyway
+  desktop and mobile viewports; tests the backend and scans its built runtime
+  container for fixable HIGH/CRITICAL vulnerabilities before merge; applies every Flyway
   migration to PostgreSQL 16; starts the packaged backend and checks its
   database-backed health endpoint; and validates all Compose files.
 - `Security`: runs dependency review, CodeQL when GitHub Advanced Security is
@@ -45,8 +46,9 @@ do not override `stream-json` across major versions or suppress its advisory.
   protection or depending on the beta `vercel curl` wrapper.
   `workflow_dispatch` can release or roll back to a full commit SHA that
   belongs to `master` and has passing CI/Security runs.
-- `Monitor Production`: checks the frontend, backend health, and optional
-  admin operations summary every 15 minutes. It also ensures frontend and
+- `Monitor Production`: is scheduled to check frontend, backend health, and
+  optional admin operations every 15 minutes. GitHub scheduled jobs can be delayed
+  or dropped; this is not a guaranteed 15-minute monitoring SLO. It also ensures frontend and
   backend serve the same commit and can send a Telegram alert on failure.
 - `Verify Production Backups`: checks backup freshness and integrity daily and
   restores the latest backup into an isolated temporary database every Sunday.
