@@ -1,3 +1,5 @@
+import { commercialEnquiryType } from "./commercial";
+
 export const GROWTH_PATHS = ["/", "/business", "/guides", "/white-label-crypto-swap", "/crypto-swap-integration",
   "/for-wallets", "/for-web3-agencies", "/guides/build-vs-license-crypto-swaps",
   "/guides/add-swaps-to-a-wallet", "/guides/non-custodial-swap-architecture", "/market-radar", "/demo", "/contact"] as const;
@@ -22,11 +24,11 @@ export function attributionFromUrl(url: URL, referrer = ""): Attribution {
       }
     } catch { /* Missing or malformed referrers carry no attribution. */ }
   }
-  const enquiry = url.searchParams.get("enquiry");
+  const enquiries = url.searchParams.getAll("enquiry");
   return { landingPage: growthPath(url.searchParams.get("landing") ?? url.pathname), referrer: source,
     utmSource: campaignTag(url.searchParams.get("utm_source")), utmMedium: campaignTag(url.searchParams.get("utm_medium")),
     utmCampaign: campaignTag(url.searchParams.get("utm_campaign")),
-    enquiryType: enquiry === "branded-demo" || enquiry === "paid-pilot" ? enquiry : "general" };
+    enquiryType: commercialEnquiryType(enquiries.length === 1 ? enquiries[0] : undefined) };
 }
 export function attributedLink(href: string, attribution: Attribution): string {
   const url = new URL(href, "https://example.invalid");

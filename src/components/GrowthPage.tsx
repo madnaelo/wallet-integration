@@ -49,9 +49,10 @@ export function GrowthPage({ page, guide = false }: { page: PageContent; guide?:
           </table>
         </div>
       </section>}
-      {page.sections.map((section, i) => <section className={styles.band} key={section.title} aria-labelledby={`section-${i}`}>
+      {page.sections.map((section, i) => <section id={section.id} className={styles.band} key={section.title} aria-labelledby={`section-${i}`}>
         <h2 id={`section-${i}`}>{section.title}</h2>{section.paragraphs.map(p => <p key={p}>{p}</p>)}
         {section.items && <ul className={styles.checklist}>{section.items.map(item => <li key={item}>{item}</li>)}</ul>}
+        {section.links && <ul className={styles.checklist}>{section.links.map(([href, label]) => <li key={href}><a href={href}>{label}</a></li>)}</ul>}
       </section>)}
       <section className={styles.band} aria-labelledby="faq-title"><h2 id="faq-title">Questions before a pilot</h2>
         {page.faq.map(([question, answer]) => <details className={styles.faq} key={question}><summary>{question}</summary><p>{answer}</p></details>)}

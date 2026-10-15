@@ -1,5 +1,13 @@
 # Growth Scoreboard
 
+## October 15: Wallet Journey Self-Review
+
+Fresh read-only [review evidence](wallet-journey-review-2026-10-15.md): Google reports 212 property impressions and zero clicks in available September 23-October 13 data, mostly Radar intent; wallet guide 9 impressions and wallet landing 5, both zero clicks. Indexing reports 14 indexed and three expected HTTP/www redirect exclusions. Bing reports zero impressions/clicks in its available window, but sitemap Success now includes all 17 URLs (last crawl October 9). All five returned contact records remain explicitly internal tests and are excluded. Google's sitemap failure report persists despite current XML/robots and CDN 200 evidence; no new submission or security change. These are not results of the unreleased PR, qualified demand, or a controlled comparison. No outreach, deployment or scheduled monitoring.
+
+## October 5: Wallet Journey Review Baseline
+
+Read-only evidence and reporting windows are recorded in the [bounded wallet-journey review](wallet-journey-review-2026-10-05.md). Google now reports 69 impressions and zero clicks in its available September 23-October 3 window, mostly Radar queries. Both edited wallet pages have one impression and zero clicks each. Bing reports zero clicks/impressions in its available window. All five returned stored enquiries are explicitly labelled QA and excluded; no qualified enquiry is established. Sitemap processing remains unresolved despite a successful current Google live fetch. No outreach, new submission, deployment or background monitoring was performed for this baseline.
+
 ## October 4: Organic Search Only
 
 The owner stopped outbound acquisition. No new prospecting emails, follow-ups, contact-form pitches or substitute direct messages are authorized. This supersedes every historical follow-up date below. Product notifications and contact-enquiry delivery are unchanged.
