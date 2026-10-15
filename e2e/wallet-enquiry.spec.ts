@@ -82,10 +82,58 @@ test("branded demo contact retains validation, retry guidance and general contac
 });
 
 test("ambiguous enquiry values use generic contact and never reflect query text", async ({ page }) => {
-  for (const query of ["enquiry=branded-demo&enquiry=paid-pilot", "enquiry=%3Cscript%3Eunsafe%3C%2Fscript%3E"]) {
+  const events: Array<{ attribution: { enquiryType: string } }> = [];
+  await page.route("**/api/growth/events", route => {
+    events.push(route.request().postDataJSON());
+    return route.fulfill({ status: 204 });
+  });
+  for (const query of ["enquiry=branded-demo&enquiry=paid-pilot", "enquiry=paid-pilot&enquiry=paid-pilot", "enquiry=%3Cscript%3Eunsafe%3C%2Fscript%3E"]) {
+    const previousEvents = events.length;
     await page.goto(`/contact?${query}`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("How can we help?");
     await expect(page.getByLabel("Message *")).toBeEmpty();
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/contact$/);
+    await expect.poll(() => events.length).toBe(previousEvents + 1);
+    expect(events.at(-1)?.attribution.enquiryType).toBe("general");
   }
+});
+
+test("contact protects an in-flight draft and preserves it for retry after failure", async ({ page }) => {
+  let finishFirstRequest!: () => void;
+  const firstResponse = new Promise<void>(resolve => { finishFirstRequest = resolve; });
+  const submissions: Record<string, unknown>[] = [];
+  await page.route("**/api/contact", async route => {
+    submissions.push(route.request().postDataJSON());
+    if (submissions.length === 1) {
+      await firstResponse;
+      await route.fulfill({ status: 503, json: { message: "Temporarily unavailable" } });
+    } else {
+      await route.fulfill({ status: 200, json: { accepted: true } });
+    }
+  });
+  await page.goto("/contact?enquiry=paid-pilot");
+  await page.getByLabel("Email address *").fill("qa@example.test");
+  const draft = "QA only: please review the scope of our illustrative wallet integration.";
+  await page.getByLabel("Message *").fill(draft);
+  await page.getByRole("checkbox").check();
+  try {
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await expect.poll(() => submissions.length).toBe(1);
+    await expect(page.locator("fieldset")).toHaveAttribute("aria-busy", "true");
+    await expect(page.getByLabel("Email address *")).toBeDisabled();
+    await expect(page.getByLabel("Topic *")).toBeDisabled();
+    await expect(page.getByLabel("Message *")).toBeDisabled();
+    await expect(page.getByRole("checkbox")).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Sending", exact: true })).toBeDisabled();
+  } finally {
+    finishFirstRequest();
+  }
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("could not be sent");
+  await expect(page.getByLabel("Message *")).toHaveValue(draft);
+  await expect(page.getByLabel("Message *")).toBeEnabled();
+  await expect(page.getByRole("checkbox")).toBeChecked();
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Your message has been received");
+  expect(submissions).toHaveLength(2);
+  expect(submissions[1]).toEqual(submissions[0]);
 });

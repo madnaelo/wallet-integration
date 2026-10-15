@@ -59,7 +59,7 @@ export function ContactForm({ initialTopic = "general", initialMessage = "" }: {
       </p>
 
       <form className="contactForm" method="post" onSubmit={handleSubmit}>
-        <fieldset className="contactFormFields" disabled={!ready} aria-busy={!ready}>
+        <fieldset className="contactFormFields" disabled={!ready || formState === "submitting"} aria-busy={!ready || formState === "submitting"}>
         <div className="contactWebsiteTrap" aria-hidden="true">
           <label htmlFor="contact-website">Website</label>
           <input

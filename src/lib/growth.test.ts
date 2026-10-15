@@ -23,6 +23,13 @@ describe("growth attribution", () => {
   it("does not attribute same-origin transitions as external referrals", () => {
     expect(attributionFromUrl(new URL("https://site.test/business"), "https://site.test/demo").referrer).toBe("direct");
   });
+  it.each([
+    "enquiry=branded-demo&enquiry=paid-pilot",
+    "enquiry=paid-pilot&enquiry=paid-pilot",
+    "enquiry=%3Cscript%3Eunsafe%3C%2Fscript%3E"
+  ])("keeps ambiguous enquiry attribution consistent with the generic form: %s", query => {
+    expect(attributionFromUrl(new URL(`https://site.test/contact?${query}`)).enquiryType).toBe("general");
+  });
   it("retains the guide collection as an organic landing page", () => {
     const attribution = attributionFromUrl(new URL("https://site.test/guides"), "https://www.google.com/search?q=swaps");
     expect(attribution.landingPage).toBe("/guides");
