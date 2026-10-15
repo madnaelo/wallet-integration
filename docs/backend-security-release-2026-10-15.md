@@ -18,7 +18,10 @@ We retain the release gate rather than suppressing the advisories.
 
 ## Resolution
 
-- Spring Boot 4.0.8 manages patched Framework 7.0.9 and Tomcat 11.0.24. The official
+- Spring Boot 4.0.8 manages patched Framework 7.0.9. Override its default Tomcat
+  11.0.24 with the current same-series patch 11.0.27: the new PR runtime gate
+  correctly caught CVE-2026-65182/CVE-2026-65905/CVE-2026-68525 in that default
+  container version before merge. The official
   Framework 6.2.20 fix is enterprise-only; no paid support was purchased. Use the
   supported Boot baseline, not Framework 7 forcibly inserted into Boot 3.
 - Keep Java 17 and existing JSON/provider/persistence contracts. Use Boot's
@@ -65,6 +68,7 @@ receipts retain those exact results.
 - [Boot 4 migration guide](https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide)
 - [JSON compatibility documentation](https://docs.spring.io/spring-boot/4.0/reference/features/json.html)
 - [Async HTTP Client releases](https://github.com/AsyncHttpClient/async-http-client/releases)
+- [Tomcat 11 security fixes](https://tomcat.apache.org/security-11.html)
 
 Provider policy, revenue evidence, commercial terms, regulatory records, private
 Radar permissions, contact persistence and production rollback protections are
