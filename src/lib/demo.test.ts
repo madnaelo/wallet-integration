@@ -13,6 +13,14 @@ describe("isolated commercial demo", () => {
     expect(demoQuotes("demo:btc", "demo:eth", "1", 10)[0].output).toBe("29940000000000000000");
     expect(demoQuotes("demo:usdc", "demo:arb-usdc", "1", 100)[0].minimum).toBe("988020");
   });
+  it("matches the fictional integration report without implying live quote prices", () => {
+    expect(demoQuotes("demo:usdc", "demo:eth", "100", 50)[0]).toEqual({
+      route: "Sample route A",
+      output: "39920000000000000",
+      minimum: "39720400000000000",
+      fee: "80000000000000"
+    });
+  });
   it.each(["0", "-1", "1e8", "1000001", "x", "9".repeat(500)])("rejects invalid amount %s", amount => {
     expect(demoQuotes("demo:eth", "demo:usdc", amount, 50)).toEqual([]);
   });
