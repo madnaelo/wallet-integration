@@ -4,6 +4,7 @@ import DemoExperience from "./DemoExperience";
 import styles from "../business/business.module.css";
 import { attributedLink, attributionFromUrl } from "@/lib/growth";
 import { COMMERCIAL } from "@/lib/commercial";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Interactive Product Demo for Teams",
@@ -20,5 +21,5 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
     if (typeof value === "string" && value.length <= 100) url.searchParams.set(name, value);
   }
   const contactHref = attributedLink(COMMERCIAL.demoRequest, attributionFromUrl(url));
-  return <main className={styles.page}><CommercialNav active="demo" contactHref={contactHref} /><DemoExperience contactHref={contactHref} /><CommercialFooter contactHref={contactHref} /></main>;
+  return <main className={styles.page}><CommercialNav active="demo" contactHref={contactHref} /><DemoExperience brandName={BRAND.name} contactHref={contactHref} /><CommercialFooter contactHref={contactHref} /></main>;
 }

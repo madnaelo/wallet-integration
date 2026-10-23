@@ -9,7 +9,7 @@ import styles from "./demo.module.css";
 
 type Activity = { pair: string; output: string; route: string };
 
-export default function DemoExperience({ contactHref = COMMERCIAL.demoRequest }: { contactHref?: string }) {
+export default function DemoExperience({ brandName, contactHref = COMMERCIAL.demoRequest }: { brandName: string; contactHref?: string }) {
   const [source, setSource] = useState(DEMO_TOKENS[0]);
   const [destination, setDestination] = useState(DEMO_TOKENS[1]);
   const [amount, setAmount] = useState("1");
@@ -39,7 +39,7 @@ export default function DemoExperience({ contactHref = COMMERCIAL.demoRequest }:
   return <div className={styles.shell}>
     <div className={styles.banner}><strong>Interactive demonstration</strong><span>Sample prices and wallet only. No real transactions, orders or fees.</span></div>
     <fieldset className={styles.controls} disabled={!ready} aria-busy={!ready} aria-label="Interactive sample">
-    <header className={styles.header}><div><p className={styles.eyebrow}>Your brand, your swap experience</p><h1>Swap Assistant</h1><p>A preview for your product team.</p></div>
+    <header className={styles.header}><div><p className={styles.eyebrow}>Your brand, your swap experience</p><h1>{brandName}</h1><p>A preview for your product team.</p></div>
       <button type="button" className={styles.wallet} onClick={() => { setConnected(!connected); resetReview(); }}>
         {connected ? "Sample wallet connected · Disconnect" : "Use sample wallet"}
       </button>
